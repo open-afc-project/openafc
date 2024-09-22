@@ -18,7 +18,7 @@ import re
 import shutil
 import sys
 import tempfile
-from typing import Any, cast, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 import yaml
 
 from utils import ArgumentParserFromFile, auto_name, AUTO_NAME, \
@@ -26,7 +26,7 @@ from utils import ArgumentParserFromFile, auto_name, AUTO_NAME, \
     get_helm_values, get_known_nodeports, INT_HELM_REL_DIR, K3D_PREFIX, \
     parse_json_output, parse_k3d_reg, parse_kubecontext, print_helm_values, \
     ROOT_DIR, SCRIPTS_DIR, set_silent_execute, unused_argument, \
-    wait_termination, yaml_load, yaml_loads
+    wait_termination, yaml_load
 
 EPILOG = """\
 - Recommended k3d invocation:
@@ -246,24 +246,34 @@ class ClusterHandlerK3d(ClusterHandler):
         return None
 
 
-def make_fake_secrets(fake_secrets_arg: Optional[str], tempdir: str) \
-        -> Optional[str]:
+def make_fake_secrets(fake_secrets_arg: str, helm_args: List[str],
+                      tempdir: str) -> str:
     """ Creates fake secrets backend definition in values.yaml format
 
     Arguments:
     fake_secrets_arg -- --fake_secrets argument in
-                          SECRETSTORE_NAME[:SECRET_DIR] form. May be None
-    tempdir            -- Directory for values.yaml override file
-    Returns name of created values.yaml override file, None if fake_secrets_arg
-    is None
+                        [SECRETSTORE_NAME][:SECRET_DIR] form. May be None
+    helm_args        -- Helm command line arguments
+    tempdir          -- Directory for values.yaml override file
+    Returns name of created values.yaml override file
     """
-    if not fake_secrets_arg:
-        return None
     parts = fake_secrets_arg.split(":")
     error_if(len(parts) > 2,
              "--fake_secrets has invalid format")
-    secret_store = parts[0]
-    file_or_dir = parts[1] if len(parts) > 1 \
+    if parts and parts[0]:
+        secret_store = parts[0]
+    else:
+        v = get_helm_values(helm_args) or {}
+        try:
+            secret_stores = v["secretStores"].keys()
+        except (TypeError, ValueError, LookupError) as ex:
+            error(f"Unexpected structure of 'secretStores' in 'values.yaml': "
+                  f"{ex}")
+        error_if(len(secret_stores) != 1,
+                 "Unexpected structure of 'secretStores' in 'values.yaml'. "
+                 "Exactly one wsecret store item expected")
+        secret_store = list(secret_stores)[0]
+    file_or_dir = parts[1] if (len(parts) > 1) and parts[1] \
         else os.path.join(ROOT_DIR, DEFAULT_SECRET_DIR)
     files: List[str] = []
     if os.path.isfile(file_or_dir):
@@ -350,14 +360,14 @@ def main(argv: List[str]) -> None:
         "--no_secrets", action="store_true",
         help="Expect no secrets to be loaded")
     argument_parser.add_argument(
-        "--fake_secrets", metavar="STORE[:FILE_OR_DIR]",
+        "--fake_secrets", metavar="[STORE][:FILE_OR_DIR]", nargs="?", const="",
         help=f"Creates 'fake' secret backend for given secret store (STORE is "
-        f"an index in 'secretStores' of values.yaml) from given file with "
-        f"secret manifest or directory full of such files (only *.yaml files "
-        f"in it are considered). Each manifest file may contain several "
-        f"secrets. Each secret should contain just one key (which is "
-        f"ignoreds, as fake store is propertyless). Default secret directory "
-        f"is {DEFAULT_SECRET_DIR}")
+        f"an index in 'secretStores' of values.yaml, first and only is used "
+        f"if not specified) from given file with secret manifest or directory "
+        f"full of such files (only *.yaml files in it are considered). Each "
+        f"manifest file may contain several secrets. Each secret should "
+        "contain just one key (which is ignored, as fake store is "
+        f"propertyless). Default secret directory is {DEFAULT_SECRET_DIR}")
     argument_parser.add_argument(
         "--http", action="store_true",
         help="Enable HTTP use (default is HTTPS only)")
@@ -368,8 +378,8 @@ def main(argv: List[str]) -> None:
         "--msghnd", action="store_true",
         help="Use legacy msghnd AFC Request handler (instead of afcserver)")
     argument_parser.add_argument(
-        "--access_log", action="store_true",
-        help="Enables dispatcher access log")
+        "--devel", action="store_true",
+        help="Enables development features of various containers")
     argument_parser.add_argument(
         "--expose", metavar="NODEPORT_NAME1,NODEPORT_NAME2,...",
         action="append", default=[],
@@ -423,9 +433,6 @@ def main(argv: List[str]) -> None:
         help="Use this directory as temporary file directory and do not "
         "remove it upon completion (for debugging)")
     argument_parser.add_argument(
-        "--print_values", choices=["yaml", "json"],
-        help="Print consolidated values in given format and exit")
-    argument_parser.add_argument(
         "RELEASE",
         help="Helm release name. 'AUTO' means construct from username and "
         "checkout directory")
@@ -440,8 +447,6 @@ def main(argv: List[str]) -> None:
              "--build and --push require --tag")
     error_if(args.preload_ratdb and (not args.wait),
              "--preload_ratdb requires --wait")
-
-    set_silent_execute(args.print_values is not None)
 
     tag: Optional[str] = \
         auto_name(kabob=False) if args.tag == AUTO_NAME else args.tag
@@ -500,10 +505,7 @@ def main(argv: List[str]) -> None:
                  (args.http, "values-http.yaml"),
                  (args.mtls, "values-mtls.yaml"),
                  (args.msghnd, "values-msghnd.yaml"),
-                 (args.access_log, "values-access_log.yaml"),
-                 (args.fake_secrets,
-                  make_fake_secrets(fake_secrets_arg=args.fake_secrets,
-                                    tempdir=tempdir))]:
+                 (args.devel, "values-devel.yaml")]:
             if not cond:
                 continue
             assert isinstance(filename, str)
@@ -540,15 +542,16 @@ def main(argv: List[str]) -> None:
         if (max_workers or 0) > 0:
             install_args += ["--set", f"{MAX_WORKERS_PATH}={max_workers}"]
 
+        # Creating fake secrets
+        if args.fake_secrets is not None:
+            install_args += \
+                ["--values",
+                 make_fake_secrets(fake_secrets_arg=args.fake_secrets,
+                                   helm_args=install_args, tempdir=tempdir)]
+
         # ... timeout
         if args.wait:
             install_args += ["--wait", "--timeout", args.wait]
-
-        if args.print_values:
-            print_helm_values(helm_args=install_args,
-                              print_format=args.print_values,
-                              cwd=ROOT_DIR)
-            return
 
         # Executing helm install
         execute(install_args)
