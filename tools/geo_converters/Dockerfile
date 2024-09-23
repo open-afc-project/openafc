@@ -27,9 +27,11 @@ COPY proc_gdal/*.h proc_gdal/*.cpp proc_gdal/CMakeLists.txt /usr/app/proc_gdal/s
 COPY proc_gdal/create_lidar_database_threaded.pl /usr/app/proc_gdal/
 RUN chmod a+x /usr/app/proc_gdal/*.pl
 USER root
-# Build stuff only installed for duration of build, thn removed, thus saving on
-# image size
-RUN apk add perl musl cmake g++ make musl-dev && cd /usr/app/proc_gdal/src && \
+# Installed permanently
+RUN apk add perl musl
+# Build stuff only installed for duration of build, then removed, thus saving
+# on image size
+RUN apk add cmake g++ make musl-dev && cd /usr/app/proc_gdal/src && \
   cmake . && make && mv proc_gdal /usr/app/proc_gdal && \
   cd .. && rm -rf src && apk del cmake g++ make musl-dev
 USER solr
