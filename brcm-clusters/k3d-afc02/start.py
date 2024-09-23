@@ -110,8 +110,8 @@ def main(argv: List[str]) -> None:
         "--msghnd", action="store_true",
         help="Use legacy msghnd AFC Request handler (instead of afcserver)")
     argument_parser.add_argument(
-        "--access_log", action="store_true",
-        help="Enables dispatcher access log")
+        "--devel", action="store_true",
+        help="Enables development features of various containers")
     argument_parser.add_argument(
         "--no_prerequisites", action="store_true",
         help="Only reloads (upgrades) top-level AFC helmcharts")
@@ -138,7 +138,7 @@ def main(argv: List[str]) -> None:
          "--tag", args.tag,
          "--values", os.path.join(SCRIPT_DIR, "values-afc-int.yaml"),
          "--fake_secrets",
-         f"secret-store:{os.path.join(SCRIPT_DIR, 'secrets')}",
+         f":{os.path.join(SCRIPT_DIR, 'secrets')}",
          "--wait", "5m"] +
         optional_args([("--max_workers", args.max_workers, args.max_workers),
                        ("--push", None, args.push),
@@ -147,7 +147,7 @@ def main(argv: List[str]) -> None:
                        ("--http", None, args.http),
                        ("--mtls", None, args.mtls),
                        ("--msghnd", None, args.msghnd),
-                       ("--access_log", None, args.access_log)]) +
+                       ("--devel", None, args.devel)]) +
         sum([["--set", s] for s in args.set], []) +
         [args.release])
     execute([os.path.join(bin_dir, "k3d_ports.py"), "CURRENT"])

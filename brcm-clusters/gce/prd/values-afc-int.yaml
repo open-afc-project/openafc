@@ -13,16 +13,12 @@ sharedEnv:
   rcache-common:
     RCACHE_POSTGRES_DSN: postgresql://postgres@{{ip:postgres}}/rcache
   ratapi-configurator:
-    REGISTRATION_APPROVE_LINK: ._
+    REGISTRATION_APPROVE_LINK: ->
       https://docs.google.com/spreadsheets/d/1W7TKAtjd26q6KHC2yqaA_CdzCLw7sPN60zH4Tv9wNm0/edit
     REGISTRATION_DEST_EMAIL: afc.admin@broadcom.com
     REGISTRATION_DEST_PDL_EMAIL: afc-admin@broadcom.com
     REGISTRATION_SRC_EMAIL: afc.admin@broadcom.com
-    MAIL_SERVER: smtp.gmail.com
     MAIL_USERNAME: afc.admin@broadcom.com
-    MAIL_PORT: "465"
-    MAIL_USE_TLS: "False"
-    MAIL_USE_SSL: "True"
     USE_CAPTCHA: "True"
     CAPTCHA_VERIFY: >-
       https://www.google.com/recaptcha/api/siteverify

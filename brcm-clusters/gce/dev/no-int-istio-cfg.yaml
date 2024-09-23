@@ -4,8 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Disables Istio in external cluster
-# Use: brcm-clusters/gce/start.py ... --extra_cfg_ext no-ext-istio-cfg.yaml ...
+# Disables Istio in internal cluster
+# Use: brcm-clusters/gce/start.py ... --extra_cfg_int no-int-istio-cfg.yaml ...
 
 install_components:
   istio_injection:

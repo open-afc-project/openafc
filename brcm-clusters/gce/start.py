@@ -121,8 +121,8 @@ def main(argv: List[str]) -> None:
         "--msghnd", action="store_true",
         help="Use legacy msghnd AFC Request handler (instead of afcserver)")
     argument_parser.add_argument(
-        "--access_log", action="store_true",
-        help="Enables dispatcher access log")
+        "--devel", action="store_true",
+        help="Enables development features of various containers")
     argument_parser.add_argument(
         "--max_workers", metavar="MAX_WORKER_PODS", type=int,
         help="Maximum number of worker pods to set for autoscaler")
@@ -173,7 +173,8 @@ def main(argv: List[str]) -> None:
         extra_args=optional_args(
             [("--tag", args.tag, args.tag),
              ("--msghnd", None, args.msghnd),
-             ("--max_workers", str(args.max_workers), args.max_workers)]) +
+             ("--max_workers", str(args.max_workers), args.max_workers),
+             ("--devel", None, args.devel)]) +
         sum([["--set", s] for s in args.set_int], []),
         extra_cfg=args.extra_cfg_int)
     start_cluster(
@@ -186,7 +187,7 @@ def main(argv: List[str]) -> None:
             [("--tag", args.tag, args.tag),
              ("--http", None, args.http),
              ("--mtls", None, args.mtls),
-             ("--access_log", None, args.access_log)]) +
+             ("--devel", None, args.devel)]) +
         sum([["--set", s] for s in args.set_ext], []),
         extra_cfg=args.extra_cfg_ext)
 
