@@ -175,10 +175,11 @@ build_dev_server() {
   # build afc server docker image
   EXT_ARGS="--build-arg BUILDREV=${BUILDREV}"
   docker_build_and_push ${wd}/rat_server/Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}"
+  build_pids+=( $! ) ; build_names+=( ${SRV} )
 
   # build ALS-related images
   docker_build_and_push ${wd}/als/Dockerfile.siphon ${ALS_SIPHON}:${tag} ${push} &
-  build_pids+=( $! ) ; build_names+=( ${SRV} )
+  build_pids+=( $! ) ; build_names+=( ${ALS_SIPHON} )
 
   cd ${wd}/als && docker_build_and_push Dockerfile.kafka ${ALS_KAFKA}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${ALS_KAFKA} )
