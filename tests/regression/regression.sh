@@ -160,7 +160,7 @@ build_dev_server() {
   build_pids+=( $! ) ; build_names+=( ${RATDB} )
 
   # build afc dynamic data storage image
-  docker_build_and_push ${wd}/objstorage/Dockerfile ${OBJST}:${tag} ${push}&
+  docker_build_and_push ${wd}/objstorage/Dockerfile ${OBJST}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${OBJST} )
   cd ${wd}
 
@@ -174,7 +174,7 @@ build_dev_server() {
 
   # build afc server docker image
   EXT_ARGS="--build-arg BUILDREV=${BUILDREV}"
-  docker_build_and_push ${wd}/rat_server/Dockerfile ${WEBUI}:${tag}  ${push} "${EXT_ARGS}"
+  docker_build_and_push ${wd}/rat_server/Dockerfile ${WEBUI}:${tag}  ${push} "${EXT_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${WEBUI} )
 
   # build ALS-related images
