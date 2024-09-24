@@ -175,7 +175,7 @@ build_dev_server() {
 
   # build afc server docker image
   EXT_ARGS="--build-arg BUILDREV=${BUILDREV}"
-  docker_build_and_push ${wd}/rat_server/Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}"
+  docker_build_and_push ${wd}/rat_server/Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${SRV} )
 
   # build ALS-related images
