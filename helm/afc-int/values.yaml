@@ -350,7 +350,7 @@ components:
         servicePort: 3000
         nodePort: 31001
   rat-server:
-    imageName: afc-server
+    imageName: webui-image
     imageRepositoryKey: private
     service:
       hostname: webui
