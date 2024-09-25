@@ -45,7 +45,7 @@ services:
     dns_search: [.]
 
   rat_server:
-    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-server:${TAG:-latest}
+    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/webui-image:${TAG:-latest}
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
       - ./pipe:/pipe
