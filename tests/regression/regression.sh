@@ -9,7 +9,7 @@
 PRIV_REPO="${PRIV_REPO:=ghcr.io/open-afc-project}"
 PUB_REPO="${PUB_REPO:=ghcr.io/open-afc-project}"
 
-SRV="${PRIV_REPO}/afc-server"                                         # server image
+WEBUI="${PRIV_REPO}/webui-image"                             # Web server image
 MSGHND="${PRIV_REPO}/afc-msghnd"                             # msghnd image
 OBJST="${PUB_REPO}/objstorage-image"                         # object storage
 RATDB=${PUB_REPO}"/ratdb-image"                                  # ratdb image
@@ -175,8 +175,8 @@ build_dev_server() {
 
   # build afc server docker image
   EXT_ARGS="--build-arg BUILDREV=${BUILDREV}"
-  docker_build_and_push ${wd}/rat_server/Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}" &
-  build_pids+=( $! ) ; build_names+=( ${SRV} )
+  docker_build_and_push ${wd}/rat_server/Dockerfile ${WEBUI}:${tag}  ${push} "${EXT_ARGS}" &
+  build_pids+=( $! ) ; build_names+=( ${WEBUI} )
 
   # build ALS-related images
   docker_build_and_push ${wd}/als/Dockerfile.siphon ${ALS_SIPHON}:${tag} ${push} &
