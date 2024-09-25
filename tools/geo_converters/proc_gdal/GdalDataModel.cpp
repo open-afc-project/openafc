@@ -110,7 +110,7 @@ std::map<int64_t,double> GdalDataModel::getBuildingsAtPoint(double lat, double l
 
     int transformSuccess;
     // Perform transform into WGS-84 lat/lon coordinate system
-    int allTransformSuccess = tmpCoordTransform->TransformEx(1, &lon, &lat, nullptr, &transformSuccess);
+    int allTransformSuccess = tmpCoordTransform->Transform(1, &lon, &lat, nullptr, &transformSuccess);
 
     // Store input point projected into data source's spatial reference
     GdalHelpers::GeomUniquePtr<OGRPoint> testPoint(GdalHelpers::createGeometry<OGRPoint>()); // Create OGRPoint on heap
@@ -203,7 +203,7 @@ void GdalDataModel::printDebugInfo() const
 
                 int transformSuccess;
                 // Perform transform into WGS-84 lat/lon coordinate system
-                int allTransformSuccess = invCoordTransform->TransformEx(1, &lon, &lat, nullptr, &transformSuccess);
+                int allTransformSuccess = invCoordTransform->Transform(1, &lon, &lat, nullptr, &transformSuccess);
 
 #if 1
                 std::cout << "    POINT " << ptIdx << " : " << pRing->getX(ptIdx) << " " << pRing->getY(ptIdx) << " " << lon << " " << lat << std::endl;
@@ -265,8 +265,8 @@ void GdalDataModel::printDebugInfo() const
     double fsY   = fsLat;
 
     int transformSuccess;
-    testCoordTransform->TransformEx(1, &rlanX, &rlanY, nullptr, &transformSuccess);
-    testCoordTransform->TransformEx(1, &fsX,   &fsY,   nullptr, &transformSuccess);
+    testCoordTransform->Transform(1, &rlanX, &rlanY, nullptr, &transformSuccess);
+    testCoordTransform->Transform(1, &fsX,   &fsY,   nullptr, &transformSuccess);
 
     std::cout << "RLAN " << " : " << rlanX << " " << rlanY << " " << rlanLon << " " << rlanLat << std::endl;
     std::cout << "FS   " << " : " <<   fsX << " " <<   fsY << " " <<   fsLon << " " <<   fsLat << std::endl;
@@ -308,7 +308,7 @@ void GdalDataModel::printDebugInfo() const
                 double lat = pRing->getY(ptIdx);
 
                 // Perform transform into WGS-84 lat/lon coordinate system
-                int allTransformSuccess = invCoordTransform->TransformEx(1, &lon, &lat, nullptr, &transformSuccess);
+                int allTransformSuccess = invCoordTransform->Transform(1, &lon, &lat, nullptr, &transformSuccess);
 
                 std::cout << "    POINT " << ptIdx << " : " << pRing->getX(ptIdx) << " " << pRing->getY(ptIdx) << " " << lon << " " << lat << std::endl;
             }

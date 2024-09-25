@@ -24,6 +24,7 @@ GRAFANA="${PUB_REPO}/grafana-image"                           # Grafana
 PROMETHEUS="${PUB_REPO}/prometheus-image"                     # Prometheus
 CADVISOR="${PUB_REPO}/cadvisor-image"                         # Cadvisor
 NGINXEXPORTER="${PUB_REPO}/nginxexporter-image"               # Nginx-exporter
+GEO_CONVERTERS="${PUB_REPO}/geo-converters-image"             # Geodeti cconverters
 
 WORKER=${PRIV_REPO}"/afc-worker"                                    # msghnd image
 WORKER_AL_D4B="${PUB_REPO}/worker-al-build-image" # Alpine worker build img
@@ -212,6 +213,9 @@ build_dev_server() {
 
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-grafana ${GRAFANA}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${GRAFANA} )
+
+  cd ${wd}/tools/geo_converters && docker_build_and_push Dockerfile ${GEO_CONVERTERS}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${GEO_CONVERTERS} )
 
   msg "wait for all images to be built"
 

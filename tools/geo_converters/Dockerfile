@@ -20,9 +20,22 @@ COPY dir_md5.py g8l_info_schema.json /usr/app/
 COPY nlcd_wgs84.py nlcd_wgs84.yaml /usr/app/
 COPY tiler.py to_wgs84.py lidar_merge.py to_png.py /usr/app/
 COPY make_population_db.py /usr/app/
-
-# If container is created on Windows 'chmod' is necessary. No harm on *nix
 RUN chmod a+x /usr/app/*.py
-ENV PATH=$PATH:/usr/app
+
+# Installing proc_gdal
+COPY proc_gdal/*.h proc_gdal/*.cpp proc_gdal/CMakeLists.txt /usr/app/proc_gdal/src/
+COPY proc_gdal/create_lidar_database_threaded.pl /usr/app/proc_gdal/
+RUN chmod a+x /usr/app/proc_gdal/*.pl
+USER root
+# Installed permanently
+RUN apk add perl musl
+# Build stuff only installed for duration of build, then removed, thus saving
+# on image size
+RUN apk add cmake g++ make musl-dev && cd /usr/app/proc_gdal/src && \
+  cmake . && make && mv proc_gdal /usr/app/proc_gdal && \
+  cd .. && rm -rf src && apk del cmake g++ make musl-dev
+USER solr
+
+ENV PATH=$PATH:/usr/app:/usr/app/proc_gdal
 
 CMD sh
