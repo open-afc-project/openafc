@@ -161,7 +161,7 @@ build_dev_server() {
   build_pids+=( $! ) ; build_names+=( ${RATDB} )
 
   # build afc dynamic data storage image
-  docker_build_and_push ${wd}/objstorage/Dockerfile ${OBJST}:${tag} ${push}&
+  docker_build_and_push ${wd}/objstorage/Dockerfile ${OBJST}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${OBJST} )
   cd ${wd}
 
