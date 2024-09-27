@@ -174,7 +174,7 @@ class AfcServerCompute:
                     await channel.declare_queue(
                         name=self._rmq_rx_queue_name, exclusive=True)
                 await queue.bind(exchange)
-                async with queue.iterator() as queue_iter:
+                async with queue.iterator(no_ack=True) as queue_iter:
                     async for msg in queue_iter:
                         try:
                             rrk = \
