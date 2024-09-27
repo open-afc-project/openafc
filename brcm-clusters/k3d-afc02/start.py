@@ -18,7 +18,7 @@ DEFAULT_TAG = "AUTO"
 DEFAULT_RELEASE = "AUTO"
 DEFAULT_EXPOSE = \
     "http,https,ratdb,rat-server,msghnd,bulk-postgres,rcache,grafana," \
-    "prometheus,disp-prometheus,disp-grafana,afcserver"
+    "prometheus,disp-prometheus,disp-grafana,afcserver,rmqweb"
 
 SCRIPT_DIR = os.path.dirname(__file__)
 DEFAULT_SOURCE_ROOT = \
