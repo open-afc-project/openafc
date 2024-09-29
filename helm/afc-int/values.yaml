@@ -303,6 +303,9 @@ components:
         servicePort: 5672
       metrics:
         containerPort: 15692
+      rmqweb:
+        servicePort: 15672
+        nodePort: 30672
     metrics:
       port: metrics
       path: /metrics/detailed
