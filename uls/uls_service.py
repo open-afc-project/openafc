@@ -898,6 +898,8 @@ class AlsRecord(pydantic.BaseModel):
     validated_time: Optional[str] = None
     # None or list of invalidated Rcache items
     invalidation: Optional[List[str]] = None
+    # None new FS DB file name
+    fs_db_name: Optional[str] = None
     # None or fs database update time in ISO format
     updated_time: Optional[str] = None
 
@@ -1250,6 +1252,7 @@ def main(argv: List[str]) -> None:
                             uls_file=os.path.basename(new_uls_file),
                             symlink=os.path.basename(settings.ext_db_symlink),
                             executor=executor)
+                        als_record.fs_db_name = os.path.basename(new_uls_file)
                         als_record.now(field_name="updated_time")
                         if rcache and (db_diff is not None) and \
                                 db_diff.diff_tiles:
