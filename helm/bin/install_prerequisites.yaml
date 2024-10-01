@@ -88,6 +88,7 @@ install_components:
     helm_chart: external-secrets/external-secrets
     helm_repo:  https://charts.external-secrets.io
     helm_release: external-secrets
+    helm_version: v0.10.3
     helm_settings:
       - installCRDs=true
     wait_pod: external-secrets-webhook
