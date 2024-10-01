@@ -678,6 +678,7 @@ components:
       - rcache-client
       - rcache-common
       - devel-env
+      - als-client
     staticVolumeMounts:
       rat_transfer: /rat_transfer
     mountedSecrets:
