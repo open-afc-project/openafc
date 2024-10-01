@@ -32,11 +32,12 @@ import sys
 import tempfile
 import threading
 import time
-from typing import cast, Dict, Iterable, List, NamedTuple, Optional, Tuple, \
-    Union
+from typing import Any, cast, Dict, Iterable, List, NamedTuple, Optional, \
+    Tuple, Union
 import urllib.error
 import urllib.request
 
+import als
 from rcache_client import RcacheClient
 from rcache_models import LatLonRect, RcacheClientSettings
 from uls_service_common import *
@@ -615,6 +616,8 @@ class DbDiff:
         self.prev_len = 0
         self.new_len = 0
         self.diff_len = 0
+        self.prev_filename = prev_filename
+        self.new_filename = new_filename
         self.diff_tiles: List[LatLonRect] = []
         logging.info("Getting differences with previous database")
         output = \
@@ -651,14 +654,19 @@ class DbDiff:
                     max_lat=float(m.group("max_lat")) * lat_sign,
                     min_lon=float(m.group("min_lon")) * lon_sign,
                     max_lon=float(m.group("max_lon")) * lon_sign))
-        logging.info(
-            f"Database comparison succeeded: "
-            f"{os.path.basename(prev_filename)} has {self.prev_len} paths, "
-            f"{os.path.basename(new_filename)} has {self.new_len} paths, "
-            f"difference is in {self.diff_len} paths, "
-            f"{self.ras_diff_len} RAS entries, "
-            f"{len(self.diff_tiles)} tiles")
         self.valid = True
+        logging.info(str(self))
+
+    def __str__(self) -> str:
+        """ String representation (for log and ALS) """
+        return \
+            f"Database comparison succeeded: " \
+            f"{os.path.basename(self.prev_filename)} has {self.prev_len} " \
+            f"paths, {os.path.basename(self.new_filename)} has " \
+            f"{self.new_len} paths, difference is in {self.diff_len} paths, " \
+            f"{self.ras_diff_len} RAS entries, " \
+            f"{len(self.diff_tiles)} tiles" \
+            if self.valid else "Not computed"
 
 
 class UlsFileChecker:
@@ -872,6 +880,35 @@ class ExtParamFilesChecker:
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
 
+class AlsRecord(pydantic.BaseModel):
+    """ Stuff logged into ALS regarding download attempt """
+    # Downloader settings
+    settings: Dict[str, Any]
+    # None or download start time in ISO format
+    start_time: Optional[str] = None
+    # None or external dependencies ccheck completion time in ISO format
+    externals_checked_time: Optional[str] = None
+    # None or download script completion time in ISO format
+    downloaded_time: Optional[str] = None
+    # None or list of updated regions
+    updated_regions: Optional[List[str]] = None
+    # None or DB diffrence report
+    db_difference: Optional[str] = None
+    # None or validation completion time in ISO format
+    validated_time: Optional[str] = None
+    # None or list of invalidated Rcache items
+    invalidation: Optional[List[str]] = None
+    # None new FS DB file name
+    fs_db_name: Optional[str] = None
+    # None or fs database update time in ISO format
+    updated_time: Optional[str] = None
+
+    def now(self, field_name: str) -> None:
+        """ Sets given field to current datetime as ISO-formatted string """
+        assert field_name.endswith("_time")
+        setattr(self, field_name, datetime.datetime.now().isoformat())
+
+
 def main(argv: List[str]) -> None:
     """Do the job.
 
@@ -1006,6 +1043,7 @@ def main(argv: List[str]) -> None:
 
     try:
         setup_logging(verbose=settings.verbose)
+        als.als_initialize(client_id="fs_downloader")
 
         if settings.run_once and (settings.prometheus_port is not None):
             logging.warning(
@@ -1084,6 +1122,8 @@ def main(argv: List[str]) -> None:
         temp_uls_file_name: Optional[str] = None
 
         while True:
+            als_record = AlsRecord(settings=settings.dict())
+            als_record.now(field_name="start_time")
             err_msg: Optional[str] = None
             completed = False
             logging.info("Starting ULS download")
@@ -1112,6 +1152,7 @@ def main(argv: List[str]) -> None:
 
                 logging.info("Checking if external parameter files changed")
                 ext_params_file_checker.check()
+                als_record.now(field_name="externals_checked_time")
 
                 # Issue download script
                 cmdline_args: List[str] = []
@@ -1151,6 +1192,7 @@ def main(argv: List[str]) -> None:
                         "Generated ULS file does not contain identity "
                         "information")
                 status_updater.milestone(DownloaderMilestone.DownloadSuccess)
+                als_record.now(field_name="downloaded_time")
 
                 updated_regions = set(new_uls_identity.keys())
                 if has_previous:
@@ -1163,6 +1205,7 @@ def main(argv: List[str]) -> None:
                 if updated_regions:
                     logging.info(f"Updated regions: "
                                  f"{', '.join(sorted(updated_regions))}")
+                als_record.updated_regions = list(updated_regions)
 
                 # If anything was updated - do the update routine
                 if updated_regions or settings.force:
@@ -1184,6 +1227,8 @@ def main(argv: List[str]) -> None:
                                      new_filename=temp_uls_file_name,
                                      executor=executor) \
                         if has_previous else None
+                    if db_diff:
+                        als_record.db_difference = str(db_diff)
                     if settings.force or \
                             uls_file_checker.valid(
                                 base_dir=settings.ext_db_dir,
@@ -1191,6 +1236,8 @@ def main(argv: List[str]) -> None:
                                     os.path.dirname(settings.ext_db_symlink),
                                     os.path.basename(temp_uls_file_name)),
                                 db_diff=db_diff):
+                        if not settings.force:
+                            als_record.now(field_name="validated_time")
                         if settings.force:
                             status_updater.status_check(CheckType.FsDatabase,
                                                         None)
@@ -1205,6 +1252,8 @@ def main(argv: List[str]) -> None:
                             uls_file=os.path.basename(new_uls_file),
                             symlink=os.path.basename(settings.ext_db_symlink),
                             executor=executor)
+                        als_record.fs_db_name = os.path.basename(new_uls_file)
+                        als_record.now(field_name="updated_time")
                         if rcache and (db_diff is not None) and \
                                 db_diff.diff_tiles:
                             tile_list = \
@@ -1214,6 +1263,9 @@ def main(argv: List[str]) -> None:
                                 ">"
                             logging.info(f"Requesting invalidation of the "
                                          f"following tiles: {tile_list}")
+                            als_record.invalidation = \
+                                [tile.short_str() for tile in
+                                 db_diff.diff_tiles[: 1000]]
                             rcache.rcache_spatial_invalidate(
                                 tiles=db_diff.diff_tiles)
 
@@ -1233,6 +1285,9 @@ def main(argv: List[str]) -> None:
                 err_msg = str(ex)
                 logging.error(f"Download failed: {ex}")
             finally:
+                als.als_json_log(topic="fs_download", record=als_record.dict())
+                if settings.run_once:
+                    als.als_flush()
                 exec_output = executor.get_output()
                 if err_msg:
                     exec_output = f"{exec_output.rstrip()}\n{err_msg}\n"

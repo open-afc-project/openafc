@@ -31,7 +31,14 @@ cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install \
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 RUN apk add py3-sqlalchemy py3-numpy py3-yaml py3-pydantic=~1.10 py3-psycopg2
 COPY uls/requirements.txt /wd
-RUN pip3 install -r /wd/requirements.txt
+RUN pip3 install -r /wd/requirements.txt && rm /wd/requirements.txt
+
+# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
+# installed as Alpine package (thus not requiring gcc and musl-dev install)
+RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
+    librdkafka-dev=~2.1.1 && \
+    pip3 install confluent-kafka==2.1.1 && \
+    apk del python3-dev gcc musl-dev
 
 RUN mkdir -p /mnt/nfs/rat_transfer/daily_uls_parse/data_files \
             /mnt/nfs/rat_transfer/daily_uls_parse/temp \
@@ -219,6 +226,11 @@ ENV ULS_NICE=YES
 # Optional note of where from is email. If specified - used as part of email
 # message body
 # ENV ULS_ALARM_SENDER_LOCATION
+
+# ALS client parameters (see arg_dscs in als.py)
+# ENV ALS_KAFKA_SERVER_ID
+# ENV ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
+# ENV ALS_KAFKA_MAX_REQUEST_SIZE
 
 COPY --from=install_image / /
 

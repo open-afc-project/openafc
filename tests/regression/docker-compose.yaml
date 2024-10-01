@@ -288,6 +288,9 @@ services:
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
+      # ALS params
+      - ALS_KAFKA_SERVER_ID=fs_downloader
+      - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
     volumes:
       - ${VOL_H_DB}:/rat_transfer
     secrets:
