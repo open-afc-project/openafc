@@ -68,7 +68,9 @@ these are WinnForum databases used by the FS Parser (antenna_model_diameter_gain
 * **proc_lidar_2019:** raw data obtained from https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/Non_Standard_Contributed/NGA_US_Cities/
 * **Multiband-BDesign3D:** this was purchased https://www.b-design3d.com/
 
-* **globe:** https://ngdc.noaa.gov/mgg/topo/globe.html
+* **globe:** 
+Global data is downloaded from: https://www.ncei.noaa.gov/products/etopo-global-relief-model.  The actual zip file downloaded is: https://www.ngdc.noaa.gov/mgg/topo/DATATILES/elev/all10g.zip. The raw files are extracted from the zip file and placed in the directory rat_transfer/globe.
+
 * **srtm3arcsecondv003:** https://search.earthdata.nasa.gov/search/granules?p=C2763266377-LPCLOUD&pg[0][v]=f&pg[0][gsk]=-start_date&q=srtm&gdf=HGT&tl=1702926101!3!!
 * **srtm1arcsecond:** https://search.earthdata.nasa.gov/search/granules?p=C2763266360-LPCLOUD&pg[0][v]=f&pg[0][gsk]=-start_date&q=srtm&gdf=HGT&tl=1702926101!3!!
 * **3dep:** https://data.globalchange.gov/dataset/usgs-national-elevation-dataset-ned-1-arc-second
