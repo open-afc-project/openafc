@@ -261,7 +261,7 @@ class RcacheService:
             else:
                 for ruleset_id in invalidation_req.ruleset_ids:
                     self._log_invalidation(invalidate_ruleset_id=ruleset_id)
-        elif isinstance(invalidation_req, RcacheInvalidateReq):
+        elif isinstance(invalidation_req, RcacheSpatialInvalidateReq):
             for tile in invalidation_req.tiles:
                 self._log_invalidation(invalidate_tile=tile)
         self._invalidation_queue.put_nowait(invalidation_req)
