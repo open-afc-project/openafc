@@ -70,7 +70,8 @@ def boundary_worker(src_dst: SrcDst, pixel_size: Optional[float],
                     pixels_per_degree: Optional[float], top: Optional[float],
                     bottom: Optional[float], left: Optional[float],
                     right: Optional[float], round_boundaries_to_degree: bool,
-                    round_pixels_to_degree: bool, src_geoids: Geoids,
+                    round_pixels_to_degree: bool, enforce_one_deg_tiles: bool,
+                    src_geoids: Geoids,
                     dst_geoids: Geoids) -> BoundaryResult:
     """ Boundary detection worker
 
@@ -96,7 +97,8 @@ def boundary_worker(src_dst: SrcDst, pixel_size: Optional[float],
                 pixels_per_degree=pixels_per_degree, top=top, bottom=bottom,
                 left=left, right=right,
                 round_boundaries_to_degree=round_boundaries_to_degree,
-                round_pixels_to_degree=round_pixels_to_degree)
+                round_pixels_to_degree=round_pixels_to_degree,
+                enforce_one_deg_tiles=enforce_one_deg_tiles)
         gi = GdalInfo(src_dst.src)
         if not boundaries.intersects(
                 Boundaries(top=gi.top, bottom=gi.bottom, left=gi.left,
@@ -185,16 +187,12 @@ def conversion_worker(
 
         success, msg = \
             warp(src=src_dst.src, dst=temp_file, resampling=resampling,
-                 top=boundaries.top if boundaries.edges_overridden else None,
-                 bottom=boundaries.bottom
-                 if boundaries.edges_overridden else None,
-                 left=boundaries.left if boundaries.edges_overridden else None,
-                 right=boundaries.right
-                 if boundaries.edges_overridden else None,
-                 pixel_size_lat=boundaries.pixel_size_lat
-                 if boundaries.pixel_size_overridden else None,
-                 pixel_size_lon=boundaries.pixel_size_lon
-                 if boundaries.pixel_size_overridden else None,
+                 top=boundaries.top,
+                 bottom=boundaries.bottom,
+                 left=boundaries.left,
+                 right=boundaries.right,
+                 pixel_size_lat=boundaries.pixel_size_lat,
+                 pixel_size_lon=boundaries.pixel_size_lon,
                  src_geoid=src_geoid, dst_geoid=dst_geoid,
                  center_lon_180=bool(boundaries.cross_180),
                  out_format=out_format, format_params=format_params,
@@ -357,6 +355,11 @@ def main(argv: List[str]) -> None:
         help="Remove source file after successful conversion (e.g. to save "
         "space)")
     argument_parser.add_argument(
+        "--enforce_one_deg_tiles", action="store_true",
+        help="Assumes the output tile is 1 x 1 degree tile and lines up the tile on the degree line. Requires pixels_per_degree to be specified"
+
+    )
+    argument_parser.add_argument(
         "FILES", nargs="+",
         help="If --recursive specified, file specification has form "
         "like BASE_DIR/*.EXT (search in subdirectories of BASE_DIR performed, "
@@ -480,6 +483,7 @@ def main(argv: List[str]) -> None:
                           args.round_boundaries_to_degree,
                           "round_pixels_to_degree":
                           args.round_pixels_to_degree,
+                          "enforce_one_deg_tiles": args.enforce_one_deg_tiles,
                           "src_geoids": src_geoids, "dst_geoids": dst_geoids},
                     callback=boundariesCompleter)
             pool.close()

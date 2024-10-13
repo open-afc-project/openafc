@@ -25,6 +25,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+from osgeo import gdal
 from typing import Any, Dict, Generic, List, NamedTuple, Optional, Tuple, \
     TypeVar, Union
 
@@ -118,6 +119,7 @@ def execute(args: List[str], env: Optional[Dict[str, str]] = None,
     ignore_exit_code -- Assume success even though exit code is nonzero
     Returns True/stdout on success, False/None on error
     """
+
     if not (return_output or disable_output):
         print(" ".join(shlex.quote(a) for a in args))
     try:
@@ -186,6 +188,8 @@ class GdalInfo:
     right          -- Right longitude in north-positive degrees or None
     pixel_size_lat -- Pixel size in latitudinal direction in degrees or None
     pixel_size_lon -- Pixel size in longitudinal direction in degrees or None
+    n_pixels_lat   -- (int) Number of pixels in the latitude direction
+    n_pixels_long  -- (int) Number of pixels in the longitude direction
     is_geodetic    -- True for geodetic coordinate system, False for map
                       projection coordinate system, None if unknown
     data_types     -- List of per-band data type names
@@ -212,6 +216,8 @@ class GdalInfo:
         self.right: Optional[float] = None
         self.pixel_size_lat: Optional[float] = None
         self.pixel_size_lon: Optional[float] = None
+        self.n_pixels_lat: Optional[int] = None
+        self.n_pixels_lon: Optional[int] = None
         self.is_geodetic: Optional[bool] = None
         self.proj_string: Optional[str] = None
         self.valid_percent: Optional[float] = None
@@ -232,49 +238,72 @@ class GdalInfo:
             return
         assert isinstance(ret, str)
         self.raw = ret
+
+        # Image properies (corners, pixel size) are gathered from the image info instead of printed info
+        gdalImage = gdal.Open(filename)
+        
+        # Get some header information about the dataset
+        nX = gdalImage.RasterXSize
+        nY = gdalImage.RasterYSize
+        
+        # The way gdal defines and returns the extents
+        xmin, dx, _, ymax, _, dy = gdalImage.GetGeoTransform()
+        xmax = xmin + dx * nX
+        ymin = ymax + dy * nY
+    
+        # Set GdalInfo class properities with the information
+        self.left = xmin
+        self.right = xmax
+        self.top = ymax
+        self.bottom = ymin
+        self.pixel_size_lat = dy
+        self.pixel_size_lon = dx
+        self.n_pixels_lat = nY
+        self.n_pixels_lon = nX
+
         r: Dict[str, Dict[str, float]] = {}
-        for prefix, lat_kind, lon_kind in [("Upper Left", "max", "min"),
-                                           ("Lower Left", "min", "min"),
-                                           ("Upper Right", "max", "max"),
-                                           ("Lower Right", "min", "max")]:
-            m = re.search(
-                prefix + r".+?\(\s*(?P<lon_deg>\d+)d\s*(?P<lon_min>\d+)'"
-                r"\s*(?P<lon_sec>\d+\.\d+)\"(?P<lon_hem>[EW]),"
-                r"\s*(?P<lat_deg>\d+)d\s*(?P<lat_min>\d+)'\s*"
-                r"(?P<lat_sec>\d+\.\d+)\"(?P<lat_hem>[NS])\s*\)", self.raw)
-            if m is None:
-                continue
-            lat = \
-                (float(m.group("lat_deg")) +
-                 float(m.group("lat_min")) / 60 +
-                 float(m.group("lat_sec")) / 3600) * \
-                (1 if m.group("lat_hem") == "N" else -1)
-            lon = \
-                (float(m.group("lon_deg")) +
-                 float(m.group("lon_min")) / 60 +
-                 float(m.group("lon_sec")) / 3600) * \
-                (1 if m.group("lon_hem") == "E" else -1)
-            for key, value, kind in [("lat", lat, lat_kind),
-                                     ("lon", lon, lon_kind)]:
-                r.setdefault(key, {})
-                r[key][kind] = \
-                    (min if kind == "min" else max)(r[key][kind], value) \
-                    if kind in r[key] else value
-        for attr, latlon, minmax in \
-                [("top", "lat", "max"), ("bottom", "lat", "min"),
-                 ("left", "lon", "min"), ("right", "lon", "max")]:
-            setattr(self, attr, r.get(latlon, {}).get(minmax))
+        # for prefix, lat_kind, lon_kind in [("Upper Left", "max", "min"),
+        #                                    ("Lower Left", "min", "min"),
+        #                                    ("Upper Right", "max", "max"),
+        #                                    ("Lower Right", "min", "max")]:
+        #     m = re.search(
+        #         prefix + r".+?\(\s*(?P<lon_deg>\d+)d\s*(?P<lon_min>\d+)'"
+        #         r"\s*(?P<lon_sec>\d+\.\d+)\"(?P<lon_hem>[EW]),"
+        #         r"\s*(?P<lat_deg>\d+)d\s*(?P<lat_min>\d+)'\s*"
+        #         r"(?P<lat_sec>\d+\.\d+)\"(?P<lat_hem>[NS])\s*\)", self.raw)
+        #     if m is None:
+        #         continue
+        #     lat = \
+        #         (float(m.group("lat_deg")) +
+        #          float(m.group("lat_min")) / 60 +
+        #          float(m.group("lat_sec")) / 3600) * \
+        #         (1 if m.group("lat_hem") == "N" else -1)
+        #     lon = \
+        #         (float(m.group("lon_deg")) +
+        #          float(m.group("lon_min")) / 60 +
+        #          float(m.group("lon_sec")) / 3600) * \
+        #         (1 if m.group("lon_hem") == "E" else -1)
+        #     for key, value, kind in [("lat", lat, lat_kind),
+        #                              ("lon", lon, lon_kind)]:
+        #         r.setdefault(key, {})
+        #         r[key][kind] = \
+        #             (min if kind == "min" else max)(r[key][kind], value) \
+        #             if kind in r[key] else value
+        # for attr, latlon, minmax in \
+        #         [("top", "lat", "max"), ("bottom", "lat", "min"),
+        #          ("left", "lon", "min"), ("right", "lon", "max")]:
+        #     setattr(self, attr, r.get(latlon, {}).get(minmax))
 
         if "CS[ellipsoidal" in self.raw:
             self.is_geodetic = True
         elif "CS[Cartesian" in self.raw:
             self.is_geodetic = False
 
-        m = re.search(r"Pixel Size\s*=\s*\(\s*([0-9.-]+),\s*([0-9.-]+)\)",
-                      self.raw)
-        if m is not None:
-            self.pixel_size_lat = abs(float(m.group(2)))
-            self.pixel_size_lon = abs(float(m.group(1)))
+        # m = re.search(r"Pixel Size\s*=\s*\(\s*([0-9.-]+),\s*([0-9.-]+)\)",
+        #               self.raw)
+        # if m is not None:
+        #     self.pixel_size_lat = abs(float(m.group(2)))
+        #     self.pixel_size_lon = abs(float(m.group(1)))
 
         m = re.search(r"PROJ\.4 string is:\s*'(.+?)'", self.raw)
         if m is not None:
@@ -659,7 +688,8 @@ class Boundaries:
                  pixels_per_degree: Optional[float] = None,
                  round_boundaries_to_degree: bool = False,
                  round_all_boundaries_to_degree: bool = False,
-                 round_pixels_to_degree: bool = False) -> None:
+                 round_pixels_to_degree: bool = False,
+                 enforce_one_deg_tiles: bool = False) -> None:
         """ Constructor
 
         Arguments:
@@ -683,6 +713,10 @@ class Boundaries:
         round_pixels_to_degree         -- Round not explicitly specified pixel
                                           sizes to whole number of pixels per
                                           degree
+        enforce_one_deg_tiles          -- Makes the boundaries such that the tile is
+                                          centered on and lines up with a 1 x 1 tile.
+                                          Boundaries are padded based on the number of pixels.
+                                          pixels_per_degree *must* be specified
         """
         self.top = top
         self.bottom = bottom
@@ -750,6 +784,18 @@ class Boundaries:
                     continue
                 self.pixel_size_overridden = True
                 setattr(self, attr, 1 / round(1 / v))
+        if enforce_one_deg_tiles and pixels_per_degree is not None:
+            # Round boundaries to nearest degree. Then pad with number of padded pixels.
+            # If number of odd n_pix - pixels_per_degree is odd, round up the number we pad
+            paddingInLonDir = math.ceil( (gi.n_pixels_lon - pixels_per_degree) / 2 )
+            paddingInLatDir = math.ceil( (gi.n_pixels_lat - pixels_per_degree) / 2 )
+
+            # Now set boundaries
+            self.left = math.ceil(gi.left) - paddingInLonDir / pixels_per_degree
+            self.right = math.floor(gi.right) + paddingInLonDir / pixels_per_degree
+            self.bottom = math.ceil(gi.bottom) - paddingInLatDir / pixels_per_degree
+            self.top = math.floor(gi.top) + paddingInLatDir / pixels_per_degree
+
         if (self.left is not None) and (self.right is not None):
             left, right = self.left, self.right
             while left > 180:
