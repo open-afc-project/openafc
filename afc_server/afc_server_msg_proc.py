@@ -126,6 +126,7 @@ class AfcServerMessageProcessor:
                                       seconds
         config_refresh_sec         -- AFC Config refresh interval in seconds
         """
+        als.als_initialize(client_id="afc_server")
         self._db = db
         self._compute = compute
         self._request_timeout_sec = request_timeout_sec
