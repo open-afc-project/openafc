@@ -21,6 +21,8 @@ merge_upstream_changes:
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_REF_NAME == "main")'
       when: always
+  environment:
+    name: development
   before_script:
   - git remote set-url origin https://git:${CI_PUSH_TOKEN}@wcc-gitlab.lvn.broadcom.net:30443/afc/brcm-afc.git
   - git config --global user.email "gitlab-runner@broadcom.com"
@@ -50,6 +52,8 @@ getsrc_job:
   rules:
     - if: $CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main")
       when: always
+  environment:
+    name: development
   script:
     - echo "create random number"
     - RAND=`date +"D_%d_%m_%y_T_%H_%M_%S_TZ_%Z"`_hash_`git rev-parse --short HEAD` && echo ${RAND}
@@ -74,6 +78,8 @@ build_job:
   rules:
     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
       when: always
+  environment:
+    name: development
   before_script:
     - if [ "$PUSH_DI" = "1" ]; then echo $ARTIFACTORY_PASSWORD | docker login -u $ARTIFACTORY_USER --password-stdin $PRIV_REPO; fi
   script:
@@ -105,6 +111,8 @@ test_job:
   needs:
     - build_job
     - getsrc_job
+  environment:
+    name: development
   rules:
     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
       when: always
@@ -130,24 +138,24 @@ test_job:
 #Deployment to Staging
 deploy_to_staging:
   stage: deploy_stg
-  script:
-    - echo "Deploying to staging environment..."
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: manual
     - when: never
   environment:
     name: staging
+  script:
+    - echo "Deploying to staging environment..."
 
 #Deployment to Production
 deploy_to_production:
   stage: deploy_prd
-  script:
-    - echo "Deploying to production environment..."
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: manual
     - when: never
   environment:
     name: production
+  script:
+    - echo "Deploying to production environment..."
 
