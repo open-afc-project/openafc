@@ -2163,7 +2163,7 @@ class MaxEirpTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
         self._col_digest = self.get_column("request_response_digest",
                                            sa_pg.UUID)
         self._col_month_idx = self.get_month_idx_col()
-        self._col_op_class = self.get_column("channel", sa.SmallInteger)
+        self._col_op_class = self.get_column("op_class", sa.SmallInteger)
         self._col_channel = self.get_column("channel", sa.SmallInteger)
         self._col_eirp = self.get_column("max_eirp_dbm", sa.Float)
 
@@ -2312,7 +2312,8 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
         max_psd_updater          -- Maximum PSD table updater
         """
         super().__init__(adb=adb, table_name=self.TABLE_NAME,
-                         json_obj_name="RequestResponse")
+                         json_obj_name="RequestResponse",
+                         data_key_column_names=["request_response_digest"])
         self._afc_config_lookup = afc_config_lookup
         self._customer_lookup = customer_lookup
         self._uls_lookup = uls_lookup
@@ -2508,6 +2509,20 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
                                          month_idx=month_idx)
         self._max_psd_updater.update_db(data_dict=updated_psds,
                                         month_idx=month_idx)
+
+    def _data_key_from_result_row(self, result_row: Tuple[Any, ...],
+                                  result_row_idx: int) -> int:
+        """ Data key from rows written to database
+
+        Arguments:
+        result_row     -- Insert result tuple
+        result_row_idx -- 0-based index in insert results
+        Returns the latter
+        """
+        ret = result_row[result_row_idx]
+        if isinstance(ret, (str, bytes)):
+            ret = uuid.UUID(ret)
+        return ret
 
 
 class EnvelopeTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
@@ -2864,7 +2879,7 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
 
         Arguments:
         result_row     -- Insert result tuple
-        result_row_idx -- 0-based index i insert results
+        result_row_idx -- 0-based index in insert results
         Returns the latter
         """
         return result_row_idx
