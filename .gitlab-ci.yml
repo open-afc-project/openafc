@@ -6,40 +6,13 @@
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 
-# vp890322 ----------------------------------------------------------------------------------------------------------------------------------------------------
-# commenting until further configuration
-# stages:
-#   - build
-#   - test
-
-# docker-build:
-#   image: docker:24.0.5
-#   # services:
-#   #   - docker:19.03.12-dind
-#   stage: build
-#   script:
-#     - docker info
-#     # - docker build -t my-image-name:${CI_COMMIT_REF_SLUG} .
-#     # - docker push my-image-name:${CI_COMMIT_REF_SLUG}
-#
-# sast:
-#   stage: test
-# include:
-# - template: Security/SAST.gitlab-ci.yml
-# - template: Security/Secret-Detection.gitlab-ci.yml
-# # container_scanning:
-# #   variables:
-# #     DOCKER_IMAGE: ...
-# #     DOCKER_USER: ...
-# #     DOCKER_PASSWORD: ...
-# - template: Jobs/Container-Scanning.gitlab-ci.yml
-# end vp890322 ----------------------------------------------------------------------------------------------------------------------------------------------------
-
 stages:          # List of stages for jobs, and their order of execution
   - merge_upstream
   - getsrc
   - build
   - test
+  - deploy_stg
+  - deploy_prd
 
 # This jobs checks for changes in upstream and pushes new changes if found.
 # It's running on schedule every 30 minutes.
@@ -48,7 +21,6 @@ merge_upstream_changes:
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_REF_NAME == "main")'
       when: always
-  environment: production
   before_script:
   - git remote set-url origin https://git:${CI_PUSH_TOKEN}@wcc-gitlab.lvn.broadcom.net:30443/afc/brcm-afc.git
   - git config --global user.email "gitlab-runner@broadcom.com"
@@ -71,14 +43,12 @@ merge_upstream_changes:
         echo "No changes found in the upstream repository."
       fi
 
-
-
 # This job runs to create dir with unique name
 # that includes sources that will be validated
 getsrc_job:
   stage: getsrc
   rules:
-    - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
+    - if: $CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main")
       when: always
   script:
     - echo "create random number"
@@ -99,6 +69,8 @@ getsrc_job:
 # Building regression test images
 build_job:
   stage: build
+  needs:
+    - getsrc_job
   rules:
     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
       when: always
@@ -110,7 +82,6 @@ build_job:
     # $CI_WORKING_DIR/wccafc-dev_$RAND
     # now need to init submodules
     - cd "${WD}"
-    - git submodule update --init --recursive
 
     # generate  regression dir path
     - REGRD=tests/regression_${RAND}
@@ -131,6 +102,9 @@ build_job:
 #Running tests
 test_job:
   stage: test
+  needs:
+    - build_job
+    - getsrc_job
   rules:
     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
       when: always
@@ -152,4 +126,24 @@ test_job:
   after_script:
     # stop dev srvr
     - bash "${WD}/${REGRD}/stop_srvr.sh" ${WD} ${RAND}
+
+#Deployment to Staging
+deploy_to_staging:
+  stage: deploy_stg
+  script:
+    - echo "Deploying to staging environment..."
+  rules:
+    - when: manual
+  environment:
+    name: staging
+
+#Deployment to Production
+deploy_to_production:
+  stage: deploy_prd
+  script:
+    - echo "Deploying to production environment..."
+  rules:
+    - when: manual
+  environment:
+    name: production
 
