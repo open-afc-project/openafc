@@ -1,7 +1,7 @@
 Running on worker USER = @K
-Tue Oct 22 14:04:02 2024 : Beginning ANALYSIS.
-TEMPLATE FILE = templates/templ_proc_boundary_ca_200km.txt
-NAME: proc_boundary_ca_200km
+Tue Oct 22 19:21:36 2024 : Beginning ANALYSIS.
+TEMPLATE FILE = templates/templ_proc_boundary_ca_50km.txt
+NAME: proc_boundary_ca_50km
 FUNCTION: procBoundary
 SRC_FILE_3D: NONE
 SRC_FILE_2D: NONE
@@ -28,22 +28,24 @@ MAX_LON (deg): 0.0000000000e+00
 MIN_LAT (deg): 0.0000000000e+00
 MAX_LAT (deg): 0.0000000000e+00
 SAMPLES_PER_DEG: 120
-POLYGON_EXPANSION: 215
-POLYGON_SIMPLIFY: 22
+POLYGON_EXPANSION: 53
+POLYGON_SIMPLIFY: 6
 KMZ_FILE: NONE
-KML_FILE: proc_boundary_ca_200km.kml
+KML_FILE: proc_boundary_ca_50km.kml
 MIN_LON_WRAP: -2.7000000000e+02
 SEED: 0
 
-SEED GENERATED FROM clock_gettime() = 2205668913
+SEED GENERATED FROM clock_gettime() = 95346325
 MIN_LON = -141.018
 MAX_LON = -52.6194
 MIN_LAT = 41.6813
 MAX_LAT = 83.1371
 TOTAL_NUM_POINTS = 16509127
-EXPANDING IMAGE: count = 217
-DONE EXPANDING IMAGE: numChange = 31685830
-[0] POLYGON NUM_VIRTICES: 125 Deleted 32649 Points from polygon
-TOTAL_NUM_VIRTICES: 125
-Tue Oct 22 14:04:22 2024 : Completed ANALYSIS.
-Elapsed time = 20 sec = 0 days 0 hours 0 min 20 sec.
+EXPANDING IMAGE: count = 55
+DONE EXPANDING IMAGE: numChange = 15256637
+[0] POLYGON NUM_VIRTICES: 830 Deleted 48248 Points from polygon
+[1] POLYGON NUM_VIRTICES: 12 Deleted 710 Points from polygon
+[2] POLYGON NUM_VIRTICES: 7 Deleted 505 Points from polygon
+TOTAL_NUM_VIRTICES: 849
+Tue Oct 22 19:21:51 2024 : Completed ANALYSIS.
+Elapsed time = 15 sec = 0 days 0 hours 0 min 15 sec.

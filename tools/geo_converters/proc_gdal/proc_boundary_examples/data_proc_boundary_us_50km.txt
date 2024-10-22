@@ -1,0 +1,68 @@
+Running on worker USER = @K
+Tue Oct 22 19:19:06 2024 : Beginning ANALYSIS.
+TEMPLATE FILE = templates/templ_proc_boundary_us_50km.txt
+NAME: proc_boundary_us_50km
+FUNCTION: procBoundary
+SRC_FILE_3D: NONE
+SRC_FILE_2D: NONE
+SRC_FILE_RASTER: NONE
+SRC_FILE_VECTOR: /mnt/nfs/rat_transfer/country_bdy/cb_2018_us_nation_5m.shp
+SRC_HEIGHT_FIELD_NAME: NONE
+HEIGHT_FIELD_NAME_3D: NONE
+HEIGHT_FIELD_NAME_2D: NONE
+OUTPUT_HEIGHT_FIELD_NAME: NONE
+CMP_FILE_RASTER: NONE
+OUTPUT_FILE: NONE
+OUTPUT_LAYER: NONE
+NODATA_VAL: 1.0000000000e+30
+CLAMP_MIN (m): -1.0000000000e+02
+CLAMP_MAX (m): 5.0000000000e+03
+MIN_MAG (m): 0.0000000000e+00
+TMP_IMAGE_FILE: NONE
+IMAGE_FILE: NONE
+IMAGE_FILE_2: NONE
+IMAGE_LON_LAT_RES (deg): 1.0000000000e-04
+VERBOSE: 1
+MIN_LON (deg): 0.0000000000e+00
+MAX_LON (deg): 0.0000000000e+00
+MIN_LAT (deg): 0.0000000000e+00
+MAX_LAT (deg): 0.0000000000e+00
+SAMPLES_PER_DEG: 120
+POLYGON_EXPANSION: 53
+POLYGON_SIMPLIFY: 6
+KMZ_FILE: NONE
+KML_FILE: proc_boundary_us_50km.kml
+MIN_LON_WRAP: -2.7000000000e+02
+SEED: 0
+
+SEED GENERATED FROM clock_gettime() = 264274730
+MIN_LON = -215.382
+MAX_LON = -64.5665
+MIN_LAT = -14.5525
+MAX_LAT = 71.3526
+TOTAL_NUM_POINTS = 30901
+EXPANDING IMAGE: count = 55
+DONE EXPANDING IMAGE: numChange = 5415379
+[0] POLYGON NUM_VIRTICES: 41 Deleted 2865 Points from polygon
+[1] POLYGON NUM_VIRTICES: 12 Deleted 826 Points from polygon
+[2] POLYGON NUM_VIRTICES: 13 Deleted 889 Points from polygon
+[3] POLYGON NUM_VIRTICES: 4 Deleted 456 Points from polygon
+[4] POLYGON NUM_VIRTICES: 22 Deleted 1384 Points from polygon
+[5] POLYGON NUM_VIRTICES: 45 Deleted 2311 Points from polygon
+[6] POLYGON NUM_VIRTICES: 9 Deleted 627 Points from polygon
+[7] POLYGON NUM_VIRTICES: 18 Deleted 932 Points from polygon
+[8] POLYGON NUM_VIRTICES: 301 Deleted 17151 Points from polygon
+[9] POLYGON NUM_VIRTICES: 4 Deleted 444 Points from polygon
+[10] POLYGON NUM_VIRTICES: 6 Deleted 508 Points from polygon
+[11] POLYGON NUM_VIRTICES: 6 Deleted 474 Points from polygon
+[12] POLYGON NUM_VIRTICES: 6 Deleted 478 Points from polygon
+[13] POLYGON NUM_VIRTICES: 7 Deleted 505 Points from polygon
+[14] POLYGON NUM_VIRTICES: 4 Deleted 442 Points from polygon
+[15] POLYGON NUM_VIRTICES: 11 Deleted 755 Points from polygon
+[16] POLYGON NUM_VIRTICES: 26 Deleted 1800 Points from polygon
+[17] POLYGON NUM_VIRTICES: 5 Deleted 487 Points from polygon
+[18] POLYGON NUM_VIRTICES: 286 Deleted 17320 Points from polygon
+[19] POLYGON NUM_VIRTICES: 28 Deleted 1548 Points from polygon
+TOTAL_NUM_VIRTICES: 854
+Tue Oct 22 19:19:44 2024 : Completed ANALYSIS.
+Elapsed time = 38 sec = 0 days 0 hours 0 min 38 sec.
