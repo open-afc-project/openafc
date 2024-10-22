@@ -73,7 +73,7 @@ Global data is downloaded from: https://www.ncei.noaa.gov/products/etopo-global-
 
 * **srtm3arcsecondv003:** https://search.earthdata.nasa.gov/search/granules?p=C2763266377-LPCLOUD&pg[0][v]=f&pg[0][gsk]=-start_date&q=srtm&gdf=HGT&tl=1702926101!3!!
 * **srtm1arcsecond:** https://search.earthdata.nasa.gov/search/granules?p=C2763266360-LPCLOUD&pg[0][v]=f&pg[0][gsk]=-start_date&q=srtm&gdf=HGT&tl=1702926101!3!!
-* **3dep:** https://data.globalchange.gov/dataset/usgs-national-elevation-dataset-ned-1-arc-second
+* **3dep:** https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/1/TIFF/current/
 * **cdsm:"** https://open.canada.ca/data/en/dataset/768570f8-5761-498a-bd6a-315eb6cc023d
 
 * **nlcd:** original file nlcd_2019_land_cover_I48_20210604 was downloaded from [link](https://www.mrlc.gov/data?f%5B0%5D=category%3Aland%20cover) (download NLCD 2019 Land Cover (CONUS)). Using gdal utilties this file was translated to nlcd_2019_land_cover_I48_20210604_resample.zip so that the 1-arcsec tiles matchup with 1-arcsec 3DEP tiles. The federated_nlcd.zip file was obtained by using other gdal utilities to convert federated's many files to one file covering CONUS.
@@ -400,3 +400,119 @@ chown -R 1003:1003 /var/databases /var/afc_config
 ```
 
 
+## Detailed Instructions for Downloading and Converting 3DEP Files For Use In AFC
+The process for downloading and converting 3DEP terrain height files involves downloading the raw data from USGS, then, in the provided docker container, converting the data from NAD83 to WGS84.  The conversion is a 2 step process where the data is first longitude and latitude values are converted, then the height values are adjusted for the WGS84 geiod.  The commands below assume a linux system running a bash shell.  The utilities wget2, gdal_translate must be installed as well as a web browser for downloading the Canada geoid.
+
+
+1) **Identify location with adequate disk space.**  It is recommended that the directory containing 3DEP data be on a disk with at least 600 GB of free space.  The disk needs to accomodate the original NAD83 files downloaded, intermediate files, and the final converted files.  Only the final converted files are used by AFC, and the original NAD83 files downloaded and intermediate files can be removed, if desired, to clear up disk space.  The commands below must be adjusted to the corresponding directory locations on your system.
+
+```
+DEPDIR=/mnt/nfs/rat_transfer/3dep
+
+GEOID_DIR=/mnt/nfs/rat_transfer/geoid
+mkdir $GEOID_DIR
+mkdir $GEOID_DIR/usa_ge
+
+TMPDIR=/tmp
+
+AFCDIR=/path/to/openafc
+```
+
+2) **Download the NAD83 files from USGS**
+
+```
+mkdir $DEPDIR/1_arcsec_nad83
+cd $DEPDIR/1_arcsec_nad83
+wget2 -c -r -np -l 2 -nd -A "*.tif" https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/1/TIFF/current
+```
+
+3) **Download geoid files for USA**
+
+```
+cd $TMPDIR
+wget2 https://www.myfloridagps.com/Geoid/NGS.zip
+mkdir NGS
+cd NGS
+unzip -x ../NGS.zip
+gdal_translate -of GTX g2018u0.bin $GEOID_DIR/usa_ge/usa_ge_prd_g2018u0.gtx
+gdal_translate -of GTX g2018p0.bin $GEOID_DIR/usa_ge/usa_ge_prd_g2018p0.gtx
+
+cd $TMPDIR
+wget2 https://vdatum.noaa.gov/download/data/vdatum_GEOID12B.zip
+unzip -x vdatum_GEOID12B.zip
+cp vdatum/core/geoid12b/g2012ba0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012ba0.gtx
+cp vdatum/core/geoid12b/g2012bg0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012bg0.gtx
+cp vdatum/core/geoid12b/g2012bh0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012bh0.gtx
+cp vdatum/core/geoid12b/g2012bp0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012bp0.gtx 
+cp vdatum/core/geoid12b/g2012bs0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012bs0.gtx
+cp vdatum/core/geoid12b/g2012bu0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012bu0.gtx
+```
+
+4) **Download geoid files for Canada**
+* Open a browser and navigate to https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/data-donnees/geoid.php?locale=en
+* If not registered, register on this site to get a username and password
+* Sign in
+* Download the file https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/process/download-helper.php?file_id=HT2_2010_tif and save to TMPDIR.
+
+```
+cd $TMPDIR
+
+gdal_translate -of GTX HT2_2010v70.tif can_ge_prd_HT2_2010v70.gtx
+
+mkdir $GEOID_DIR/can_ge
+mv can_ge_prd_HT2_2010v70.gtx $GEOID_DIR/can_ge
+```
+
+5) **Build gdal container distributed with openafc, then run the gdal container.**
+
+```
+cd $AFCDIR/tools/geo_converters
+docker rmi gdalcontainer
+docker build . -t gdalcontainer
+
+gdalCmd="docker run --rm -it  --privileged"
+gdalCmd="$gdalCmd -v $AFCDIR:/wd/afc/open-afc"
+gdalCmd="$gdalCmd -v $DEPDIR:/mnt/nfs/rat_transfer/3dep"
+gdalCmd="$gdalCmd -v $GEOID_DIR:/mnt/nfs/rat_transfer/geoid"
+gdalCmd="$gdalCmd -h gdalcontainer"
+gdalCmd="$gdalCmd gdalcontainer"
+alias gdalcontainer="$gdalCmd"
+
+gdalcontainer
+```
+
+6) **Perform first conversion to WGS84 longitude/latitute coordinates.**  In the gdal contain run the commands
+
+```
+mkdir /mnt/nfs/rat_transfer/3dep/1_arcsec_wgs84_datum_aligned
+to_wgs84.py --pixels_per_degree 3600 --enforce_one_deg_tiles --resampling cubic --threads 16 \
+    --out_dir /mnt/nfs/rat_transfer/3dep/1_arcsec_wgs84_datum_aligned/ \
+    '/mnt/nfs/rat_transfer/3dep/1_arcsec_nad83/*.tif'
+```
+
+7) **Perform second conversion to WGS84 adjusting height values to the WGS84 ellipsoid.**  In the gdal contain run the commands
+
+```
+mkdir /mnt/nfs/rat_transfer/3dep/1_arcsec_wgs84
+to_wgs84.py --pixels_per_degree 3600 --enforce_one_deg_tiles --resampling cubic --threads 16 \
+    --src_geoid '/mnt/nfs/rat_transfer/geoid/usa_ge/usa_ge_prd_g2018?0.gtx' \
+    --src_geoid '/mnt/nfs/rat_transfer/geoid/usa_ge/usa_ge_prd_g2012b?0.gtx' \
+    --src_geoid /mnt/nfs/rat_transfer/geoid/can_ge/can_ge_prd_HT2_2010v70.gtx \
+    --format_param COMPRESS=PACKBITS \
+    --out_dir /mnt/nfs/rat_transfer/3dep/1_arcsec_wgs84 \
+    '/mnt/nfs/rat_transfer/3dep/1_arcsec_wgs84_datum_aligned/*.tif`
+```
+
+8) **Exit the gdalcontainer.**
+
+```
+exit
+```
+
+9) **Create a symbolic link pointing to the WGS84 dataset.**
+
+```
+ln -s $DEPDIR/1_arcsec_wgs84 $DEPDIR/1_arcsec
+```
+
+At this point the conversion is complete.  The directories ```$DEPDIR/1_arcsec_wgs84_datum_aligned``` and ```$DEPDIR/1_arcsec_wgs84``` can be deleted, if desired, to free up disk space.
