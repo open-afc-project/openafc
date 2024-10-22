@@ -1,0 +1,5 @@
+CMakeFiles
+*.o
+Makefile
+cmake_install.cmake
+proc_gdal

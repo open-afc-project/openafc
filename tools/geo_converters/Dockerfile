@@ -34,7 +34,7 @@ RUN apk add perl musl
 RUN apk add cmake g++ make musl-dev && cd /usr/app/proc_gdal/src && \
   cmake . && make && mv proc_gdal /usr/app/proc_gdal && \
   cd .. && rm -rf src && apk del cmake g++ make musl-dev
-USER solr
+# USER solr
 
 ENV PATH=$PATH:/usr/app:/usr/app/proc_gdal
 

@@ -1,4 +1,25 @@
 # Release Note
+
+## **Version and Date**
+|Version|**135*|
+| :- | :- |
+|**Date**|**10/22/2024**|
+
+## **Issues Addressed**
+ * 135: Country Boundary Fix 
+ * Added proc_boundary functionality to proc_gdal (https://github.com/open-afc-project/openafc/tree/135-country-boundary-fix/tools/geo_converters/proc_gdal) and included proc_boundary_examples for USA and Canada.
+ * Updated database_readme.md with 'Detailed Instructions for Downloading and Converting 3DEP Files For Use In AFC'and minor editorial changes
+
+## **Interface Changes**
+ * Only the country boundary (for US and Canada) kml files need to be updated. 
+ * The updated kml files are attached to the issue 135 on Github
+
+## **Testing Done**
+ * Ran FSP1 on our local dev server and confirmed getting golden response.
+
+## **Open Issues** 
+
+
 ## **Version and Date**
 |Version|**2&136*|
 | :- | :- |

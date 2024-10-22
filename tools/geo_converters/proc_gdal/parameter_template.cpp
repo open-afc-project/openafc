@@ -34,6 +34,7 @@ ParameterTemplateClass::ParameterTemplateClass()
     heightFieldName3D.clear();
     heightFieldName2D.clear();
     outputHeightFieldName.clear();
+    cmpFileRaster.clear();
     outputFile.clear();
     outputLayer.clear();
     nodataVal = 1.0e30;
@@ -45,6 +46,16 @@ ParameterTemplateClass::ParameterTemplateClass()
     imageFile2.clear();
     imageLonLatRes = 0.0001;
     verbose = 0;
+    minLon = 0.0;
+    maxLon = 0.0;
+    minLat = 0.0;
+    maxLat = 0.0;
+    samplesPerDeg = 120;
+    polygonExpansion = 10;
+    polygonSimplify = 2;
+    kmzFile.clear();
+    kmlFile.clear();
+    minLonWrap = -180.0;
     seed = 0;
 }
 /******************************************************************************************/
@@ -235,6 +246,10 @@ void ParameterTemplateClass::readFile_1_0(FILE *fp, char *line, const char *file
                         paramProc->getParamVal(outputHeightFieldName, "OUTPUT_HEIGHT_FIELD_NAME", linenum, paramName, paramVal);
                         found = true;
                     }
+                    if ((!found) && (strcmp(paramName, "CMP_FILE_RASTER")==0)) {
+                        paramProc->getParamVal(cmpFileRaster, "CMP_FILE_RASTER", linenum, paramName, paramVal);
+                        found = true;
+                    }
                     if ((!found) && (strcmp(paramName, "OUTPUT_FILE")==0)) {
                         paramProc->getParamVal(outputFile, "OUTPUT_FILE", linenum, paramName, paramVal);
                         found = true;
@@ -277,6 +292,46 @@ void ParameterTemplateClass::readFile_1_0(FILE *fp, char *line, const char *file
                     }
                     if ((!found) && (strcmp(paramName, "VERBOSE")==0)) {
                         paramProc->getParamVal(verbose, "VERBOSE", linenum, paramName, paramVal);
+                        found = true;
+                    }
+                    if ((!found) && (strcmp(paramName, "MIN_LON")==0)) {
+                        paramProc->getParamVal(minLon, "MIN_LON", linenum, paramName, paramVal);
+                        found = true;
+                    }
+                    if ((!found) && (strcmp(paramName, "MAX_LON")==0)) {
+                        paramProc->getParamVal(maxLon, "MAX_LON", linenum, paramName, paramVal);
+                        found = true;
+                    }
+                    if ((!found) && (strcmp(paramName, "MIN_LAT")==0)) {
+                        paramProc->getParamVal(minLat, "MIN_LAT", linenum, paramName, paramVal);
+                        found = true;
+                    }
+                    if ((!found) && (strcmp(paramName, "MAX_LAT")==0)) {
+                        paramProc->getParamVal(maxLat, "MAX_LAT", linenum, paramName, paramVal);
+                        found = true;
+                    }
+                    if ((!found) && (strcmp(paramName, "SAMPLES_PER_DEG")==0)) {
+                        paramProc->getParamVal(samplesPerDeg, "SAMPLES_PER_DEG", linenum, paramName, paramVal);
+                        found = true;
+                    }
+                    if ((!found) && (strcmp(paramName, "POLYGON_EXPANSION")==0)) {
+                        paramProc->getParamVal(polygonExpansion, "POLYGON_EXPANSION", linenum, paramName, paramVal);
+                        found = true;
+                    }
+                    if ((!found) && (strcmp(paramName, "POLYGON_SIMPLIFY")==0)) {
+                        paramProc->getParamVal(polygonSimplify, "POLYGON_SIMPLIFY", linenum, paramName, paramVal);
+                        found = true;
+                    }
+                    if ((!found) && (strcmp(paramName, "KMZ_FILE")==0)) {
+                        paramProc->getParamVal(kmzFile, "KMZ_FILE", linenum, paramName, paramVal);
+                        found = true;
+                    }
+                    if ((!found) && (strcmp(paramName, "KML_FILE")==0)) {
+                        paramProc->getParamVal(kmlFile, "KML_FILE", linenum, paramName, paramVal);
+                        found = true;
+                    }
+                    if ((!found) && (strcmp(paramName, "MIN_LON_WRAP")==0)) {
+                        paramProc->getParamVal(minLonWrap, "MIN_LON_WRAP", linenum, paramName, paramVal);
                         found = true;
                     }
                     if ((!found) && (strcmp(paramName, "SEED")==0)) {
@@ -335,6 +390,7 @@ void ParameterTemplateClass::print(FILE *fp) const
     fprintf(fp, "HEIGHT_FIELD_NAME_3D: %s\n", (heightFieldName3D.empty() ? "NONE" : heightFieldName3D.c_str()));
     fprintf(fp, "HEIGHT_FIELD_NAME_2D: %s\n", (heightFieldName2D.empty() ? "NONE" : heightFieldName2D.c_str()));
     fprintf(fp, "OUTPUT_HEIGHT_FIELD_NAME: %s\n", (outputHeightFieldName.empty() ? "NONE" : outputHeightFieldName.c_str()));
+    fprintf(fp, "CMP_FILE_RASTER: %s\n", (cmpFileRaster.empty() ? "NONE" : cmpFileRaster.c_str()));
     fprintf(fp, "OUTPUT_FILE: %s\n", (outputFile.empty() ? "NONE" : outputFile.c_str()));
     fprintf(fp, "OUTPUT_LAYER: %s\n", (outputLayer.empty() ? "NONE" : outputLayer.c_str()));
     fprintf(fp, "NODATA_VAL: %15.10e\n", nodataVal);
@@ -346,6 +402,16 @@ void ParameterTemplateClass::print(FILE *fp) const
     fprintf(fp, "IMAGE_FILE_2: %s\n", (imageFile2.empty() ? "NONE" : imageFile2.c_str()));
     fprintf(fp, "IMAGE_LON_LAT_RES (deg): %15.10e\n", imageLonLatRes);
     fprintf(fp, "VERBOSE: %d\n", verbose);
+    fprintf(fp, "MIN_LON (deg): %15.10e\n", minLon);
+    fprintf(fp, "MAX_LON (deg): %15.10e\n", maxLon);
+    fprintf(fp, "MIN_LAT (deg): %15.10e\n", minLat);
+    fprintf(fp, "MAX_LAT (deg): %15.10e\n", maxLat);
+    fprintf(fp, "SAMPLES_PER_DEG: %d\n", samplesPerDeg);
+    fprintf(fp, "POLYGON_EXPANSION: %d\n", polygonExpansion);
+    fprintf(fp, "POLYGON_SIMPLIFY: %d\n", polygonSimplify);
+    fprintf(fp, "KMZ_FILE: %s\n", (kmzFile.empty() ? "NONE" : kmzFile.c_str()));
+    fprintf(fp, "KML_FILE: %s\n", (kmlFile.empty() ? "NONE" : kmlFile.c_str()));
+    fprintf(fp, "MIN_LON_WRAP: %15.10e\n", minLonWrap);
     fprintf(fp, "SEED: %d\n", seed);
     fprintf(fp, "\n");
 }

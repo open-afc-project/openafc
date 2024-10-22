@@ -33,6 +33,8 @@ public:
     double getMaxBuildingHeightAtPoint(double latDeg, double lonDeg) const;
     std::map<int64_t,double> getBuildingsAtPoint(double lat, double lon) const;
 
+    void getExtents(double& minLon, double& maxLon, double& minLat, double& maxLat, double minLonWrap) const;
+
     void printDebugInfo() const;
 
     int heightFieldIdx;
