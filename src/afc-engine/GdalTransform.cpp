@@ -144,10 +144,18 @@ GdalTransform::BoundRect GdalTransform::makeBoundRect() const
 
 void GdalTransform::roundPpdToMultipleOf(double pixelsPerDegree)
 {
+	// Latitude and longitude or (0, 0) pixel
+	double origLat = latPixMax / latPixPerDeg;
+	double origLon = lonPixMin / lonPixPerDeg;
+
+	// Rounding pixels-per-degree
 	latPixPerDeg = std::round(latPixPerDeg / pixelsPerDegree) * pixelsPerDegree;
 	lonPixPerDeg = std::round(lonPixPerDeg / pixelsPerDegree) * pixelsPerDegree;
-	latPixMax = std::round(latPixMax / pixelsPerDegree) * pixelsPerDegree;
-	lonPixMin = std::round(lonPixMin / pixelsPerDegree) * pixelsPerDegree;
+	// Restoring latPixMax and lonPixMin with new pixels per degree and rounding them
+	// Half pixelsPerDegree is used here for hal-pixel margins, like used in SRTM
+	double halfPpd = pixelsPerDegree / 2.;
+	latPixMax = std::round((origLat * latPixPerDeg) / halfPpd) * halfPpd;
+	lonPixMin = std::round((origLon * lonPixPerDeg) / halfPpd) * halfPpd;
 }
 
 void GdalTransform::setMarginsOutsideDeg(double deg)
