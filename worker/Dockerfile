@@ -5,8 +5,8 @@
 # a copy of which is included with this software program
 
 # default value of args
-ARG BLD_TAG=1.0.0.0
-ARG PRINST_TAG=1.0.0.0
+ARG BLD_TAG=1.0.1.0
+ARG PRINST_TAG=1.0.1.0
 ARG BLD_NAME=ghcr.io/open-afc-project/worker-al-build-image
 ARG PRINST_NAME=ghcr.io/open-afc-project/worker-al-preinstall
 
