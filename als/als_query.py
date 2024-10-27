@@ -71,11 +71,9 @@ import urllib.parse
 
 import secret_utils
 
-# Default connection string parts
-DEFAULT_SCHEME = "postgresql"
-DEFAULT_USER = "postgres"
-DEFAULT_PASSWORD = "postgres"
-DEFAULT_PORT = 5432
+# Template arguments for old-stylw DSN part environment variables
+ALS_TEMPLATE_ARG = "ALS"
+LOG_TEMPLATE_ARG = "LOG"
 
 # Connection string scheme that should be ultimately used
 ACTUAL_SCHEME = "postgresql+psycopg2"
@@ -117,9 +115,58 @@ def unused_arguments(*args) -> None:  # pylint: disable=unused-argument
     return
 
 
+class DsnPart:
+    """ DB DSN part that can be default or taken from old-style environment
+    variable
+
+    Private attributes:
+    default      -- Deafult value (optional)
+    env_template -- Environment variiable template. May include {0} for
+                    template argument
+    """
+    def __init__(self, default: Optional[str] = None,
+                 env_template: Optional[str] = None) -> None:
+        """ Connstructor
+
+        Arguments:
+        default      -- Deafult value (optional)
+        env_template -- Environment variiable template. May include {0} for
+                        template argument
+        """
+        self._default = default
+        self._env_template = env_template
+
+    def __call__(self, template_arg: str, default: Optional[str] = None) \
+            -> str:
+        """ Returns path name (taken from default value or from environment
+        variable)
+
+        Arguments:
+        template_arg -- Template argument for ennvironment variable name
+        default      -- Default value override
+        Returns value, obtained from environment variable or from default
+        override or from default
+        """
+        default = default or self._default
+        assert default is not None
+        return \
+            os.environ.get(self._env_template.format(template_arg), default) \
+            if self._env_template else default
+
+
+# Descriptors of DSN parts
+DP_SCHEME = DsnPart(default="postgresql")
+DP_USER = DsnPart(default="postgres", env_template="POSTGRES_{0}_USER")
+DP_PASSWORD = DsnPart(default="postgres",
+                      env_template="POSTGRES_{0}_PASSWORD")
+DP_HOST = DsnPart(env_template="POSTGRES_HOST")
+DP_PORT = DsnPart(default="5432", env_template="POSTGRES_PORT")
+DP_DB = DsnPart(env_template="POSTGRES_{0}_DB")
+
+
 def db_engine(arg_dsn: Optional[str], password_file: Optional[str],
               default_db: str, dsn_env: str, password_file_env: str,
-              name_for_logs: str, verbose: bool) \
+              template_arg: str, name_for_logs: str) \
         -> Tuple[sa.engine.Engine, sa.MetaData]:
     """ Creates database engine and metadata
 
@@ -133,17 +180,18 @@ def db_engine(arg_dsn: Optional[str], password_file: Optional[str],
     name_for_logs     -- Database name to use in error messages
     Returns (engine, metadata) tuple
     """
-    default_parts = \
-        urllib.parse.urlparse(
-            f"{DEFAULT_SCHEME}://{DEFAULT_USER}:{DEFAULT_PASSWORD}@REQUIRED:"
-            f"{DEFAULT_PORT}/{default_db}")
+    default_dsn = \
+        f"{DP_SCHEME(template_arg)}://{DP_USER(template_arg)}:" \
+        f"{DP_PASSWORD(template_arg)}@" \
+        f"{DP_HOST(template_arg, 'REQUIRED')}:{DP_PORT(template_arg)}/" \
+        f"{DP_DB(template_arg, default_db)}"
+    default_parts = urllib.parse.urlparse(default_dsn)
     arg_dsn = arg_dsn or os.environ.get(dsn_env)
-    error_if(not arg_dsn,
-             f"Database connection string not specified - neither with --dsn, "
-             f"nor with '{dsn_env}' environment variable")
-    assert arg_dsn is not None
-    if "://" not in arg_dsn:
-        arg_dsn = f"{default_parts.scheme}://{arg_dsn}"
+    if arg_dsn is None:
+        arg_dsn = default_dsn
+    else:
+        if "://" not in arg_dsn:
+            arg_dsn = f"{default_parts.scheme}://{arg_dsn}"
 
     arg_parts = urllib.parse.urlparse(arg_dsn)
     netloc = ""
@@ -547,7 +595,7 @@ def do_log(args: Any) -> None:
         db_engine(arg_dsn=args.dsn, password_file=args.password_file,
                   default_db=LOG_DB, dsn_env=LOG_CONN_ENV,
                   password_file_env=LOG_PASSWORD_ENV,
-                  name_for_logs="JSON logs", verbose=args.verbose)
+                  template_arg=LOG_TEMPLATE_ARG, name_for_logs="JSON logs")
     if args.topics:
         error_if(args.sources or args.SELECT,
                  "--sources and SELECT arguments may not be specified with "
@@ -1918,7 +1966,7 @@ def do_als(args: Any) -> None:
         db_engine(arg_dsn=args.dsn, password_file=args.password_file,
                   default_db=ALS_DB, dsn_env=ALS_CONN_ENV,
                   password_file_env=ALS_PASSWORD_ENV,
-                  name_for_logs="ALS")
+                  template_arg=ALS_TEMPLATE_ARG, name_for_logs="ALS")
     timezone = decode_timezone(args.timezone)
     if args.decode_errors:
         columns = metadata.tables["decode_error"].c
@@ -2222,7 +2270,6 @@ def main(argv: List[str]) -> None:
         argument_parser.print_help()
         sys.exit(1)
     args, _ = argument_parser.parse_known_args(argv)
-    ic(args)
     if not getattr(args, "unknown_args", False):
         args = argument_parser.parse_args(argv)
 
