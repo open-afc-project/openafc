@@ -73,7 +73,7 @@ ENV SIPHON_PROMETHEUS_PORT=8080
 
 # Disable SqlAlchemy compatibility warnings
 ENV SQLALCHEMY_SILENCE_UBER_WARNING=1
-ENV SQLALCHEMY_WARN_20=1
+ENV SQLALCHEMY_WARN_20=0
 
 COPY als/als_siphon.py als/als_query.py /usr/app/
 RUN chmod a+x /usr/app/*.py
