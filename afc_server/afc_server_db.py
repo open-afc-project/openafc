@@ -486,10 +486,12 @@ class AfcServerDb:
             await self._get_table(
                 table_name=self._RATDB_RULESET_TABLE, meta=self._ratdb_meta,
                 engine=self._ratdb_engine, db_name="RatDB")
+
         class CertInfo(NamedTuple):
             """ Information about certification from select result """
             location_flags: int
             denied_serials: Set[Optional[str]] = set()
+
         try:
             s = sa.select(
                     [ruleset_table.c.name, cert_table.c.certification_id,
@@ -579,7 +581,8 @@ class AfcServerDb:
 
         try:
             s = sa.select([afc_config_table.c.config]).where(
-                afc_config_table.c.config["regionStr"].astext.in_(list(regions)))
+                afc_config_table.c.config["regionStr"].astext.
+                in_(list(regions)))
             region_to_config: Dict[str, Dict[str, Any]] = {}
             async with self._ratdb_engine.connect() as conn:
                 rp = await conn.execute(s)
