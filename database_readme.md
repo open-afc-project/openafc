@@ -48,7 +48,7 @@ Corine Land Cover is land categorization over the EU used to determine RLAN/FS m
 contains the Gridded Population of the World (GPW), v4.11, population density database. Use of GPW for determination of RLAN morphology is only used in the absence of a land cover database.
 
 #### **Country Boundary Files:**
-The AFC database contains a country boundary file for each administrative region supported by AFC.  The boundary file is a kml file defining a single polygon, or multiple polygons that define the corresponding region.  Typically, government agencies require the use of an official website defining the region, and further processing is required to convert these files into the kml format that is used by AFC.  The procedure for converting country boundary files to the format that AFC uses is described in [readme](tools/geo_converters/proc_gdal/proc_boundary_examples/readme.md)
+The AFC database contains a country boundary file for each administrative region supported by AFC.  The boundary file is a kml file defining a single polygon, or multiple polygons that define the corresponding region.  Typically, government agencies require the use of an official website defining the region, and further processing is required to convert these files into the kml format that is used by AFC.  The procedure for converting country boundary files to the format that AFC uses is described in [readme](tools/geo_converters/proc_gdal/proc_boundary_examples/readme.md).
 
 * **US.kml:** 
 specifies United States' country boundary where AP access is allowed for that region. 
@@ -86,7 +86,7 @@ Global data is downloaded from: https://www.ncei.noaa.gov/products/etopo-global-
 
 * **Country Boundary Files:**
 The following country boundary files were created from data obtained from the following websites.  The procedure for converting data into the format used by AFC is described in [readme](tools/geo_converters/proc_gdal/proc_boundary_examples/readme.md).
-    * **US.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
+    * **US.kml:** https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_us_nation_5m.zip
     * **CA.kml:** https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/index2021-eng.cfm?year=21 (Catrographic Boundary files, selecting 'Provinces/territories' of Administrative boundaries)
     * **GB.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
     * **BRA.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
@@ -217,7 +217,7 @@ THIS DOCUMENT (OR WORK PRODUCT) IS BEING OFFERED WITHOUT ANY WARRANTY WHATSOEVER
    * (5) Under target directory create directory for each city, under each city create dir structure containing combined tif files.
    * (6) For each city create info file listing tif files and min/max lon/lat for each file.
 * **srtm3arcsecondv003:** the two SRTM tiles over Manhattan are removed since they erroneously contain building height
-* **country.KML:** there is some post-processing done that is not documented here as we are moving to using a different processing.
+* **country.kml:** the program proc_gdal is used to post-process downloaded shapefile into a format for use with AFC.  This is described in more detail in [readme](tools/geo_converters/proc_gdal/proc_boundary_examples/readme.md).
 
 * **Near Field Adjustment Factor File:** "nfa_table_data.csv" is created as follows.
 
