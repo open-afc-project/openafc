@@ -47,13 +47,16 @@ Corine Land Cover is land categorization over the EU used to determine RLAN/FS m
 #### **population:** 
 contains the Gridded Population of the World (GPW), v4.11, population density database. Use of GPW for determination of RLAN morphology is only used in the absence of a land cover database.
 
-#### **US.kml:** 
+#### **Country Boundary Files:**
+The AFC database contains a country boundary file for each administrative region supported by AFC.  The boundary file is a kml file defining a single polygon, or multiple polygons that define the corresponding region.  Typically, government agencies require the use of an official website defining the region, and further processing is required to convert these files into the kml format that is used by AFC.  The procedure for converting country boundary files to the format that AFC uses is described in [readme](tools/geo_converters/proc_gdal/proc_boundary_examples/readme.md)
+
+* **US.kml:** 
 specifies United States' country boundary where AP access is allowed for that region. 
-#### **CA.kml:** 
+* **CA.kml:** 
 specifies Canada's country boundary where AP access is allowed for that region. 
-#### **GB.kml:** 
+* **GB.kml:** 
 specifies the Great Britain country boundary where AP access is allowed for that region. 
-#### **BRA.kml:** 
+* **BRA.kml:** 
 specifies Brazil's country boundary where AP access is allowed for that region.  
 
 #### **itudata:** 
@@ -81,10 +84,12 @@ Global data is downloaded from: https://www.ncei.noaa.gov/products/etopo-global-
 * **clc:** original file was downloaded from the [Copernicus](https://land.copernicus.eu/pan-european/corine-land-cover/clc2018) website (download the GeoTIFF data). Login is required. Using gdal utilies this file was translated to landcover-2020-classification_resampled.tif so that the 1-arcsec tiles matchup with 1-arcsec 3DEP tiles and the canada landcover classifications are mapped to the equivalent NLCD codes.
 * **population:** https://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-rev11
 
-* **US.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
-* **CA.kml:** https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/index2021-eng.cfm?year=21 (Catrographic Boundary files, selecting 'Provinces/territories' of Administrative boundaries)
-* **GB.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
-* **BRA.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
+* **Country Boundary Files:**
+The following country boundary files were created from data obtained from the following websites.  The procedure for converting data into the format used by AFC is described in [readme](tools/geo_converters/proc_gdal/proc_boundary_examples/readme.md).
+    * **US.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
+    * **CA.kml:** https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/index2021-eng.cfm?year=21 (Catrographic Boundary files, selecting 'Provinces/territories' of Administrative boundaries)
+    * **GB.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
+    * **BRA.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
  
 * **itudata:** The Radio Climate map, TropoClim.txt, is in the zip file from ITU-R Rec, P.617-3 (https://www.itu.int/dms_pubrec/itu-r/rec/p/R-REC-P.617-3-201309-S!!ZIP-E.zip).  The Surface Refractivity map, N050.txt, is in the zip file from ITU-R Rec, P.617-5 (https://www.itu.int/dms_pubrec/itu-r/rec/p/R-REC-P.617-5-201908-I!!ZIP-E.zip)
 

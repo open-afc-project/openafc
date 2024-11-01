@@ -38,4 +38,4 @@ RUN apk add cmake g++ make musl-dev && cd /usr/app/proc_gdal/src && \
 
 ENV PATH=$PATH:/usr/app:/usr/app/proc_gdal
 
-CMD sh
+CMD ["sh"]
