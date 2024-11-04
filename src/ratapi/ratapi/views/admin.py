@@ -587,6 +587,8 @@ class AllowedFreqRanges(MethodView):
 
     def get(self):
         """GET method for allowed frequency bands"""
+        user_id = auth(roles=["Admin", "AP", "Analysis"])
+        LOGGER.debug("current user: %s", user_id)
         LOGGER.debug("getting admin supplied frequncy bands")
         filename = "allowed_frequencies.json"
         if filename not in self.ACCEPTABLE_FILES:
