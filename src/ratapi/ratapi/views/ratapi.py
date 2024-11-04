@@ -434,6 +434,8 @@ class AfcRegions(MethodView):
     def get(self):
         ''' GET method for afc config
         '''
+        user_id = auth(roles=['Admin'])
+        LOGGER.debug('Getting AFC regions for user %s', user_id)
         resp = flask.make_response()
         resp.data = ' '.join(RulesetVsRegion.region_list())
         resp.content_type = 'text/plain'
@@ -1117,6 +1119,8 @@ class AfcRulesetIds(MethodView):
     def get(self):
         ''' GET method for afc config
         '''
+        user_id = auth(roles=['AP', 'Analysis', 'Admin'])
+        LOGGER.debug('getting ruleset ids with user is %s', user_id)
         resp = flask.make_response()
         resp.data = ' '.join(RulesetVsRegion.ruleset_list())
         resp.content_type = 'text/plain'
