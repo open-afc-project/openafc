@@ -13,6 +13,15 @@ Creates file: ```proc_boundary_us_50km.kml```
 
 (2) Process Canada boundary:
 
+For the Canada boundary, the file downloaded ```lpr_000b21a_e.shp``` is not in a longitude/latitude format.  As such, before running proc_gdal this file must be converted to a longitude/latitude format by running:
+
+```
+ogr2ogr -t_srs 'WGS84' /mnt/nfs/rat_transfer/country_bdy/lpr_000b21a_e_wgs84.shp /mnt/nfs/rat_transfer/country_bdy/lpr_000b21a_e.shp
+```
+
+Next, the Canada boundary can be processed using proc_gdal:
+
+
 COMMAND:
 ```
 ../proc_gdal -templ templates/templ_proc_boundary_ca_50km.txt >| data_proc_boundary_ca_50km.txt

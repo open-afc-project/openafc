@@ -87,7 +87,7 @@ Global data is downloaded from: https://www.ncei.noaa.gov/products/etopo-global-
 * **Country Boundary Files:**
 The following country boundary files were created from data obtained from the following websites.  The procedure for converting data into the format used by AFC is described in [readme](tools/geo_converters/proc_gdal/proc_boundary_examples/readme.md).
     * **US.kml:** https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_us_nation_5m.zip
-    * **CA.kml:** https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/index2021-eng.cfm?year=21 (Catrographic Boundary files, selecting 'Provinces/territories' of Administrative boundaries)
+    * **CA.kml:** https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lpr_000b21a_e.zip
     * **GB.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
     * **BRA.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
  
