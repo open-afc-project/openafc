@@ -1,4 +1,12 @@
 #!/bin/bash
+#!/bin/sh
+#
+# Copyright (C) 2024 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
 [ -z "$1" ] && echo "provide from tag name "&&exit || echo   "from $1"
 [ -z "$2" ] && echo "provide to tag name "&&exit || echo "  to $2"
 
@@ -31,11 +39,6 @@ from=$1
 to=$2
 
 docker login ${REPO}
-
-#aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/w9v6y1o0
-#aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 110738915961.dkr.ecr.us-east-1.amazonaws.com
-
-#images=(${RCACHE} ${CERT_DB} ${RATDB} ${WEBUI} ${MSGHND} ${WORKER} ${WORKER_AL_D4B} ${WORKER_AL_PRINST} ${OBJST} ${RMQ} ${DISPATCHER} ${ALS_SIPHON} ${ALS_KAFKA} ${BULK_POSTGRES} ${ULS_DOWNLOADER} ${GRAFANA} ${PROMETHEUS} ${CADVISOR} ${AFC_SERVER} ${NGINXEXPORTER} ${GEO_CONVERTERS})
 images=(
   ${AFC_SERVER}
   ${ALS_KAFKA}
@@ -67,25 +70,3 @@ for img in ${images[@]}; do
 	docker push ${REPO}/${img}:${to}
 	docker push ${REPO}/${img}:latest
 done
-
-
-
-
-
-#docker images | grep ${from} 
-#docker tag dr942120/srv_di:${from} 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server:${to}
-#docker tag dr942120/srv_di:${from} 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server:latest
-#docker tag dr942120/centos-build-image:${from} public.ecr.aws/w9v6y1o0/openafc/centos-build-image:${to}
-#docker tag dr942120/centos-build-image:${from} public.ecr.aws/w9v6y1o0/openafc/centos-build-image:latest
-#docker tag dr942120/centos-preinstall-image:${from} public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image:${to}
-#docker tag dr942120/centos-preinstall-image:${from} public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image:latest
-
-
-#docker images | grep ${to} 
-#echo docker push 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server:${to}
-#echo docker push 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server:latest
-#echo docker push public.ecr.aws/w9v6y1o0/openafc/centos-build-image:${to}
-#echo docker push public.ecr.aws/w9v6y1o0/openafc/centos-build-image:latest
-#echo docker push public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image:${to}
-#echo docker push public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image:latest
-
