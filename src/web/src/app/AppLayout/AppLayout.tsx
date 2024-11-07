@@ -129,19 +129,19 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
 
   // @ts-ignore
   const uls: any = (
-    <a target="_blank" href={guiConfig.uls_url}>
+    <a target="_blank" rel="noopener noreferrer" href={guiConfig.uls_url}>
       ULS Databases
     </a>
   );
   // @ts-ignore
   const antenna: any = (
-    <a target="_blank" href={guiConfig.antenna_url}>
+    <a target="_blank" rel="noopener noreferrer" href={guiConfig.antenna_url}>
       Antenna Patterns
     </a>
   );
   // @ts-ignore
   const history: any = (
-    <a target="_blank" href={guiConfig.history_url}>
+    <a target="_blank" rel="noopener noreferrer" href={guiConfig.history_url}>
       Debug Files
     </a>
   );
