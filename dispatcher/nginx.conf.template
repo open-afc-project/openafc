@@ -65,7 +65,6 @@ http {
         add_header Referrer-Policy "strict-origin-when-cross-origin";
         add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), speaker=(), vibrate=(), payment=(), fullscreen=(self), sync-xhr=(), magnetometer=(), gyroscope=(), accelerometer=(), usb=(), autoplay=(), midi=(), encrypted-media=(), vr=(), xr-spatial-tracking=()";
         add_header Feature-Policy "geolocation 'self'; microphone 'none'; camera 'none'; speaker 'none'; vibrate 'none'; payment 'none'; fullscreen 'self'; sync-xhr 'none'; magnetometer 'none'; gyroscope 'none'; accelerometer 'none'; usb 'none'; autoplay 'none'; midi 'none'; encrypted-media 'self'; vr 'none'; xr-spatial-tracking 'none';";
-        add_header Cross-Origin-Opener-Policy "same-origin";
 
 
         #ssl_stapling on;
@@ -118,9 +117,6 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_pass http://webui;
             proxy_redirect http:// $scheme://;
-            # keep connections open by changing it's header
-            proxy_http_version 1.1;
-            proxy_set_header   "Connection" "";
         }
 
         location /fbrat/ap-afc/availableSpectrumInquiry {
@@ -140,9 +136,6 @@ http {
             # transmit a request to a proxied server
             proxy_send_timeout 720;
             proxy_pass http://msghnd$uri$is_args$args;
-            # keep connections open by changing it's header
-            proxy_http_version 1.1;
-            proxy_set_header   "Connection" "";
             access_log off;
             log_not_found off;
         }
