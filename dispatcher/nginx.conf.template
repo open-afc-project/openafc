@@ -65,7 +65,6 @@ http {
         add_header Referrer-Policy "strict-origin-when-cross-origin";
         add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), speaker=(), vibrate=(), payment=(), fullscreen=(self), sync-xhr=(), magnetometer=(), gyroscope=(), accelerometer=(), usb=(), autoplay=(), midi=(), encrypted-media=(), vr=(), xr-spatial-tracking=()";
         add_header Feature-Policy "geolocation 'self'; microphone 'none'; camera 'none'; speaker 'none'; vibrate 'none'; payment 'none'; fullscreen 'self'; sync-xhr 'none'; magnetometer 'none'; gyroscope 'none'; accelerometer 'none'; usb 'none'; autoplay 'none'; midi 'none'; encrypted-media 'self'; vr 'none'; xr-spatial-tracking 'none';";
-        add_header Cross-Origin-Opener-Policy "same-origin";
 
 
         #ssl_stapling on;
