@@ -82,3 +82,4 @@ and to run a re-format
 ```
 yarn prettier src --write
 ```
+If you have a prettier issue in the check, you need to run prettier --write locally and see what has changed to understand what is needed.  Prettier does not provide a list of changes, it just rewrites your files.
