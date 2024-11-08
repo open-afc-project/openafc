@@ -26,10 +26,12 @@ BEGIN {
 	print ""
 	print "CREATE EXTENSION postgis;"
 	print ""
+    # Make all operations SQL-statement-level (not line-level)
 	RS=ORS=";"
 }
 
-/\w+ TABLE \"device_descriptor_certification\"/ {next}
-/\w+ TABLE \"device_descriptor_regulatory_rule\"/ {next}
+# Removal of unwanted tables, created by dbdiagram.io for many-to-many relations
+/\w+ TABLE "device_descriptor_certification"/ {next}
+/\w+ TABLE "device_descriptor_regulatory_rule"/ {next}
 
 { print }
