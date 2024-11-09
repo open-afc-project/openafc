@@ -142,7 +142,7 @@ class AfcServerMessageProcessor:
 
     async def process_msg(self, req_msg: Rest_ReqMsg, debug: bool,
                           edebug: bool, nocache: bool, gui: bool,
-                          internal: bool) \
+                          mtls_dn: Optional[str], internal: bool) \
             -> Dict[str, Any]:
         """ Process AFC Request message
 
@@ -152,29 +152,35 @@ class AfcServerMessageProcessor:
         edebug   -- True if 'edebug' flag was set in URL
         nocache  -- True if 'nocache' flag was set in URL
         gui      -- True if 'gui' flag was set in URL
+        mtls_dn  -- DN of client's MTLS certificate or None
         internal -- True if request message came from within the cluster
         Returns AFC Response message in dictionary form
         """
         req_msg_dict = req_msg.dict(exclude_none=True)
         als_req_id = als.als_afc_req_id()
-        als.als_afc_request(req_id=als_req_id, req=req_msg_dict)
+        als.als_afc_request(
+            req_id=als_req_id, mtls_dn=mtls_dn, req=req_msg_dict)
         deadline = time.time() + \
             (self._edebug_request_timeout_sec if edebug
              else self._request_timeout_sec)
+        ret: Dict[str, Any]
         # Message format version acceptable?
         if req_msg.version not in Rest_SupportedVersions:
-            return \
+            ret = \
                 self._make_response_msg(
                     response_info=self._make_response_info(
-                        response_code=Rest_ResponseCode.VERSION_NOT_SUPPORTED),
+                        response_code=Rest_ResponseCode.
+                        VERSION_NOT_SUPPORTED),
                     req_msg_dict=req_msg_dict)
-        ret = \
-            (await self._process_msg_internal(
-                req_msg_dict=req_msg_dict, debug=debug, edebug=edebug,
-                nocache=nocache, gui=gui, internal=internal,
-                als_req_id=als_req_id, deadline=deadline))
-        self._drop_unwanted_extensions(
-            msg_dict=ret, is_input=False, is_gui=gui, is_internal=internal)
+        else:
+            ret = \
+                (await self._process_msg_internal(
+                    req_msg_dict=req_msg_dict, debug=debug, edebug=edebug,
+                    nocache=nocache, gui=gui, internal=internal,
+                    als_req_id=als_req_id, deadline=deadline))
+            self._drop_unwanted_extensions(
+                msg_dict=ret, is_input=False, is_gui=gui,
+                is_internal=internal)
         als.als_afc_response(req_id=als_req_id, resp=ret)
         return ret
 
@@ -223,9 +229,10 @@ class AfcServerMessageProcessor:
                     req_tg.create_task(
                         self._process_req(
                             req_dict=req_dict, debug=debug, edebug=edebug,
-                            nocache=nocache, gui=gui, als_req_id=als_req_id,
-                            req_idx=req_idx, deadline=deadline)))
-        # Make result form individual responses
+                            nocache=nocache, gui=gui, internal=internal,
+                            als_req_id=als_req_id, req_idx=req_idx,
+                            deadline=deadline)))
+        # Make result from individual responses
         return \
             self._make_response_msg(
                 responses=[task.result() for task in req_tasks],
@@ -233,8 +240,8 @@ class AfcServerMessageProcessor:
 
     async def _process_req(self, req_dict: Dict[str, Any], debug: bool,
                            edebug: bool, nocache: bool, gui: bool,
-                           als_req_id: int, req_idx: int, deadline: float) \
-            -> Dict[str, Any]:
+                           internal: bool, als_req_id: int, req_idx: int,
+                           deadline: float) -> Dict[str, Any]:
         """ Process individual AFC request
 
         Arguments:
@@ -243,6 +250,7 @@ class AfcServerMessageProcessor:
         edebug        -- True if 'edebug' flag was set in URL
         nocache       -- True if 'nocache' flag was set in URL
         gui           -- True if 'gui' flag was set in URL
+        internal      -- True if request message came from within the cluster
         als_req_id    -- Request id to use in subsequent ALS writes
         req_idx       -- Request index inside AFC Request message
         deadline      -- Message processing deadline in seconds since the Epoch
@@ -266,10 +274,10 @@ class AfcServerMessageProcessor:
             validated_dict = None
 
             # Find allowed certifications
+            cert_req = afc_server_db.AfcCertReq(req.deviceDescriptor)
             cert_info = \
-                await self._db.get_cert_info(
-                    afc_server_db.AfcCertReq(req.deviceDescriptor),
-                    deadline=deadline)
+                afc_server_db.AfcCertResp(bypass_checks=cert_req) if internal \
+                else await self._db.get_cert_info(cert_req, deadline=deadline)
             allowed_certifications = cert_info.allowed_cert_resps()
             if not allowed_certifications:
                 # Bail if none allowed
