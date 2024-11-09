@@ -111,6 +111,7 @@ http {
             # keep connections open by changing it's header
             proxy_http_version 1.1;
             proxy_set_header   "Connection" "";
+            proxy_set_header "mTLS-DN" '$ssl_client_s_dn';
         }
 
         location /fbrat/ap-afc/availableSpectrumInquiry {
@@ -133,6 +134,7 @@ http {
             # keep connections open by changing it's header
             proxy_http_version 1.1;
             proxy_set_header   "Connection" "";
+            proxy_set_header "mTLS-DN" '$ssl_client_s_dn';
             access_log off;
             log_not_found off;
         }
