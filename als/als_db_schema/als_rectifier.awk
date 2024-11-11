@@ -9,7 +9,7 @@
 BEGIN {
 	print "/*"
 	print " * Copyright (C) 2022 Broadcom. All rights reserved."
-	print " * The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate"
+	print " * The term \"Broadcom\" refers solely to the Broadcom Inc. corporate affiliate"
 	print " * that owns the software below."
 	print " * This work is licensed under the OpenAFC Project License, a copy of which is"
 	print " * included with this software program."
