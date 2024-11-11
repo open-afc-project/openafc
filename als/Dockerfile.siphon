@@ -11,6 +11,7 @@
 
 FROM alpine:3.18
 
+# Destination in docker image. Not a parameter (i.e. no reasons to change it)
 ARG WORKDIR=/usr/app
 ENV WORKDIR=$WORKDIR
 
