@@ -2794,7 +2794,6 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
     _col_tx_time          -- AFC Response timetag column
     _rx_envelope_digest   -- AFC Request envelope digest column
     _tx_envelope_digest   -- AFC Response envelope digest column
-    _tx_envelope_digest   -- AFC Response envelope digest column
     _mtls_dn_digest       -- mTLS DN  digest column
     _afc_server_lookup    -- Lookup fr AFC Server names
     _rr_assoc_updater     -- Updater of message to request/response association
