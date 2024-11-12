@@ -17,7 +17,9 @@
 
 #include "global_defines.h"
 #include "GdalDataModel.h"
+#include "image.h"
 #include "data_set.h"
+#include "polygon.h"
 
 /******************************************************************************************/
 /**** FUNCTION: DataSetClass::DataSetClass()                                           ****/
@@ -50,6 +52,8 @@ void DataSetClass::run()
         vectorCvg();
     } else if (parameterTemplate.function == "mbRasterCvg") {
         mbRasterCvg();
+    } else if (parameterTemplate.function == "procBoundary") {
+        procBoundary();
     } else {
         std::ostringstream errStr;
         errStr << "ERROR: function set to unrecognized value: " << parameterTemplate.function;
@@ -1134,5 +1138,365 @@ void DataSetClass::mbRasterCvg()
     command = "convert /tmp/image_2.ppm " + parameterTemplate.imageFile2;
     std::cout << "COMMAND: " << command << std::endl;
     system(command.c_str());
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: DataSetClass::procBoundary                                             ****/
+/******************************************************************************************/
+void DataSetClass::procBoundary()
+{
+    std::ostringstream errStr;
+
+    GDALAllRegister();
+
+    GdalDataModel *gdalDataModel = new GdalDataModel(parameterTemplate.srcFileVector, "");
+    // gdalDataModel->printDebugInfo();
+
+    OGRLayer *layer = gdalDataModel->getLayer();
+
+    double minLon, maxLon;
+    double minLat, maxLat;
+
+#if 1
+    gdalDataModel->getExtents(minLon, maxLon, minLat, maxLat, parameterTemplate.minLonWrap);
+#else
+    // If polygon wraps around discontinuity in longitude (-180 to 180) this does not work well
+    OGREnvelope oExt;
+    if (layer->GetExtent(&oExt, TRUE) == OGRERR_NONE) {
+        minLon = oExt.MinX;
+        maxLon = oExt.MaxX;
+        minLat = oExt.MinY;
+        maxLat = oExt.MaxY;
+    }
+#endif
+
+    std::cout << "MIN_LON = " << minLon << std::endl;
+    std::cout << "MAX_LON = " << maxLon << std::endl;
+    std::cout << "MIN_LAT = " << minLat << std::endl;
+    std::cout << "MAX_LAT = " << maxLat << std::endl;
+
+    double samplesPerDeg = parameterTemplate.samplesPerDeg;
+
+    int lonN0 = (int) floor(minLon * samplesPerDeg) - (parameterTemplate.polygonExpansion + 4);
+    int lonN1 = (int) floor(maxLon * samplesPerDeg) + (parameterTemplate.polygonExpansion + 4);
+    int latN0 = (int) floor(minLat * samplesPerDeg) - (parameterTemplate.polygonExpansion + 4);
+    int latN1 = (int) floor(maxLat * samplesPerDeg) + (parameterTemplate.polygonExpansion + 4);
+
+    int numLon = lonN1 - lonN0 + 1;
+    int numLat = latN1 - latN0 + 1;
+    int lonIdx, latIdx;
+
+    double longitudeDegStart = ((double) lonN0     ) / samplesPerDeg;
+    double longitudeDegStop  = ((double) lonN1  + 1) / samplesPerDeg;
+    double latitudeDegStart  = ((double) latN0     ) / samplesPerDeg;
+    double latitudeDegStop   = ((double) latN1  + 1) / samplesPerDeg;
+
+#if 0
+    FILE *fkml = (FILE *) NULL;
+    /**************************************************************************************/
+    /* Open KML File and write header                                                     */
+    /**************************************************************************************/
+    if ( !(fkml = fopen("/tmp/doc.kml", "wb")) ) {
+        errStr << std::string("ERROR: Unable to open kmlFile \"") + "/tmp/doc.kml" + std::string("\"\n");
+        throw std::runtime_error(errStr.str());
+    }
+    fprintf(fkml, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    fprintf(fkml, "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n");
+    fprintf(fkml, "\n");
+    fprintf(fkml, "    <Document>\n");
+    fprintf(fkml, "        <name>Shapefile Coverage</name>\n");
+    fprintf(fkml, "        <open>1</open>\n");
+    fprintf(fkml, "        <description>%s : Display Shapefile Coverage</description>\n", parameterTemplate.name.c_str());
+    fprintf(fkml, "\n");
+    /**************************************************************************************/
+#endif
+
+    std::string tmpImageFile = (parameterTemplate.tmpImageFile.empty() ? "/tmp/image.ppm" : parameterTemplate.tmpImageFile);
+
+    /**************************************************************************************/
+    /* Define color scheme                                                                */
+    /**************************************************************************************/
+    std::vector<std::string> colorList;
+    colorList.push_back("255   0   0"); // 0: Not Used
+    colorList.push_back("  0   0   0"); // 1: Polygon Interior
+    colorList.push_back("255 255 255"); // 2: Polygon Exterior
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /**** Allocate and initialize image array                                          ****/
+    /**************************************************************************************/
+    ImageClass *image = new ImageClass(lonN0, lonN1, latN0, latN1, samplesPerDeg);
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /**** Create Driver                                                                ****/
+    /**************************************************************************************/
+    const char *pszDriverName = "ESRI Shapefile";
+    GDALDriver *poDriver;
+
+    poDriver = GetGDALDriverManager()->GetDriverByName(pszDriverName );
+    if( poDriver == NULL )
+    {
+        printf( "%s driver not available.\n", pszDriverName );
+        exit( 1 );
+    }
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /**** Add all polygons from layer, one segment at a time                           ****/
+    /**************************************************************************************/
+    int totalNumberPoints = 0;
+    OGREnvelope env;
+    std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter> ptrOFeature;
+    layer->ResetReading();
+    while ((ptrOFeature = std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter>(layer->GetNextFeature())) != NULL) {
+        // GDAL maintains ownership of returned pointer, so we should not manage its memory
+        OGRGeometry *ptrOGeometry = ptrOFeature->GetGeometryRef();
+
+        if (ptrOGeometry != NULL) {
+            bool useGeometryFlag;
+            bool isMultiPolygonFlag;
+            bool cont;
+            OGRMultiPolygon *multipoly;
+            OGRPolygon *poly;
+            OGRPolygon **iter;
+            OGRwkbGeometryType geometryType = ptrOGeometry->getGeometryType();
+            if (geometryType == OGRwkbGeometryType::wkbPolygon) {
+                poly = (OGRPolygon *) ptrOGeometry;
+                useGeometryFlag = true;
+                isMultiPolygonFlag = false;
+            } else if (geometryType == OGRwkbGeometryType::wkbMultiPolygon ) {
+                multipoly = (OGRMultiPolygon *) ptrOGeometry;
+                iter = multipoly->begin();
+                if (iter != multipoly->end()) {
+                    useGeometryFlag = true;
+                } else {
+                    useGeometryFlag = false;
+                }
+                isMultiPolygonFlag = true;
+            } else {
+                useGeometryFlag = false;
+                isMultiPolygonFlag = false;
+                std::cout << "Ignore features of type: " << OGRGeometryTypeToName(geometryType) << std::endl;
+            }
+
+            if (useGeometryFlag) {
+                do {
+                    if (isMultiPolygonFlag) {
+                        poly = *iter;
+                    }
+
+                    OGRLinearRing *pRing = poly->getExteriorRing();
+                    int numPoints = pRing->getNumPoints();
+                    // std::cout << "NUM_POINTS = " << pRing->getNumPoints() << std::endl;
+                    if (numPoints > 2) {
+                        double prevLon = pRing->getX(numPoints-1);
+                        double prevLat = pRing->getY(numPoints-1);
+                        while(prevLon < parameterTemplate.minLonWrap) {
+                            prevLon += 360.0;
+                        }
+                        while(prevLon >= parameterTemplate.minLonWrap+360.0) {
+                            prevLon -= 360.0;
+                        }
+
+                        int nx0 = (int) floor(prevLon * samplesPerDeg) - lonN0;
+                        int ny0 = (int) floor(prevLat * samplesPerDeg) - latN0;
+                        for(int ptIdx=0; ptIdx<pRing->getNumPoints(); ptIdx++) {
+                            double lon = pRing->getX(ptIdx);
+                            double lat = pRing->getY(ptIdx);
+                            while(lon < parameterTemplate.minLonWrap) {
+                                lon += 360.0;
+                            }
+                            while(lon >= parameterTemplate.minLonWrap+360.0) {
+                                lon -= 360.0;
+                            }
+
+                            int nx1 = (int) floor(lon * samplesPerDeg) - lonN0;
+                            int ny1 = (int) floor(lat * samplesPerDeg) - latN0;
+
+                            // std::cout << "POINT " << ptIdx << ": " << lon << " " << lat << std::endl;
+
+                            image->processSegment(prevLon, prevLat, nx0, ny0, lon, lat, nx1, ny1);
+
+                            prevLon = lon;
+                            prevLat = lat;
+                            nx0 = nx1;
+                            ny0 = ny1;
+                            totalNumberPoints++;
+                        }
+                    } else {
+                        std::cout << "WARNING: Polygon has " << numPoints << " virtices" << std::endl;
+                    }
+
+                    if (isMultiPolygonFlag) {
+                        iter++;
+                        if (iter != multipoly->end()) {
+                            cont = true;
+                        } else {
+                            cont = false;
+                        }
+                    } else {
+                        cont = false;
+                    }
+                } while(cont);
+
+            }
+        }
+    }
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /**** Everything is in image, done with gdalDataModel                              ****/
+    /**************************************************************************************/
+    delete gdalDataModel;
+    /**************************************************************************************/
+
+    std::cout << "TOTAL_NUM_POINTS = " << totalNumberPoints << std::endl;
+
+    image->expand(1, parameterTemplate.polygonExpansion + 2);
+    image->fill();
+
+    image->changeVal(0, 1);
+    image->changeVal(2, 0);
+
+    std::vector<PolygonClass *> polyList = image->createPolygonList();
+
+    // PolygonClass::writeMultiGeometry(polyList, std::string("/tmp/") + parameterTemplate.name + "_dbg.kml", 1.0/samplesPerDeg, parameterTemplate.name + "_dbg");
+
+    int totalNumPts = 0;
+    for(int polyIdx=0; polyIdx<polyList.size(); ++polyIdx) {
+        PolygonClass *poly = polyList[polyIdx];
+        double area = poly->comp_bdy_area();
+        int numDel = 0;
+        if (area > 100.0) {
+            numDel = poly->simplify(0, parameterTemplate.polygonSimplify);
+        }
+
+        std::cout << "[" << polyIdx << "] POLYGON NUM_VIRTICES: " << poly->num_bdy_pt[0] << " Deleted " << numDel << " Points from polygon" << std::endl;
+        totalNumPts += poly->num_bdy_pt[0];
+    }
+    std::cout << "TOTAL_NUM_VIRTICES: " << totalNumPts << std::endl;
+
+    PolygonClass::writeMultiGeometry(polyList, parameterTemplate.kmlFile, 1.0/samplesPerDeg, parameterTemplate.name);
+
+#if 0
+    int interpolationFactor = 1;
+    int maxPtsPerRegion = 1000;
+    int numRegionLon = (numLon + maxPtsPerRegion - 1)/maxPtsPerRegion;
+    int numRegionLat = (numLat + maxPtsPerRegion - 1)/maxPtsPerRegion;
+
+    int lonRegionIdx;
+    int latRegionIdx;
+    int startLonIdx, stopLonIdx;
+    int startLatIdx, stopLatIdx;
+    int lonN = numLon/numRegionLon;
+    int lonq = numLon%numRegionLon;
+    int latN = numLat/numRegionLat;
+    int latq = numLat%numRegionLat;
+
+    for(lonRegionIdx=0; lonRegionIdx<numRegionLon; lonRegionIdx++) {
+
+        if (lonRegionIdx < lonq) {
+            startLonIdx = (lonN+1)*lonRegionIdx;
+            stopLonIdx  = (lonN+1)*lonRegionIdx+lonN;
+        } else {
+            startLonIdx = lonN*lonRegionIdx + lonq;
+            stopLonIdx  = lonN*lonRegionIdx + lonq + lonN - 1;
+        }
+
+        for(latRegionIdx=0; latRegionIdx<numRegionLat; latRegionIdx++) {
+
+            if (latRegionIdx < latq) {
+                startLatIdx = (latN+1)*latRegionIdx;
+                stopLatIdx  = (latN+1)*latRegionIdx+latN;
+            } else {
+                startLatIdx = latN*latRegionIdx + latq;
+                stopLatIdx  = latN*latRegionIdx + latq + latN - 1;
+            }
+
+            /**************************************************************************************/
+            /* Create PPM File                                                                    */
+            /**************************************************************************************/
+            FILE *fppm;
+            if ( !(fppm = fopen("/tmp/image.ppm", "wb")) ) {
+                throw std::runtime_error("ERROR");
+            }
+            fprintf(fppm, "P3\n");
+            fprintf(fppm, "%d %d %d\n", (stopLonIdx-startLonIdx+1)*interpolationFactor, (stopLatIdx-startLatIdx+1)*interpolationFactor, 255);
+
+            for(latIdx=stopLatIdx; latIdx>=startLatIdx; --latIdx) {
+                for(int interpLat=interpolationFactor-1; interpLat>=0; --interpLat) {
+                    for(lonIdx=startLonIdx; lonIdx<=stopLonIdx; ++lonIdx) {
+                        for(int interpLon=0; interpLon<interpolationFactor; interpLon++) {
+                            if (lonIdx || interpLon) { fprintf(fppm, " "); }
+                            fprintf(fppm, "%s", colorList[image->getVal(lonIdx,latIdx)].c_str());
+                        }
+                    }
+                    fprintf(fppm, "\n");
+                }
+            }
+            fclose(fppm);
+            /**************************************************************************************/
+
+            std::string pngFile = "/tmp/image_" + std::to_string(lonRegionIdx)
+                                          + "_" + std::to_string(latRegionIdx) + ".png";
+
+            std::string command = "convert /tmp/image.ppm -transparent white " + pngFile;
+            std::cout << "COMMAND: " << command << std::endl;
+            system(command.c_str());
+
+            /**************************************************************************************/
+            /* Write to KML File                                                                  */
+            /**************************************************************************************/
+            fprintf(fkml, "<GroundOverlay>\n");
+            fprintf(fkml, "    <name>Region: %d_%d</name>\n", lonRegionIdx, latRegionIdx);
+            fprintf(fkml, "    <visibility>%d</visibility>\n", 1);
+            fprintf(fkml, "    <color>C0ffffff</color>\n");
+            fprintf(fkml, "    <Icon>\n");
+            fprintf(fkml, "        <href>image_%d_%d.png</href>\n", lonRegionIdx, latRegionIdx);
+            fprintf(fkml, "    </Icon>\n");
+            fprintf(fkml, "    <LatLonBox>\n");
+            fprintf(fkml, "        <north>%.8f</north>\n", latitudeDegStart  + ((double) (stopLatIdx + 1))/samplesPerDeg);
+            fprintf(fkml, "        <south>%.8f</south>\n", latitudeDegStart  + ((double) (startLatIdx   ))/samplesPerDeg);
+            fprintf(fkml, "        <east>%.8f</east>\n",   longitudeDegStart + ((double) (stopLonIdx + 1))/samplesPerDeg);
+            fprintf(fkml, "        <west>%.8f</west>\n",   longitudeDegStart + ((double) (startLonIdx   ))/samplesPerDeg);
+            fprintf(fkml, "    </LatLonBox>\n");
+            fprintf(fkml, "</GroundOverlay>\n");
+            /**************************************************************************************/
+
+        }
+    }
+
+    /**************************************************************************************/
+    /* Write end of KML and close                                                         */
+    /**************************************************************************************/
+    if (fkml) {
+        fprintf(fkml, "    </Document>\n");
+        fprintf(fkml, "</kml>\n");
+        fclose(fkml);
+
+        std::string kmzFile = parameterTemplate.name + ".kmz";
+
+        std::string command;
+
+        std::cout << "CLEARING KMZ FILE: " << std::endl;
+        command = "rm -fr " + kmzFile;
+        system(command.c_str());
+
+        command = "zip -j " + kmzFile + " /tmp/doc.kml";
+        int caseIdx;
+        for(lonRegionIdx=0; lonRegionIdx<numRegionLon; lonRegionIdx++) {
+            for(latRegionIdx=0; latRegionIdx<numRegionLat; latRegionIdx++) {
+                command += " /tmp/image_" + std::to_string(lonRegionIdx)
+                                    + "_" + std::to_string(latRegionIdx) + ".png";
+            }
+        }
+        std::cout << "COMMAND: " << command.c_str() << std::endl;
+        system(command.c_str());
+    }
+    /**************************************************************************************/
+#endif
+    return;
 }
 /******************************************************************************************/
