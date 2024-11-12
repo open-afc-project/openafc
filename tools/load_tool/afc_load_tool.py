@@ -14,6 +14,7 @@
 # pylint: disable=too-many-branches, too-many-nested-blocks
 # pylint: disable=too-many-statements, eval-used, consider-using-with
 # pylint: disable=unnecessary-pass, use-yield-from
+# pylint: disable=too-many-positional-arguments
 
 import argparse
 from collections.abc import Iterable, Iterator
@@ -37,6 +38,7 @@ import re
 import shlex
 import signal
 import sqlite3
+import ssl
 import subprocess
 import sys
 import time
@@ -1320,6 +1322,7 @@ class ResultsProcessor:
         cpu_consumed_ns: int = 0
         time_spent_sec: float = 0
         req_rate_ema = RateEma()
+        max_req_rate: float = 0
         cpu_consumption_ema = RateEma()
 
         def status_message(intermediate: bool) -> str:
@@ -1355,8 +1358,9 @@ class ResultsProcessor:
                 f"({requests_failed * 100 / (requests_sent or 1):.3f}%), " \
                 f"{retries} retries made. " \
                 f"{elapsed_str} elapsed, " \
-                f"rate is {global_req_rate:.3f} req/sec " \
-                f"(avg req proc time {req_duration_str})"
+                f"avg rate {global_req_rate:.3f} req/sec " \
+                f"(avg req proc time {req_duration_str}), " \
+                f"max rate {max_req_rate:.3f} req/sec"
             if cpu_consumption >= 0:
                 ret += f", CPU consumption is {cpu_consumption:.3f}"
             if intermediate and elapsed_sec and requests_sent:
@@ -1391,14 +1395,17 @@ class ResultsProcessor:
                 if isinstance(result_info, TickInfo):
                     req_rate_ema.on_tick(requests_sent)
                     cpu_consumption_ema.on_tick(cpu_consumed_ns * 1e-9)
+                    max_req_rate = max(max_req_rate, req_rate_ema.rate_ema)
                     if self._rate_print_sec is not None:
                         now = datetime.datetime.now()
                         if (now - self._last_rate_printed).total_seconds() >= \
                                 self._rate_print_sec:
                             self._last_rate_printed = now
                             self._status_printer.pr(
-                                f"{now.strftime('%H:%M:%S')}: "
-                                f"{req_rate_ema.rate_ema:.3f} req/sec")
+                                f"{now.strftime('%H:%M:%S')}. "
+                                f"Current rate: {req_rate_ema.rate_ema:.3f} "
+                                f"req/sec, max rate: {max_req_rate:.3f} "
+                                f"req/sec")
                             print("")
                     continue
                 error_msg = result_info.error_msg
@@ -1482,11 +1489,54 @@ class ResultsProcessor:
             self._status_printer.pr(s)
 
 
+def get_https_args(url: str, use_requests: bool, client_cert: Optional[str],
+                   client_key: Optional[str], ca_cert: Optional[str],
+                   verify_server: bool) -> Dict[str, Any]:
+    """ Returns https-related kwargs for requests or urllib.request
+
+    Argumens:
+    url           -- URL (used to find out if protocol is HTTPS)
+    use_requests  -- True to return parameters for requests, False - for
+                     urllib.request
+    client_cert   -- None or client mTLS certificate or PEM file
+    client_cert   -- None or client mTLS certificate or PEM file
+    client_key    -- None or client mTLS private key file\
+    ca_cert       -- None or CA certificate file
+    verify_server -- True to verify HTTPS server certificate
+    Returns dictionary of https-related arguments, empty dictionary if URL
+    is HTTP
+    """
+    ret: Dict[str, Any] = {}
+    if urllib.parse.urlparse(url).scheme != Protocol.https.name:
+        return ret
+    error_if(client_cert and (not os.path.isfile(client_cert)),
+             f"Client certificate file '{client_cert}' not found")
+    error_if(client_key and (not os.path.isfile(client_key)),
+             f"Client key file '{client_key}' not found")
+    error_if(client_key and (not client_cert),
+             "Client key file may not be used without client certificate file")
+    if use_requests:
+        ret["verify"] = ca_cert if ca_cert and verify_server else verify_server
+        if client_cert:
+            ret["cert"] = client_cert if not client_key \
+                else (client_cert, client_key)
+    else:
+        ssl_context = \
+            ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_cert)
+        ssl_context.check_hostname = verify_server
+        if client_cert:
+            ssl_context.load_cert_chain(client_cert, client_key)
+        ret["context"] = ssl_context
+    return ret
+
+
 def post_req_worker(
         url: str, retries: int, backoff: float, timeout: float, dry: bool,
         post_req_queue: multiprocessing.Queue,
         result_queue: "multiprocessing.Queue[ResultQueueDataType]",
         dry_result_data: Optional[bytes], use_requests: bool,
+        client_cert: Optional[str], client_key: Optional[str],
+        ca_cert: Optional[str], verify_server: bool,
         return_requests: bool = False, delay_sec: float = 0) -> None:
     """ REST API POST worker
 
@@ -1502,6 +1552,10 @@ def post_req_worker(
     result_queue    -- Result queue. Elements added are WorkerResultInfo for
                        operation results, None to signal that worker finished
     use_requests    -- True to use requests, False to use urllib.request
+    client_cert     -- None or client mTLS certificate or PEM file
+    client_key      -- None or client mTLS private key file
+    ca_cert          -- None or CA certificate file
+    verify_server   -- True to verify HTTPS server certificate
     return_requests -- True to return requests in WorkerResultInfo
     delay_sec       -- Delay start by this number of seconds
     """
@@ -1509,6 +1563,11 @@ def post_req_worker(
         time.sleep(delay_sec)
         session: Optional[requests.Session] = \
             requests.Session() if use_requests and (not dry) else None
+        https_args = \
+            get_https_args(
+                url=url, use_requests=use_requests, client_cert=client_cert,
+                client_key=client_key, ca_cert=ca_cert,
+                verify_server=verify_server)
         has_proc_time = hasattr(time, "process_time_ns")
         prev_proc_time_ns = time.process_time_ns() if has_proc_time else 0
         while True:
@@ -1537,7 +1596,7 @@ def post_req_worker(
                                         "application/json; charset=utf-8",
                                         "Content-Length":
                                         str(len(req_info.req_data))},
-                                    timeout=timeout)
+                                    timeout=timeout, **https_args)
                             if not resp.ok:
                                 last_error = \
                                     f"{resp.status_code}: {resp.reason}"
@@ -1554,8 +1613,8 @@ def post_req_worker(
                                        str(len(req_info.req_data)))
                         try:
                             with urllib.request.urlopen(
-                                    req, req_info.req_data, timeout=timeout) \
-                                    as f:
+                                    req, req_info.req_data, timeout=timeout,
+                                    **https_args) as f:
                                 result_data = f.read()
                             break
                         except (urllib.error.HTTPError, urllib.error.URLError,
@@ -1590,7 +1649,9 @@ def get_req_worker(
         url: str, expected_code: Optional[int], retries: int, backoff: float,
         timeout: float, dry: bool, get_req_queue: multiprocessing.Queue,
         result_queue: "multiprocessing.Queue[ResultQueueDataType]",
-        use_requests: bool) -> None:
+        use_requests: bool, client_cert: Optional[str],
+        client_key: Optional[str], ca_cert: Optional[str],
+        verify_server: bool) -> None:
     """ REST API GET worker
 
     Arguments:
@@ -1606,11 +1667,20 @@ def get_req_worker(
     result_queue  -- Result queue. Elements added are WorkerResultInfo for
                      operation results, None to signal that worker finished
     use_requests  -- True to use requests, False to use urllib.request
+    client_cert   -- None or client mTLS certificate or PEM file
+    client_key    -- None or client mTLS private key file
+    ca_cert       -- None or CA certificate file
+    verify_server -- True to verify HTTPS server certificate
     """
     try:
         if expected_code is None:
             expected_code = http.HTTPStatus.OK.value
         has_proc_time = hasattr(time, "process_time_ns")
+        https_args = \
+            get_https_args(
+                url=url, use_requests=use_requests, client_cert=client_cert,
+                client_key=client_key, ca_cert=ca_cert,
+                verify_server=verify_server)
         prev_proc_time_ns = time.process_time_ns() if has_proc_time else 0
         session: Optional[requests.Session] = \
             requests.Session() if use_requests and (not dry) else None
@@ -1630,7 +1700,8 @@ def get_req_worker(
                         if use_requests:
                             assert session is not None
                             try:
-                                resp = session.get(url=url, timeout=timeout)
+                                resp = session.get(url=url, timeout=timeout,
+                                                   **https_args)
                                 if resp.status_code != expected_code:
                                     last_error = \
                                         f"{resp.status_code}: {resp.reason}"
@@ -1643,8 +1714,8 @@ def get_req_worker(
                             status_code: Optional[int] = None
                             status_reason: str = ""
                             try:
-                                with urllib.request.urlopen(req,
-                                                            timeout=timeout):
+                                with urllib.request.urlopen(
+                                        req, timeout=timeout, **https_args):
                                     pass
                                 status_code = http.HTTPStatus.OK.value
                                 status_reason = http.HTTPStatus.OK.name
@@ -1759,7 +1830,9 @@ def run(url: str, parallel: int, backoff: float, timeout: float, retries: int,
         use_requests: bool = False, err_dir: Optional[str] = None,
         ramp_up: Optional[float] = None, randomize: Optional[bool] = None,
         population_db: Optional[str] = None,
-        rate_print_sec: Optional[float] = None) -> None:
+        rate_print_sec: Optional[float] = None,
+        client_cert: Optional[str] = None, client_key: Optional[str] = None,
+        ca_cert: Optional[str] = None, verify_server: bool = False) -> None:
     """ Run the POST operation
 
     Arguments:
@@ -1792,6 +1865,10 @@ def run(url: str, parallel: int, backoff: float, timeout: float, retries: int,
     population_db     -- Population database file name or None. Only used for
                          banner printing
     rate_print_sec    -- None or rate printing interval
+    client_cert       -- None or client mTLS certificate or PEM file
+    client_key        -- None or client mTLS private key file
+    ca_cert           -- None or CA certificate file
+    verify_server     -- True to verify HTTPS server certificate
     """
     error_if(use_requests and ("requests" not in sys.modules),
              "'requests' Python3 module have to be installed to use "
@@ -1842,7 +1919,9 @@ def run(url: str, parallel: int, backoff: float, timeout: float, retries: int,
         req_worker_kwargs: Dict[str, Any] = {
             "url": url, "backoff": backoff, "timeout": timeout,
             "retries": retries, "dry": dry, "result_queue": result_queue,
-            "use_requests": use_requests}
+            "use_requests": use_requests, "client_cert": client_cert,
+            "client_key": client_key, "ca_cert": ca_cert,
+            "verify_server": verify_server}
         req_worker: Callable
         if netload_target:
             req_worker = get_req_worker
@@ -2169,7 +2248,9 @@ def do_load(cfg: Config, args: Any) -> None:
         status_period=args.status_period,
         count=None if args.all else args.count, use_requests=args.no_reconnect,
         err_dir=args.err_dir, ramp_up=args.ramp_up, randomize=args.random,
-        population_db=args.population, rate_print_sec=args.rate_print_sec)
+        population_db=args.population, rate_print_sec=args.rate_print_sec,
+        client_cert=args.client_cert, client_key=args.client_key,
+        ca_cert=args.ca_cert, verify_server=args.verify_server)
 
 
 def do_netload(cfg: Config, args: Any) -> None:
@@ -2220,7 +2301,9 @@ def do_netload(cfg: Config, args: Any) -> None:
         retries=args.retries, dry=args.dry, batch=1000,
         expected_code=args.code if args.code is not None else expected_code,
         status_period=args.status_period, count=args.count,
-        use_requests=args.no_reconnect, rate_print_sec=args.rate_print_sec)
+        use_requests=args.no_reconnect, rate_print_sec=args.rate_print_sec,
+        client_cert=args.client_cert, client_key=args.client_key,
+        ca_cert=args.ca_cert, verify_server=args.verify_server)
 
 
 def do_cache(cfg: Config, args: Any) -> None:
@@ -2395,6 +2478,23 @@ def main(argv: List[str]) -> None:
         "or https port of the dispatcher. If neither --afc nor --dispatcher "
         "specified, AFC Requests are sent directly to msghnd (to avoid https "
         "issues on dispatcher")
+    switches_afc.add_argument(
+        "--verify_server", action="store_true",
+        help="Verify HTTPS server identity")
+    switches_afc.add_argument(
+        "--client_cert", metavar="CLIENT_CERT_OR_PEM_FILE",
+        help="Client certificate for mTLS authentication. May be .cert file "
+        "(containing certificate only) or .pem file (containing certificate "
+        "and private key). In former case --client_key parameter should also "
+        "be provided")
+    switches_afc.add_argument(
+        "--client_key", metavar="CLIENT_PRIVATE_KEY_FILE",
+        help="Client private key file thatr accompanies mTLS certificcate "
+        "file. Not needed if .pem certificate is used")
+    switches_afc.add_argument(
+        "--ca_cert", metavar="CA_CERT_PEM_FILE",
+        help="CA (certidication authority) certificate file to use if server "
+        "uses self-signed certificate")
 
     switches_k3d = argparse.ArgumentParser(add_help=False)
     switches_k3d.add_argument(

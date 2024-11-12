@@ -3,7 +3,7 @@
 ## **Version and Date**
 |Version|**135*|
 | :- | :- |
-|**Date**|**10/22/2024**|
+|**Date**|**11/12/2024**|
 
 ## **Issues Addressed**
  * 135: Country Boundary Fix 
@@ -18,6 +18,24 @@
  * Ran FSP1 on our local dev server and confirmed getting golden response.
 
 ## **Open Issues** 
+
+
+|Version|**226*|
+| :- | :- |
+|**Date**|**11/02/2024**|
+
+## **Issues Addressed**
+ * 226: Update jquery version from 1.11.0 
+
+
+## **Interface Changes**
+ * There was an unneeded link to an old jQuery that was removed
+
+## **Testing Done**
+ * Exercised UI: Updated configuration, exercised web page controls, ran a request, all functionality seems working
+
+## **Open Issues** 
+
 
 |Version|1.0.1.0|
 | :- | :- |
