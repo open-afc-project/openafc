@@ -142,7 +142,7 @@ class AfcServerMessageProcessor:
 
     async def process_msg(self, req_msg: Rest_ReqMsg, debug: bool,
                           edebug: bool, nocache: bool, gui: bool,
-                          internal: bool) \
+                          mtls_dn: Optional[str], internal: bool) \
             -> Dict[str, Any]:
         """ Process AFC Request message
 
@@ -152,12 +152,14 @@ class AfcServerMessageProcessor:
         edebug   -- True if 'edebug' flag was set in URL
         nocache  -- True if 'nocache' flag was set in URL
         gui      -- True if 'gui' flag was set in URL
+        mtls_dn  -- DN of client's MTLS certificate or None
         internal -- True if request message came from within the cluster
         Returns AFC Response message in dictionary form
         """
         req_msg_dict = req_msg.dict(exclude_none=True)
         als_req_id = als.als_afc_req_id()
-        als.als_afc_request(req_id=als_req_id, req=req_msg_dict)
+        als.als_afc_request(
+            req_id=als_req_id, mtls_dn=mtls_dn, req=req_msg_dict)
         deadline = time.time() + \
             (self._edebug_request_timeout_sec if edebug
              else self._request_timeout_sec)

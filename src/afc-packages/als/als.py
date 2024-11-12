@@ -68,6 +68,8 @@ ALS_FIELD_GEO_DATA = "geoDataVersion"
 ALS_FIELD_ULS_ID = "ulsId"
 # Request indices field of AFC Config/Request/Response record
 ALS_FIELD_REQ_INDICES = "requestIndexes"
+# mTLS DN field  of AFC Request record
+ALS_FIELD_MTLS_DN = "mtlsDn"
 
 # JSON log record format version
 JSON_LOG_VERSION = "1.0"
@@ -320,19 +322,24 @@ class Als:
             self._req_idx += 1
             return str(self._req_idx)
 
-    def afc_request(self, req_id: str, req: Dict[str, Any]) -> None:
+    def afc_request(self, req_id: str, req: Dict[str, Any],
+                    mtls_dn: Optional[str] = None) -> None:
         """ Send AFC Request
 
         Arguments:
-        req_id -- Unique for this Als object instance request ID string (e.g.
-                  returned by req_id())
-        req    -- Request message JSON dictionary
+        req_id  -- Unique for this Als object instance request ID string (e.g.
+                   returned by req_id())
+        req     -- Request message JSON dictionary
+        mtls_dn -- DN of client mTLS certificate or None
         """
         if self._producer is None:
             return
+        extra_fields = \
+            {k: v for k, v in [(ALS_FIELD_MTLS_DN, mtls_dn)] if v is not None}
         self._send(
             topic=ALS_TOPIC, key=self._als_key(req_id),
-            value=self._als_value(data_type=ALS_DT_REQUEST, data=req))
+            value=self._als_value(data_type=ALS_DT_REQUEST, data=req,
+                                  extra_fields=extra_fields))
 
     def afc_response(self, req_id: str, resp: Dict[str, Any]) -> None:
         """ Send AFC Response
@@ -545,15 +552,17 @@ def als_afc_req_id() -> Optional[str]:
     return _als_instance.afc_req_id() if _als_instance is not None else None
 
 
-def als_afc_request(req_id: str, req: Dict[str, Any]) -> None:
+def als_afc_request(req_id: str, req: Dict[str, Any],
+                    mtls_dn: Optional[str] = None) -> None:
     """ Send AFC Request
 
     Arguments:
-    req_id -- Unique (on at least server level) request ID string
-    req    -- Request message JSON dictionary
+    req_id  -- Unique (on at least server level) request ID string
+    req     -- Request message JSON dictionary
+    mtls_dn -- DN of client mTLS certificate or None
     """
     if (_als_instance is not None) and (req_id is not None):
-        _als_instance.afc_request(req_id, req)
+        _als_instance.afc_request(req_id, req, mtls_dn)
 
 
 def als_afc_response(req_id: str, resp: Dict[str, Any]) -> None:

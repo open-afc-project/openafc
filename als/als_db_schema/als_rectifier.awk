@@ -9,7 +9,7 @@
 BEGIN {
 	print "/*"
 	print " * Copyright (C) 2022 Broadcom. All rights reserved."
-	print " * The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate"
+	print " * The term \"Broadcom\" refers solely to the Broadcom Inc. corporate affiliate"
 	print " * that owns the software below."
 	print " * This work is licensed under the OpenAFC Project License, a copy of which is"
 	print " * included with this software program."
@@ -26,10 +26,12 @@ BEGIN {
 	print ""
 	print "CREATE EXTENSION postgis;"
 	print ""
+    # Make all operations SQL-statement-level (not line-level)
 	RS=ORS=";"
 }
 
-/\w+ TABLE \"device_descriptor_certification\"/ {next}
-/\w+ TABLE \"device_descriptor_regulatory_rule\"/ {next}
+# Removal of unwanted tables, created by dbdiagram.io for many-to-many relations
+/\w+ TABLE "device_descriptor_certification"/ {next}
+/\w+ TABLE "device_descriptor_regulatory_rule"/ {next}
 
 { print }

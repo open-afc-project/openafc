@@ -7,6 +7,8 @@
 // Schema of AFC Request/response/config log database
 // This file is a DBML source code for visualizing database scheme in dbdiagram.io
 
+// Read als_rectifier.awk for update instructions
+
 // Table, containing a record for each request messgae/response message/config(s) set
 table afc_message [headercolor: #000000, note: 'AFC Request/Response message pair (contain individual requests/responses)'] {
   message_id bigserial
@@ -16,6 +18,7 @@ table afc_message [headercolor: #000000, note: 'AFC Request/Response message pai
   tx_time timestamptz
   rx_envelope_digest uuid [note: 'Envelope of AFC Request message']
   tx_envelope_digest uuid [note: 'Envelope of AFC Response message']
+  dn_text_digest uuid [note: 'mTLS DN digest']
 
   indexes {
     (message_id, month_idx) [pk]
@@ -27,6 +30,7 @@ table afc_message [headercolor: #000000, note: 'AFC Request/Response message pai
 Ref afc_message_afc_server_ref: afc_message.(afc_server, month_idx) > afc_server.(afc_server_id, month_idx)
 Ref afc_message_rx_envelope_digest_ref: afc_message.(rx_envelope_digest, month_idx) > rx_envelope.(rx_envelope_digest, month_idx)
 Ref afc_message_tx_envelope_digest_ref: afc_message.(tx_envelope_digest, month_idx) > tx_envelope.(tx_envelope_digest, month_idx)
+Ref afc_message_dn_text_digest_ref: afc_message.(dn_text_digest, month_idx) > mtls_dn.(dn_text_digest, month_idx) [note: 'This relation was added to existing database, so it is OK for dn_text_digest to be NULL on legacy records']
 
 // Outer part of request message
 table rx_envelope [headercolor: #4B82B0, note: 'Envelope (constant part) of AFC Request Message'] {
@@ -52,13 +56,26 @@ table tx_envelope [headercolor: #4B82B0, note: 'Envelope (constant part) of AFC 
   }
 }
 
+// mTLS certificate
+table mtls_dn [headercolor: #4B82B0, note: 'mTLS certificate DN components'] {
+  dn_text_digest uuid [note: 'Digest computed over string representation of DN']
+  dn_json jsonb [note: 'Components of certificate distinguished name']
+  dn_text text [note: 'Certificate distinquished name as string']
+  month_idx smallint
+
+  indexes {
+    (dn_text_digest, month_idx) [pk]
+    dn_text_digest [type: hash]
+  }
+}
+
 // Join table between message table (afc_message) and request/response/config table (request_response)
 // Implement smany-to-many relationship, contains variable part of request/response
 table request_response_in_message [headercolor: #4B82B0, note: 'Associative table for relatonship between AFC Request/Response messages and individual requests/responses. Also encapsulates variable part of requests/responses'] {
   message_id bigint [note: 'AFC request/response message pair this request/response belongs']
   request_id text [note: 'ID of request/response within message']
   month_idx smallint
-  request_response_digest uuid [note: 'Reference to otentially constant part of request/response']
+  request_response_digest uuid [note: 'Reference to potentially constant part of request/response']
   expire_time timestamptz [note: 'Response expiration time']
 
   indexes {
@@ -216,7 +233,7 @@ table geo_data_version [headercolor: #79AD51, note: 'Version of geospatial data'
 }
 
 // ULS data version
-table uls_data_version [headercolor: #79AD51, note: "Version of ULS data'"] {
+table uls_data_version [headercolor: #79AD51, note: 'Version of ULS data'] {
   uls_data_version_id serial
   month_idx smallint
   uls_data_version text
