@@ -107,13 +107,14 @@ async def available_pectrum_inquiry(
             False, title="Run request in AFC Engine (bypass cache lookup)"),
         gui: bool = fastapi.Query(
             False, title="Request from Web GUI"),
+        mtls_dn: Optional[str] = fastapi.Header(default=None),
         message_processor: afc_server_msg_proc.AfcServerMessageProcessor =
         fastapi.Depends(get_message_processor)) -> Dict[str, Any]:
     """ Process external AFC Request message """
     return \
         await message_processor.process_msg(
             req_msg=afc_req_msg, debug=debug, edebug=edebug,
-            nocache=nocache, gui=gui, internal=False)
+            nocache=nocache, gui=gui, mtls_dn=mtls_dn, internal=False)
 
 
 @app.post("/fbrat/ap-afc/availableSpectrumInquiryInternal",
@@ -130,13 +131,14 @@ async def available_pectrum_inquiry_internal(
             False, title="Run request in AFC Engine (bypass cache lookup)"),
         gui: bool = fastapi.Query(
             False, title="Request from Web GUI"),
+        mtls_dn: Optional[str] = fastapi.Header(default=None),
         message_processor: afc_server_msg_proc.AfcServerMessageProcessor =
         fastapi.Depends(get_message_processor)) -> Dict[str, Any]:
     """ Process internal AFC Request message """
     return \
         await message_processor.process_msg(
             req_msg=afc_req_msg, debug=debug, edebug=edebug,
-            nocache=nocache, gui=gui, internal=True)
+            nocache=nocache, gui=gui, mtls_dn=mtls_dn, internal=True)
 
 
 if __name__ == "__main__":

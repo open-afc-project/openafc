@@ -25,6 +25,7 @@ CREATE TABLE "afc_message" (
   "tx_time" timestamptz,
   "rx_envelope_digest" uuid,
   "tx_envelope_digest" uuid,
+  "dn_text_digest" uuid,
   PRIMARY KEY ("message_id", "month_idx")
 );
 
@@ -40,6 +41,14 @@ CREATE TABLE "tx_envelope" (
   "month_idx" smallint,
   "envelope_json" json,
   PRIMARY KEY ("tx_envelope_digest", "month_idx")
+);
+
+CREATE TABLE "mtls_dn" (
+  "dn_text_digest" uuid,
+  "dn_json" jsonb,
+  "dn_text" text,
+  "month_idx" smallint,
+  PRIMARY KEY ("dn_text_digest", "month_idx")
 );
 
 CREATE TABLE "request_response_in_message" (
@@ -176,6 +185,8 @@ CREATE INDEX ON "rx_envelope" USING HASH ("rx_envelope_digest");
 
 CREATE INDEX ON "tx_envelope" USING HASH ("tx_envelope_digest");
 
+CREATE INDEX ON "mtls_dn" USING HASH ("dn_text_digest");
+
 CREATE INDEX ON "request_response_in_message" ("request_id");
 
 CREATE INDEX ON "request_response_in_message" ("request_response_digest");
@@ -260,6 +271,8 @@ COMMENT ON COLUMN "afc_message"."rx_envelope_digest" IS 'Envelope of AFC Request
 
 COMMENT ON COLUMN "afc_message"."tx_envelope_digest" IS 'Envelope of AFC Response message';
 
+COMMENT ON COLUMN "afc_message"."dn_text_digest" IS 'mTLS DN digest';
+
 COMMENT ON TABLE "rx_envelope" IS 'Envelope (constant part) of AFC Request Message';
 
 COMMENT ON COLUMN "rx_envelope"."rx_envelope_digest" IS 'MD5 of envelope_json field in UTF8 encoding';
@@ -272,13 +285,21 @@ COMMENT ON COLUMN "tx_envelope"."tx_envelope_digest" IS 'MD5 of envelope_json fi
 
 COMMENT ON COLUMN "tx_envelope"."envelope_json" IS 'AFC Response JSON with empty availableSpectrumInquiryRequests field';
 
+COMMENT ON TABLE "mtls_dn" IS 'mTLS certificate DN components';
+
+COMMENT ON COLUMN "mtls_dn"."dn_text_digest" IS 'Digest computed over string representation of DN';
+
+COMMENT ON COLUMN "mtls_dn"."dn_json" IS 'Components of certificate distinguished name';
+
+COMMENT ON COLUMN "mtls_dn"."dn_text" IS 'Certificate distinquished name as string';
+
 COMMENT ON TABLE "request_response_in_message" IS 'Associative table for relatonship between AFC Request/Response messages and individual requests/responses. Also encapsulates variable part of requests/responses';
 
 COMMENT ON COLUMN "request_response_in_message"."message_id" IS 'AFC request/response message pair this request/response belongs';
 
 COMMENT ON COLUMN "request_response_in_message"."request_id" IS 'ID of request/response within message';
 
-COMMENT ON COLUMN "request_response_in_message"."request_response_digest" IS 'Reference to otentially constant part of request/response';
+COMMENT ON COLUMN "request_response_in_message"."request_response_digest" IS 'Reference to potentially constant part of request/response';
 
 COMMENT ON COLUMN "request_response_in_message"."expire_time" IS 'Response expiration time';
 
@@ -362,7 +383,7 @@ COMMENT ON COLUMN "afc_config"."afc_config_json" IS 'JSON representation of AFC 
 
 COMMENT ON TABLE "geo_data_version" IS 'Version of geospatial data';
 
-COMMENT ON TABLE "uls_data_version" IS 'Version of ULS data"';
+COMMENT ON TABLE "uls_data_version" IS 'Version of ULS data';
 
 COMMENT ON TABLE "max_psd" IS 'PSD result';
 
@@ -377,6 +398,8 @@ ALTER TABLE "afc_message" ADD CONSTRAINT "afc_message_afc_server_ref" FOREIGN KE
 ALTER TABLE "afc_message" ADD CONSTRAINT "afc_message_rx_envelope_digest_ref" FOREIGN KEY ("rx_envelope_digest", "month_idx") REFERENCES "rx_envelope" ("rx_envelope_digest", "month_idx");
 
 ALTER TABLE "afc_message" ADD CONSTRAINT "afc_message_tx_envelope_digest_ref" FOREIGN KEY ("tx_envelope_digest", "month_idx") REFERENCES "tx_envelope" ("tx_envelope_digest", "month_idx");
+
+ALTER TABLE "afc_message" ADD CONSTRAINT "afc_message_dn_text_digest_ref" FOREIGN KEY ("dn_text_digest", "month_idx") REFERENCES "mtls_dn" ("dn_text_digest", "month_idx");
 
 ALTER TABLE "request_response_in_message" ADD CONSTRAINT "request_response_in_message_message_id_ref" FOREIGN KEY ("message_id", "month_idx") REFERENCES "afc_message" ("message_id", "month_idx");
 

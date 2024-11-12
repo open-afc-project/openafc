@@ -11,6 +11,7 @@
 # pylint: disable=too-many-arguments, broad-exception-caught, invalid-name
 # pylint: disable=too-many-statements, too-few-public-methods, too-many-lines
 # pylint: disable=too-many-boolean-expressions, consider-using-f-string
+# pylint: disable=too-many-positional-arguments
 
 # Brief structural overview
 # - error() and error_if() used to report errors
@@ -67,16 +68,8 @@ import sys
 import tabulate
 from typing import Any, Dict, List, NamedTuple, NoReturn, Optional,  Set, \
     Tuple, Union
-import urllib.parse
 
-import secret_utils
-
-# Template arguments for old-stylw DSN part environment variables
-ALS_TEMPLATE_ARG = "ALS"
-LOG_TEMPLATE_ARG = "LOG"
-
-# Connection string scheme that should be ultimately used
-ACTUAL_SCHEME = "postgresql+psycopg2"
+import utils
 
 # Default database names for ALS and JSON logs
 ALS_DB = "ALS"
@@ -115,59 +108,9 @@ def unused_arguments(*args) -> None:  # pylint: disable=unused-argument
     return
 
 
-class DsnPart:
-    """ DB DSN part that can be default or taken from old-style environment
-    variable
-
-    Private attributes:
-    default      -- Deafult value (optional)
-    env_template -- Environment variiable template. May include {0} for
-                    template argument
-    """
-    def __init__(self, default: Optional[str] = None,
-                 env_template: Optional[str] = None) -> None:
-        """ Connstructor
-
-        Arguments:
-        default      -- Deafult value (optional)
-        env_template -- Environment variiable template. May include {0} for
-                        template argument
-        """
-        self._default = default
-        self._env_template = env_template
-
-    def __call__(self, template_arg: str, default: Optional[str] = None) \
-            -> str:
-        """ Returns path name (taken from default value or from environment
-        variable)
-
-        Arguments:
-        template_arg -- Template argument for ennvironment variable name
-        default      -- Default value override
-        Returns value, obtained from environment variable or from default
-        override or from default
-        """
-        default = default or self._default
-        assert default is not None
-        return \
-            os.environ.get(self._env_template.format(template_arg), default) \
-            if self._env_template else default
-
-
-# Descriptors of DSN parts
-DP_SCHEME = DsnPart(default="postgresql")
-DP_USER = DsnPart(default="postgres", env_template="POSTGRES_{0}_USER")
-DP_PASSWORD = DsnPart(default="postgres",
-                      env_template="POSTGRES_{0}_PASSWORD")
-DP_HOST = DsnPart(env_template="POSTGRES_HOST")
-DP_PORT = DsnPart(default="5432", env_template="POSTGRES_PORT")
-DP_DB = DsnPart(env_template="POSTGRES_{0}_DB")
-
-
 def db_engine(arg_dsn: Optional[str], password_file: Optional[str],
               default_db: str, dsn_env: str, password_file_env: str,
-              template_arg: str, name_for_logs: str) \
-        -> Tuple[sa.engine.Engine, sa.MetaData]:
+              name_for_logs: str) -> Tuple[sa.engine.Engine, sa.MetaData]:
     """ Creates database engine and metadata
 
     Arguments:
@@ -180,40 +123,13 @@ def db_engine(arg_dsn: Optional[str], password_file: Optional[str],
     name_for_logs     -- Database name to use in error messages
     Returns (engine, metadata) tuple
     """
-    default_dsn = \
-        f"{DP_SCHEME(template_arg)}://{DP_USER(template_arg)}:" \
-        f"{DP_PASSWORD(template_arg)}@" \
-        f"{DP_HOST(template_arg, 'REQUIRED')}:{DP_PORT(template_arg)}/" \
-        f"{DP_DB(template_arg, default_db)}"
-    default_parts = urllib.parse.urlparse(default_dsn)
-    arg_dsn = arg_dsn or os.environ.get(dsn_env)
-    if arg_dsn is None:
-        arg_dsn = default_dsn
-    else:
-        if "://" not in arg_dsn:
-            arg_dsn = f"{default_parts.scheme}://{arg_dsn}"
-
-    arg_parts = urllib.parse.urlparse(arg_dsn)
-    netloc = ""
-    for part_name, separator in [("username", ""), ("password", ":"),
-                                 ("hostname", "@"), ("port", ":")]:
-        part = getattr(arg_parts, part_name) or \
-            getattr(default_parts, part_name)
-        netloc += f"{separator}{part}"
-
-    replacements = {"scheme": ACTUAL_SCHEME, "netloc": netloc}
-    replacements.update(
-        {field: getattr(default_parts, field)
-         for field in default_parts._fields
-         if (not getattr(arg_parts, field)) and
-         getattr(default_parts, field) and (field not in replacements)})
-    arg_parts = arg_parts._replace(**replacements)
-    error_if(getattr(arg_parts, "hostname") == "REQUIRED",
-             "DB server hostname not specified")
-    dsn = \
-        secret_utils.substitute_password(
-            dsc=name_for_logs, dsn=arg_parts.geturl(),
-            password_file=password_file or os.environ.get(password_file_env))
+    try:
+        dsn = utils.dsn(arg_dsn=arg_dsn, password_file=password_file,
+                        default_db=default_db, dsn_env=dsn_env,
+                        password_file_env=password_file_env,
+                        name_for_logs=name_for_logs)
+    except ValueError as ex:
+        error(str(ex))
     try:
         engine = sa.create_engine(dsn)
     except sa.exc.SQLAlchemyError as ex:
@@ -595,7 +511,7 @@ def do_log(args: Any) -> None:
         db_engine(arg_dsn=args.dsn, password_file=args.password_file,
                   default_db=LOG_DB, dsn_env=LOG_CONN_ENV,
                   password_file_env=LOG_PASSWORD_ENV,
-                  template_arg=LOG_TEMPLATE_ARG, name_for_logs="JSON logs")
+                  name_for_logs="JSON logs")
     if args.topics:
         error_if(args.sources or args.SELECT,
                  "--sources and SELECT arguments may not be specified with "
@@ -1124,8 +1040,9 @@ class AlsOut(AlsSelectComponent):
                         cmd="error",
                         help_="Response code and supplemental info"),
                     SimpleAlsOut(
-                        cmd="cn", help_="mTLS distinguished name",
-                        table_names=["dn", "afc_message"], column_name="cn"),
+                        cmd="dn", help_="mTLS DN",
+                        table_names=["mtls_dn", "afc_message"],
+                        column_name="dn_json"),
                     SimpleAlsOut(
                         cmd="uls", help_="ULS data version",
                         table_names=["uls_data_version", "request_response"],
@@ -1592,16 +1509,7 @@ class AlsFilter(AlsSelectComponent):
                         table_names=["certification", "device_descriptor",
                                      "request_response"],
                         column_name="ruleset_id"),
-                    SimpleAlsFilter(
-                        arg_name="cn",
-                        table_names=["dn", "device_descriptor",
-                                     "request_response"],
-                        column_name="cn"),
-                    SimpleAlsFilter(
-                        arg_name="cn",
-                        table_names=["dn", "device_descriptor",
-                                     "request_response"],
-                        column_name="cn"),
+                    MtlsCnAlsFilter(arg_name="cn"),
                     RespCodeAlsFilter(arg_name="resp_code"),
                     PsdAlsFilter(arg_name="psd"),
                     EirpAlsFilter(arg_name="eirp")]:
@@ -1646,6 +1554,11 @@ class SimpleAlsFilter(AlsFilter):
 class DistAlsFilter(AlsFilter):
     """ Filter by distance """
     def __init__(self, arg_name: str) -> None:
+        """ Constructor
+
+        Arguments:
+        arg_name    -- Name of command line filtering parameter
+        """
         super().__init__(arg_name=arg_name,
                          table_names=["location", "request_response"])
 
@@ -1667,9 +1580,42 @@ class DistAlsFilter(AlsFilter):
                 self.context.to_meters(arg_value))
 
 
+class MtlsCnAlsFilter(AlsFilter):
+    """ Filter by mTLS CN """
+    def __init__(self, arg_name: str) -> None:
+        """ Constructor
+
+        Arguments:
+        arg_name    -- Name of command line filtering parameter
+        """
+        super().__init__(arg_name=arg_name,
+                         table_names=["mtls_dn", "afc_message"])
+
+    def apply_filter(self, s: sa.sql.selectable.Select, arg_value: Any) \
+            -> sa.sql.selectable.Select:
+        """ 'Applies 'where' clause to select statement
+
+        Arguments:
+        s         -- Select statement to apply clause to
+        arg_value -- Command line parameter value
+        Returns modified select statement """
+        return \
+            s.where(self.column(column_name="dn_json")["CN"].astext ==
+                    arg_value) \
+            if arg_value else \
+            s.where((self.column(column_name="dn_text_digest",
+                                 table_name="afc_message").is_(None)) |
+                    sa.not_(self.column(column_name="dn_json").has_key("CN")))
+
+
 class RespCodeAlsFilter(AlsFilter):
     """ Filter by ALS Response code(s) """
     def __init__(self, arg_name: str) -> None:
+        """ Constructor
+
+        Arguments:
+        arg_name    -- Name of command line filtering parameter
+        """
         super().__init__(arg_name=arg_name, table_names=["request_response"])
 
     def apply_filter(self, s: sa.sql.selectable.Select, arg_value: Any) \
@@ -1693,6 +1639,11 @@ class RespCodeAlsFilter(AlsFilter):
 class PsdAlsFilter(AlsFilter):
     """ Filter by PSD frequency range """
     def __init__(self, arg_name: str) -> None:
+        """ Constructor
+
+        Arguments:
+        arg_name    -- Name of command line filtering parameter
+        """
         super().__init__(arg_name=arg_name,
                          table_names=["max_psd", "request_response"])
 
@@ -1727,6 +1678,11 @@ class PsdAlsFilter(AlsFilter):
 class EirpAlsFilter(AlsFilter):
     """ Filter by EIRP channels """
     def __init__(self, arg_name: str) -> None:
+        """ Constructor
+
+        Arguments:
+        arg_name    -- Name of command line filtering parameter
+        """
         super().__init__(arg_name=arg_name,
                          table_names=["max_eirp", "request_response"])
 
@@ -1818,9 +1774,9 @@ als_joins = \
      AlsJoin(joined_table_name="rx_envelope",
              frame_table_name="afc_message",
              column_name="rx_envelope_digest"),
-     AlsJoin(joined_table_name="dn",
+     AlsJoin(joined_table_name="mtls_dn",
              frame_table_name="afc_message",
-             column_name="dn_digest", outer=True),
+             column_name="dn_text_digest", outer=True),
      AlsJoin(joined_table_name="request_response",
              frame_table_name="request_response_in_message",
              column_name="request_response_digest"),
@@ -1965,8 +1921,7 @@ def do_als(args: Any) -> None:
     engine, metadata = \
         db_engine(arg_dsn=args.dsn, password_file=args.password_file,
                   default_db=ALS_DB, dsn_env=ALS_CONN_ENV,
-                  password_file_env=ALS_PASSWORD_ENV,
-                  template_arg=ALS_TEMPLATE_ARG, name_for_logs="ALS")
+                  password_file_env=ALS_PASSWORD_ENV, name_for_logs="ALS")
     timezone = decode_timezone(args.timezone)
     if args.decode_errors:
         columns = metadata.tables["decode_error"].c
@@ -2217,7 +2172,8 @@ def main(argv: List[str]) -> None:
         "authority, i.e. country)")
     parser_als.add_argument(
         "--cn", metavar="MTLS_COMMON_NAME",
-        help="CN (Common Name) field of AFC Request message mTLS certificate")
+        help="CN (Common Name) field of AFC Request message mTLS certificate. "
+        "Empty means messages without certificate")
     parser_als.add_argument(
         "--resp_code", metavar="CODE1[,CODE2...]",
         help="Response codes")
