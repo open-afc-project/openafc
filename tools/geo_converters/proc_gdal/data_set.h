@@ -28,7 +28,14 @@ private:
      void fixRaster();
      void fixVector();
      void vectorCvg();
+     void vectorCvgKMZ();
      void mbRasterCvg();
+     void rasterDumpText();
+     void diffRaster();
+     void cmpRaster();
+     void createSampleTiff();
+     void procNLCD();
+     void procBoundary();
 
     /**************************************************************************************/
     /**** Data                                                                         ****/
