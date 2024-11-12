@@ -10,10 +10,8 @@
 ''' The custom REST api for using the web UI and configuring AFC.
 '''
 
-import contextlib
 import logging
 import os
-import shutil
 import sys
 import pkg_resources
 import flask
@@ -34,7 +32,9 @@ from afc_worker import run
 from fst import DataIf
 from ncli import MsgPublisher
 from hchecks import RmqHealthcheck, ObjstHealthcheck
-from ..util import AFCEngineException, require_default_uls, getQueueDirectory
+from ..util import AFCEngineException, require_default_uls, \
+    getQueueDirectory, als_log_afc_config_change
+
 from afcmodels.aaa import User, AccessPointDeny, AFCConfig, MTLS
 from afcmodels.base import db
 from afcmodels.hardcoded_relations import RulesetVsRegion
@@ -397,31 +397,23 @@ class AfcConfigFile(MethodView):
                                           exc=werkzeug.exceptions.NotFound)
         # make sure the config region string is upper case
         rcrd['regionStr'] = filename
-        ordered_bytes = json.dumps(rcrd, sort_keys=True)
         try:
             config = AFCConfig.query.filter(
                 AFCConfig.config['regionStr'].astext == filename).first()
+            als_log_afc_config_change(
+                old_config=config.config if config else None,
+                new_config=rcrd, user=current_user.username,
+                region=rcrd['regionStr'], source=flask.request.remote_addr)
             if not config:
                 config = AFCConfig(rcrd)
                 db.session.add(config)
-                als.als_json_log('afc_config',
-                                 {'action': 'create',
-                                  'user': current_user.username,
-                                  'region': filename,
-                                  'from': flask.request.remote_addr,
-                                  'content': ordered_bytes})
             else:
                 config.config = rcrd
                 config.created = datetime.datetime.now()
-                als.als_json_log('afc_config',
-                                 {'action': 'update',
-                                  'user': current_user.username,
-                                  'region': filename,
-                                  'from': flask.request.remote_addr,
-                                  'content': ordered_bytes})
             db.session.commit()
 
-        except BaseException:
+        except BaseException as ex:
+            LOGGER.error(f"Error updating AFC Config: {ex}")
             raise werkzeug.exceptions.NotFound()
 
         return flask.make_response('AFC configuration file updated', 204)

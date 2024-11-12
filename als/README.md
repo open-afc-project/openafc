@@ -221,7 +221,7 @@ One can chose what pieces of information about request/response to print:
 |config|AFC Config|Yes|
 |region|Region aka customer (AFC Config ID)|Yes|
 |error|Response code and supplemental info|Yes|
-|cn|mTLS distinguished name (not ready as of time of this writing)|Yes|
+|dn|mTLS distinguished name|Yes|
 |uls|ULS data version (not quite implemented as of time of this writing)|Yes|
 |geo|Geodetic data version (not quite implemented as of time of this writing)|Yes|
 
@@ -250,7 +250,7 @@ Command format:
 |--serial **SERIAL**|Only print records for AP of given serial number|
 |--certificate **CERTIFICATE**|Only print records of APs of given certification (i.e. of given manufacturer)|
 |--ruleset **RULESET_ID**|Only print records of APs certified by given ruleset ID (i.e. certified by given certification authority)|
-|--cn **MTLS_COMMON_NAME**|Only print records with given CN of mTLS certificate (not yet working as of time of this writing)|
+|--cn **MTLS_COMMON_NAME**|Only print records with given CN of mTLS certificate|
 |--resp_code **CODE1[,CODE2...]**|Only print records with given AFC Response codes|
 |--psd **[FROM_MHZ][-TO_MHZ]**|Only print records responded with PSD in given frequency range. Range boundaries specified in MHz|
 |--eirp **CHANNELS_OR_FREQUENCIES**|Only print records responded with EIRP for channels specified by numbers, number ranges and frequency ranges. E.g. `--eirp 1-33,13,1-50:40,6800-7000` - here we have a range of all channel numbers, individual channel number, range for 40MHz only and frequency range, YMMV|

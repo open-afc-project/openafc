@@ -4,6 +4,7 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
+distinguishedname==1.0.2
 GeoAlchemy==0.7.2
 GeoAlchemy2==0.12.5
 icecream==2.1.3

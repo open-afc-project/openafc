@@ -561,7 +561,8 @@ class RatAfc(MethodView):
                 (flask.request.args.get('conn_type') == 'async') or \
                 (flask.request.args.get('gui') == 'True')
 
-            als.als_afc_request(req_id=als_req_id, req=args)
+            als.als_afc_request(req_id=als_req_id, req=args,
+                                mtls_dn=flask.request.headers.get("mTLS-DN"))
             uls_id = "Unknown"
             geo_id = "Unknown"
             indoor_certified = True
