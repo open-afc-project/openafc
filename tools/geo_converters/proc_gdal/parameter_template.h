@@ -27,6 +27,7 @@ public:
     std::string heightFieldName3D;
     std::string heightFieldName2D;
     std::string outputHeightFieldName;
+    std::string cmpFileRaster;
     std::string outputFile;
     std::string outputLayer;
     double nodataVal;
@@ -38,6 +39,16 @@ public:
     std::string imageFile2;
     double imageLonLatRes;
     int verbose;
+    double minLon;
+    double maxLon;
+    double minLat;
+    double maxLat;
+    int samplesPerDeg;
+    int polygonExpansion;
+    int polygonSimplify;
+    std::string kmzFile;
+    std::string kmlFile;
+    double minLonWrap;
     int seed;
 
 private:

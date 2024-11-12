@@ -7626,7 +7626,7 @@ void AfcManager::runPointAnalysis()
 #if DEBUG_AFC
 	// std::vector<int> fsidTraceList{2128, 3198, 82443};
 	// std::vector<int> fsidTraceList{64324};
-	std::vector<int> fsidTraceList{24175};
+	std::vector<int> fsidTraceList{148348};
 	std::string pathTraceFile = "path_trace.csv.gz";
 #endif
 
@@ -9204,6 +9204,44 @@ void AfcManager::runPointAnalysis()
 #if DEBUG_AFC
 								if (traceFlag&&(!contains2D)) {
 									if (uls->ITMHeightProfile) {
+#if 1
+										double tdist;
+										int N = ((int) uls->ITMHeightProfile[0]) + 1;
+										QVector<QPointF> latlons = UlsMeasurementAnalysis::computeGreatCircleLineMM(
+											QPointF(rlanCoord.latitudeDeg, rlanCoord.longitudeDeg),
+											QPointF(ulsRxLatitude, ulsRxLongitude), N, &tdist);
+
+										double lon1Rad = rlanCoord.longitudeDeg*M_PI/180.0;
+										double lat1Rad = rlanCoord.latitudeDeg*M_PI/180.0;
+										for(int ptIdx=0; ptIdx<N; ptIdx++) {
+											Vector3 losPathPosn = (((double) (N-1-ptIdx))/(N-1))*rlanPosn + (((double) ptIdx)/(N-1))*ulsRxPos;
+											GeodeticCoord losPathPosnGeodetic = EcefModel::ecefToGeodetic(losPathPosn);
+											double losPathHeight = losPathPosnGeodetic.heightKm*1000.0;
+
+											double ptLon = latlons[ptIdx].y();
+											double ptLat = latlons[ptIdx].x();
+
+											double lon2Rad = ptLon*M_PI/180.0;
+											double lat2Rad = ptLat*M_PI/180.0;
+											double slat = sin((lat2Rad-lat1Rad)/2);
+											double slon = sin((lon2Rad-lon1Rad)/2);
+											double ptDistKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+
+											pathTraceGc.ptId = (boost::format("PT_%d") % ptIdx).str();
+											pathTraceGc.lon = ptLon;
+											pathTraceGc.lat = ptLat;
+											pathTraceGc.dist = ptDistKm;
+											pathTraceGc.amsl = uls->ITMHeightProfile[2+ptIdx];
+											pathTraceGc.losAmsl = losPathHeight;
+											pathTraceGc.fsid = uls->getID();
+											pathTraceGc.divIdx = divIdx;
+											pathTraceGc.segIdx = segIdx;
+											pathTraceGc.scanPtIdx = scanPtIdx;
+											pathTraceGc.rlanHtIdx = rlanHtIdx;
+											pathTraceGc.completeRow();
+										}
+
+#else
 										double lon1Rad = rlanCoord.longitudeDeg*M_PI/180.0;
 										double lat1Rad = rlanCoord.latitudeDeg*M_PI/180.0;
 										int N = ((int) uls->ITMHeightProfile[0]) + 1;
@@ -9234,6 +9272,7 @@ void AfcManager::runPointAnalysis()
 											pathTraceGc.rlanHtIdx = rlanHtIdx;
 											pathTraceGc.completeRow();
 										}
+#endif
 									}
 								}
 #endif
