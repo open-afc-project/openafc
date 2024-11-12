@@ -2,6 +2,7 @@
 '''
 
 import os
+import json
 import logging
 import flask
 import tempfile
@@ -11,6 +12,8 @@ from celery import Celery
 from werkzeug.exceptions import HTTPException
 from werkzeug.http import HTTP_STATUS_CODES
 from werkzeug._internal import _get_environ
+
+import als
 
 #: LOGGER for this module
 LOGGER = logging.getLogger(__name__)
@@ -178,3 +181,54 @@ class HeadersMiddleware(object):
             headers.append(('Cache-Control', "max-age=0"))
             return start_response(status, headers, exc_info)
         return self.app(environ, custom_start_response)
+
+
+def three_way_dict_diff(d_from, d_to):
+    """ Recursive dictionary difference
+    Returns (added, removed, changed) tuple, containing dictionaries that
+    describe change. Leaves of 'added' are new values, leaves of 'removed' are
+    old values, leaves of 'changed' are {"from": old_value, "to": new_value}
+    tuples
+    """
+    added = {}
+    removed = {}
+    changed = {}
+    if not (isinstance(d_from, dict) and isinstance(d_to, dict)):
+        # This should not be, but still may happen at top level
+        changed['uncomparable'] = {'from': d_from, 'to': d_to}
+    else:
+        # Now the intended case - both entities are dictionaries
+        for k, v_from in d_from.items():
+            if k in d_to:
+                v_to = d_to[k]
+                if isinstance(v_from, dict) and isinstance(v_to, dict):
+                    for diff_dict, dest_dict in \
+                            zip(three_way_dict_diff(v_from, v_to),
+                                (added, removed, changed)):
+                        if diff_dict:
+                            dest_dict[k] = diff_dict
+                elif v_from != v_to:
+                    changed[k] = {'from': v_from, 'to': v_to}
+            else:
+                removed[k] = v_from
+        for k, v_to in d_to.items():
+            if k not in d_from:
+                added[k] = v_to
+    return (added, removed, changed)
+
+
+def als_log_afc_config_change(old_config, new_config, region, user, source):
+    als_record = \
+        {'action':
+         ('update' if old_config else 'create') if new_config else 'delete',
+         'user': user, 'region': region, 'from': source}
+    jsons = {'content': new_config, 'previous': old_config}
+    if new_config and old_config:
+        jsons.update(
+            {k: v for k, v in
+             zip(('added_items', 'removed_items', 'changed_items'),
+                 three_way_dict_diff(old_config, new_config))})
+    for k, v in jsons.items():
+        if v:
+            als_record[k] = json.dumps(v, sort_keys=True)
+    als.als_json_log('afc_config', als_record)

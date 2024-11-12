@@ -28,6 +28,7 @@ from prettytable import PrettyTable
 from flask_script import Manager, Command, Option, commands
 from . import cmd_utils
 import als
+from .util import als_log_afc_config_change
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1470,10 +1471,13 @@ class ConfigAdd(Command):
 
                         config = AFCConfig.query.filter(
                             AFCConfig.config['regionStr'].astext == region_rcrd[0]).first()
+                        als_log_afc_config_change(
+                            old_config=config.rcrd if config else None,
+                            new_config=cfg_rcrd[0], user=username[0],
+                            region=region_rcrd[0], source='manage.py')
                         if not config:
                             config = AFCConfig(cfg_rcrd[0])
-                            config.config['regionStr'] = config.config['regionStr'].upper(
-                            )
+                            config.config['regionStr'] = config.config['regionStr'].upper()
                             db.session.add(config)
                         else:
                             config.config = cfg_rcrd[0]
