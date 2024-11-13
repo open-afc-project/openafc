@@ -66,8 +66,8 @@ import re
 import sqlalchemy as sa
 import sys
 import tabulate
-from typing import Any, Dict, List, NamedTuple, NoReturn, Optional,  Set, \
-    Tuple, Union
+from typing import Any, cast, Dict, List, NamedTuple, NoReturn, Optional, \
+    Set, Tuple, Union
 
 import utils
 
@@ -1547,8 +1547,18 @@ class SimpleAlsFilter(AlsFilter):
         s         -- Select statement to apply clause to
         arg_value -- Command line parameter value
         Returns modified select statement """
-        return \
-            s.where(self.column(column_name=self._column_name) == arg_value)
+        args = cast(List[str], arg_value)
+        positives = [arg for arg in args if not arg.startswith("-")]
+        negatives = [arg[1:] for arg in args if arg.startswith("-")]
+        and_args: List[Any] = []
+        if positives:
+            and_args.append(
+                self.column(column_name=self._column_name).in_(positives))
+        if negatives:
+            and_args.append(
+                self.column(column_name=self._column_name).not_in(negatives))
+        assert and_args
+        return s.where(sa.and_(*and_args))
 
 
 class DistAlsFilter(AlsFilter):
@@ -1599,13 +1609,19 @@ class MtlsCnAlsFilter(AlsFilter):
         s         -- Select statement to apply clause to
         arg_value -- Command line parameter value
         Returns modified select statement """
-        return \
-            s.where(self.column(column_name="dn_json")["CN"].astext ==
-                    arg_value) \
-            if arg_value else \
-            s.where((self.column(column_name="dn_text_digest",
-                                 table_name="afc_message").is_(None)) |
-                    sa.not_(self.column(column_name="dn_json").has_key("CN")))
+        args = cast(List[str], arg_value)
+        positives = [arg or None for arg in args if not arg.startswith("-")]
+        negatives = [arg[1:] or None for arg in args if arg.startswith("-")]
+        and_args: List[Any] = []
+        if positives:
+            and_args.append(
+                self.column(column_name="dn_json")["CN"].astext.in_(positives))
+        if negatives:
+            and_args.append(
+                self.column(column_name="dn_json")["CN"].
+                astext.not_in(negatives))
+        assert and_args
+        return s.where(sa.and_(*and_args))
 
 
 class RespCodeAlsFilter(AlsFilter):
@@ -1626,14 +1642,23 @@ class RespCodeAlsFilter(AlsFilter):
         s         -- Select statement to apply clause to
         arg_value -- Command line parameter value
         Returns modified select statement """
-        codes: List[int] = []
-        for code_s in re.split(r",\s*|\s+", arg_value):
-            try:
-                codes.append(int(code_s))
-            except (TypeError, ValueError) as ex:
-                error(f"--resp_code has invalid syntax: {ex}")
-        error_if(not codes, "No codes specified in --resp_code")
-        return s.where(self.column(column_name="response_code").in_(codes))
+        args = cast(List[str], arg_value)
+        positives: List[int] = []
+        negatives: List[int] = []
+        for arg in args:
+            m = re.match(r"^(-??)(-1|[0-9]+)$", arg)
+            error_if(not m, f"Invalid syntax for --resp_code: {arg}")
+            assert m is not None
+            (negatives if m.group(1) else positives).append(int(m.group(2)))
+        and_args: List[Any] = []
+        if positives:
+            and_args.append(
+                self.column(column_name="response_code").in_(positives))
+        if negatives:
+            and_args.append(
+                self.column(column_name="response_code").not_in(negatives))
+        assert and_args
+        return s.where(sa.and_(*and_args))
 
 
 class PsdAlsFilter(AlsFilter):
@@ -1942,7 +1967,7 @@ def do_als(args: Any) -> None:
     error_if(not args.OUT, "No output items specified")
     unknown_outs = [out for out in args.OUT if out not in AlsOut.all()]
     error_if(unknown_outs,
-             f"Invalid values foe OUT parameter: {', '.join(unknown_outs)}")
+             f"Invalid values for OUT parameter: {', '.join(unknown_outs)}")
     AlsSelectComponent.context.set_metadata(metadata)
     AlsSelectComponent.context.set_position(args.pos if args.pos else None)
     AlsSelectComponent.context.set_use_miles(args.miles)
@@ -2158,25 +2183,35 @@ def main(argv: List[str]) -> None:
         help="Maximum AP distance from position, specified by --pos. In "
         "kilometers or miles (see --miles)")
     parser_als.add_argument(
-        "--region", metavar="REGION",
-        help="Region (aka customer) name, that identifies AFC Config")
+        "--region", metavar="[-]REGION", action="append",
+        help="Region (aka customer) name, that identifies AFC Config. If "
+        "prefixed with '-' - all except this region. This parameter may be "
+        "specified several times")
     parser_als.add_argument(
-        "--serial", metavar="SERIAL",
+        "--serial", metavar="[-]SERIAL", action="append",
         help="AP Serial number")
     parser_als.add_argument(
-        "--certificate", metavar="CERTIFICATE",
-        help="AP AFC certification name (identifies manufacturer)")
+        "--certificate", metavar="[-]CERTIFICATE", action="append",
+        help="AP AFC certification name (identifies manufacturer). If "
+        "prefixed with '-' - all except this certificate. This parameter may "
+        "be  specified several times")
     parser_als.add_argument(
-        "--ruleset", metavar="RULESET_ID",
+        "--ruleset", metavar="[-]RULESET_ID", action="append",
         help="AP certification ruleset ID (identifies certification "
-        "authority, i.e. country)")
+        "authority, i.e. country). If prefixed with '-' - all except this "
+        "ruleset. This parameter may be specified several times")
     parser_als.add_argument(
-        "--cn", metavar="MTLS_COMMON_NAME",
+        "--cn", metavar="[-]MTLS_COMMON_NAME", action="append",
         help="CN (Common Name) field of AFC Request message mTLS certificate. "
-        "Empty means messages without certificate")
+        "Empty means messages without certificate. Ifprefixed with '-' - all "
+        "except this common name. This parameter may be specified several "
+        "times")
     parser_als.add_argument(
-        "--resp_code", metavar="CODE1[,CODE2...]",
-        help="Response codes")
+        "--resp_code", metavar="[-]CODE", action="append",
+        help="Response code. . If "
+        "prefixed with '-' - all except this response code (and yes, "
+        "GeneralFailure is excluded with --1). This parameter may be "
+        "specified several times")
     parser_als.add_argument(
         "--psd", metavar="[FROM_MHZ][-TO_MHZ]",
         help="Filter output by PSD responses in given frequency range")

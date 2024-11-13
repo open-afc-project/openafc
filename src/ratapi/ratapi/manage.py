@@ -1472,7 +1472,7 @@ class ConfigAdd(Command):
                         config = AFCConfig.query.filter(
                             AFCConfig.config['regionStr'].astext == region_rcrd[0]).first()
                         als_log_afc_config_change(
-                            old_config=config.rcrd if config else None,
+                            old_config=config.config if config else None,
                             new_config=cfg_rcrd[0], user=username[0],
                             region=region_rcrd[0], source='manage.py')
                         if not config:

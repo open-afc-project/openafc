@@ -246,12 +246,12 @@ Command format:
 |--miles|Use miles instead of kilometers in `dist` column and `--dist` parameter|
 |--pos **LAT**,**LON**|Position from which distance to AP is measured (`dist` column, `--dist` parameter). Latitude and longitude (separated by comma and/or spaces) specified in degrees, hemisphere may be specified by sign (north/east is positive) or by letter: `--pos 37.5,-121.2` is the same as `--dist "37.5n 121W"`|
 |--dist **DISTANCE**|Only print records for APs within given distance (specified in kilometers or miles - see `--miles` parameter) from position specified by `--pos`|
-|--region **REGION**|Only print records served with AFC Config of given region|
-|--serial **SERIAL**|Only print records for AP of given serial number|
-|--certificate **CERTIFICATE**|Only print records of APs of given certification (i.e. of given manufacturer)|
-|--ruleset **RULESET_ID**|Only print records of APs certified by given ruleset ID (i.e. certified by given certification authority)|
-|--cn **MTLS_COMMON_NAME**|Only print records with given CN of mTLS certificate|
-|--resp_code **CODE1[,CODE2...]**|Only print records with given AFC Response codes|
+|--region[=-]**REGION**|Only print records served with AFC Config of/except given region|
+|--serial[=-]**SERIAL**|Only print records for AP of/except given serial number|
+|--certificate[=-]**CERTIFICATE**|Only print records of APs of/except given certification (i.e. of given manufacturer)|
+|--ruleset[=-]**RULESET_ID**|Only print records of APs certified of/except given ruleset ID (i.e. certified by given certification authority)|
+|--cn[=-]**MTLS_COMMON_NAME**|Only print records of/except given CN of mTLS certificate|
+|--resp_code[=-]**CODE**|Only print records of/except given AFC Response codes (except `GeneralFailure` is `--resp_code=--1`)|
 |--psd **[FROM_MHZ][-TO_MHZ]**|Only print records responded with PSD in given frequency range. Range boundaries specified in MHz|
 |--eirp **CHANNELS_OR_FREQUENCIES**|Only print records responded with EIRP for channels specified by numbers, number ranges and frequency ranges. E.g. `--eirp 1-33,13,1-50:40,6800-7000` - here we have a range of all channel numbers, individual channel number, range for 40MHz only and frequency range, YMMV|
 |--order_by **ITEM[,desc]**|Order by given output item (not all may be used - see table in the beginning of chapter). `desc` means order in descending order. This parameter may be specified several times|
@@ -268,10 +268,11 @@ Examples below assume that DSN is specified via environment variables and proper
 - Print table of output item names:  
   `als_query.py als --outs`
 
-- Print dates, serials and positions of APs, within 100 miles from given point, allowed to transmit in 6800-7000MHz frequency range, for last year, sorted by distance (farthest first). Output is in CSV format:  
+- Print dates, serials and positions of APs, within 100 miles from given point, allowed to transmit in 6800-7000MHz frequency range, for last year, sorted by distance (farthest first) except requests made by ULS Downloader. Output is in CSV format:  
   ```
   als_query.py als --pos 37N,121E --dist 100 --miles --max_age 365d \
-      --psd 6800-7000 --eirp 6800-7000 --order_by distance,desc --format csv \
+      --psd 6800-7000 --eirp 6800-7000 --serial=-FS_ACCEPTANCE_TEST \
+      --order_by distance,desc --format csv \
       time serial location
   ```
 

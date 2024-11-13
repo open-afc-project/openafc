@@ -230,5 +230,5 @@ def als_log_afc_config_change(old_config, new_config, region, user, source):
                  three_way_dict_diff(old_config, new_config))})
     for k, v in jsons.items():
         if v:
-            als_record[k] = json.dumps(v, sort_keys=True)
+            als_record[k] = v
     als.als_json_log('afc_config', als_record)
