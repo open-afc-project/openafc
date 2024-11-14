@@ -211,6 +211,8 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_pass http://webui;
             proxy_redirect http:// $scheme://;
+            proxy_cookie_flags OptanonConsent secure httponly;
+            proxy_cookie_flags OptanonAlertBoxClosed secure httponly;
             proxy_cookie_flags csrf_token secure;
         }
 
