@@ -20,7 +20,7 @@ def upgrade() -> None:
     op.create_table(
         "mtls_dn",
         sa.Column("dn_json", sa_pg.JSONB()),
-        sa.Column("dn_text", sa.String(), index=True),
+        sa.Column("dn_text", sa.Text(), index=True),
         sa.Column("dn_text_digest", sa_pg.UUID(), index=True),
         sa.Column("month_idx", sa.SmallInteger()))
     op.create_primary_key(
