@@ -80,6 +80,7 @@ class PopGridClass;
 class AntennaClass;
 class RlanRegionClass;
 class ExThrGzipCsv;
+class ResponseInfo;
 
 namespace OpClass
 {
@@ -819,7 +820,7 @@ class AfcManager
 
 		std::vector<std::string>
 			statusMessageList; // List of messages regarding run status to send to GUI
-		CConst::ResponseCodeEnum _responseCode;
+		std::shared_ptr<ResponseInfo> _responseInfo;
 		QStringList _missingParams;
 		QStringList _invalidParams;
 		QStringList _unexpectedParams;
