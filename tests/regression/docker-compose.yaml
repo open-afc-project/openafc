@@ -1,12 +1,11 @@
 # check .env file for env vars info and values
 
-version: '3.2'
 services:
   ratdb:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/ratdb-image:${TAG:-latest}
     restart: always
     volumes:
-      - ${}:${} # TODO: ./pgdata:${RATDB_GUEST_PGDATA}
+      - pgdata_state:${RATDB_GUEST_PGDATA}
     environment:
       POSTGRES_PASSWORD: ${RATDB_POSTGRES_PASSWORD}
       PGDATA: ${RATDB_GUEST_PGDATA:-/var/lib/pgsql/data}
@@ -403,6 +402,7 @@ services:
 
 volumes:
   uls_downloader_state:
+  pgdata_state:
 
 secrets:
   ALS_DB_PASSWORD:
