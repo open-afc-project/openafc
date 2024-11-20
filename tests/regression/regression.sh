@@ -211,7 +211,7 @@ build_dev_server() {
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-nginxexporter ${NGINXEXPORTER}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${NGINXEXPORTER} )
 
-  cd ${wd}/prometheus && docker_build_and_push Dockerfile-grafana ${GRAFANA}:${tag} ${push} &
+  cd ${wd}/grafana && docker_build_and_push Dockerfile ${GRAFANA}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${GRAFANA} )
 
   cd ${wd}/tools/geo_converters && docker_build_and_push Dockerfile ${GEO_CONVERTERS}:${tag} ${push} &
