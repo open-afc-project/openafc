@@ -275,7 +275,7 @@ If you wish to use [Prometheus](https://prometheus.io/) to montitor your system,
 cd prometheus && docker build . -t  Dockerfile-prometheus -t prometheus-image ; cd ../
 cd /prometheus && docker build . Dockerfile-cadvisor -t cadvisor-image ; cd ../
 cd /prometheus && docker build . Dockerfile-nginxexporter -t nginxexporter-image  ; cd ../
-cd /prometheus && docker build . Dockerfile-grafana -t grafana-image ; cd ../
+cd /grafana && docker build . Dockerfile -t grafana-image ; cd ../
 ```
 
 Once built, docker images are usable as usual docker image.
@@ -801,8 +801,8 @@ services:
   grafana:
     image:  grafana-image:latest
     build:
-        context: ./prometheus
-        dockerfile: Dockerfile-grafana
+        context: ./grafana
+        dockerfile: Dockerfile
     restart: always
     depends_on:
       - prometheus
