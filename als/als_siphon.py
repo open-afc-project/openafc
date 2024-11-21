@@ -1418,6 +1418,8 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
                 self._by_value[value_month] = \
                     self._key_from_value(value_month[0])
             rows += self._rows_from_value(*value_month)
+        if not rows:
+            return
         try:
             ins = sa_pg.insert(self._table).values(rows).\
                 on_conflict_do_nothing()
@@ -1770,6 +1772,8 @@ class TableUpdaterBase(AlsTableBase,
             raise JsonFormatError(
                 f"Invalid {self._json_obj_name} object format: {ex}",
                 code_line=LineNumber.exc())
+        if not rows:
+            return
         ins = sa_pg.insert(self._table).values(rows).on_conflict_do_nothing()
         if self._data_key_columns:
             ins = ins.returning(*self._data_key_columns)
@@ -3265,6 +3269,7 @@ class Siphon:
     _kafka_positions            -- Nonprocessed Kafka positions' collection
     _als_bundles                -- Incomplete ALS Bundler collection
     _metrics                    -- Collection of Prometheus metrics
+    _touch_file                 -- None or file to touch after each poll
     """
     # Number of messages fetched from Kafka in single access
     KAFKA_MAX_RECORDS = 1000
@@ -3276,7 +3281,7 @@ class Siphon:
     ALS_MAX_REQ_UPDATE = 5000
 
     def __init__(self, adb: Optional[AlsDatabase], ldb: Optional[LogsDatabase],
-                 kafka_client: KafkaClient) -> None:
+                 kafka_client: KafkaClient, touch_file: Optional[str]) -> None:
         """ Constructor
 
         Arguments:
@@ -3308,6 +3313,7 @@ class Siphon:
                       "Number of incomplete AFC Request messages"),
                      ("Gauge", "siphon_afc_msg_in_progress",
                       "Number of AFC Request messages awaiting completion")])
+        self._touch_file = touch_file
         self._adb = adb
         self._ldb = ldb
         self._kafka_client = kafka_client
@@ -3399,6 +3405,9 @@ class Siphon:
                 busy |= self._timeout_als_messages()
                 busy |= self._commit_kafka_offsets()
             self._kafka_client.subscription_check()
+            if self._touch_file:
+                with open(self._touch_file, 'a'):
+                    os.utime(self._touch_file, None)
 
     def _read_als_kafka_messages(
             self, kafka_messages: List[KafkaClient.MessageInfo]) -> None:
@@ -3663,7 +3672,8 @@ def do_siphon(args: Any) -> None:
             KafkaClient(args=args, subscribe_als=adb is not None,
                         subscribe_log=ldb is not None,
                         resubscribe_interval_s=5)
-        siphon = Siphon(adb=adb, ldb=ldb, kafka_client=kafka_client)
+        siphon = Siphon(adb=adb, ldb=ldb, kafka_client=kafka_client,
+                        touch_file=args.touch_file)
         siphon.main_loop()
     finally:
         if adb is not None:
@@ -3870,6 +3880,10 @@ def main(argv: List[str]) -> None:
     switches_siphon.add_argument(
         "--prometheus_port", metavar="PORT", type=docker_arg_type(int),
         help="Port to serve Prometheus metrics on")
+    switches_siphon.add_argument(
+        "--touch_file", metavar="FILENAME", type=docker_arg_type(str),
+        help="File to touch after each successfull poll. May be used for "
+        "healthchecking")
 
     # Top level parser
     argument_parser = argparse.ArgumentParser(
