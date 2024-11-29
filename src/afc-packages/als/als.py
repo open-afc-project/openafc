@@ -68,8 +68,12 @@ ALS_FIELD_GEO_DATA = "geoDataVersion"
 ALS_FIELD_ULS_ID = "ulsId"
 # Request indices field of AFC Config/Request/Response record
 ALS_FIELD_REQ_INDICES = "requestIndexes"
-# mTLS DN field  of AFC Request record
+# mTLS DN field of AFC Request record
 ALS_FIELD_MTLS_DN = "mtlsDn"
+# AP IP field of AFC Request record
+ALS_FIELD_AP_IP = "apIp"
+# Runtime Options field of AFC Request record
+ALS_FIELD_RUNTIME_OPT = "runtimeOpt"
 
 # JSON log record format version
 JSON_LOG_VERSION = "1.0"
@@ -323,19 +327,27 @@ class Als:
             return str(self._req_idx)
 
     def afc_request(self, req_id: str, req: Dict[str, Any],
-                    mtls_dn: Optional[str] = None) -> None:
+                    mtls_dn: Optional[str] = None, ap_ip: Optional[str] = None,
+                    runtime_opt: Optional[int] = None) -> None:
         """ Send AFC Request
 
         Arguments:
-        req_id  -- Unique for this Als object instance request ID string (e.g.
-                   returned by req_id())
-        req     -- Request message JSON dictionary
-        mtls_dn -- DN of client mTLS certificate or None
+        req_id      -- Unique for this Als object instance request ID string
+                       (e.g. returned by req_id())
+        req         -- Request message JSON dictionary
+        mtls_dn     -- DN of client mTLS certificate or None
+        ap_ip       -- AP (Request sender) IP as string or None
+        runtime_opt -- Runtime options (Numerical representation of request
+                       flags) or None
         """
         if self._producer is None:
             return
         extra_fields = \
-            {k: v for k, v in [(ALS_FIELD_MTLS_DN, mtls_dn)] if v is not None}
+            {k: v for k, v in [
+                (ALS_FIELD_MTLS_DN, mtls_dn),
+                (ALS_FIELD_AP_IP, ap_ip),
+                (ALS_FIELD_RUNTIME_OPT, runtime_opt)]
+             if v is not None}
         self._send(
             topic=ALS_TOPIC, key=self._als_key(req_id),
             value=self._als_value(data_type=ALS_DT_REQUEST, data=req,
@@ -553,16 +565,21 @@ def als_afc_req_id() -> Optional[str]:
 
 
 def als_afc_request(req_id: str, req: Dict[str, Any],
-                    mtls_dn: Optional[str] = None) -> None:
+                    mtls_dn: Optional[str] = None, ap_ip: Optional[str] = None,
+                    runtime_opt: Optional[int] = None) -> None:
     """ Send AFC Request
 
     Arguments:
-    req_id  -- Unique (on at least server level) request ID string
-    req     -- Request message JSON dictionary
-    mtls_dn -- DN of client mTLS certificate or None
+    req_id      -- Unique (on at least server level) request ID string
+    req         -- Request message JSON dictionary
+    mtls_dn     -- DN of client mTLS certificate or None
+    ap_ip       -- AP (Request sender) IP as string or None
+    runtime_opt -- Runtime options (Numerical representation of request flags)
+                   or None
     """
     if (_als_instance is not None) and (req_id is not None):
-        _als_instance.afc_request(req_id, req, mtls_dn)
+        _als_instance.afc_request(req_id=req_id, req=req, mtls_dn=mtls_dn,
+                                  ap_ip=ap_ip, runtime_opt=runtime_opt)
 
 
 def als_afc_response(req_id: str, resp: Dict[str, Any]) -> None:
