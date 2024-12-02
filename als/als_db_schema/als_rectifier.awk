@@ -34,4 +34,8 @@ BEGIN {
 /\w+ TABLE "device_descriptor_certification"/ {next}
 /\w+ TABLE "device_descriptor_regulatory_rule"/ {next}
 
-{ print }
+{
+    # Postgres has inet, dbdiagram has intet6 - converting. \y is word boundary
+    gsub(/\yinet6\y/, "inet")
+    print
+}

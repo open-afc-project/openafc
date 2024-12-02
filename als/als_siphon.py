@@ -57,8 +57,9 @@ ALS_KAFKA_TOPIC = "ALS"
 JSON_DATA_TYPE = Union[Dict[str, Any], List[Any]]
 
 # Type for database column
-COLUMN_DATA_TYPE = Optional[Union[int, float, str, bytes, bool,
-                                  datetime.datetime, uuid.UUID, Dict, List]]
+COLUMN_DATA_TYPE = \
+    Optional[Union[int, float, str, bytes, bool, datetime.datetime, uuid.UUID,
+                   Dict, List]]
 
 # Type for database row dictionary
 ROW_DATA_TYPE = Dict[str, COLUMN_DATA_TYPE]
@@ -802,6 +803,8 @@ class AlsMessage:
     request_indexes -- Indexes of requests to which config is related (if
                        Config) or None
     mtls_dn         -- Client mTLS DN (for Request) or None
+    ap_ip           -- AP IP Address or None
+    runtime_opt     -- Runtimeoption flags or None
     """
     # ALS message format version
     FORMAT_VERSION = "1.0"
@@ -843,8 +846,10 @@ class AlsMessage:
             self.request_indexes: Optional[Set[int]] = \
                 set(int(i) for i in msg_dict.get("requestIndexes", [])) \
                 if is_config else None
-            self.mtls_dn: Optional[str] = \
-                msg_dict.get("mtlsDn")
+            self.mtls_dn: Optional[str] = msg_dict.get("mtlsDn")
+            self.ap_ip: Optional[str] = msg_dict.get("apIp")
+            self.runtime_opt: Optional[int] = msg_dict.get("runtimeOpt")
+
         except (LookupError, TypeError, ValueError) as ex:
             raise AlsProtocolError(f"Invalid content of ALS message: {ex}",
                                    code_line=LineNumber.exc(), data=msg_dict)
@@ -882,6 +887,8 @@ class AlsMessageBundle:
                          individual request sequential indexes (or None if for
                          all requests)
     _mtls_dn          -- None or mTLS DN string
+    _ap_ip            -- AP IP or None
+    _runtime_opt      -- Runtime options or None
     _assembled        -- True if bundle has all necessary parts
     _store_parts      -- Bundle in StoreParts representation. None if not yet
                          computed
@@ -936,7 +943,11 @@ class AlsMessageBundle:
              # List of responses with no requests
              ("orphan_responses", List[JSON_DATA_TYPE]),
              # mTLS DN string (empty if there was none)
-             ("mtls_dn", str)])
+             ("mtls_dn", str),
+             # Optional AP IP
+             ("ap_ip", Optional[str]),
+             # Optional Runtime Option flags
+             ("runtime_opt", Optional[int])])
 
     def __init__(self, message_key: AlsMessageKeyType,
                  kafka_positions: KafkaPositions) -> None:
@@ -957,6 +968,8 @@ class AlsMessageBundle:
         self._configs: Dict[Optional[int],
                             "AlsMessageBundle.AfcConfigInfo"] = {}
         self._mtls_dn: Optional[str] = None
+        self._ap_ip: Optional[str] = None
+        self._runtime_opt: Optional[int] = None
         self._assembled = False
         self._store_parts: Optional["AlsMessageBundle.StoreParts"] = None
         self._als_positions: Set[KafkaPosition] = set()
@@ -982,6 +995,8 @@ class AlsMessageBundle:
             {"key": self._message_key.decode("latin-1"),
              "afc_server": self._afc_server,
              "mtls_dn": self._mtls_dn,
+             "ap_ip": self._ap_ip,
+             "runtime_opt": self._runtime_opt,
              "last_update": self._last_update.isoformat(),
              "request_msg": self._request_msg,
              "request_timetag":
@@ -1028,6 +1043,8 @@ class AlsMessageBundle:
                         code_line=LineNumber.exc(), data=message.json_str)
                 self._request_timetag = message.time_tag
                 self._mtls_dn = message.mtls_dn or ""
+                self._ap_ip = message.ap_ip
+                self._runtime_opt = message.runtime_opt
             elif message.msg_type == AlsMessage.MsgType.Response:
                 if self._response_msg is not None:
                     return
@@ -1079,7 +1096,9 @@ class AlsMessageBundle:
                 rx_timetag=jdt(self._request_timetag),
                 tx_timetag=jdt(self._response_timetag),
                 request_responses={}, orphan_requests=[], orphan_responses=[],
-                mtls_dn=js(self._mtls_dn))
+                mtls_dn=js(self._mtls_dn),
+                ap_ip=self._ap_ip,
+                runtime_opt=self._runtime_opt)
         requests: List[JSON_DATA_TYPE] = \
             jl(jd(self._request_msg)["availableSpectrumInquiryRequests"])
         responses: List[JSON_DATA_TYPE] = \
@@ -2521,7 +2540,7 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
                                         month_idx=month_idx)
 
     def _data_key_from_result_row(self, result_row: Tuple[Any, ...],
-                                  result_row_idx: int) -> int:
+                                  result_row_idx: int) -> uuid.UUID:
         """ Data key from rows written to database
 
         Arguments:
@@ -2791,21 +2810,23 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
     Data objects are AlsMessageBundle objects
 
     Private attributes:
-    _col_message_id       -- Message serial ID column
-    _col_month_idx        -- Month index column
-    _col_afc_server       -- AFC Server ID column
-    _col_rx_time          -- AFC Request timetag column
-    _col_tx_time          -- AFC Response timetag column
-    _rx_envelope_digest   -- AFC Request envelope digest column
-    _tx_envelope_digest   -- AFC Response envelope digest column
-    _mtls_dn_digest       -- mTLS DN  digest column
-    _afc_server_lookup    -- Lookup fr AFC Server names
-    _rr_assoc_updater     -- Updater of message to request/response association
-                             table
-    _rx_envelope_updater  -- Updater for AFC Request envelope table
-    _tx_envelope_updater  -- Updater for AFC Response envelope table
-    _mtls_dn_updater      -- Updater for mTLS DN table
-    _decode_error_writer  -- Decode error table writer
+    _col_message_id         -- Message serial ID column
+    _col_month_idx          -- Month index column
+    _col_afc_server         -- AFC Server ID column
+    _col_rx_time            -- AFC Request timetag column
+    _col_tx_time            -- AFC Response timetag column
+    _col_rx_envelope_digest -- AFC Request envelope digest column
+    _col_tx_envelope_digest -- AFC Response envelope digest column
+    _col_mtls_dn_digest     -- mTLS DN  digest column
+    _col_ap_ip              -- AP IP address column
+    _col_runtime_opt        -- Runtime option address column
+    _afc_server_lookup      -- Lookup fr AFC Server names
+    _rr_assoc_updater       -- Updater of message to request/response
+                               association table
+    _rx_envelope_updater    -- Updater for AFC Request envelope table
+    _tx_envelope_updater    -- Updater for AFC Response envelope table
+    _mtls_dn_updater        -- Updater for mTLS DN table
+    _decode_error_writer    -- Decode error table writer
     """
     # Table name
     TABLE_NAME = "afc_message"
@@ -2835,11 +2856,14 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
         self._col_afc_server = self.get_column("afc_server", sa.Integer)
         self._col_rx_time = self.get_column("rx_time", sa.DateTime)
         self._col_tx_time = self.get_column("tx_time", sa.DateTime)
-        self._rx_envelope_digest = self.get_column("rx_envelope_digest",
+        self._col_rx_envelope_digest = self.get_column("rx_envelope_digest",
+                                                       sa_pg.UUID)
+        self._col_tx_envelope_digest = self.get_column("tx_envelope_digest",
+                                                       sa_pg.UUID)
+        self._col_mtls_dn_digest = self.get_column("dn_text_digest",
                                                    sa_pg.UUID)
-        self._tx_envelope_digest = self.get_column("tx_envelope_digest",
-                                                   sa_pg.UUID)
-        self._mtls_dn_digest = self.get_column("dn_text_digest", sa_pg.UUID)
+        self._col_ap_ip = self.get_column("ap_ip", sa_pg.INET)
+        self._col_runtime_opt = self.get_column("runtime_opt", sa.Integer)
 
         self._afc_server_lookup = afc_server_lookup
         self._rr_assoc_updater = rr_assoc_updater
@@ -2886,12 +2910,15 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
                                                        month_idx),
                  ms(self._col_rx_time.name): parts.rx_timetag,
                  ms(self._col_tx_time.name): parts.tx_timetag,
-                 ms(self._rx_envelope_digest.name):
+                 ms(self._col_rx_envelope_digest.name):
                  BytesUtils.json_to_uuid(parts.rx_envelope).urn,
-                 ms(self._tx_envelope_digest.name):
+                 ms(self._col_tx_envelope_digest.name):
                  BytesUtils.json_to_uuid(parts.tx_envelope).urn,
-                 ms(self._mtls_dn_digest.name):
-                 BytesUtils.text_to_uuid(parts.mtls_dn).urn}]
+                 ms(self._col_mtls_dn_digest.name):
+                 BytesUtils.text_to_uuid(parts.mtls_dn).urn,
+                 ms(self._col_ap_ip.name): parts.ap_ip,
+                 ms(self._col_runtime_opt.name): parts.runtime_opt,
+                 }]
 
     def _update_foreign_targets(
             self,
@@ -2906,20 +2933,21 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
         """
         self._rx_envelope_updater.update_db(
             data_dict={uuid.UUID(js(rows[0]
-                                    [ms(self._rx_envelope_digest.name)])):
+                                    [ms(self._col_rx_envelope_digest.name)])):
                        bundle.take_apart().rx_envelope
                        for bundle, rows in row_infos.values()},
             month_idx=month_idx)
         self._tx_envelope_updater.update_db(
             data_dict={uuid.UUID(js(rows[0]
-                                    [ms(self._tx_envelope_digest.name)])):
+                                    [ms(self._col_tx_envelope_digest.name)])):
                        bundle.take_apart().tx_envelope
                        for bundle, rows in row_infos.values()},
             month_idx=month_idx)
         self._mtls_dn_updater.update_db(
-            data_dict={uuid.UUID(js(rows[0][ms(self._mtls_dn_digest.name)])):
-                       bundle.take_apart().mtls_dn
-                       for bundle, rows in row_infos.values()},
+            data_dict={
+                uuid.UUID(js(rows[0][ms(self._col_mtls_dn_digest.name)])):
+                bundle.take_apart().mtls_dn
+                for bundle, rows in row_infos.values()},
             month_idx=month_idx)
 
     def _update_foreign_sources(

@@ -26,6 +26,8 @@ CREATE TABLE "afc_message" (
   "rx_envelope_digest" uuid,
   "tx_envelope_digest" uuid,
   "dn_text_digest" uuid,
+  "ap_ip" inet,
+  "runtime_opt" int,
   PRIMARY KEY ("message_id", "month_idx")
 );
 
@@ -181,6 +183,16 @@ CREATE INDEX ON "afc_message" ("rx_time");
 
 CREATE INDEX ON "afc_message" ("tx_time");
 
+CREATE INDEX ON "afc_message" USING HASH ("rx_envelope_digest");
+
+CREATE INDEX ON "afc_message" USING HASH ("tx_envelope_digest");
+
+CREATE INDEX ON "afc_message" USING HASH ("dn_text_digest");
+
+CREATE INDEX ON "afc_message" ("ap_ip");
+
+CREATE INDEX ON "afc_message" ("runtime_opt");
+
 CREATE INDEX ON "rx_envelope" USING HASH ("rx_envelope_digest");
 
 CREATE INDEX ON "tx_envelope" USING HASH ("tx_envelope_digest");
@@ -272,6 +284,10 @@ COMMENT ON COLUMN "afc_message"."rx_envelope_digest" IS 'Envelope of AFC Request
 COMMENT ON COLUMN "afc_message"."tx_envelope_digest" IS 'Envelope of AFC Response message';
 
 COMMENT ON COLUMN "afc_message"."dn_text_digest" IS 'mTLS DN digest';
+
+COMMENT ON COLUMN "afc_message"."ap_ip" IS 'IP address of AFC Request sender';
+
+COMMENT ON COLUMN "afc_message"."runtime_opt" IS 'Flags from request URL (gui, nocache, etc.)';
 
 COMMENT ON TABLE "rx_envelope" IS 'Envelope (constant part) of AFC Request Message';
 

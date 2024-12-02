@@ -137,6 +137,7 @@ http {
             # transmit a request to a proxied server
             proxy_send_timeout 720;
             proxy_pass http://msghnd$uri$is_args$args;
+            proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header "mTLS-DN" '$ssl_client_s_dn';
             access_log off;
             log_not_found off;

@@ -101,7 +101,7 @@ class AfcServerCompute:
 
     async def process_request(
             self, request_str: str, config_str: str, req_cfg_digest: str,
-            runtime_opts: int, task_id: str, history_dir: Optional[str],
+            runtime_opt: int, task_id: str, history_dir: Optional[str],
             deadline: float) -> Optional[str]:
         """ Process AFC Engine computation request
 
@@ -109,7 +109,7 @@ class AfcServerCompute:
         request_str    -- AFC Request as string
         config_str     -- AFC Config as string
         req_cfg_digest -- Hash of request and config
-        runtime_opts   -- Value for --runtime_opt AFC Engine parameter
+        runtime_opt    -- Value for --runtime_opt AFC Engine parameter
         task_id        -- Unique request ID
         history_dir    -- None or ObjStore history directory
         deadline       -- Deadline as seconds since Epoch
@@ -130,7 +130,7 @@ class AfcServerCompute:
                             self._send_req_to_celery, request_str=request_str,
                             config_str=config_str,
                             req_cfg_digest=req_cfg_digest,
-                            runtime_opts=runtime_opts, task_id=task_id,
+                            runtime_opt=runtime_opt, task_id=task_id,
                             history_dir=history_dir, deadline=deadline),
                         name=f"Celery sender {future_holder.seq}")
                 self._celery_sender_tasks.add(celery_sender_task)
@@ -198,7 +198,7 @@ class AfcServerCompute:
 
     def _send_req_to_celery(
             self, request_str: str, config_str: str, req_cfg_digest: str,
-            runtime_opts: int, task_id: str, history_dir: Optional[str],
+            runtime_opt: int, task_id: str, history_dir: Optional[str],
             deadline: float) -> None:
         """ Called on separate thread to AFC Engine request via Celery """
         if self._stopping:
@@ -224,7 +224,7 @@ class AfcServerCompute:
                     "hash_val": req_cfg_digest,
                     "config_path": None,
                     "history_dir": history_dir,
-                    "runtime_opts": runtime_opts,
+                    "runtime_opts": runtime_opt,
                     "mntroot": self._worker_mnt_root,
                     "rcache_queue": self._rmq_rx_queue_name,
                     "request_str": request_str,

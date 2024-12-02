@@ -222,6 +222,8 @@ One can chose what pieces of information about request/response to print:
 |region|Region aka customer (AFC Config ID)|Yes|
 |error|Response code and supplemental info|Yes|
 |dn|mTLS distinguished name|Yes|
+|ip|IP address or request sender (AP or AFC Proxy)|Yes|
+|runtime_opt|Flags from AFC Request URL (gui, nocache, debug, edebug)|Yes| 
 |uls|ULS data version (not quite implemented as of time of this writing)|Yes|
 |geo|Geodetic data version (not quite implemented as of time of this writing)|Yes|
 
@@ -251,6 +253,7 @@ Command format:
 |--certificate[=-]**CERTIFICATE**|Only print records of APs of/except given certification (i.e. of given manufacturer)|
 |--ruleset[=-]**RULESET_ID**|Only print records of APs certified of/except given ruleset ID (i.e. certified by given certification authority)|
 |--cn[=-]**MTLS_COMMON_NAME**|Only print records of/except given CN of mTLS certificate|
+|-request_opt[=-]**OPT**|Only print records of messages with/without given request option flags (gui, nocache, debug, edebug)|
 |--resp_code[=-]**CODE**|Only print records of/except given AFC Response codes (except `GeneralFailure` is `--resp_code=--1`)|
 |--psd **[FROM_MHZ][-TO_MHZ]**|Only print records responded with PSD in given frequency range. Range boundaries specified in MHz|
 |--eirp **CHANNELS_OR_FREQUENCIES**|Only print records responded with EIRP for channels specified by numbers, number ranges and frequency ranges. E.g. `--eirp 1-33,13,1-50:40,6800-7000` - here we have a range of all channel numbers, individual channel number, range for 40MHz only and frequency range, YMMV|
@@ -268,11 +271,11 @@ Examples below assume that DSN is specified via environment variables and proper
 - Print table of output item names:  
   `als_query.py als --outs`
 
-- Print dates, serials and positions of APs, within 100 miles from given point, allowed to transmit in 6800-7000MHz frequency range, for last year, sorted by distance (farthest first) except requests made by ULS Downloader. Output is in CSV format:  
+- Print dates, serials and positions of APs, within 100 miles from given point, allowed to transmit in 6800-7000MHz frequency range, for last year, sorted by distance (farthest first) except requests made by ULS Downloader and from WebUI. Output is in CSV format:  
   ```
   als_query.py als --pos 37N,121E --dist 100 --miles --max_age 365d \
       --psd 6800-7000 --eirp 6800-7000 --serial=-FS_ACCEPTANCE_TEST \
-      --order_by distance,desc --format csv \
+      --runtime_opt=-gui --order_by distance,desc --format csv \
       time serial location
   ```
 

@@ -9,7 +9,7 @@
 # pylint: disable=wrong-import-order, too-many-arguments
 # pylint: disable=too-few-public-methods, too-many-branches, too-many-locals
 # pylint: disable=broad-exception-caught, too-many-statements
-# pylint: disable=consider-using-from-import
+# pylint: disable=consider-using-from-import, too-many-positional-arguments
 
 import asyncio
 import datetime
@@ -142,7 +142,8 @@ class AfcServerMessageProcessor:
 
     async def process_msg(self, req_msg: Rest_ReqMsg, debug: bool,
                           edebug: bool, nocache: bool, gui: bool,
-                          mtls_dn: Optional[str], internal: bool) \
+                          mtls_dn: Optional[str], ap_ip: Optional[str],
+                          internal: bool) \
             -> Dict[str, Any]:
         """ Process AFC Request message
 
@@ -153,13 +154,24 @@ class AfcServerMessageProcessor:
         nocache  -- True if 'nocache' flag was set in URL
         gui      -- True if 'gui' flag was set in URL
         mtls_dn  -- DN of client's MTLS certificate or None
+        ap_ip    -- AFC Request source IP or None
         internal -- True if request message came from within the cluster
         Returns AFC Response message in dictionary form
         """
+        runtime_opt = 0
+        for predicate, flag in \
+                [(debug, defs.RNTM_OPT_DBG),
+                 (edebug, defs.RNTM_OPT_SLOW_DBG),
+                 (nocache, defs.RNTM_OPT_NOCACHE),
+                 (gui, defs.RNTM_OPT_GUI)]:
+            if predicate:
+                runtime_opt |= flag
+
         req_msg_dict = req_msg.dict(exclude_none=True)
         als_req_id = als.als_afc_req_id()
         als.als_afc_request(
-            req_id=als_req_id, mtls_dn=mtls_dn, req=req_msg_dict)
+            req_id=als_req_id, mtls_dn=mtls_dn, req=req_msg_dict, ap_ip=ap_ip,
+            runtime_opt=runtime_opt)
         deadline = time.time() + \
             (self._edebug_request_timeout_sec if edebug
              else self._request_timeout_sec)
@@ -176,8 +188,9 @@ class AfcServerMessageProcessor:
             ret = \
                 (await self._process_msg_internal(
                     req_msg_dict=req_msg_dict, debug=debug, edebug=edebug,
-                    nocache=nocache, gui=gui, internal=internal,
-                    als_req_id=als_req_id, deadline=deadline))
+                    nocache=nocache, gui=gui, runtime_opt=runtime_opt,
+                    internal=internal, als_req_id=als_req_id,
+                    deadline=deadline))
             self._drop_unwanted_extensions(
                 msg_dict=ret, is_input=False, is_gui=gui,
                 is_internal=internal)
@@ -186,8 +199,8 @@ class AfcServerMessageProcessor:
 
     async def _process_msg_internal(
             self, req_msg_dict: Dict[str, Any], debug: bool, edebug: bool,
-            nocache: bool, gui: bool, internal: bool, als_req_id: int,
-            deadline: float) -> Dict[str, Any]:
+            nocache: bool, gui: bool, runtime_opt: int, internal: bool,
+            als_req_id: int, deadline: float) -> Dict[str, Any]:
         """ Internal implementation of Request message processing
 
         Arguments:
@@ -196,6 +209,7 @@ class AfcServerMessageProcessor:
         edebug        -- True if 'edebug' flag was set in URL
         nocache       -- True if 'nocache' flag was set in URL
         gui           -- True if 'gui' flag was set in URL
+        runtime_opt   -- Runtime options, derived from AFC message parameters
         internal      -- True if request message came from within the cluster
         als_req_id    -- Request id to use in subsequent ALS writes
         deadline      -- Message processing deadline in seconds since the Epoch
@@ -229,9 +243,9 @@ class AfcServerMessageProcessor:
                     req_tg.create_task(
                         self._process_req(
                             req_dict=req_dict, debug=debug, edebug=edebug,
-                            nocache=nocache, gui=gui, internal=internal,
-                            als_req_id=als_req_id, req_idx=req_idx,
-                            deadline=deadline)))
+                            nocache=nocache, gui=gui, runtime_opt=runtime_opt,
+                            internal=internal, als_req_id=als_req_id,
+                            req_idx=req_idx, deadline=deadline)))
         # Make result from individual responses
         return \
             self._make_response_msg(
@@ -240,8 +254,8 @@ class AfcServerMessageProcessor:
 
     async def _process_req(self, req_dict: Dict[str, Any], debug: bool,
                            edebug: bool, nocache: bool, gui: bool,
-                           internal: bool, als_req_id: int, req_idx: int,
-                           deadline: float) -> Dict[str, Any]:
+                           runtime_opt: int, internal: bool, als_req_id: int,
+                           req_idx: int, deadline: float) -> Dict[str, Any]:
         """ Process individual AFC request
 
         Arguments:
@@ -250,6 +264,7 @@ class AfcServerMessageProcessor:
         edebug        -- True if 'edebug' flag was set in URL
         nocache       -- True if 'nocache' flag was set in URL
         gui           -- True if 'gui' flag was set in URL
+        runtime_opt   -- Runtime options, derived from AFC message parameters
         internal      -- True if request message came from within the cluster
         als_req_id    -- Request id to use in subsequent ALS writes
         req_idx       -- Request index inside AFC Request message
@@ -346,16 +361,9 @@ class AfcServerMessageProcessor:
 
             # If no results from cache - invoke AFC Engine
             if ret is None:
-                runtime_opts = 0
-                for predicate, flag in \
-                        [(cert_resp.location_flags &
-                          hardcoded_relations.CERT_ID_LOCATION_INDOOR,
-                          defs.RNTM_OPT_CERT_ID),
-                         (debug, defs.RNTM_OPT_DBG),
-                         (edebug, defs.RNTM_OPT_SLOW_DBG),
-                         (gui, defs.RNTM_OPT_GUI)]:
-                    if predicate:
-                        runtime_opts |= flag
+                if cert_resp.location_flags & \
+                        hardcoded_relations.CERT_ID_LOCATION_INDOOR:
+                    runtime_opt |= defs.RNTM_OPT_CERT_ID
                 resp_str = \
                     await self._compute.process_request(
                         request_str=json.dumps(
@@ -363,7 +371,7 @@ class AfcServerMessageProcessor:
                              "availableSpectrumInquiryRequests": [req_dict]}),
                         config_str=rcc.cfg_str,
                         req_cfg_digest=rcc.req_cfg_hash,
-                        runtime_opts=runtime_opts, task_id=task_id,
+                        runtime_opt=runtime_opt, task_id=task_id,
                         history_dir=os.path.join(
                             "/history", req.deviceDescriptor.serialNumber,
                             datetime.datetime.now().isoformat()),
