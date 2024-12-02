@@ -8,6 +8,7 @@
 #
 
 # pylint: disable=wrong-import-order, global-statement, too-many-arguments
+# pylint: disable=too-many-positional-arguments
 
 import fastapi
 import logging
@@ -108,13 +109,15 @@ async def available_pectrum_inquiry(
         gui: bool = fastapi.Query(
             False, title="Request from Web GUI"),
         mtls_dn: Optional[str] = fastapi.Header(default=None),
+        x_real_ip: Optional[str] = fastapi.Header(dsfault=None),
         message_processor: afc_server_msg_proc.AfcServerMessageProcessor =
         fastapi.Depends(get_message_processor)) -> Dict[str, Any]:
     """ Process external AFC Request message """
     return \
         await message_processor.process_msg(
             req_msg=afc_req_msg, debug=debug, edebug=edebug,
-            nocache=nocache, gui=gui, mtls_dn=mtls_dn, internal=False)
+            nocache=nocache, gui=gui, mtls_dn=mtls_dn, ap_ip=x_real_ip,
+            internal=False)
 
 
 @app.post("/fbrat/ap-afc/availableSpectrumInquiryInternal",
@@ -132,13 +135,15 @@ async def available_pectrum_inquiry_internal(
         gui: bool = fastapi.Query(
             False, title="Request from Web GUI"),
         mtls_dn: Optional[str] = fastapi.Header(default=None),
+        x_real_ip: Optional[str] = fastapi.Header(dsfault=None),
         message_processor: afc_server_msg_proc.AfcServerMessageProcessor =
         fastapi.Depends(get_message_processor)) -> Dict[str, Any]:
     """ Process internal AFC Request message """
     return \
         await message_processor.process_msg(
             req_msg=afc_req_msg, debug=debug, edebug=edebug,
-            nocache=nocache, gui=gui, mtls_dn=mtls_dn, internal=True)
+            nocache=nocache, gui=gui, mtls_dn=mtls_dn, ap_ip=x_real_ip,
+            internal=True)
 
 
 if __name__ == "__main__":
