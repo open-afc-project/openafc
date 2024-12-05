@@ -19,11 +19,19 @@ table afc_message [headercolor: #000000, note: 'AFC Request/Response message pai
   rx_envelope_digest uuid [note: 'Envelope of AFC Request message']
   tx_envelope_digest uuid [note: 'Envelope of AFC Response message']
   dn_text_digest uuid [note: 'mTLS DN digest']
+  ap_ip inet6 [note: 'IP address of AFC Request sender']
+  runtime_opt int [note: 'Flags from request URL (gui, nocache, etc.)']
+
 
   indexes {
     (message_id, month_idx) [pk]
     rx_time
     tx_time
+    rx_envelope_digest [type: hash]
+    tx_envelope_digest [type: hash]
+    dn_text_digest [type: hash]
+    ap_ip
+    runtime_opt
   }
 }
 

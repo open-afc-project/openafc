@@ -66,10 +66,11 @@ import re
 import sqlalchemy as sa
 import sys
 import tabulate
-from typing import Any, cast, Dict, List, NamedTuple, NoReturn, Optional, \
-    Set, Tuple, Union
+from typing import Any, Callable, cast, Dict, List, NamedTuple, NoReturn, \
+    Optional, Set, Tuple, Union
 
 import utils
+import defs
 
 # Default database names for ALS and JSON logs
 ALS_DB = "ALS"
@@ -702,6 +703,39 @@ class Point:
         return f"POINT({self._lon} {self._lat})"
 
 
+class RuntimeOpt(enum.IntFlag):
+    """ Ruintime Option flags (flags from AFC request URL)
+    Some RNTM_OPT_ bits are not here, as they are not from request URL
+    """
+    debug = defs.RNTM_OPT_DBG
+    gui = defs.RNTM_OPT_GUI
+    nocache = defs.RNTM_OPT_NOCACHE
+    edebug = defs.RNTM_OPT_SLOW_DBG
+
+    def out_repr(self) -> List[str]:
+        """ Returns output reresentation as list of options """
+        ret: List[str] = []
+        rest = self.value
+        for opt in list(self):
+            ret.append(opt.name)
+            rest &= ~opt.value
+        while rest:
+            bit = rest & ~(rest - 1)
+            ret.append(str(bit))
+            rest &= ~bit
+        return ret
+
+    @classmethod
+    def from_cmd(cls, s: str) -> "RuntimeOpt":
+        """ Construct from command line representation """
+        if re.match(r"^\d+$", s):
+            return cls(int(s))
+        ret = cls.__members__.get(s)
+        error_if(ret is None, f"Unknown runtime option '{s}'")
+        assert ret is not None
+        return ret
+
+
 class AlsSelectComponent:
     """ Base class for select-related components (output items, wheres) of
     ALS Queries
@@ -1044,6 +1078,15 @@ class AlsOut(AlsSelectComponent):
                         table_names=["mtls_dn", "afc_message"],
                         column_name="dn_json"),
                     SimpleAlsOut(
+                        cmd="ip", help_="Sender (AP) IP",
+                        table_names=["afc_message"], column_name="ap_ip"),
+                    SimpleAlsOut(
+                        cmd="runtime_opt",
+                        help_="Option flags (gui, nocache, etc.)",
+                        table_names=["afc_message"],
+                        column_name="runtime_opt",
+                        converter=lambda x: RuntimeOpt(x).out_repr()),
+                    SimpleAlsOut(
                         cmd="uls", help_="ULS data version",
                         table_names=["uls_data_version", "request_response"],
                         column_name="uls_data_version"),
@@ -1060,9 +1103,11 @@ class SimpleAlsOut(AlsOut):
 
     Private attributes:
     _column_name -- Name of column that contains desired value
+    _converter   -- Optional convertrer function for non-None value
     """
     def __init__(self, cmd: str, help_: str, table_names: List[str],
-                 column_name: str) -> None:
+                 column_name: str,
+                 converter: Optional[Callable[[Any], Any]] = None) -> None:
         """ Constructor
 
         Arguments:
@@ -1074,9 +1119,11 @@ class SimpleAlsOut(AlsOut):
                        to 'request_response_in_message' table (that itself
                        might be omitted, if not containing pertinent columns)
         column_name -- Name of column that contains desired value
+        converter   -- Optional convertrer function for non-None value
         """
         super().__init__(cmd=cmd, help_=help_, table_names=table_names)
         self._column_name = column_name
+        self._converter = converter
 
     def add_columns(self, column_dict: Dict[str, Any]) -> None:
         """ Add columns to select list """
@@ -1088,7 +1135,10 @@ class SimpleAlsOut(AlsOut):
 
     def collate(self, rows: List[Any]) -> Any:
         """ Read value from row list """
-        return self._get_row0(rows, column_name=self._column_name)
+        ret = self._get_row0(rows, column_name=self._column_name)
+        if self._converter and (ret is not None):
+            ret = self._converter(ret)
+        return ret
 
 
 class ReqRespAlsOut(AlsOut):
@@ -1510,6 +1560,7 @@ class AlsFilter(AlsSelectComponent):
                                      "request_response"],
                         column_name="ruleset_id"),
                     MtlsCnAlsFilter(arg_name="cn"),
+                    RuntimeOptFilter(arg_name="runtime_opt"),
                     RespCodeAlsFilter(arg_name="resp_code"),
                     PsdAlsFilter(arg_name="psd"),
                     EirpAlsFilter(arg_name="eirp")]:
@@ -1620,6 +1671,46 @@ class MtlsCnAlsFilter(AlsFilter):
             and_args.append(
                 self.column(column_name="dn_json")["CN"].
                 astext.not_in(negatives))
+        assert and_args
+        return s.where(sa.and_(*and_args))
+
+
+class RuntimeOptFilter(AlsFilter):
+    """ Filter by runtime options """
+    def __init__(self, arg_name: str) -> None:
+        """ Constructor
+
+        Arguments:
+        arg_name    -- Name of command line filtering parameter
+        """
+        super().__init__(arg_name=arg_name, table_names=["afc_message"])
+
+    def apply_filter(self, s: sa.sql.selectable.Select, arg_value: Any) \
+            -> sa.sql.selectable.Select:
+        """ 'Applies 'where' clause to select statement
+
+        Arguments:
+        s         -- Select statement to apply clause to
+        arg_value -- Command line parameter value
+        Returns modified select statement """
+        args = cast(List[str], arg_value)
+        positives: Optional[int] = None
+        negatives: Optional[int] = None
+        for arg in args:
+            if arg.startswith("-"):
+                negatives = \
+                    (negatives or 0) | RuntimeOpt.from_cmd(arg[1:]).value
+            else:
+                positives = \
+                    (positives or 0) | RuntimeOpt.from_cmd(arg).value
+        and_args: List[Any] = []
+        if positives is not None:
+            and_args.append(
+                self.column(column_name="runtime_opt").op("&")(positives) ==
+                positives)
+        if negatives is not None:
+            and_args.append(
+                self.column(column_name="runtime_opt").op("&")(negatives) == 0)
         assert and_args
         return s.where(sa.and_(*and_args))
 
@@ -2221,6 +2312,14 @@ def main(argv: List[str]) -> None:
         "comma-separated sequence of channel numbers (like '5'), channel "
         "number ranges (like '1-101'), channel ranges for given bandwidth "
         "(like '1-200:40'), MHz frequency ranges (like '6000-6500')")
+    runtime_options = \
+        ", ".join(f"{o.name}({o.value}"
+                  for o in RuntimeOpt.__members__.values())
+    parser_als.add_argument(
+        "--runtime_opt", metavar="[-]OPTION", action="append",
+        help=f"Filter output by presence or absence of given request option, "
+        f"that can be specified by name or bitmask. Options and their "
+        f"bitmasks are: {runtime_options}")
     parser_als.add_argument(
         "--order_by", metavar="ITEM[,desc]", action="append", default=[],
         help=f"Sort output by given item. ',desc' means descending order. "

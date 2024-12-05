@@ -558,11 +558,19 @@ class RatAfc(MethodView):
             request_type = 'AP-AFC'
 
             use_tasks = (rcache is None) or \
-                (flask.request.args.get('conn_type') == 'async') or \
-                (flask.request.args.get('gui') == 'True')
+                (flask.request.args.get('conn_type') == 'async') or is_gui
+
+            message_runtime_opts = 0
+            for arg, mask in [('gui', RNTM_OPT_GUI), ('debug', RNTM_OPT_DBG),
+                              ('edebug', RNTM_OPT_SLOW_DBG),
+                              ('nocache', RNTM_OPT_NOCACHE)]:
+                if flask.request.args.get(arg):
+                    message_runtime_opts |= mask
 
             als.als_afc_request(req_id=als_req_id, req=args,
-                                mtls_dn=flask.request.headers.get("mTLS-DN"))
+                                mtls_dn=flask.request.headers.get('mTLS-DN'),
+                                runtime_opt=message_runtime_opts,
+                                ap_ip=flask.request.headers.get('X-Real-IP'))
             uls_id = "Unknown"
             geo_id = "Unknown"
             indoor_certified = True
@@ -628,28 +636,16 @@ class RatAfc(MethodView):
                     elif not serial:
                         raise InvalidValueException(["serialNumber", serial])
 
+                    runtime_opts = message_runtime_opts
+
                     indoor_certified = \
                         self._auth_ap(serial, prefix, certId,
                                       device_desc.get('rulesetIds'), ver)
-
                     if indoor_certified:
-                        runtime_opts = RNTM_OPT_CERT_ID | RNTM_OPT_NODBG_NOGUI
-                    else:
-                        runtime_opts = RNTM_OPT_NODBG_NOGUI
-
-                    debug_opt = flask.request.args.get('debug')
-                    if debug_opt == 'True':
-                        runtime_opts |= RNTM_OPT_DBG
-                    edebug_opt = flask.request.args.get('edebug')
-                    if edebug_opt == 'True':
-                        runtime_opts |= RNTM_OPT_SLOW_DBG
-                    if is_gui:
-                        runtime_opts |= RNTM_OPT_GUI
-                    opt = flask.request.args.get('nocache')
-                    if opt == 'True':
-                        runtime_opts |= RNTM_OPT_NOCACHE
+                        runtime_opts |= RNTM_OPT_CERT_ID
                     if use_tasks:
                         runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
+
                     LOGGER.debug("(%d) %s::%s() runtime %d",
                                  threading.get_native_id(),
                                  self.__class__, inspect.stack()[0][3],
