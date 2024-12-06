@@ -191,9 +191,13 @@ def do_reset_admin_password(args: Any) -> None:
     with open(settings.admin_password_file, encoding="ascii") as f:
         password = f.read()
     try:
-        subprocess.check_call(
-            ["grafana", "cli", "admin", "reset-admin-password", password],
-            cwd=settings.grafana_dir)
+        args = ["grafana", "cli"]
+        if settings.grafana_dir:
+            args += ["--homepath", settings.grafana_dir]
+        if settings.grafana_config:
+            args += ["--config", settings.grafana_config]
+        args += ["admin", "reset-admin-password", password]
+        subprocess.check_call(args)
     except (OSError, subprocess.SubprocessError):
         error("Attempt to (re)set Grafana admin password failed")
 
@@ -225,8 +229,8 @@ class Settings(pydantic.BaseSettings):
     recreate_db: bool = pydantic.Field(False)
     admin_password_file: Optional[str] = \
         pydantic.Field(None, env="GRAFANA_ADMIN_PASSWORD_FILE")
-    grafana_dir: Optional[str] = \
-        pydantic.Field(None, env="GF_PATHS_HOME")
+    grafana_dir: Optional[str] = pydantic.Field(None, env="GF_PATHS_HOME")
+    grafana_config: Optional[str] = pydantic.Field(None, env="GF_PATHS_CONFIG")
 
     @pydantic.root_validator(pre=True)
     @classmethod
@@ -308,6 +312,10 @@ def main(argv: List[str]) -> None:
         "--grafana_dir", metavar="GRAFANA_INSTALL_DIR",
         help=f"Grafana install dir"
         f"{pydantic_utils.env_help(Settings, 'grafana_dir')}")
+    parser_reset_admin_password.add_argument(
+        "--grafana_config", metavar="GRAFANA_CONFIG_FILE",
+        help=f"Grafana config or config override file"
+        f"{pydantic_utils.env_help(Settings, 'grafana_config')}")
 
     parser_reset_admin_password.set_defaults(func=do_reset_admin_password)
 
