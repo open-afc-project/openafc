@@ -16,8 +16,9 @@ import random
 import string
 from typing import cast, List, Optional, Set
 
-from log_utils import error, get_module_logger, safe_dsn
+from log_utils import error, get_module_logger
 from rcache_models import RCACHE_RMQ_EXCHANGE_NAME, RmqReqRespKey
+import secret_utils
 
 __all__ = ["RcacheRmq", "RcacheRmqConnection"]
 
@@ -186,8 +187,8 @@ class RcacheRmq:
         try:
             self._url_params = pika.URLParameters(self.rmq_dsn)
         except pika.exceptions.AMQPError as ex:
-            error(f"RabbitMQ URL '{safe_dsn(self.rmq_dsn)}' has invalid "
-                  f"syntax: {ex}")
+            error(f"RabbitMQ URL '{secret_utils.safe_dsn(self.rmq_dsn)}' has "
+                  f"invalid syntax: {ex}")
 
     def create_connection(self, tx_queue_name: Optional[str] = None) \
             -> RcacheRmqConnection:

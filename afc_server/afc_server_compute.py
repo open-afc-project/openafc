@@ -21,7 +21,7 @@ from typing import Any, Dict, Optional, Set
 
 import afc_worker
 import fst
-from log_utils import dp, error, error_if, get_module_logger, safe_dsn
+from log_utils import dp, error, error_if, get_module_logger
 import rcache_models
 import secret_utils
 

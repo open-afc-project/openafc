@@ -49,7 +49,7 @@ License, a copy of which is included with this software program.
      - [Config override files](#gcp_config_overrides)
      - [Putting images to registry](#gcp_push_images)
      - [Installing prerequisites](#gcp_install_prerequisites")
-     - [Installing/reinstalling OpenAFC helmcharts ](#cp_install helmcharts")
+     - [Installing/reinstalling OpenAFC helmcharts](#cp_install_helmcharts")
      - [Uninstalling OpenAFC helmcharts](#gcp_uninstall_helmcharts")
      - [Uninstalling prerequisites](#gcp_uninstall_prerequisites")
 
@@ -164,6 +164,11 @@ Here are list of secrets used by OpenAFC:
 |oidc-client-secret|rat-server, msghnd (deprecated, not really used), objst (not really used), cert-db (not really used)|Client Secret for OIDC-based (single sign-in, such as `Okta` - if used) login. Only be used by rat-server, other Flask-based containers require it for initialization code not to crash|
 |server-cert-pem|dispatcher|Server private key for TLS termination. Combined with *server-key-pem* into a single *server-cert* secret in cluster secret store|
 |server-key-pem|dispatcher|Server certificate for TLS termination. Combined with *server-cert-pem* into a single *server-cert* secret in cluster secret store|
+|grafana-db-password|grafana|Password for PostgreSQL DSN for Grafana database (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
+|als-ro-db-password|grafana|Password for PostgreSQL DSN for read-only access to ALS database (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
+|als-json-log-ro-db-password|grafana|Password for PostgreSQL DSN for read-only access to ALS JSON logs database (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
+|uls-state-ro-db-password|grafana|Password for PostgreSQL DSN for read-only acces to database with ULS Downloader state (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
+|grafana-admin-password|grafana|Grafana admin user password|
 
 
 ### Database DSNs and their passwords <a name="dsns_and_passwords">
@@ -820,7 +825,7 @@ Here:
 - **`CONTEXT_INT`, `CONTEXT_EXT`** Context names for internal and external clusters. May be omitted if default. May use wildcards (e.g. `*ext`)
 
 
-#### Installing/reinstalling OpenAFC helmcharts <a name="gcp_install helmcharts">
+#### Installing/reinstalling OpenAFC helmcharts <a name="gcp_install_helmcharts">
 
 ```
 helm/bin/helm_install_int.py --tag <TAG>  --context <[KUBECONFIG][:CONTEXT_INT]> \

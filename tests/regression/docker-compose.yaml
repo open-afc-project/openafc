@@ -254,7 +254,7 @@ services:
       - POSTGRES_INIT_CONN_STR=bulk_postgres
       - POSTGRES_ALS_CONN_STR=bulk_postgres
       - POSTGRES_LOG_CONN_STR=bulk_postgres
-      - POSTGRES_INIT_PASSWORD_FILE=${VOL_C_SECRETS}/POSTGRES_PASSWORD
+      - POSTGRES_INIT_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_INIT_DB_PASSWORD
       - POSTGRES_ALS_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_DB_PASSWORD
       - POSTGRES_LOG_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_JSON_LOG_DB_PASSWORD
       - INIT_IF_EXISTS=skip
@@ -262,7 +262,7 @@ services:
     secrets:
       - ALS_DB_PASSWORD
       - ALS_JSON_LOG_DB_PASSWORD
-      - POSTGRES_PASSWORD
+      - ALS_INIT_DB_PASSWORD
     depends_on:
       - als_kafka
       - bulk_postgres
@@ -353,9 +353,31 @@ services:
   grafana:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/grafana-image:${TAG:-latest}
     restart: always
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GRAFANA_ADMIN_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_ADMIN_PASSWORD
+      - GRAFANA_DATABASE_URL=postgres://postgres:postgres@bulk_postgres/grafana
+      - GRAFANA_DATABASE_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_DB_PASSWORD
+      - GRAFANA_DATABASE_INIT_URL=postgresql://postgres:postgres@bulk_postgres/postgres
+      - GRAFANA_DATABASE_INIT_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_INIT_DB_PASSWORD
+      - GRAFANA_DS_ALS_RO_DSN=postgresql://postgres:postgres@bulk_postgres/ALS
+      - GRAFANA_DS_ALS_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_RO_DB_PASSWORD
+      - GRAFANA_DS_JSON_LOG_RO_DSN=postgresql://postgres:postgres@bulk_postgres/ALS_LOGS
+      - GRAFANA_DS_JSON_LOG_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_JSON_LOG_RO_DB_PASSWORD
+      - GRAFANA_DS_FS_STATE_RO_DSN=postgresql://postgres:postgres@bulk_postgres/fs_state
+      - GRAFANA_DS_FS_STATE_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ULS_STATE_RO_DB_PASSWORD
+      - GRAFANA_DS_PROMETHEUS_HOST=prometheus
+      - GRAFANA_DS_RCACHE_HOST=rcache
     depends_on:
       - prometheus
       - bulk_postgres
+    secrets:
+      - GRAFANA_DB_PASSWORD
+      - GRAFANA_INIT_DB_PASSWORD
+      - ALS_RO_DB_PASSWORD
+      - ALS_JSON_LOG_RO_DB_PASSWORD
+      - ULS_STATE_RO_DB_PASSWORD
+      - GRAFANA_ADMIN_PASSWORD
     dns_search: [.]
 
   prometheus:
@@ -410,3 +432,17 @@ secrets:
     file: ${VOL_H_SECRETS}/RCACHE_DB_PASSWORD
   ULS_STATE_DB_PASSWORD:
     file: ${VOL_H_SECRETS}/ULS_STATE_DB_PASSWORD
+  ALS_INIT_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/ALS_INIT_DB_PASSWORD
+  GRAFANA_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/GRAFANA_DB_PASSWORD
+  GRAFANA_INIT_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/GRAFANA_INIT_DB_PASSWORD
+  ALS_RO_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/ALS_RO_DB_PASSWORD
+  ALS_JSON_LOG_RO_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/ALS_JSON_LOG_RO_DB_PASSWORD
+  ULS_STATE_RO_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/ULS_STATE_RO_DB_PASSWORD
+  GRAFANA_ADMIN_PASSWORD:
+    file: ${VOL_H_SECRETS}/GRAFANA_ADMIN_PASSWORD

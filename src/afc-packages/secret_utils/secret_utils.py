@@ -71,3 +71,20 @@ def substitute_password(dsc: str, dsn: Optional[str] = None,
         if part:
             netloc += f"{separator}{part}"
     return dsn_parts._replace(netloc=netloc).geturl()
+
+
+def safe_dsn(dsn: Optional[str]) -> Optional[str]:
+    """ Returns DSN without password (if there was any) """
+    if not dsn:
+        return dsn
+    try:
+        parsed = urllib.parse.urlparse(dsn)
+        if not parsed.password:
+            return dsn
+        return \
+            urllib.parse.urlunparse(
+                parsed._replace(
+                    netloc=parsed.netloc.replace(":" + parsed.password,
+                                                 ":<PASSWORD>")))
+    except Exception:
+        return dsn

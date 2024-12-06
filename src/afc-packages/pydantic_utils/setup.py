@@ -1,4 +1,4 @@
-""" Prometheus client utility stuff for Flask """
+""" Common helper functions for Pydantic """
 #
 # Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
@@ -16,11 +16,11 @@ class InstallCmdWrapper(install):
 
 
 setup(
-    name='prometheus_utils',
+    name='pydantic_utils',
     # Label compatible with PEP 440
     version='0.1.0',
     description='AFC packages',
-    py_modules=["prometheus_utils"],
+    py_modules=["pydantic_utils"],
     cmdclass={
         'install': InstallCmdWrapper,
     }

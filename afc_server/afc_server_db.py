@@ -24,7 +24,7 @@ from typing import Any, Callable, cast, Dict, Generic, List, NamedTuple, \
 
 import afcmodels.hardcoded_relations as hardcoded_relations
 import afc_server_models
-from log_utils import dp, error, error_if, get_module_logger, safe_dsn
+from log_utils import dp, error, error_if, get_module_logger
 import rcache_models
 import secret_utils
 
@@ -636,7 +636,8 @@ class AfcServerDb:
         try:
             parts = urllib.parse.urlsplit(dsn)
         except ValueError as ex:
-            error(f"Invalid database DSN syntax: '{safe_dsn(dsn)}': {ex}")
+            error(f"Invalid database DSN syntax: "
+                  f"'{secret_utils.safe_dsn(dsn)}': {ex}")
         if not any(self._ASYNC_DRIVER_NAME in part for part in parts):
             dsn = \
                 urllib.parse.urlunsplit(
@@ -649,5 +650,6 @@ class AfcServerDb:
         try:
             engine = sa_async.create_async_engine(dsn, pool_pre_ping=True)
         except (sa.exc.SQLAlchemyError, OSError) as ex:
-            error(f"Error opening {dsc} DSN '{safe_dsn(dsn)}': {ex}")
+            error(f"Error opening {dsc} DSN '{secret_utils.safe_dsn(dsn)}': "
+                  f"{ex}")
         return engine
