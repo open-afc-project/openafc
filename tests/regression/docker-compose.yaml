@@ -26,10 +26,10 @@ services:
       # Ports to be used externally
       - "${EXT_IP:-0.0.0.0}:80-180:80"
       - "${EXT_IP:-0.0.0.0}:443-543:443"
-    # Uncomment and update if you plan to use SSL and mTLS
-    # volumes:
+    volumes:
+      - ./ssl/nginx:/certificates/servers
+    # Uncomment and update if you plan to use mTLS
     #   - ./ssl:/usr/share/ca-certificates/certs
-    #   - ./ssl/nginx:/certificates/servers
     environment:
       - AFC_SERVER_NAME=_
       - AFC_ENFORCE_HTTPS=TRUE

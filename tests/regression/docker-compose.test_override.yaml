@@ -1,4 +1,0 @@
-services:
-  dispatcher:
-    volumes:
-      - ./ssl/nginx:/certificates/servers
