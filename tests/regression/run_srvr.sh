@@ -43,7 +43,7 @@ check_ret $?
 [ -d ~/template_regrtest/ssl ] && cp -a ~/template_regrtest/ssl .
 
 # run srvr
-docker-compose down -v && docker-compose up -d && docker ps -a
+docker-compose down -v && docker-compose -f docker-compose.yaml -f docker-compose.test_override.yaml up -d && docker ps -a
 check_ret $?
 sleep 5
 
@@ -58,6 +58,7 @@ docker-compose exec -T rat_server rat-manage-api cert_id create  --location 3 \
 --cert_id FsDownloaderCertIdCA --ruleset_id CA_RES_DBS-06
 docker-compose exec -T rat_server rat-manage-api cert_id create  --location 3 \
 --cert_id FsDownloaderCertIdBR --ruleset_id BRAZIL_RULESETID
+
 
 # Local Variables:
 # vim: sw=2:et:tw=80:cc=+1
