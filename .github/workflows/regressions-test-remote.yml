@@ -79,8 +79,6 @@ jobs:
     - name: run remote srvr
       run: |
           ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "EXT_IP=${{ secrets.INT_TO_EXT_IPADDR }} sh -x ${{ env.WD }}/${{ env.REGRD }}/run_srvr.sh ${{ env.WD }} ${{ env.RAND }} 1"
-      env:
-          EXT_IP: ${{ secrets.INT_TO_EXT_IPADDR }}
 # } start dev srvr
 
 # get dev srvr port num{
