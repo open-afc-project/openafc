@@ -4,12 +4,13 @@ services:
   ratdb:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/ratdb-image:${TAG:-latest}
     restart: always
-    volumes:
-      - pgdata_state:${RATDB_GUEST_PGDATA}
-    environment:
-      POSTGRES_PASSWORD: ${RATDB_POSTGRES_PASSWORD}
-      PGDATA: ${RATDB_GUEST_PGDATA:-/var/lib/pgsql/data}
-      POSTGRES_DB: ${RATDB_POSTGRES_DB:-fbrat}
+    # for persistent configuration
+    # volumes:
+    #   - ./pgdata:/var/lib/pgsql/data
+    # environment:
+    #   POSTGRES_PASSWORD: <default password>
+    #   PGDATA: /var/lib/pgsql/data
+    #   POSTGRES_DB: fbrat
     dns_search: [.]
 
   rmq:
@@ -20,29 +21,31 @@ services:
   dispatcher:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/dispatcher-image:${TAG:-latest}
     restart: always
+
     ports:
-      - "${EXT_PORT}:80"
-      - "${EXT_PORT_S}:443"
-    volumes:
-      - ${VOL_H_NGNX:-/tmp}:${VOL_C_NGNX:-/dummyngnx}
+      # Ports to be used externally
+      - "${EXT_IP:-0.0.0.0}:80-180:80"
+      - "${EXT_IP:-0.0.0.0}:443-543:443"
+    # Uncomment and update if you plan to use SSL and mTLS
+    # volumes:
+    #   - ./ssl:/usr/share/ca-certificates/certs
+    #   - ./ssl/nginx:/certificates/servers
     environment:
-      - AFC_SERVER_NAME=${AFC_SERVER_NAME:-_}
-      - AFC_ENFORCE_HTTPS=${AFC_ENFORCE_HTTPS:-TRUE}
+      - AFC_SERVER_NAME=_
+      - AFC_ENFORCE_HTTPS=TRUE
       # set to true if required to enforce mTLS check
-      - AFC_ENFORCE_MTLS=${AFC_ENFORCE_MTLS:-false}
+      - AFC_ENFORCE_MTLS=false
       - AFC_MSGHND_NAME=${AFC_REQ_SERVER}
-      - AFC_MSGHND_PORT=${AFC_REQ_SERVER_PORT}:-8000}
-      - AFC_WEBUI_NAME=${AFC_WEBUI_NAME:-rat_server}
-      - AFC_WEBUI_PORT=${AFC_WEBUI_PORT:-80}
+      - AFC_MSGHND_PORT=${AFC_REQ_SERVER_PORT}
+      - AFC_WEBUI_NAME=${AFC_RAT_SERVER_NAME}
+      - AFC_WEBUI_PORT=80
       # Filestorage params:
-      - AFC_OBJST_HOST=${AFC_OBJST_HOST:-objst}
-      - AFC_OBJST_PORT=${AFC_OBJST_PORT:-5000}
-      - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME:-HTTP}
-      # proxy timeout
-      - AFC_PROXY_CONN_TOUT=${AFC_PROXY_CONN_TOUT}
+      - AFC_OBJST_HOST=${AFC_OBJST_HOST}
+      - AFC_OBJST_PORT=${AFC_OBJST_PORT}
+      - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
       # Prometheus params:
-      - AFC_PROMETHEUS_TARGET=${AFC_PROMETHEUS_HOST:-prometheus}:${AFC_PROMETHEUS_PORT:-9090}
-      - AFC_PROMETHEUS_ENABLED=${AFC_PROMETHEUS_ENABLED:-true}
+      - AFC_PROMETHEUS_TARGET=prometheus:9090
+      - AFC_PROMETHEUS_ENABLED=true
     depends_on:
       - afcserver
       - msghnd
@@ -56,6 +59,8 @@ services:
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
       - ./pipe:/pipe
+      # In case you want to cinfigure OIDC
+      # - ./OIDC:/OIDC
     depends_on:
       - ratdb
       - rmq
@@ -85,22 +90,25 @@ services:
       - OIDCFILE_OIDC_CLIENT_ID=${VOL_C_SECRETS}/OIDC_CLIENT_ID
       - OIDCFILE_OIDC_CLIENT_SECRET=${VOL_C_SECRETS}/OIDC_CLIENT_SECRET
       # RabbitMQ server name:
-      - BROKER_TYPE=${BROKER_TYPE:-external}
-      - BROKER_FQDN=${BROKER_FQDN:-rmq}
+      - BROKER_TYPE=${BROKER_TYPE}
+      - BROKER_FQDN=${BROKER_FQDN}
       # Filestorage params:
-      - AFC_OBJST_HOST=${AFC_OBJST_HOST:-objst}
-      - AFC_OBJST_PORT=${AFC_OBJST_PORT:-5000}
-      - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME:-HTTP}
+      - AFC_OBJST_HOST=${AFC_OBJST_HOST}
+      - AFC_OBJST_PORT=${AFC_OBJST_PORT}
+      - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
       # ALS params
-      - ALS_KAFKA_SERVER_ID=rat_server
+      - ALS_KAFKA_SERVER_ID=${AFC_RAT_SERVER_NAME}
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
+      - RCACHE_POSTGRES_DSN=${RCACHE_POSTGRES_DSN}
       - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
-      - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
+      - RCACHE_RMQ_DSN=${RCACHE_RMQ_DSN}
+      # OIDC and Captcha conf can be added here:
+      # - OIDC_ARG=/OIDC/oidc_env.cfg
+      # - RATAPI_ARG=/OIDC/ratapi_env.cfg
 
   msghnd:
     image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-msghnd:${TAG:-latest}
@@ -114,22 +122,22 @@ services:
       - OIDCFILE_OIDC_CLIENT_ID=${VOL_C_SECRETS}/OIDC_CLIENT_ID
       - OIDCFILE_OIDC_CLIENT_SECRET=${VOL_C_SECRETS}/OIDC_CLIENT_SECRET
       # RabbitMQ server name:
-      - BROKER_TYPE=${BROKER_TYPE:-external}
-      - BROKER_FQDN=${BROKER_FQDN:-rmq}
+      - BROKER_TYPE=${BROKER_TYPE}
+      - BROKER_FQDN=${BROKER_FQDN}
       # Filestorage params:
-      - AFC_OBJST_HOST=${AFC_OBJST_HOST:-objst}
-      - AFC_OBJST_PORT=${AFC_OBJST_PORT:-5000}
-      - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME:-HTTP}
+      - AFC_OBJST_HOST=${AFC_OBJST_HOST}
+      - AFC_OBJST_PORT=${AFC_OBJST_PORT}
+      - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
       # ALS params
       - ALS_KAFKA_SERVER_ID=msghnd
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
+      - RCACHE_POSTGRES_DSN=${RCACHE_POSTGRES_DSN}
       - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
-      - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
+      - RCACHE_RMQ_DSN=${RCACHE_RMQ_DSN}
     dns_search: [.]
     secrets:
       - RATDB_PASSWORD
@@ -154,25 +162,25 @@ services:
     image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afcserver-image:${TAG:-latest}
     restart: always
     environment:
-      - AFC_SERVER_PORT=${AFC_REQ_SERVER_PORT:-8000}
+      - AFC_SERVER_PORT=${AFC_REQ_SERVER_PORT}
       - AFC_SERVER_RATDB_DSN=postgresql://postgres:postgres@ratdb/fbrat
       - AFC_SERVER_RATDB_RATDB_PASSWORD_FILE=${VOL_C_SECRETS}/RATDB_PASSWORD
       - AFC_SERVER_REQUEST_TIMEOUT=180
       - AFC_SERVER_CONFIG_REFRESH=5
-      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
+      - RCACHE_POSTGRES_DSN=${RCACHE_POSTGRES_DSN}
       - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
-      - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
+      - RCACHE_RMQ_DSN=${RCACHE_RMQ_DSN}
       # ALS params
-      - ALS_KAFKA_SERVER_ID=afcserver
+      - ALS_KAFKA_SERVER_ID=${AFC_REQ_SERVER}
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
       # Filestorage params:
-      - AFC_OBJST_HOST=${AFC_OBJST_HOST:-objst}
-      - AFC_OBJST_PORT=${AFC_OBJST_PORT:-5000}
-      - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME:-HTTP}
+      - AFC_OBJST_HOST=${AFC_OBJST_HOST}
+      - AFC_OBJST_PORT=${AFC_OBJST_PORT}
+      - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
       # RabbitMQ server name:
-      - BROKER_TYPE=${BROKER_TYPE:-external}
-      - BROKER_FQDN=${BROKER_FQDN:-rmq}
+      - BROKER_TYPE=${BROKER_TYPE}
+      - BROKER_FQDN=${BROKER_FQDN}
     dns_search: [.]
     secrets:
       - RATDB_PASSWORD
@@ -187,9 +195,9 @@ services:
   objst:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/objstorage-image:${TAG:-latest}
     environment:
-      - AFC_OBJST_PORT=${AFC_OBJST_PORT:-5000}
-      - AFC_OBJST_HIST_PORT=${AFC_OBJST_HIST_PORT:-4999}
-      - AFC_OBJST_LOCAL_DIR=${AFC_OBJST_LOCAL_DIR:-/storage}
+      - AFC_OBJST_PORT=${AFC_OBJST_PORT}
+      - AFC_OBJST_HIST_PORT=4999
+      - AFC_OBJST_LOCAL_DIR=/storage
       - FLASKFILE_SQLALCHEMY_DATABASE_PASSWORD=${VOL_C_SECRETS}/RATDB_PASSWORD
       - FLASKFILE_SECRET_KEY=${VOL_C_SECRETS}/FLASK_SECRET_KEY
       - FLASKFILE_GOOGLE_APIKEY=${VOL_C_SECRETS}/GOOGLE_APIKEY
@@ -213,17 +221,18 @@ services:
     image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-worker:${TAG:-latest}
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
-      - ./pipe:/pipe
+      # used for testing mainly
+      # - ./pipe:/pipe
     environment:
       # Filestorage params:
-      - AFC_OBJST_HOST=${AFC_OBJST_HOST:-objst}
-      - AFC_OBJST_PORT=${AFC_OBJST_PORT:-5000}
-      - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME:-HTTP}
+      - AFC_OBJST_HOST=${AFC_OBJST_HOST}
+      - AFC_OBJST_PORT=${AFC_OBJST_PORT}
+      - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
       # worker params
-      - AFC_WORKER_CELERY_WORKERS=${AFC_WORKER_CELERY_WORKERS:-"rat_1 rat_2"}
+      - AFC_WORKER_CELERY_WORKERS=rat_1 rat_2
       # RabbitMQ server name:
-      - BROKER_TYPE=${BROKER_TYPE:-external}
-      - BROKER_FQDN=${BROKER_FQDN:-rmq}
+      - BROKER_TYPE=${BROKER_TYPE}
+      - BROKER_FQDN=${BROKER_FQDN}
       # afc-engine preload lib params
       - AFC_AEP_ENABLE=1
       - AFC_AEP_DEBUG=1
@@ -231,14 +240,14 @@ services:
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
-      - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
+      - RCACHE_RMQ_DSN=${RCACHE_RMQ_DSN}
       # ALS params
       - ALS_KAFKA_SERVER_ID=worker
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
-      - RCACHE_UPDATE_ON_SEND=${RCACHE_UPDATE_ON_SEND}
+      - RCACHE_UPDATE_ON_SEND=True
       # TIMEOUT
-      - AFC_WORKER_ENG_TOUT=${AFC_WORKER_ENG_TOUT}
+      - AFC_WORKER_ENG_TOUT=300
     depends_on:
       - ratdb
       - rmq
@@ -281,12 +290,15 @@ services:
   bulk_postgres:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/bulk-postgres-image:${TAG:-latest}
     dns_search: [.]
+    # add for bulk_postgres persistence
+    # volumes:
+    #   - ./bulk_pgdata:/var/lib/postgresql/data
 
   uls_downloader:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/uls-downloader:${TAG:-latest}
     restart: always
     environment:
-      - ULS_AFC_URL=http://${AFC_REQ_SERVER}:${AFC_REQ_SERVER_PORT}:-8000}/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
+      - ULS_AFC_URL=http://${AFC_REQ_SERVER}:${AFC_REQ_SERVER_PORT}/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
       - ULS_DELAY_HR=1
       - ULS_SERVICE_STATE_DB_DSN=postgresql://postgres:postgres@bulk_postgres/fs_state
       - ULS_SERVICE_STATE_DB_PASSWORD_FILE=${VOL_C_SECRETS}/ULS_STATE_DB_PASSWORD
@@ -295,11 +307,12 @@ services:
       # ULS_SMTP_SSL, ULS_SMTP_TLS should also be specified to send email
       # notifications
       - ULS_SMTP_PASSWORD_FILE=${VOL_C_SECRETS}/MAIL_PASSWORD
-      - ULS_ALARM_SMTP_INFO=${VOL_C_SECRETS}/NOTIFIER_MAIL.json
-      - ULS_ALARM_EMAIL_TO=${ULS_ALARM_EMAIL_TO}
-      - ULS_ALARM_ALARM_INTERVAL_HR=${ULS_ALARM_ALARM_INTERVAL_HR:-0}
-      - ULS_ALARM_SUCCESS_MAX_AGE_HR=${ULS_ALARM_SUCCESS_MAX_AGE_HR:-9}
-      - ULS_ALARM_BEACON_INTERVAL_HR=${ULS_ALARM_BEACON_INTERVAL_HR:-0}
+      # ULS autoupdate error reporting configuration See README for ULS updater for reference
+        #- ULS_ALARM_SMTP_INFO=/run/secrets/NOTIFIER_MAIL.json
+        #- ULS_ALARM_EMAIL_TO=wcc-afc-swdev.pdl@broadcom.com
+        #- ULS_ALARM_ALARM_INTERVAL_HR=0
+        #- ULS_ALARM_SUCCESS_MAX_AGE_HR=9
+        #- ULS_ALARM_BEACON_INTERVAL_HR=0
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
@@ -308,7 +321,8 @@ services:
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
     volumes:
       - ${VOL_H_DB}:/rat_transfer
-      # TODO:  - uls_downloader_state:/uls_downloader_state
+      # May be useful in prod deployment
+      # - uls_downloader_state:/uls_downloader_state
     secrets:
       - MAIL_PASSWORD
       - ULS_STATE_DB_PASSWORD
@@ -351,11 +365,11 @@ services:
     environment:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_CLIENT_PORT=${RCACHE_CLIENT_PORT}
-      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
+      - RCACHE_POSTGRES_DSN=${RCACHE_POSTGRES_DSN}
       - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
-      - RCACHE_AFC_REQ_URL=http://${AFC_REQ_SERVER}:${AFC_REQ_SERVER_PORT}:-8000}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
-      - RCACHE_RULESETS_URL=http://rat_server/fbrat/ratapi/v1/GetRulesetIDs
-      - RCACHE_CONFIG_RETRIEVAL_URL=http://rat_server/fbrat/ratapi/v1/GetAfcConfigByRulesetID
+      - RCACHE_AFC_REQ_URL=http://${AFC_REQ_SERVER}:${AFC_REQ_SERVER_PORT}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
+      - RCACHE_RULESETS_URL=http://${AFC_RAT_SERVER_NAME}/fbrat/ratapi/v1/GetRulesetIDs
+      - RCACHE_CONFIG_RETRIEVAL_URL=http://${AFC_RAT_SERVER_NAME}/fbrat/ratapi/v1/GetAfcConfigByRulesetID
       # ALS params
       - ALS_KAFKA_SERVER_ID=rcache
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
@@ -399,10 +413,9 @@ services:
       - dispatcher
     dns_search: [.]
 
-
-volumes:
-  uls_downloader_state:
-  pgdata_state:
+# Should be added if ULS downloader state persistent needed
+# volumes:
+#   uls_downloader_state:
 
 secrets:
   ALS_DB_PASSWORD:
