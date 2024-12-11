@@ -3,9 +3,5 @@
 # that owns the software below.
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
-
-# Disables use of secrets
-
-externalSecrets: null
-
-secretStores: null
+/wd/afc-packages/pydantic_utils
+/wd/afc-packages/secret_utils
