@@ -14,9 +14,10 @@ import sqlalchemy.ext.asyncio as sa_async
 import sqlalchemy.dialects.postgresql as sa_pg
 from typing import Any, Dict, List, Optional
 
-from log_utils import dp, error, error_if, FailOnError, safe_dsn
+from log_utils import dp, error, error_if, FailOnError
 from rcache_db import RcacheDb
 from rcache_models import ApDbRespState, FuncSwitch, LatLonRect, ApDbPk
+import secret_utils
 
 __all__ = ["RcacheDbAsync"]
 
@@ -285,7 +286,8 @@ class RcacheDbAsync(RcacheDb):
         try:
             parts = urllib.parse.urlsplit(dsn)
         except ValueError as ex:
-            error(f"Invalid database DSN syntax: '{safe_dsn(dsn)}': {ex}")
+            error(f"Invalid database DSN syntax: "
+                  f"'{secret_utils.safe_dsn(dsn)}': {ex}")
         if self.ASYNC_DRIVER_NAME not in parts:
             dsn = \
                 urllib.parse.urlunsplit(

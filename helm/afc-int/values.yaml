@@ -173,6 +173,24 @@ sharedEnv:
   # certain containers
   devel-env:
     AFC_DEVEL_ENV: production
+  # ALS database DSNs
+  als-db:
+    POSTGRES_INIT_CONN_STR: >-
+      postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/postgres
+    POSTGRES_ALS_CONN_STR: >-
+      postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/ALS
+    POSTGRES_LOG_CONN_STR: >-
+      postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/AFC_LOGS
+    POSTGRES_INIT_PASSWORD_FILE: "{{secretFile:als-init-db-password:optional}}"
+    POSTGRES_ALS_PASSWORD_FILE: "{{secretFile:als-db-password:optional}}"
+    POSTGRES_LOG_PASSWORD_FILE: >-
+      {{secretFile:als-json-log-db-password:optional}}
+  # FS(ULS) downloader DSNs
+  uls-db:
+    ULS_SERVICE_STATE_DB_DSN: >-
+      postgresql://postgres:postgres@{{host:bulk-postgres}}/fs_state
+    ULS_SERVICE_STATE_DB_PASSWORD_FILE: >-
+      {{secretFile:uls-state-db-password:optional}}
 
 # Dictionary of static (non-templated and non-secret) volume definitions.
 # Indexed by volume names
@@ -621,20 +639,11 @@ components:
     env:
       KAFKA_SERVERS: "{{host:als-kafka}}:{{port:als-kafka:kafka}}"
       INIT_IF_EXISTS: skip
-      POSTGRES_INIT_CONN_STR: >-
-        postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/postgres
-      POSTGRES_ALS_CONN_STR: >-
-        postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/ALS
-      POSTGRES_LOG_CONN_STR: >-
-        postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/AFC_LOGS
-      POSTGRES_INIT_PASSWORD_FILE: "{{secretFile:postgres-password:optional}}"
-      POSTGRES_ALS_PASSWORD_FILE: "{{secretFile:als-db-password:optional}}"
-      POSTGRES_LOG_PASSWORD_FILE: >-
-        {{secretFile:als-json-log-db-password:optional}}
     sharedEnvKeys:
       - als-kafka-common
+      - als-db
     mountedSecrets:
-      - postgres-password
+      - als-init-db-password
       - als-db-password
       - als-json-log-db-password
   bulk-postgres:
@@ -657,10 +666,6 @@ components:
       ULS_AFC_URL: >-
         http://{{sameAs:afc-req-service:host}}:{{sameAs:afc-req-service:port}}/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
       ULS_DELAY_HR: 0
-      ULS_SERVICE_STATE_DB_DSN: >-
-        postgresql://postgres:postgres@{{host:bulk-postgres}}/fs_state
-      ULS_SERVICE_STATE_DB_PASSWORD_FILE: >-
-        {{secretFile:uls-state-db-password:optional}}
       ULS_PROMETHEUS_PORT: 8000
       ULS_SMTP_SERVER: >-
         {{sameAs:ratapi-configurator:MAIL_SERVER:optional}}
@@ -679,6 +684,7 @@ components:
       - rcache-common
       - devel-env
       - als-client
+      - uls-db
     staticVolumeMounts:
       rat_transfer: /rat_transfer
     mountedSecrets:
@@ -740,6 +746,41 @@ components:
       grafana:
         servicePort: 3000
         nodePort: 31000
+    env:
+      GF_SECURITY_ADMIN_USER: admin
+      GRAFANA_ADMIN_PASSWORD_FILE: >-
+        {{secretFile:grafana-admin-password}}
+      GRAFANA_DATABASE_URL: >-
+        postgresql://postgres:postgres@{{host:bulk-postgres}}/grafana
+      GRAFANA_DATABASE_PASSWORD_FILE: >-
+        {{secretFile:grafana-db-password}}
+      GRAFANA_DATABASE_INIT_URL: >-
+        postgresql://postgres:postgres@{{host:bulk-postgres}}/postgres
+      GRAFANA_DATABASE_INIT_PASSWORD_FILE: >-
+        {{secretFile:grafana-init-db-password}}
+      GRAFANA_DS_ALS_RO_DSN: >-
+        {{sameAs:als-db:POSTGRES_ALS_CONN_STR}}
+      GRAFANA_DS_ALS_RO_PASSWORD_FILE: >-
+        {{sameAs:als-db:POSTGRES_ALS_PASSWORD_FILE}}
+      GRAFANA_DS_JSON_LOG_RO_DSN: >-
+        {{sameAs:als-db:POSTGRES_LOG_CONN_STR}}
+      GRAFANA_DS_JSON_LOG_RO_PASSWORD_FILE: >-
+        {{sameAs:als-db:POSTGRES_LOG_PASSWORD_FILE}}
+      GRAFANA_DS_FS_STATE_RO_DSN: >-
+        {{sameAs:uls-db:ULS_SERVICE_STATE_DB_DSN}}
+      GRAFANA_DS_FS_STATE_RO_PASSWORD_FILE: >-
+        {{sameAs:uls-db:ULS_SERVICE_STATE_DB_PASSWORD_FILE}}
+      GRAFANA_DS_PROMETHEUS_URL: >-
+        http://prometheus-operated.monitoring:9090
+      GRAFANA_DS_RCACHE_HOST: >-
+        http://{{host:rcache}}:{{port:rcache:rcache}}
+    mountedSecrets:
+      - grafana-db-password
+      - grafana-init-db-password
+      - als-ro-db-password
+      - als-json-log-ro-db-password
+      - uls-state-ro-db-password
+      - grafana-admin-password
     ingress:
       rules:
         - path: /grafana
@@ -838,8 +879,22 @@ externalSecrets:
     property: RCACHE_DB_PASSWORD
   als-db-password:
     property: ALS_DB_PASSWORD
+  als-init-db-password:
+    property: ALS_INIT_DB_PASSWORD
   als-json-log-db-password:
     property: ALS_JSON_LOG_DB_PASSWORD
+  grafana-db-password:
+    property: GRAFANA_DB_PASSWORD
+  grafana-init-db-password:
+    property: GRAFANA_INIT_DB_PASSWORD
+  als-ro-db-password:
+    property: ALS_RO_DB_PASSWORD
+  als-json-log-ro-db-password:
+    property: ALS_JSON_LOG_RO_DB_PASSWORD
+  uls-state-ro-db-password:
+    property: ULS_STATE_RO_DB_PASSWORD
+  grafana-admin-password:
+    property: GRAFANA_ADMIN_PASSWORD
   image-pull:
     property: .dockerconfigjson
     template:

@@ -273,9 +273,9 @@ If you wish to use [Prometheus](https://prometheus.io/) to montitor your system,
 
 ```
 cd prometheus && docker build . -t  Dockerfile-prometheus -t prometheus-image ; cd ../
-cd /prometheus && docker build . Dockerfile-cadvisor -t cadvisor-image ; cd ../
-cd /prometheus && docker build . Dockerfile-nginxexporter -t nginxexporter-image  ; cd ../
-cd /grafana && docker build . Dockerfile -t grafana-image ; cd ../
+cd prometheus && docker build . Dockerfile-cadvisor -t cadvisor-image ; cd ../
+cd prometheus && docker build . Dockerfile-nginxexporter -t nginxexporter-image  ; cd ../
+docker build . Dockerfile -t grafana-image
 ```
 
 Once built, docker images are usable as usual docker image.
@@ -678,14 +678,14 @@ services:
       - POSTGRES_INIT_CONN_STR=bulk_postgres
       - POSTGRES_ALS_CONN_STR=bulk_postgres
       - POSTGRES_LOG_CONN_STR=bulk_postgres
-      - POSTGRES_INIT_PASSWORD_FILE=${VOL_C_SECRETS}/POSTGRES_PASSWORD
+      - POSTGRES_INIT_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_INIT_DB_PASSWORD
       - POSTGRES_ALS_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_DB_PASSWORD
       - POSTGRES_LOG_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_JSON_LOG_DB_PASSWORD
       - KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
     secrets:
       - ALS_DB_PASSWORD
       - ALS_JSON_LOG_DB_PASSWORD
-      - POSTGRES_PASSWORD
+      - ALS_INIT_DB_PASSWORD
     depends_on:
       - als_kafka
       - bulk_postgres
@@ -799,14 +799,33 @@ services:
     dns_search: [.]
 
   grafana:
-    image:  grafana-image:latest
-    build:
-        context: ./grafana
-        dockerfile: Dockerfile
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/grafana-image:${TAG:-latest}
     restart: always
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GRAFANA_ADMIN_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_ADMIN_PASSWORD
+      - GRAFANA_DATABASE_URL=postgres://postgres:postgres@bulk_postgres/grafana
+      - GRAFANA_DATABASE_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_DB_PASSWORD
+      - GRAFANA_DATABASE_INIT_URL=postgresql://postgres:postgres@bulk_postgres/postgres
+      - GRAFANA_DATABASE_INIT_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_INIT_DB_PASSWORD
+      - GRAFANA_DS_ALS_RO_DSN=postgresql://postgres:postgres@bulk_postgres/ALS
+      - GRAFANA_DS_ALS_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_RO_DB_PASSWORD
+      - GRAFANA_DS_JSON_LOG_RO_DSN=postgresql://postgres:postgres@bulk_postgres/AFC_LOGS
+      - GRAFANA_DS_JSON_LOG_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_JSON_LOG_RO_DB_PASSWORD
+      - GRAFANA_DS_FS_STATE_RO_DSN=postgresql://postgres:postgres@bulk_postgres/fs_state
+      - GRAFANA_DS_FS_STATE_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ULS_STATE_RO_DB_PASSWORD
+      - GRAFANA_DS_PROMETHEUS_URL=http://prometheus:9090
+      - GRAFANA_DS_RCACHE_URL=http://rcache:8000
     depends_on:
       - prometheus
       - bulk_postgres
+    secrets:
+      - GRAFANA_DB_PASSWORD
+      - GRAFANA_INIT_DB_PASSWORD
+      - ALS_RO_DB_PASSWORD
+      - ALS_JSON_LOG_RO_DB_PASSWORD
+      - ULS_STATE_RO_DB_PASSWORD
+      - GRAFANA_ADMIN_PASSWORD
     dns_search: [.]
 
   prometheus:
@@ -870,6 +889,20 @@ secrets:
     file: ${VOL_H_SECRETS}/RCACHE_DB_PASSWORD
   ULS_STATE_DB_PASSWORD:
     file: ${VOL_H_SECRETS}/ULS_STATE_DB_PASSWORD
+  ALS_INIT_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/ALS_INIT_DB_PASSWORD
+  GRAFANA_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/GRAFANA_DB_PASSWORD
+  GRAFANA_INIT_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/GRAFANA_INIT_DB_PASSWORD
+  ALS_RO_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/ALS_RO_DB_PASSWORD
+  ALS_JSON_LOG_RO_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/ALS_JSON_LOG_RO_DB_PASSWORD
+  ULS_STATE_RO_DB_PASSWORD:
+    file: ${VOL_H_SECRETS}/ULS_STATE_RO_DB_PASSWORD
+  GRAFANA_ADMIN_PASSWORD:
+    file: ${VOL_H_SECRETS}/GRAFANA_ADMIN_PASSWORD
 
 ```
 
