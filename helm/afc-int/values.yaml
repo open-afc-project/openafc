@@ -770,9 +770,10 @@ components:
         {{sameAs:uls-db:ULS_SERVICE_STATE_DB_DSN}}
       GRAFANA_DS_FS_STATE_RO_PASSWORD_FILE: >-
         {{sameAs:uls-db:ULS_SERVICE_STATE_DB_PASSWORD_FILE}}
-      GRAFANA_DS_PROMETHEUS_HOST: prometheus-operated.monitoring
+      GRAFANA_DS_PROMETHEUS_URL: >-
+        http://prometheus-operated.monitoring:9090
       GRAFANA_DS_RCACHE_HOST: >-
-        {{host:rcache}}
+        http://{{host:rcache}}:{{port:rcache:rcache}}
     mountedSecrets:
       - grafana-db-password
       - grafana-init-db-password
@@ -780,7 +781,6 @@ components:
       - als-json-log-ro-db-password
       - uls-state-ro-db-password
       - grafana-admin-password
-      - nginxexporter
     ingress:
       rules:
         - path: /grafana

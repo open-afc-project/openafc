@@ -810,12 +810,12 @@ services:
       - GRAFANA_DATABASE_INIT_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_INIT_DB_PASSWORD
       - GRAFANA_DS_ALS_RO_DSN=postgresql://postgres:postgres@bulk_postgres/ALS
       - GRAFANA_DS_ALS_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_RO_DB_PASSWORD
-      - GRAFANA_DS_JSON_LOG_RO_DSN=postgresql://postgres:postgres@bulk_postgres/ALS_LOGS
+      - GRAFANA_DS_JSON_LOG_RO_DSN=postgresql://postgres:postgres@bulk_postgres/AFC_LOGS
       - GRAFANA_DS_JSON_LOG_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_JSON_LOG_RO_DB_PASSWORD
       - GRAFANA_DS_FS_STATE_RO_DSN=postgresql://postgres:postgres@bulk_postgres/fs_state
       - GRAFANA_DS_FS_STATE_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ULS_STATE_RO_DB_PASSWORD
-      - GRAFANA_DS_PROMETHEUS_HOST=prometheus
-      - GRAFANA_DS_RCACHE_HOST=rcache
+      - GRAFANA_DS_PROMETHEUS_URL=http://prometheus:9090
+      - GRAFANA_DS_RCACHE_URL=http://rcache:8000
     depends_on:
       - prometheus
       - bulk_postgres
