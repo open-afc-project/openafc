@@ -187,6 +187,8 @@ http {
         }
 
         location /grafana {
+            proxy_connect_timeout 60;
+            proxy_read_timeout 60;
             set $grafana_enabled "${AFC_GRAFANA_ENABLED}";
             if ($grafana_enabled != true) {
                 return 501;
