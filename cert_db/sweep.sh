@@ -6,5 +6,12 @@
 # a copy of which is included with this software program
 #
 
-/usr/bin/rat-manage-api cert_id sweep --country US
-/usr/bin/rat-manage-api cert_id sweep --country CA
+result=success
+for region in $SWEEP_REGIONS
+do
+    /usr/bin/rat-manage-api cert_id sweep --country $region || result=fail
+done
+if [ "$result" == "success" ]
+then
+	touch /wd/touchfile
+fi

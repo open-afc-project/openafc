@@ -113,4 +113,4 @@ ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --als_alembic_config=$ALEMBIC_CONFIG \
     --als_alembic_initial_version=$ALS_ALEMBIC_INITIAL_VERSION
 
-HEALTHCHECK CMD test ! `find $SIPHON_TOUCH_FILE -mmin 1`
+HEALTHCHECK CMD test `find $SIPHON_TOUCH_FILE -mmin -1`

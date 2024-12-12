@@ -890,7 +890,10 @@ class CertIdSweep(Command):
                 'user-agent': 'rat_server/1.0'
             }
             try:
-                with requests.get(url, headers, stream=True) as r:
+                timeout = os.environ.get("REQUEST_TIMEOUT_SEC")
+                if timeout is not None:
+                    timeout = float(timeout)
+                with requests.get(url, headers, stream=True, timeout=timeout) as r:
                     r.raise_for_status()
 
                     local_filename = "/tmp/SD6_list.csv"
@@ -960,7 +963,7 @@ class CertIdSweep(Command):
 
         now = datetime.datetime.now()
         with flaskapp.app_context():
-            url = 'https://apps.fcc.gov/oetcf/eas/reports/GenericSearchResult.cfm?RequestTimeout=500'
+            url = f'https://apps.fcc.gov/oetcf/eas/reports/GenericSearchResult.cfm?RequestTimeout={os.environ.get("REQUEST_TIMEOUT_SEC", "500")}'
             headers = {
                 'accept': 'text/html,application/xhtml+xml,application/xml',
                 'cache-control': 'max-age=0',
@@ -969,7 +972,10 @@ class CertIdSweep(Command):
             }
 
             try:
-                resp = requests.post(url, headers=headers, data=data)
+                timeout = os.environ.get("REQUEST_TIMEOUT_SEC")
+                if timeout is not None:
+                    timeout = float(timeout)
+                resp = requests.post(url, headers=headers, data=data, timeout=timeout)
                 if resp.status_code == 200:
                     try:
                         from xml.etree import ElementTree
