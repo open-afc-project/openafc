@@ -18,7 +18,7 @@ import urllib.parse
 
 
 __all__ = ["dp", "error", "error_if", "FailOnError", "get_module_logger",
-           "include_stack_to_error_log", "safe_dsn", "set_dp_printer",
+           "include_stack_to_error_log", "set_dp_printer",
            "set_error_exception", "set_parent_logger"]
 
 # Exception type to raise on error()/error_if()
@@ -223,20 +223,3 @@ class FailOnError:
             set_error_exception(self._prev_error_exception_type)
             return True
         return False
-
-
-def safe_dsn(dsn: Optional[str]) -> Optional[str]:
-    """ Returns DSN without password (if there was any) """
-    if not dsn:
-        return dsn
-    try:
-        parsed = urllib.parse.urlparse(dsn)
-        if not parsed.password:
-            return dsn
-        return \
-            urllib.parse.urlunparse(
-                parsed._replace(
-                    netloc=parsed.netloc.replace(":" + parsed.password,
-                                                 ":<PASSWORD>")))
-    except Exception:
-        return dsn

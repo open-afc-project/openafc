@@ -273,9 +273,9 @@ If you wish to use [Prometheus](https://prometheus.io/) to montitor your system,
 
 ```
 cd prometheus && docker build . -t  Dockerfile-prometheus -t prometheus-image ; cd ../
-cd /prometheus && docker build . Dockerfile-cadvisor -t cadvisor-image ; cd ../
-cd /prometheus && docker build . Dockerfile-nginxexporter -t nginxexporter-image  ; cd ../
-cd /grafana && docker build . Dockerfile -t grafana-image ; cd ../
+cd prometheus && docker build . Dockerfile-cadvisor -t cadvisor-image ; cd ../
+cd prometheus && docker build . Dockerfile-nginxexporter -t nginxexporter-image  ; cd ../
+docker build . Dockerfile -t grafana-image
 ```
 
 Once built, docker images are usable as usual docker image.

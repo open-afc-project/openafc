@@ -97,23 +97,6 @@ AlarmInfo = \
          ("timestamp", datetime.datetime)])
 
 
-def safe_dsn(dsn: Optional[str]) -> Optional[str]:
-    """ Returns DSN without password (if there was any) """
-    if not dsn:
-        return dsn
-    try:
-        parsed = urllib.parse.urlparse(dsn)
-        if not parsed.password:
-            return dsn
-        return \
-            urllib.parse.urlunparse(
-                parsed._replace(
-                    netloc=parsed.netloc.replace(":" + parsed.password,
-                                                 ":<PASSWORD>")))
-    except Exception:
-        return dsn
-
-
 class StateDb:
     """ Status database access wrapper
 
@@ -173,8 +156,8 @@ class StateDb:
                 self.conn = self._engine.connect()
             except sa.exc.SQLAlchemyError as ex:
                 error(
-                    f"Can't connect to root database '{safe_dsn(self.dsn)}': "
-                    f"{ex}")
+                    f"Can't connect to root database "
+                    f"'{secret_utils.safe_dsn(self.dsn)}': {ex}")
             finally:
                 if (self.conn is None) and (self._engine is not None):
                     # Connection failed
@@ -346,11 +329,11 @@ class StateDb:
                 error_if(
                     table_name not in metadata.tables,
                     f"Table '{table_name}' not present in the database "
-                    f"'{safe_dsn(self.db_dsn)}'")
+                    f"'{secret_utils.safe_dsn(self.db_dsn)}'")
             self.metadata = metadata
         except sa.exc.SQLAlchemyError as ex:
             error(f"Can't connect to database "
-                  f"'{safe_dsn(self.db_dsn)}': {repr(ex)}")
+                  f"'{secret_utils.safe_dsn(self.db_dsn)}': {repr(ex)}")
         finally:
             if engine is not None:
                 engine.dispose()
@@ -394,7 +377,8 @@ class StateDb:
         try:
             return sa.create_engine(dsn)
         except sa.exc.SQLAlchemyError as ex:
-            error(f"Invalid database DSN: '{safe_dsn(dsn)}': {ex}")
+            error(
+                f"Invalid database DSN: '{secret_utils.safe_dsn(dsn)}': {ex}")
         return None  # Will never happen, appeasing pylint
 
     def write_milestone(self, milestone: DownloaderMilestone,
