@@ -334,17 +334,17 @@ inside the worker container execute the afc-engine app
 
 ## docker-compose run
 
-You would probably like to use docker-compose for setting up everything together - in this case feel free to use [docker-compose.yaml](/tests/regression/docker-compose.yaml) which we use for testing as reference. Also check [.env](/tests/regression/.env) file from tests/regression directory, which are used by OpenAFC CI.
+You would probably like to use docker-compose for setting up everything together - in this case feel free to use [docker-compose.yaml](/docker-compose.yaml) which we use for testing as reference. Also check [.env](/.env) file from tests/regression directory, which are used by OpenAFC CI.
 
 Despite these files are used in our CI/CD, they are ready to be used as a starting point.
 
-[.env](/tests/regression/.env) file contains variables which can be met in the [docker-compose.yaml](/tests/regression/docker-compose.yaml) file more then once, just to make it possible changing those values in one place. Unfortunately [docker-compose.yaml](/tests/regression/docker-compose.yaml) and yaml in general doesn't give such ability.
+[.env](/.env) file contains variables which can be met in the [docker-compose.yaml](/docker-compose.yaml) file more then once, just to make it possible changing those values in one place. Unfortunately [docker-compose.yaml](/docker-compose.yaml) and yaml in general doesn't give such ability.
 
 This compose file takes all the images from repository.
 
 In order to run the system you will need to
 
-- Set up docker-compose.yaml file suitable for your environment. We strongly recommend leave the [docker-compose.yaml](/tests/regression/docker-compose.yaml) unchanged and use the docker-compose override mechanism and use your own docker-compose.custom.yaml with all overrides together with [docker-compose.yaml](/tests/regression/docker-compose.yaml). Details about overrides in docker-compose.yaml can be found [in the corresponding article on official docker website](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/).
+- Set up docker-compose.yaml file suitable for your environment. We strongly recommend leave the [docker-compose.yaml](/docker-compose.yaml) unchanged and use the docker-compose override mechanism and use your own docker-compose.custom.yaml with all overrides together with [docker-compose.yaml](/docker-compose.yaml). Details about overrides in docker-compose.yaml can be found [in the corresponding article on official docker website](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/).
 - Set up a .env file that defines certain global environment variables. 
 - Set up a local set of secrets containing various passwords and other private information. See the [secrets readme](/tools/secrets/README.md) for details
 - Data mappings as described in [Data mappings](#data-mappings)
