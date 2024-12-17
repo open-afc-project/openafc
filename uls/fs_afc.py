@@ -187,6 +187,8 @@ ResponseInfo = \
             ("timeout", bool),
             # HTTP Status code
             ("status_code", Optional[int]),
+            # Error text
+            ("error", Optional[str]),
             # Request duration in seconds
             ("duration_sec", int)])
 
@@ -216,6 +218,9 @@ def do_request(req: Dict[str, Any], url: str, timeout_sec: float) \
             else None,
             timeout=timeout,
             status_code=result.status_code if result is not None else None,
+            error=result.text
+            if (result is not None) and
+            (result.status_code != http.HTTPStatus.OK) else None,
             duration_sec=int((datetime.datetime.now() -
                               start_time).total_seconds()))
 
@@ -413,9 +418,12 @@ def main(argv: List[str]) -> None:
                     assert response_info is not None
                     error_if(response_info.timeout,
                              f"Request '{req_info.point_info()}' timed out")
+                    err_msg = f"({response_info.error})" \
+                        if response_info.error else None
                     error_if(response_info.status_code != http.HTTPStatus.OK,
                              f"Request '{req_info.point_info()}' ended with "
-                             f"status code {response_info.status_code}")
+                             f"status code {response_info.status_code}"
+                             f"{err_msg}")
                     response_code = \
                         json_retrieve(json_obj=response_info.afc_response,
                                       path=paths[RESPONSE_CODE_PATH_KEY])
