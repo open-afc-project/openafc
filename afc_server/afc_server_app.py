@@ -109,7 +109,7 @@ async def available_pectrum_inquiry(
         gui: bool = fastapi.Query(
             False, title="Request from Web GUI"),
         mtls_dn: Optional[str] = fastapi.Header(default=None),
-        x_real_ip: Optional[str] = fastapi.Header(dsfault=None),
+        x_real_ip: Optional[str] = fastapi.Header(default=None),
         message_processor: afc_server_msg_proc.AfcServerMessageProcessor =
         fastapi.Depends(get_message_processor)) -> Dict[str, Any]:
     """ Process external AFC Request message """
@@ -135,7 +135,7 @@ async def available_pectrum_inquiry_internal(
         gui: bool = fastapi.Query(
             False, title="Request from Web GUI"),
         mtls_dn: Optional[str] = fastapi.Header(default=None),
-        x_real_ip: Optional[str] = fastapi.Header(dsfault=None),
+        x_real_ip: Optional[str] = fastapi.Header(default=None),
         message_processor: afc_server_msg_proc.AfcServerMessageProcessor =
         fastapi.Depends(get_message_processor)) -> Dict[str, Any]:
     """ Process internal AFC Request message """
