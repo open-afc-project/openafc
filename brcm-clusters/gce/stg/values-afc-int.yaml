@@ -27,16 +27,14 @@ sharedEnv:
     OIDC_LOGIN: "False"
     OIDC_DISCOVERY_URL: >-
       https://login.broadcom.com/oauth2/default/.well-known/openid-configuration
+  als-db:
+    POSTGRES_INIT_CONN_STR: postgresql://postgres@{{ip:postgres}}/postgres
+    POSTGRES_ALS_CONN_STR: postgresql://postgres@{{ip:postgres}}/ALS
+    POSTGRES_LOG_CONN_STR: postgresql://postgres@{{ip:postgres}}/AFC_LOGS
+  uls-db:
+    ULS_SERVICE_STATE_DB_DSN: postgresql://postgres@{{ip:postgres}}/fs_state
 
 components:
-  als-siphon:
-    env:
-      POSTGRES_INIT_CONN_STR: postgresql://postgres@{{ip:postgres}}/postgres
-      POSTGRES_ALS_CONN_STR: postgresql://postgres@{{ip:postgres}}/ALS
-      POSTGRES_LOG_CONN_STR: postgresql://postgres@{{ip:postgres}}/AFC_LOGS
-  uls-downloader:
-    env:
-      ULS_SERVICE_STATE_DB_DSN: postgresql://postgres@{{ip:postgres}}/fs_state
   bulk-postgres:
     imageName: null
   ratdb:
@@ -71,6 +69,11 @@ components:
           stabilizationWindowSeconds: 0
         scaleDown:
           stabilizationWindowSeconds: 120
+  grafana:
+    env:
+      GRAFANA_DATABASE_URL: postgresql://postgres@{{ip:postgres}}/grafana
+      GRAFANA_DATABASE_INIT_URL: postgresql://postgres@{{ip:postgres}}/postgres
+
 
 staticVolumes:
   rat_transfer:
@@ -94,7 +97,19 @@ externalSecrets:
     remoteSecretName: postgres-password
   rcache-db-password:
     remoteSecretName: postgres-password
+  als-init-db-password:
+    remoteSecretName: postgres-password
   als-db-password:
     remoteSecretName: postgres-password
   als-json-log-db-password:
+    remoteSecretName: postgres-password
+  grafana-db-password:
+    remoteSecretName: postgres-password
+  grafana-init-db-password:
+    remoteSecretName: postgres-password
+  als-ro-db-password:
+    remoteSecretName: postgres-password
+  als-json-log-ro-db-password:
+    remoteSecretName: postgres-password
+  uls-state-ro-db-password:
     remoteSecretName: postgres-password
