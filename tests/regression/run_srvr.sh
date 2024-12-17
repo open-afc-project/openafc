@@ -32,6 +32,9 @@ fi
 # go to test dir
 cd $tests_dir
 
+# copy base docker-compose.yaml to test directory
+cp $wd/docker-compose.yaml $wd/.env $tests_dir/
+
 # create pipe and afc_config dir if does not exist
 [ ! -d pipe ] && mkdir pipe
 
