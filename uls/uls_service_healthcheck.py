@@ -21,7 +21,7 @@ import pydantic
 import smtplib
 import sqlalchemy as sa
 import sys
-from typing import Any, cast, List, NamedTuple, Optional, Set, Union
+from typing import Any, cast, Dict, List, NamedTuple, Optional, Set, Union
 
 from pydantic_utils import env_help, merge_args
 from secret_utils import safe_dsn
@@ -158,7 +158,7 @@ def expired(event_td: Optional[datetime.datetime],
         return False
     if event_td is None:
         return True
-    return (datetime.datetime.now() - event_td) > \
+    return (datetime.datetime.utcnow() - event_td) > \
         datetime.timedelta(hours=max_age_hr)
 
 
@@ -291,7 +291,7 @@ def email_if_needed(state_db: StateDb, settings: Any) -> None:
         message_body += \
             f"{heading}{'Unknown' if et is None else et.isoformat()}"
         if et is not None:
-            message_body += f" ({datetime.datetime.now() - et} ago)"
+            message_body += f" ({datetime.datetime.utcnow() - et} ago)"
         message_body += "\n"
 
     for reg in sorted(set(cast(str, r) for r in reg_data_changes.keys()) |
@@ -301,7 +301,7 @@ def email_if_needed(state_db: StateDb, settings: Any) -> None:
             (f"FS data for region '{reg}' last time updated in: "
              f"{'Unknown' if et is None else et.isoformat()}")
         if et is not None:
-            message_body += f" ({datetime.datetime.now() - et} ago)"
+            message_body += f" ({datetime.datetime.utcnow() - et} ago)"
         message_body += "\n"
     if email_milestone == DownloaderMilestone.AlarmSent:
         log_info = state_db.read_last_log(log_type=LogType.Last)
