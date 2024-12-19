@@ -103,8 +103,9 @@ def recreate_tables(with_timezone: bool) -> None:
 
 def upgrade() -> None:
     """ Recreate all tables to timezoned """
-    recreate_tables(with_timezone=True)        
+    recreate_tables(with_timezone=True)
+
 
 def downgrade() -> None:
     """ Recreate all tables to nontimezoned """
-    recreate_tables(with_timezone=True)        
+    recreate_tables(with_timezone=False)
