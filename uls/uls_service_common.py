@@ -13,9 +13,8 @@ import __main__
 import inspect
 import logging
 import os
-import pydantic
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, NoReturn, Optional
 
 # Default directory for status filers
 DEFAULT_STATUS_DIR = os.path.join(os.path.dirname(__file__), "status")
@@ -42,7 +41,7 @@ def set_error_exit_params(exit_code: Optional[int] = None,
         error_log_level = log_level
 
 
-def error(msg: str) -> None:
+def error(msg: str) -> NoReturn:
     """ Prints given msg as error message and exit abnormally """
     logging.log(error_log_level, msg)
     sys.exit(error_exit_code)
