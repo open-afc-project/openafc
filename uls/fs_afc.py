@@ -9,7 +9,7 @@
 
 # pylint: disable=wrong-import-order, too-many-statements, too-many-branches
 # pylint: disable=invalid-name, too-many-locals, logging-fstring-interpolation
-# pylint: disable=too-many-nested-blocks
+# pylint: disable=too-many-nested-blocks, superfluous-parens
 
 import argparse
 import concurrent.futures
@@ -24,7 +24,7 @@ import re
 import requests
 import string
 import sys
-from typing import Any, Dict, List, NamedTuple, Optional, Union
+from typing import Any, Dict, List, NamedTuple, NoReturn, Optional, Union
 import yaml
 
 # Name of the default config file
@@ -97,7 +97,7 @@ POINT_COORD_LAT_KEY = "latitude"
 POINT_COORD_LON_KEY = "longitude"
 
 
-def error(msg: str) -> None:
+def error(msg: str) -> NoReturn:
     """ Prints given msg as error message and exits abnormally """
     logging.error(msg)
     sys.exit(1)

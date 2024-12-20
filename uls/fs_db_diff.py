@@ -20,7 +20,8 @@ import math
 import os
 import sqlalchemy as sa
 import sys
-from typing import Any, cast, Dict, List, NamedTuple, Optional, Set, Tuple
+from typing import Any, cast, Dict, List, NamedTuple, NoReturn, Optional, \
+    Set, Tuple
 
 
 # START OF DATABASE SCHEMA-DEPENDENT STUFF
@@ -90,7 +91,7 @@ PR_ORDER_FIELD = "prSeq"
 # END OF DATABASE SCHEMA-DEPENDENT STUFF
 
 
-def error(msg: str) -> None:
+def error(msg: str) -> NoReturn:
     """ Prints given msg as error message and exits abnormally """
     logging.error(msg)
     sys.exit(1)

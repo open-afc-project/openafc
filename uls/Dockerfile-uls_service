@@ -29,7 +29,8 @@ cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install \
     ninja -j$(nproc --all --ignore=2) install
 
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
-RUN apk add py3-sqlalchemy py3-numpy py3-yaml py3-pydantic=~1.10 py3-psycopg2
+RUN apk add py3-sqlalchemy py3-numpy py3-yaml py3-pydantic=~1.10 py3-psycopg2 \
+    py3-alembic
 COPY uls/requirements.txt /wd
 RUN pip3 install -r /wd/requirements.txt && rm /wd/requirements.txt
 
@@ -55,6 +56,8 @@ COPY uls/uls_service*.py uls/fsid_tool.py uls/fs_db_diff.py uls/fs_afc.py \
 RUN chmod -x /wd/*.py
 RUN chmod +x /wd/uls_service.py /wd/uls_service_healthcheck.py \
     wd/fsid_tool.py wd/fs_db_diff.py wd/fs_afc.py
+
+COPY uls/migrations wd/migrations/
 
 FROM alpine:3.18
 
@@ -106,6 +109,17 @@ ENV ULS_NICE=YES
 
 # Recreate (erase) service state database if exists (default is False)
 # ENV ULS_SERVICE_STATE_DB_RECREATE
+
+# Alembic parameters
+ENV ULS_ALEMBIC_CONFIG=/wd/migrations/alembic.ini
+
+# Initial Alembic version of state database (used to stamp existing alembicless
+# database)
+ENV ULS_ALEMBIC_INITIAL_VERSION=b41cf8a00430
+
+# current Alembic version of state database (used to stamp newly created
+# database). Default is 'head'
+# ENV ULS_ALEMBIC_HEAD_VERSION
 
 # Prometheus port to serve metrics on. Prometheus metrics (if used) are only
 # meaningful in continuous (not run-once) operation
