@@ -625,7 +625,7 @@ def als_json_log(topic: str, record: Any):
         _als_instance.json_log(topic, record)
 
 
-def als_flush(timeout_sec: float = 2) -> bool:
+def als_flush(timeout_sec: float = 10) -> bool:
     """ Flush pending messages (if any)
 
     Usually it is not needed, but if last log ALS/JSON write was made
