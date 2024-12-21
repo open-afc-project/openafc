@@ -11,6 +11,6 @@ TAG=${2}
 export TAG
 cd $wd/tests/regression_${TAG}
 docker ps -a
-docker-compose logs
-docker-compose down -v
+docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE logs
+docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE down -v
 docker ps -a
