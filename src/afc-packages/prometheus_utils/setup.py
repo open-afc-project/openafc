@@ -20,7 +20,7 @@ setup(
     # Label compatible with PEP 440
     version='0.1.0',
     description='AFC packages',
-    py_modules=["prometheus_utils"],
+    py_modules=["prometheus_utils", "afc_traffic_metrics"],
     cmdclass={
         'install': InstallCmdWrapper,
     }
