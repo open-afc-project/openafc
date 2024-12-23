@@ -25,6 +25,7 @@ import datetime
 import zlib
 import uuid
 import copy
+import time
 import platform
 from flask.views import MethodView
 import werkzeug.exceptions
@@ -59,6 +60,7 @@ from rcache_models import RcacheClientSettings
 from rcache_client import RcacheClient
 from rcache_req_cfg_hash import RequestConfigHash
 import prometheus_client
+import afc_traffic_metrics
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(AFC_RATAPI_LOG_LEVEL)
@@ -522,6 +524,7 @@ class RatAfc(MethodView):
     def post(self):
         ''' POST method for RAT AFC
         '''
+        flask.g.is_afc = True
         LOGGER.debug("(%d) %s::%s()", threading.get_native_id(),
                      self.__class__, inspect.stack()[0][3])
         als_req_id = als.als_afc_req_id()
@@ -701,11 +704,16 @@ class RatAfc(MethodView):
                         {"requestId": individual_request["requestId"],
                          "rulesetId": prefix or "Unknown",
                          "response": response_dict})
+                    afc_traffic_metrics.request_processed(
+                        duration_sec=time.time() - flask.g.afc_start_time,
+                        response="Exception")
 
             # Creating 'responses' - dictionary of responses as JSON strings,
             # indexed by request/config hashes
             # First looking up in the cache
             responses = self._cache_lookup(dataif=dataif, req_infos=req_infos)
+            cached_req_hashes = set(responses.keys())
+            cached_duration = time.time() - flask.g.afc_start_time
 
             # Computing the responses not found in cache
             # First handling async case
@@ -733,6 +741,7 @@ class RatAfc(MethodView):
                         req_infos={k: v for k, v in req_infos.items()
                                    if k not in responses},
                         is_internal_request=is_internal_request))
+            computed_duration = time.time() - flask.g.afc_start_time
 
             # Preparing responses for requests
             for req_info in req_infos.values():
@@ -756,6 +765,13 @@ class RatAfc(MethodView):
                     req_id=als_req_id, config_text=req_info.config_str,
                     customer=req_info.region, geo_data_version=geo_id,
                     uls_id=uls_id, req_indices=[req_info.req_idx])
+                afc_traffic_metrics.request_processed(
+                    duration_sec=cached_duration
+                    if req_info.req_cfg_hash in cached_req_hashes
+                    else computed_duration,
+                    response=actualResult[0].get("response", {}).
+                    get("responseCode", "Error") if actualResult
+                    else "NotComputed")
         except Exception as e:
             LOGGER.error(traceback.format_exc())
             lineno = "Unknown"
@@ -786,6 +802,9 @@ class RatAfc(MethodView):
                 {"requestId": missing_id,
                  "rulesetId": "Unknown",
                  "response": response_info})
+            afc_traffic_metrics.request_processed(
+                duration_sec=time.time() - flask.g.afc_start_time,
+                response="Exception")
 
         # Removing internal vendor extensions
         drop_unwanted_extensions(
@@ -806,6 +825,7 @@ class RatAfc(MethodView):
         LOGGER.debug("Final results: %s", str(results))
         resp = flask.make_response(flask.json.dumps(results), 200)
         resp.content_type = 'application/json'
+        flask.g.afc_no_exception = True
         return resp
 
     def _cache_lookup(self, dataif, req_infos):
@@ -971,6 +991,24 @@ class ReadinessCheck(MethodView):
 
         msg += 'ready'
         return flask.make_response(msg, 200)
+
+
+# Message-level AFC metrics
+@module.before_request
+def traffic_metrics_bedore():
+    flask.g.afc_start_time = time.time()
+    flask.g.is_afc = False
+    flask.g.afc_no_exception = False
+
+
+@module.after_request
+def traffic_metrics_after(response):
+    if flask.g.is_afc:
+        afc_traffic_metrics.message_processed(
+            duration_sec=time.time() - flask.g.afc_start_time,
+            status=response.status_code if flask.g.afc_no_exception
+            else "Exception")
+    return response
 
 
 # registration of default runtime options
