@@ -295,5 +295,3 @@ def multiprocess_fastapi_metrics() -> Callable:
     registry = prometheus_client.CollectorRegistry()
     prometheus_client.multiprocess.MultiProcessCollector(registry)
     return prometheus_client.make_asgi_app(registry=registry)
-
-
