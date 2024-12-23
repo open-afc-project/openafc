@@ -75,6 +75,12 @@ ENV AFC_SERVER_ERROR_LOG=/proc/self/fd/2
 
 WORKDIR /wd
 
+# Prometheus stuff
+COPY gunicorn/config.py /wd/gunicorn_config.py
+# Directory for Prometheus's multiprocess housekeeping
+ENV PROMETHEUS_MULTIPROC_DIR=/wd/prometheus_multiproc_dir
+RUN mkdir -p $PROMETHEUS_MULTIPROC_DIR
+
 RUN apk add --update --no-cache python3=~3.11 py3-sqlalchemy=~1.4 py3-pip \
     py3-pydantic=~1.10 py3-psycopg2 py3-greenlet curl
 

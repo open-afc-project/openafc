@@ -12,17 +12,19 @@
 
 import fastapi
 import logging
+import time
 import uvicorn
-from typing import Any, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional, Union
 
 
 import afc_server_compute
 import afc_server_db
 import afc_server_models
 import afc_server_msg_proc
+import afc_traffic_metrics
 import appcfg
 from log_utils import dp, get_module_logger, set_dp_printer, set_parent_logger
-
+import prometheus_utils
 
 __all__ = ["app"]
 
@@ -98,7 +100,7 @@ async def healthcheck(response: fastapi.Response) -> None:
           "(msghnd-compatible path)")
 @app.post("/availableSpectrumInquiry",
           summary="Process AFC Request from outside the cluster")
-async def available_pectrum_inquiry(
+async def available_spectrum_inquiry(
         afc_req_msg: afc_server_models.Rest_ReqMsg,
         debug: bool = fastapi.Query(
             False, title="Run request in AFC Engine in debug mode"),
@@ -124,7 +126,7 @@ async def available_pectrum_inquiry(
           summary="Process AFC Request from inside the cluster (legacy path)")
 @app.post("/availableSpectrumInquiryInternal",
           summary="Process AFC Request from inside the cluster")
-async def available_pectrum_inquiry_internal(
+async def available_spectrum_inquiry_internal(
         afc_req_msg: afc_server_models.Rest_ReqMsg,
         debug: bool = fastapi.Query(
             False, title="Run request in AFC Engine in debug mode"),
@@ -144,6 +146,31 @@ async def available_pectrum_inquiry_internal(
             req_msg=afc_req_msg, debug=debug, edebug=edebug,
             nocache=nocache, gui=gui, mtls_dn=mtls_dn, ap_ip=x_real_ip,
             internal=True)
+
+
+# Exposing Promtheus metrics
+app.mount("/metrics", prometheus_utils.multiprocess_fastapi_metrics())
+
+
+@app.middleware("http")
+async def add_process_time_header(
+        request: fastapi.Request,
+        call_next: Callable[[fastapi.Request], Awaitable[fastapi.Response]]) \
+        -> fastapi.Response:
+    """ Middleware that updates message-level AFC traffic metrics """
+    is_afc = \
+        any(request.url.path.endswith(afc_path) for afc_path in
+            ("availableSpectrumInquiry", "availableSpectrumInquiryInternal"))
+    start_time = time.time()
+    status: Union[int, str] = "Exception"
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        if is_afc:
+            afc_traffic_metrics.message_processed(
+                duration_sec=time.time() - start_time, status=status)
 
 
 if __name__ == "__main__":
