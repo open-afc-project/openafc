@@ -1,0 +1,45 @@
+# Broadcom Confidential
+
+services:
+  ratdb:
+    volumes:
+      - ./pgdata:/var/lib/pgsql/data
+    environment:
+      POSTGRES_PASSWORD: N3SF0LVKJx1RAhFGx4fcw
+      PGDATA: /var/lib/pgsql/data
+      POSTGRES_DB: fbrat
+
+  dispatcher:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl/nginx:/certificates/servers
+    environment:
+      - AFC_SERVER_NAME=afc.broadcom.com
+      - AFC_ENFORCE_HTTPS=TRUE
+      - AFC_ENFORCE_MTLS=true
+
+  rat_server:
+    volumes:
+      - ./OIDC:/OIDC
+    environment:
+      # OIDC and Captcha
+      - OIDC_ARG=/OIDC/oidc_env.cfg
+      - RATAPI_ARG=/OIDC/ratapi_env.cfg
+
+  bulk_postgres:
+    volumes:
+      - ./bulk_pgdata:/var/lib/postgresql/data
+
+  uls_downloader:
+    environment:
+      - ULS_ALARM_SMTP_INFO=/run/secrets/NOTIFIER_MAIL.json
+      - ULS_ALARM_EMAIL_TO=wcc-afc-swdev.pdl@broadcom.com
+      - ULS_ALARM_ALARM_INTERVAL_HR=0
+      - ULS_ALARM_SUCCESS_MAX_AGE_HR=9
+      - ULS_ALARM_BEACON_INTERVAL_HR=0
+    volumes:
+      - uls_downloader_state:/uls_downloader_state
+volumes:
+  uls_downloader_state:

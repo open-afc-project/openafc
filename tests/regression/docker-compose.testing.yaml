@@ -1,0 +1,11 @@
+services:
+  dispatcher:
+    ports: !override
+      - "1381-1391:80"
+      - "13443-13543:443"
+    volumes: !override
+      - /tmp:/dummyngnx
+    environment:
+      - AFC_ENFORCE_HTTPS=FALSE
+      - AFC_GRAFANA_ENABLED=false
+

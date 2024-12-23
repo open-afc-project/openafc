@@ -123,8 +123,8 @@ test_job:
     - bash "${WD}/${REGRD}/run_srvr.sh" ${WD} ${RAND} ${RUN_FROM_RAND}
   script:
     # get dev srvr port num
-    - TEST_PORT=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose port dispatcher 80 |sed 's/.*://'`
-    - TEST_PORT_HTTPS=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose port dispatcher 443 |sed 's/.*://'`
+    - TEST_PORT=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE port dispatcher 80 |sed 's/.*://'`
+    - TEST_PORT_HTTPS=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE port dispatcher 443 |sed 's/.*://'`
 
     # run tests
     - bash "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} $CI_HOST_HOSTNAME ${TEST_PORT} http
