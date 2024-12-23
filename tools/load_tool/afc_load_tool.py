@@ -518,11 +518,11 @@ class ServiceDiscoveryCompose(ServiceDiscovery):
                 assert name_offset is not None
                 container: Optional[str] = None
                 for names in re.split(r",\s*", line[name_offset:]):
-                    m = re.search(r"(%s_(.+)_\d+)" %
+                    m = re.search(r"(%s(_|-)(.+)(_|-)\d+)" %
                                   re.escape(self._compose_project),
                                   names)
                     if m:
-                        container = m.group(2)
+                        container = m.group(3)
                         self._containers[container] = \
                             self._ContainerInfo(name=m.group(1))
                 if container:
