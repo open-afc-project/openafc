@@ -921,7 +921,8 @@ class AlsRecord(pydantic.BaseModel):
     def now(self, field_name: str) -> None:
         """ Sets given field to current datetime as ISO-formatted string """
         assert field_name.endswith("_time")
-        setattr(self, field_name, datetime.datetime.utcnow().isoformat())
+        setattr(self, field_name,
+                datetime.datetime.now(datetime.timezone.utc).isoformat())
 
 
 def main(argv: List[str]) -> None:

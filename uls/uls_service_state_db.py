@@ -458,7 +458,7 @@ class StateDb:
             ops.append(
                 sa.delete(table).where(table.c.region.notin_(all_regions)).
                 where(table.c.milestone == milestone.name))
-        timestamp = datetime.datetime.utcnow()
+        timestamp = datetime.datetime.now(datetime.timezone.utc)
         ins = sa_pg.insert(table).\
             values(
                 [{"milestone": milestone.name, "region": region or "",
@@ -496,7 +496,7 @@ class StateDb:
         table = self.metadata.tables[self.ALARM_TABLE_NAME]
         ops: List[Any] = [sa.delete(table)]
         if reasons:
-            timestamp = datetime.datetime.utcnow()
+            timestamp = datetime.datetime.now(datetime.timezone.utc)
             values: List[Dict[str, Any]] = []
             for alarm_type, alarm_reasons in reasons.items():
                 values += [{"alarm_type": alarm_type.name,
@@ -531,7 +531,7 @@ class StateDb:
         table = self.metadata.tables[self.LOG_TABLE_NAME]
         ins = sa_pg.insert(table).\
             values(log_type=log_type.name, text=log,
-                   timestamp=datetime.datetime.utcnow())
+                   timestamp=datetime.datetime.now(datetime.timezone.utc))
         ins = \
             ins.on_conflict_do_update(
                 index_elements=["log_type"],
@@ -569,7 +569,7 @@ class StateDb:
         ops: List[Any] = \
             [sa.delete(table).where(table.c.check_type == check_type.name)]
         if results:
-            timestamp = datetime.datetime.utcnow()
+            timestamp = datetime.datetime.now(datetime.timezone.utc)
             ops.append(
                 sa.insert(table).values(
                     [{"check_type": check_type.name, "check_item": key,
