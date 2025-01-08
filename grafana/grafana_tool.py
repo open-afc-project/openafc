@@ -13,7 +13,10 @@
 # pylint: disable=too-many-statements
 
 import argparse
+import copy
+import http
 import http.client
+from icecream import ic
 import jinja2
 import json
 import operator
@@ -21,6 +24,7 @@ import os
 import pydantic
 import re
 import requests
+from requests.api import request
 import sqlalchemy as sa
 import subprocess
 import sys
@@ -35,6 +39,8 @@ import secret_utils
 SQLALCHEMY_DB_SCHEME = "postgresql"
 DEFAULT_URL = "http://localhost:3000/grafana"
 ADMIN_USER_ENV = "GF_SECURITY_ADMIN_USER"
+DEFAULT_DOCKER_SOCKET = "/var/run/docker.sock"
+DEFAULT_SERVICE_NAME = "grafana"
 
 
 def error(errmsg: str) -> NoReturn:
@@ -66,6 +72,10 @@ class Settings(pydantic.BaseSettings):
         pydantic.Field(None, env="GRAFANA_ADMIN_PASSWORD_FILE")
     grafana_dir: Optional[str] = pydantic.Field(None, env="GF_PATHS_HOME")
     grafana_config: Optional[str] = pydantic.Field(None, env="GF_PATHS_CONFIG")
+    docker_socket_port: Optional[int] = \
+        pydantic.Field(None, env="GRAFANA_DOCKER_SOCKET_PORT")
+    compose_service: Optional[str] = \
+        pydantic.Field(None, env="GRAFANA_COMPOSE_SERVICE")
 
     @pydantic.root_validator(pre=True)
     @classmethod
@@ -263,14 +273,17 @@ def get_auth(settings: Settings) -> Any:
         return (settings.admin_user, f.read())
 
 
-def get_json(url: str, auth: Any) -> Any:
-    """ Get JSON from given RESTV API URL
+def get_json(url: str, auth: Any, verbose: bool) -> Any:
+    """ Get JSON from given REST API URL
 
     Arguments:
-    url       -- REST API GET URL
-    auth      -- Value for requests.get() auth parameter
+    url     -- REST API GET URL
+    auth    -- Value for requests.get() auth parameter
+    verbose -- Print URL being accessed
     Returns decoded JSON object. Doesn't catch exceptions
     """
+    if verbose:
+        print(url)
     r = requests.get(url, auth=auth)
     if not r.ok:
         msg = http.client.responses.get(r.status_code, "Unknown status code")
@@ -280,14 +293,17 @@ def get_json(url: str, auth: Any) -> Any:
 
 
 def remove_ids(data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> None:
-    """ Remove all non-name IDs from items in given data item or list thereof
-    """
-    if not isinstance(data, list):
-        data = [data]
-    for d in data:
-        for key in ("id", "uid"):
-            if key in d:
-                del d[key]
+    """ Recursive removal of integer IDs, UIDs, grafana URLs """
+    if isinstance(data, list):
+        for e in data:
+            if isinstance(e, (list, dict)):
+                remove_ids(e)
+    elif isinstance(data, dict):
+        for k, v in list(data.items()):
+            if ((k == "id") and isinstance(v, int)) or (k == "uid"):
+                del data[k]
+            elif isinstance(v, (list, dict)):
+                remove_ids(v)
 
 
 def output(data: Union[Dict[str, Any], List[Dict[str, Any]]], indented: bool,
@@ -301,7 +317,7 @@ def output(data: Union[Dict[str, Any], List[Dict[str, Any]]], indented: bool,
     filename   -- File to output to. None to print to stdout
     """
     s = yaml.dump(data, Dumper=yaml.Dumper, indent=2) if use_yaml \
-        else json.dumps(data, indent=4 if indented else None)
+        else json.dumps(data, indent=2 if indented else None)
     if filename:
         try:
             with open(filename, "w", encoding="utf-8") as f:
@@ -325,7 +341,8 @@ def do_rest(args: Any) -> None:
     try:
         result = \
             get_json(
-                url=f"{args.url.rstrip('/')}/api/{args.API}", auth=auth)
+                url=f"{args.url.rstrip('/')}/api/{args.API}", auth=auth,
+                verbose=args.verbose)
     except requests.RequestException as ex:
         error(f"{ex}")
     if args.remove_ids:
@@ -344,7 +361,7 @@ def do_datasources(args: Any) -> None:
         cast(Settings,
              pydantic_utils.merge_args(settings_class=Settings, args=args))
     auth = get_auth(settings=settings)
-    datasources: Union[List[Dict[str, Any]], Dict[str, Any]] = []
+    datasources: List[Dict[str, Any]] = []
     url = args.url.rstrip("/")
     uids: Set[str] = set()
     for key_name, key_type, keys in [("name", "name", args.name),
@@ -354,7 +371,7 @@ def do_datasources(args: Any) -> None:
                 ds = \
                     get_json(
                         url=f"{url}/api/datasources/{key_type}/{key}",
-                        auth=auth)
+                        auth=auth, verbose=args.verbose)
                 uid = ds.get("uid")
                 if uid is not None:
                     if uid in uids:
@@ -367,10 +384,10 @@ def do_datasources(args: Any) -> None:
                       f"{ex}")
     if not (args.name or args.uid):
         try:
-            datasources = get_json(url=f"{url}/api/datasources", auth=auth)
+            datasources = get_json(url=f"{url}/api/datasources", auth=auth,
+                                   verbose=args.verbose)
         except (OSError, json.JSONDecodeError) as ex:
             error(f"Error retrieving datasources: {ex}")
-    assert isinstance(datasources, list)
     if args.list:
         print(
             tabulate.tabulate(
@@ -378,14 +395,16 @@ def do_datasources(args: Any) -> None:
                  for ds in datasources],
                 headers=["Name", "UID", "Type"], tablefmt="github"))
     else:
+        for_output: Union[List[Dict[str, Any]], Dict[str, Any]] = \
+            copy.deepcopy(datasources)
         if args.remove_ids:
-            remove_ids(datasources)
+            remove_ids(for_output)
         if args.provisioning:
-            datasources = \
-                {"apiVersion": 1, "datasources": datasources,
+            for_output = \
+                {"apiVersion": 1, "datasources": for_output,
                  "deleteDatasources":
-                 [{"name": ds.get("name")} for ds in datasources]}
-        output(datasources, indented=args.indented, use_yaml=args.yaml,
+                 [{"name": ds.get("name")} for ds in for_output]}
+        output(for_output, indented=args.indented, use_yaml=args.yaml,
                filename=args.file)
 
 
@@ -398,16 +417,18 @@ def relink_ds(d: Any, ds_uid_to_name=Dict[str, Any]) -> None:
     if isinstance(d, list):
         for e in d:
             if isinstance(e, (list, dict)):
-                relink_ds(d, ds_uid_to_name=ds_uid_to_name)
+                relink_ds(e, ds_uid_to_name=ds_uid_to_name)
     elif isinstance(d, dict):
         for k, v in list(d.items()):
             if (k == "datasource") and (isinstance(v, dict)) and \
                     (v.get("type") != "grafana") and ("uid" in v):
-                ds_name = ds_uid_to_name.get(k.get("uid"))
+                ds_name = ds_uid_to_name.get(v.get("uid"))
                 error_if(ds_name is None,
-                         f"{k.get('type')} data source with uid "
-                         f"'{k.get('uid')}' not found")
+                         f"{v.get('type')} data source with uid "
+                         f"'{v.get('uid')}' not found")
                 d["datasource"] = ds_name
+            elif isinstance(v, (list, dict)):
+                relink_ds(v, ds_uid_to_name=ds_uid_to_name)
 
 
 def do_dashboards(args: Any) -> None:
@@ -421,13 +442,17 @@ def do_dashboards(args: Any) -> None:
              pydantic_utils.merge_args(settings_class=Settings, args=args))
     auth = get_auth(settings=settings)
     url = args.url.rstrip("/")
-    folders_by_uid: Dict[str, Dict[str, Any]] = {}
-    folders_by_name: Dict[str, Dict[str, Any]] = {}
+    root_folder = {"uid": "", "uri": ""}
+    folders_by_uid: Dict[str, Dict[str, Any]] = \
+        {root_folder["uid"]: root_folder}
+    folders_by_name: Dict[str, Dict[str, Any]] = \
+        {root_folder["uri"]: root_folder}
     dashboards_by_uid: Dict[str, Dict[str, Any]] = {}
     dashboards_by_name: Dict[str, List[Dict[str, Any]]] = {}
     dashboards_by_folder: Dict[str, List[Dict[str, Any]]] = {}
     try:
-        for fd in get_json(url=f"{url}/api/search", auth=auth):
+        for fd in get_json(url=f"{url}/api/search", auth=auth,
+                           verbose=args.verbose):
             if fd.get("isDeleted"):
                 continue
             if fd.get("type") == "dash-folder":
@@ -436,7 +461,7 @@ def do_dashboards(args: Any) -> None:
             elif fd.get("type") == "dash-db":
                 dashboards_by_uid[fd.get("uid")] = fd
                 dashboards_by_name.setdefault(fd.get("title"), []).append(fd)
-                dashboards_by_folder.setdefault(fd.get("folderUid"), []).\
+                dashboards_by_folder.setdefault(fd.get("folderUid", ""), []).\
                     append(fd)
         if not args.list:
             for name in args.name:
@@ -461,8 +486,7 @@ def do_dashboards(args: Any) -> None:
                                   cast(str, dashboard.get("uid"))])
                 else:
                     if (args.name or args.uid or args.folder) and \
-                            (dashboard.get("title") not in
-                             dashboards_by_name) and \
+                            (dashboard.get("title") not in args.name) and \
                             (dashboard.get("uid") not in args.uid) and \
                             (folder.get("uri") not in args.folder):
                         continue
@@ -470,7 +494,7 @@ def do_dashboards(args: Any) -> None:
                         get_json(
                             url=f"{url}/api/dashboards/uid/"
                             f"{dashboard.get('uid')}",
-                            auth=auth))
+                            auth=auth, verbose=args.verbose))
     except requests.RequestException as ex:
         error(f"Error accessing Grafana API: {ex}")
     if args.list:
@@ -479,17 +503,25 @@ def do_dashboards(args: Any) -> None:
                 lines, headers=["Folder", "Dashboard", "Dashboard UID"],
                 tablefmt="github"))
     else:
+        for_output: Union[List[Dict[str, Any]], Dict[str, Any]] = \
+            copy.deepcopy(dashboards)
         if args.relink_ds:
             try:
                 ds_uid_to_name = \
                     {ds.get("uid"): ds.get("name") for ds in
-                     get_json(url=f"{url}/api/datasources", auth=auth)}
+                     get_json(url=f"{url}/api/datasources", auth=auth,
+                              verbose=args.verbose)}
             except (OSError, json.JSONDecodeError) as ex:
                 error(f"Error retrieving datasources: {ex}")
-            relink_ds(dashboards, ds_uid_to_name=ds_uid_to_name)
+            relink_ds(for_output, ds_uid_to_name=ds_uid_to_name)
         if args.remove_ids:
-            remove_ids(dashboards)
-        output(dashboards, indented=args.indented, use_yaml=args.yaml,
+            remove_ids(for_output)
+        if args.provisioning:
+            assert isinstance(for_output, list)
+            error_if(len(for_output) !=1,
+                     "Provisioning requires exactly one resulting dashboard")
+            for_output = for_output[0].get("dashboard", {})
+        output(for_output, indented=args.indented, use_yaml=args.yaml,
                filename=args.file)
 
 
@@ -577,6 +609,9 @@ def main(argv: List[str]) -> None:
     switches_fetch.add_argument(
         "--file", metavar="FILENAME",
         help="Write to given file instead of print")
+    switches_fetch.add_argument(
+        "--verbose", action="store_true",
+        help="Print REST API being used")
 
     switches_grafana_files = argparse.ArgumentParser(add_help=False)
     switches_grafana_files.add_argument(
@@ -704,6 +739,10 @@ def main(argv: List[str]) -> None:
     parser_dashboards.add_argument(
         "--relink_ds", action="store_true",
         help="Convert uid-based datasource references to name-based ones")
+    parser_dashboards.add_argument(
+        "--provisioning", action="store_true",
+        help="Strip to leave only part that goes to provisioning. Only "
+        "allowed for a single dashboard")
     parser_dashboards.set_defaults(func=do_dashboards)
 
     parser_inatall_plugins = \
@@ -731,7 +770,10 @@ def main(argv: List[str]) -> None:
         argument_parser.print_help()
         sys.exit(1)
 
-    args = argument_parser.parse_args(argv)
+    args, _ = argument_parser.parse_known_args(argv)
+    if args.subcommand != "help":
+        args = argument_parser.parse_args(argv)
+
     args.func(args)
 
 
