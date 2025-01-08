@@ -21,6 +21,8 @@ BULK_POSTGRES="${PUB_REPO}/bulk-postgres-image" # PostgreSQL for bulk stuff (ALS
 RCACHE="${PUB_REPO}/rcache-image"                             # Request cache
 AFC_SERVER="${PUB_REPO}/afcserver-image"                      # AFC Server image
 GRAFANA="${PUB_REPO}/grafana-image"                           # Grafana
+LOKI="${PUB_REPO}/loki-image"                                 # Loki
+PROMTAIL="${PUB_REPO}/promtail-image"                         # Promtail
 PROMETHEUS="${PUB_REPO}/prometheus-image"                     # Prometheus
 CADVISOR="${PUB_REPO}/cadvisor-image"                         # Cadvisor
 NGINXEXPORTER="${PUB_REPO}/nginxexporter-image"               # Nginx-exporter
@@ -211,8 +213,14 @@ build_dev_server() {
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-nginxexporter ${NGINXEXPORTER}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${NGINXEXPORTER} )
 
-  docker_build_and_push ${wd}/grafana/Dockerfile ${GRAFANA}:${tag} ${push} &
+  docker_build_and_push ${wd}/grafana/Dockerfile-grafana ${GRAFANA}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${GRAFANA} )
+
+  cd ${wd}/grafana && docker_build_and_push ${wd}/Dockerfile-loki ${LOKI}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${LOKI} )
+
+  cd ${wd}/grafana && docker_build_and_push ${wd}/Dockerfile-promtail ${PROMTAIL}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${PROMTAIL} )
 
   cd ${wd}/tools/geo_converters && docker_build_and_push Dockerfile ${GEO_CONVERTERS}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${GEO_CONVERTERS} )
