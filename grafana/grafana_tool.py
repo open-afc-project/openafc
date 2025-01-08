@@ -24,7 +24,6 @@ import os
 import pydantic
 import re
 import requests
-from requests.api import request
 import sqlalchemy as sa
 import subprocess
 import sys
@@ -403,7 +402,8 @@ def do_datasources(args: Any) -> None:
             for_output = \
                 {"apiVersion": 1, "datasources": for_output,
                  "deleteDatasources":
-                 [{"name": ds.get("name")} for ds in for_output]}
+                 [{"name": ds.get("name")}
+                  for ds in cast(List[Dict[str, Any]], for_output)]}
         output(for_output, indented=args.indented, use_yaml=args.yaml,
                filename=args.file)
 
@@ -518,7 +518,7 @@ def do_dashboards(args: Any) -> None:
             remove_ids(for_output)
         if args.provisioning:
             assert isinstance(for_output, list)
-            error_if(len(for_output) !=1,
+            error_if(len(for_output) != 1,
                      "Provisioning requires exactly one resulting dashboard")
             for_output = for_output[0].get("dashboard", {})
         output(for_output, indented=args.indented, use_yaml=args.yaml,
