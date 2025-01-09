@@ -6,3 +6,15 @@
 #
 
 FROM grafana/loki:3.3.2
+
+# Directory where Loki stores chunks, indices, etc. if filesystem store is used
+ENV GRAFANA_LOKI_DATA_FILESYSTEM_DIRECTORY=/loki
+
+# Log retention period. 0 to store forever
+ENV GRAFANA_LOKI_RETENTION_PERIOD=10d
+
+WORKDIR /wd
+
+COPY loki-config.yaml /wd/
+
+ENTRYPOINT loki -config.file=/wd/loki-config.yaml  -config.expand-env
