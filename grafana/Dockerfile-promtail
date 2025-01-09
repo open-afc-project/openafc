@@ -18,12 +18,11 @@ ENV HOMEDIR=/root
 # Loki URL
 ENV GRAFANA_DS_LOKI_URL=http://loki:3100
 
-# Installing Jinja for config file manipulation (as environment substitution in
-# promtail config somehow does not work)
-RUN apt-get update
-RUN apt-get -y install python3-minimal python3-jinja2 pipx
-ENV PATH=${HOMEDIR}/.local/bin:${PATH}
-RUN pipx install jinja-cli==1.2.2
+# # Installing Jinja for config file manipulation
+# RUN apt-get update
+# RUN apt-get -y install python3-minimal python3-jinja2 pipx
+# ENV PATH=${HOMEDIR}/.local/bin:${PATH}
+# RUN pipx install jinja-cli==1.2.2
 
 # Promtail config file
 ENV PROMTAIL_CONFIG=/etc/promtail/config.yml

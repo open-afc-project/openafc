@@ -9,6 +9,4 @@
 set -e
 set -x
 
-jinja --env-regex GRAFANA_.* -o ${PROMTAIL_CONFIG} ${PROMTAIL_CONFIG}
-
-promtail -config.file=${PROMTAIL_CONFIG}
+promtail -config.file=${PROMTAIL_CONFIG} -config.expand-env

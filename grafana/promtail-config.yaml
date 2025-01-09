@@ -14,7 +14,7 @@ server:
   grpc_listen_port: 0
 
 clients:
-  - url: {{ GRAFANA_DS_LOKI_URL }}/loki/api/v1/push
+  - url: ${GRAFANA_DS_LOKI_URL}/loki/api/v1/push
 
 scrape_configs:
   - job_name: docker
@@ -25,10 +25,10 @@ scrape_configs:
         filters:
           - name: label
             values:
-              - com.docker.compose.project={{ GRAFANA_COMPOSE_PROJECT_NAME }}
+              - com.docker.compose.project=${GRAFANA_COMPOSE_PROJECT_NAME}
     # use container name to create a loki label
     relabel_configs:
       - source_labels: ['__meta_docker_container_name']
-        regex: '/{{ GRAFANA_COMPOSE_PROJECT_NAME }}(_|-)(.*)(_|-)\d+'
+        regex: '/${GRAFANA_COMPOSE_PROJECT_NAME}(_|-)(.*)(_|-)\d+'
         replacement: $2
         target_label: 'container'
