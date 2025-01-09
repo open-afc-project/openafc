@@ -216,10 +216,10 @@ build_dev_server() {
   docker_build_and_push ${wd}/grafana/Dockerfile-grafana ${GRAFANA}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${GRAFANA} )
 
-  cd ${wd}/grafana && docker_build_and_push ${wd}/Dockerfile-loki ${LOKI}:${tag} ${push} &
+  cd ${wd}/grafana && docker_build_and_push Dockerfile-loki ${LOKI}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${LOKI} )
 
-  cd ${wd}/grafana && docker_build_and_push ${wd}/Dockerfile-promtail ${PROMTAIL}:${tag} ${push} &
+  cd ${wd}/grafana && docker_build_and_push Dockerfile-promtail ${PROMTAIL}:${tag} ${push} &
   build_pids+=( $! ) ; build_names+=( ${PROMTAIL} )
 
   cd ${wd}/tools/geo_converters && docker_build_and_push Dockerfile ${GEO_CONVERTERS}:${tag} ${push} &
