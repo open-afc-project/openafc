@@ -202,9 +202,8 @@ def do_jinja(args: Any) -> None:
             out_fn = fn
             if args.strip_ext:
                 stem, ext = os.path.splitext(fn)
-                if ext != args.strip_ext:
-                    continue
-                out_fn = stem
+                if ext == args.strip_ext:
+                    out_fn = stem
             rel_dir = \
                 os.path.dirname(
                     os.path.relpath(os.path.join(dirpath, fn), args.FROM))
@@ -664,7 +663,8 @@ def main(argv: List[str]) -> None:
         "--recursive", action="store_true", help="Instantiate recursively")
     parser_jinja.add_argument(
         "--strip_ext", metavar=".EXT",
-        help="Source files' extension to strip")
+        help="Source files' extension to strip. Files without this extension "
+        "are templatized without name change")
     parser_jinja.add_argument(
         "--print", action="store_true",
         help="Also print resulted files")

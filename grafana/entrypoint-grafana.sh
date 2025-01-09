@@ -16,7 +16,7 @@ if [[ -e /var/run/docker.sock ]] && \
     socat UNIX-CONNECT:/var/run/docker.sock TCP-LISTEN:${GRAFANA_DOCKER_SOCKET_PORT},fork,reuseaddr &
 fi
 
-grafana_tool.py jinja --recursive $WORKDIR/templates $WORKDIR
+grafana_tool.py jinja --recursive --strip_ext=.template $WORKDIR/templates $WORKDIR
 grafana_tool.py create_db
 grafana_tool.py reset_admin_password
 

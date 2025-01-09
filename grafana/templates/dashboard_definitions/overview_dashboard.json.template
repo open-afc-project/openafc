@@ -33,11 +33,7 @@
       "title": "",
       "type": "row"
     },
-    {
-      %- if
-      GRAFANA_COMPOSE_PROJECT_NAME is
-      defined %
-    }
+{%- if GRAFANA_COMPOSE_PROJECT_NAME is defined %}
     {
       "datasource": "Docker",
       "fieldConfig": {
@@ -59,9 +55,13 @@
                   "color": "dark-green",
                   "index": 1
                 },
+                "Restarting": {
+                  "color": "red",
+                  "index": 2
+                },
                 "starting": {
                   "color": "dark-purple",
-                  "index": 2
+                  "index": 3
                 },
                 "unhealthy": {
                   "color": "dark-red",
@@ -142,7 +142,7 @@
           "root_selector": "",
           "source": "url",
           "type": "json",
-          "uql": "parse-json\r\n| project \"Labels\", \"Status\"\r\n| extend \"Service\"=\"Labels['com.docker.compose.service']\"\r\n| extend \"Project\"=\"Labels['com.docker.compose.project']\"\r\n| extend \"Up\"=extract('^[^(]+', 0, \"Status\")\r\n| extend \"Health\"=extract('unhealthy|healthy|starting', 0, \"Status\")\r\n| project \"Service\", \"Status\", \"Up\", \"Health\", \"Project\"\r\n| order by \"Up\" asc\r\n| order by \"Health\" desc",
+          "uql": "parse-json\r\n| project \"Labels\", \"Status\"\r\n| extend \"Service\"=\"Labels['com.docker.compose.service']\"\r\n| extend \"Project\"=\"Labels['com.docker.compose.project']\"\r\n| extend \"Up\"=extract('^[^(]+', 0, \"Status\")\r\n| extend \"Health\"=extract('\W(unhealthy|healthy|Restarting|starting)', 1, \"Status\")\r\n| project \"Service\", \"Status\", \"Up\", \"Health\", \"Project\"\r\n| order by \"Up\" asc\r\n| order by \"Health\" desc",
           "url": "/containers/json",
           "url_options": {
             "data": "",
@@ -186,10 +186,7 @@
       ],
       "type": "table"
     },
-    {
-      % endif
-      -%
-    }
+{% endif -%}
     {
       "datasource": "Prometheus",
       "fieldConfig": {
