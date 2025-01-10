@@ -85,4 +85,4 @@ RUN chmod 744 /etc/periodic/$SWEEP_PERIOD/sweep.sh
 RUN chmod +x /entrypoint.sh
 CMD ["/entrypoint.sh"]
 
-HEALTHCHECK --start-period=30m CMD test `find /wd/touchfile -mmtime -3`
+HEALTHCHECK --start-period=30m CMD test `find /wd/touchfile -mtime -3`
