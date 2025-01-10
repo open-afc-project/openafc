@@ -961,58 +961,62 @@ class CertIdSweep(Command):
         import requests
         import datetime
 
-        now = datetime.datetime.now()
+        url = f'https://apps.fcc.gov/oetcf/eas/reports/GenericSearchResult.cfm?RequestTimeout={os.environ.get("REQUEST_TIMEOUT_SEC", "500")}'
+        headers = {
+            'accept': 'text/html,application/xhtml+xml,application/xml',
+            'accept-encoding': 'deflate, gzip, br, zstd',
+            'cache-control': 'max-age=0',
+            'content-type': 'application/x-www-form-urlencoded',
+            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15'
+        }
+        for _ in range(5):
+            now = datetime.datetime.now()
+            with flaskapp.app_context():
+                try:
+                    timeout = os.environ.get("REQUEST_TIMEOUT_SEC")
+                    if timeout is not None:
+                        timeout = float(timeout)
+                    resp = requests.post(url, headers=headers, data=data, timeout=timeout)
+                    if resp.status_code == 200:
+                        try:
+                            from xml.etree import ElementTree
+                            tree = ElementTree.fromstring(resp.content)
+                            for node in tree:
+                                fcc_id = node.find('fcc_id').text
+                                cert = CertId.query.filter_by(
+                                    certification_id=fcc_id).first()
+
+                                if cert:
+                                    cert.refreshed_at = now
+                                    cert.location = cert.location | location
+                                elif location == CERT_ID_LOCATION_OUTDOOR:
+                                    # add new entries that are in 6SD list.
+                                    cert = CertId(certification_id=fcc_id,
+                                                  location=CERT_ID_LOCATION_OUTDOOR)
+                                    ruleset_id_str = \
+                                        RulesetVsRegion.region_to_ruleset(
+                                            "US", exc=werkzeug.exceptions.NotFound)
+                                    ruleset = Ruleset.query.filter_by(
+                                        name=ruleset_id_str).first()
+                                    ruleset.cert_ids.append(cert)
+                                    db.session.add(cert)
+
+                            als.als_json_log(
+                                'cert_db', {
+                                    'action': 'sweep', 'country': 'US', 'status': 'success'})
+                        except BaseException:
+                            raise RuntimeError("Bad XML in Cert Id download")
+                    else:
+                        raise RuntimeError("Bad Cert Id download")
+                    db.session.commit()  # pylint: disable=no-member
+                    return
+                except BaseException:
+                    time.sleep(5)
+        als.als_json_log(
+            'cert_db', {
+                'action': 'sweep', 'country': 'US', 'status': 'failed download'})
         with flaskapp.app_context():
-            url = f'https://apps.fcc.gov/oetcf/eas/reports/GenericSearchResult.cfm?RequestTimeout={os.environ.get("REQUEST_TIMEOUT_SEC", "500")}'
-            headers = {
-                'accept': 'text/html,application/xhtml+xml,application/xml',
-                'cache-control': 'max-age=0',
-                'content-type': 'application/x-www-form-urlencoded',
-                'user-agent': 'rat_server/1.0'
-            }
-
-            try:
-                timeout = os.environ.get("REQUEST_TIMEOUT_SEC")
-                if timeout is not None:
-                    timeout = float(timeout)
-                resp = requests.post(url, headers=headers, data=data, timeout=timeout)
-                if resp.status_code == 200:
-                    try:
-                        from xml.etree import ElementTree
-                        tree = ElementTree.fromstring(resp.content)
-                        for node in tree:
-                            fcc_id = node.find('fcc_id').text
-                            cert = CertId.query.filter_by(
-                                certification_id=fcc_id).first()
-
-                            if cert:
-                                cert.refreshed_at = now
-                                cert.location = cert.location | location
-                            elif location == CERT_ID_LOCATION_OUTDOOR:
-                                # add new entries that are in 6SD list.
-                                cert = CertId(certification_id=fcc_id,
-                                              location=CERT_ID_LOCATION_OUTDOOR)
-                                ruleset_id_str = \
-                                    RulesetVsRegion.region_to_ruleset(
-                                        "US", exc=werkzeug.exceptions.NotFound)
-                                ruleset = Ruleset.query.filter_by(
-                                    name=ruleset_id_str).first()
-                                ruleset.cert_ids.append(cert)
-                                db.session.add(cert)
-
-                        als.als_json_log(
-                            'cert_db', {
-                                'action': 'sweep', 'country': 'US', 'status': 'success'})
-                    except BaseException:
-                        raise RuntimeError("Bad XML in Cert Id download")
-                else:
-                    raise RuntimeError("Bad Cert Id download")
-                db.session.commit()  # pylint: disable=no-member
-            except BaseException:
-                als.als_json_log(
-                    'cert_db', {
-                        'action': 'sweep', 'country': 'US', 'status': 'failed download'})
-                self.mailAlert(flaskapp, 'US', str(location))
+            self.mailAlert(flaskapp, 'US', str(location))
 
     def mailAlert(self, flaskapp, country, other):
         import flask
