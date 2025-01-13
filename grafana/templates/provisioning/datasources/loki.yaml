@@ -4,13 +4,14 @@
 # a copy of which is included with this software program
 #
 
-# Rcache rest API
-apiVersion: 1
+# Loki datasource
 
-{% if GRAFANA_DS_RCACHE_URL is defined -%}
+{% if GRAFANA_DS_LOKI_URL is defined -%}
+
 deleteDatasources:
-  - name: Rcache
+  - name: Loki
 
+apiVersion: 1
 datasources:
   - access: proxy
     apiVersion: ''
@@ -18,24 +19,16 @@ datasources:
     basicAuthUser: ''
     database: ''
     isDefault: false
-    jsonData:
-      auth_method: none
-      customHealthCheckEnabled: true
-      customHealthCheckUrl: >-
-        {{ GRAFANA_DS_RCACHE_URL }}/status
-      global_queries: []
-      oauthPassThru: false
-      proxy_type: none
-      tlsSkipVerify: true
-    name: Rcache
+    jsonData: {}
+    name: Loki
     orgId: 1
     readOnly: false
     secureJsonFields: {}
-    type: yesoreyeram-infinity-datasource
-    typeLogoUrl: public/plugins/yesoreyeram-infinity-datasource/img/icon.svg
+    type: loki
+    typeLogoUrl: public/app/plugins/datasource/loki/img/loki_icon.svg
     url: >-
-      {{ GRAFANA_DS_RCACHE_URL }}
+      {{ GRAFANA_DS_LOKI_URL }}
     user: ''
-    version: 6
+    version: 3
     withCredentials: false
-{% endif -%}
+{% endif %}

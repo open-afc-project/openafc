@@ -1,0 +1,34 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Promtail (docker log collector for Loki)
+
+FROM grafana/promtail:3.3.2
+
+ENV HOMEDIR=/root
+
+# In compose environment - name of current compose project (available in
+# docker-compose.yaml as COMPOSE_PROJECT_NAME)
+# ENV GRAFANA_COMPOSE_PROJECT_NAME
+
+# Loki URL
+ENV GRAFANA_DS_LOKI_URL=http://loki:3100
+
+# # Installing Jinja for config file manipulation
+# RUN apt-get update
+# RUN apt-get -y install python3-minimal python3-jinja2 pipx
+# ENV PATH=${HOMEDIR}/.local/bin:${PATH}
+# RUN pipx install jinja-cli==1.2.2
+
+# Promtail config file
+ENV PROMTAIL_CONFIG=/etc/promtail/config.yml
+
+COPY promtail-config.yaml ${PROMTAIL_CONFIG}
+COPY entrypoint-promtail.sh ${HOMEDIR}
+RUN chmod +x ${HOMEDIR}/entrypoint-promtail.sh
+
+ENTRYPOINT ${HOMEDIR}/entrypoint-promtail.sh

@@ -16,8 +16,7 @@ __all__ = ["message_processed", "request_processed"]
 hostname = platform.node()
 
 # Histogram duration buckets in seconds
-DURATION_BUCKETS = \
-    (0.1, 0.25, 0.5, 0.75, 1., 2., 5., 10., 25., 50., 75., 100., 150., 180.)
+DURATION_BUCKETS = (0.05, 0.1, 1., 10., 60., 120.)
 
 # Message processing duration histogram
 message_duration_hist = \

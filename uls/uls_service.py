@@ -1265,13 +1265,12 @@ def main(argv: List[str]) -> None:
                         if has_previous else None
                     if db_diff:
                         als_record.db_difference = str(db_diff)
-                    if settings.force or \
-                            uls_file_checker.valid(
-                                base_dir=settings.ext_db_dir,
-                                new_filename=os.path.join(
-                                    os.path.dirname(settings.ext_db_symlink),
-                                    os.path.basename(temp_uls_file_name)),
-                                db_diff=db_diff):
+                    if uls_file_checker.valid(
+                            base_dir=settings.ext_db_dir,
+                            new_filename=os.path.join(
+                                os.path.dirname(settings.ext_db_symlink),
+                                os.path.basename(temp_uls_file_name)),
+                            db_diff=db_diff) or settings.force:
                         if not settings.force:
                             als_record.now(field_name="validated_time")
                         if settings.force:

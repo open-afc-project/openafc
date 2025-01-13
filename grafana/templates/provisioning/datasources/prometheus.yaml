@@ -25,6 +25,7 @@ datasources:
     type: prometheus
     typeLogoUrl: public/app/plugins/datasource/prometheus/img/prometheus_logo.svg
     typeName: Prometheus
-    url: {{ GRAFANA_DS_PROMETHEUS_URL }}
+    url: >-
+      {{ GRAFANA_DS_PROMETHEUS_URL }}
     user: ''
 {% endif -%}

@@ -7,7 +7,7 @@
 
 # Grafana dockerfile (for future expansion)
 
-FROM grafana/grafana:11.3.1-ubuntu
+FROM grafana/grafana:11.4.0-ubuntu
 
 EXPOSE 3000/tcp
 
@@ -76,6 +76,19 @@ ENV GRAFANA_DS_PROMETHEUS_URL=http://prometheus:9090
 # Host name of rcache server
 ENV GRAFANA_DS_RCACHE_URL=http://rcache:8000
 
+# In compose environment - TCP port where to docker unix socket
+# (/var/run/docker.sock) is landed to by means of socat. If not defined or if
+# docker socket is not mapped (e.g. in Kubernetes environment) no socat is
+# performed
+ENV GRAFANA_DOCKER_SOCKET_PORT=10000
+
+# In compose environment - name of current compose project (available in
+# docker-compose.yaml as COMPOSE_PROJECT_NAME)
+# ENV GRAFANA_COMPOSE_PROJECT_NAME
+
+
+# Loki URL
+ENV GRAFANA_DS_LOKI_URL=http://loki:3100
 
 # Disabling SqlAlchemy 2.0 transition warnings
 ENV SQLALCHEMY_SILENCE_UBER_WARNING=1
@@ -90,14 +103,23 @@ ENV PYTHONPATH=$WORKDIR
 ENV PATH=$PATH:$WORKDIR
 
 RUN apt-get update
-RUN apt-get -y install python3-minimal python3-pip wget unzip
+RUN apt-get -y install python3-minimal wget unzip socat
+
+# Somehow python3-pip may refuses to install normally, so:
+RUN if ! apt-get -y install python3-pip ; then \
+    wget -O $WORKDIR/get-pip.py https://bootstrap.pypa.io/get-pip.py && \
+    python3 $WORKDIR/get-pip.py ; rm -f $WORKDIR/get-pip.py ; fi
+
+# Making socat setuid to redirect root-restricted Docker socket (if any) to
+# grafana-readable one
+RUN chmod u+s `which socat`
 
 USER grafana
 
 # Install required python modules
-COPY grafana/requirements.txt $WORKDIR/
-RUN pip3 install -r $WORKDIR/requirements.txt && \
-    rm -f $WORKDIR/requirements.txt
+COPY grafana/requirements-grafana.txt $WORKDIR/
+RUN pip3 install -r $WORKDIR/requirements-grafana.txt && \
+    rm -f $WORKDIR/requirements-grafana.txt
 
 # Install shared AFC packages
 COPY --chown=grafana src/afc-packages $WORKDIR/afc-packages/
@@ -108,19 +130,20 @@ RUN pip3 install --use-pep517  -r $WORKDIR/afc-packages/pkgs.grafana \
 # directory by means of Jinja)
 ENV GF_PATHS_CONFIG=$WORKDIR/custom.ini
 
-# Templates to be instantiated with Jinja in entrypoint.sh
+# Templates to be instantiated with Jinja in entrypoint-grafana.sh
 COPY --chown=grafana grafana/templates $WORKDIR/templates/
 
 # Root provisioning directory. May not be overridden in custom.ini because
 # base dockerfile already defined this variable
 ENV GF_PATHS_PROVISIONING=$WORKDIR/provisioning
 
-# Provisioning directories (filled from templates in entrypoint.sh)
+# Provisioning directories (filled from templates in entrypoint-grafana.sh)
 RUN mkdir -p $GF_PATHS_PROVISIONING
 
 # Startup scripts
-COPY --chown=grafana grafana/entrypoint.sh grafana/grafana_tool.py $WORKDIR/
-RUN chmod a+x $WORKDIR/entrypoint.sh $WORKDIR/grafana_tool.py
+COPY --chown=grafana grafana/entrypoint-grafana.sh grafana/grafana_tool.py \
+    $WORKDIR/
+RUN chmod a+x $WORKDIR/entrypoint-grafana.sh $WORKDIR/grafana_tool.py
 
 # Plugins directory. May not be overridden in custom.ini because it is defined
 # in base dockerfile
@@ -134,4 +157,4 @@ RUN wget -qO plugin.zip 'https://grafana.com/api/plugins/yesoreyeram-infinity-da
      unzip plugin.zip -d $GF_PATHS_PLUGINS && \
      rm plugin.zip
 
-ENTRYPOINT $WORKDIR/entrypoint.sh
+ENTRYPOINT $WORKDIR/entrypoint-grafana.sh
