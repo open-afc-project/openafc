@@ -1,0 +1,34 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Promtail config (Jinja template thereof to be precise)
+# Uses Jinja substitution from environment as direct environment substitution
+# somehow does not work
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+clients:
+  - url: ${GRAFANA_DS_LOKI_URL}/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    # use docker.sock to filter containers
+    docker_sd_configs:
+      - host: "unix:///var/run/docker.sock"
+        refresh_interval: 15s
+        filters:
+          - name: label
+            values:
+              - com.docker.compose.project=${GRAFANA_COMPOSE_PROJECT_NAME}
+    # use container name to create a loki label
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/${GRAFANA_COMPOSE_PROJECT_NAME}(_|-)(.*)(_|-)\d+'
+        replacement: $2
+        target_label: 'container'

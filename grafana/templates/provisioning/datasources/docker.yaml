@@ -1,15 +1,15 @@
-# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
 
-# Rcache rest API
+# FS (ULS) downloader state data source
+---
 apiVersion: 1
 
-{% if GRAFANA_DS_RCACHE_URL is defined -%}
+{% if GRAFANA_COMPOSE_PROJECT_NAME is defined -%}
 deleteDatasources:
-  - name: Rcache
+  - name: Docker
 
 datasources:
   - access: proxy
@@ -19,23 +19,15 @@ datasources:
     database: ''
     isDefault: false
     jsonData:
-      auth_method: none
-      customHealthCheckEnabled: true
-      customHealthCheckUrl: >-
-        {{ GRAFANA_DS_RCACHE_URL }}/status
       global_queries: []
-      oauthPassThru: false
-      proxy_type: none
-      tlsSkipVerify: true
-    name: Rcache
+    name: Docker
     orgId: 1
     readOnly: false
     secureJsonFields: {}
     type: yesoreyeram-infinity-datasource
     typeLogoUrl: public/plugins/yesoreyeram-infinity-datasource/img/icon.svg
-    url: >-
-      {{ GRAFANA_DS_RCACHE_URL }}
+    url: http://localhost:{{ GRAFANA_DOCKER_SOCKET_PORT }}
     user: ''
-    version: 6
+    version: 4
     withCredentials: false
-{% endif -%}
+{% endif %}

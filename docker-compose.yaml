@@ -383,6 +383,8 @@ services:
   grafana:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/grafana-image:${TAG:-latest}
     restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GRAFANA_ADMIN_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_ADMIN_PASSWORD
@@ -398,6 +400,8 @@ services:
       - GRAFANA_DS_FS_STATE_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ULS_STATE_RO_DB_PASSWORD
       - GRAFANA_DS_PROMETHEUS_URL=http://prometheus:9090
       - GRAFANA_DS_RCACHE_URL=http://rcache:8000
+      - GRAFANA_DS_LOKI_URL=http://loki:3100
+      - GRAFANA_COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
     depends_on:
       - prometheus
       - bulk_postgres
@@ -408,6 +412,22 @@ services:
       - ALS_JSON_LOG_RO_DB_PASSWORD
       - ULS_STATE_RO_DB_PASSWORD
       - GRAFANA_ADMIN_PASSWORD
+    dns_search: [.]
+
+  loki:
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/loki-image:${TAG:-latest}
+    restart: always
+    dns_search: [.]
+
+  promtail:
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/promtail-image:${TAG:-latest}
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers
+    environment:
+      - GRAFANA_DS_LOKI_URL=http://loki:3100
+      - GRAFANA_COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
     dns_search: [.]
 
   prometheus:
