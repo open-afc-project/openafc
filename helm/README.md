@@ -150,11 +150,11 @@ Here are list of secrets used by OpenAFC:
 |Name|Pods|Role|
 |----|----|----|
 |image-pull|None|Image pull secret (not needed on `k3d`). Has `kubernetes.io/dockerconfigjson` type, see <https://kubernetes.io/docs/concepts/configuration/secret/#docker-config-secrets> or <https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#registry-secret-existing-credentials> on how to prepare it|
-|postgres-password|als-siphon|Password for PostgreSQL DSN with user `postgres` - used to create databases, if they are absent|
-|ratdb-password|rat-server, msghnd (deprecated), afcserver, objst, cert-db|Password for PostgreSQL DSN for RatDB database (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
-|uls-state-db-password|uls-downloader|Password for PostgreSQL DSN for database with ULS Downloader state (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
-|als-db-password|als-siphon|Password for PostgreSQL DSN for ALS database (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
-|als-json-log-db-password|als-siphon|Password for PostgreSQL DSN for ALS JSON logs database (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
+|db-creator-password-*|rat-server|For each PostgreSQL server - password of user that may create databases there (usually it is a 'postgres' user)|
+|ratdb-password|rat-server, msghnd (deprecated), afcserver, objst, cert-db|Password for PostgreSQL DSN for *fbrat* database|
+|uls-state-db-password|uls-downloader|Password for PostgreSQL DSN for database with ULS Downloader state|
+|als-db-password|als-siphon|Password for PostgreSQL DSN for ALS database|
+|als-json-log-db-password|als-siphon|Password for PostgreSQL DSN for ALS JSON logs database|
 |flask-secret-key|rat-server, msghnd (deprecated, not really used), objst (not really used), cert-db (not really used)|Value for Flask's SECRET_KEY (used to cookie signing, CSRF token generation, etc.). Only used by *rat-server*, other Flask-based containers require it for initialization code not to crash|
 |google-apikey|rat-server, msghnd (deprecated, not really used), objst (not really used), cert-db (not really used)|Google API key. Passed to WebUI for map drawing. Only used by *rat-server*, other Flask-based containers require it for initialization code not to crash|
 |ratapi-captcha-secret|rat-server, msghnd (deprecated, not really used), objst (not really used), cert-db (not really used)|Secret for Google's `recaptcha`. Only used by *rat-server*, other Flask-based containers require it for initialization code not to crash|
@@ -162,21 +162,24 @@ Here are list of secrets used by OpenAFC:
 |ratapi-mail-password|rat-server, uls-downloader, msghnd (deprecated, not really used), objst (not really used), cert-db (not really used)|SMTP password to use when sending mail. Only used by *uls-downloader* and *rat-server*, other Flask-based containers require it for initialization code not to crash|
 |oidc-client-id|rat-server, msghnd (deprecated, not really used), objst (not really used), cert-db (not really used)|Client ID for OIDC-based (single sign-in, such as `Okta` - if used) login. Only be used by *rat-server*, other Flask-based containers require it for initialization code not to crash|
 |oidc-client-secret|rat-server, msghnd (deprecated, not really used), objst (not really used), cert-db (not really used)|Client Secret for OIDC-based (single sign-in, such as `Okta` - if used) login. Only be used by rat-server, other Flask-based containers require it for initialization code not to crash|
-|server-cert-pem|dispatcher|Server private key for TLS termination. Combined with *server-key-pem* into a single *server-cert* secret in cluster secret store|
+|server-cert|dispatcher|Server private key for TLS termination. Combined with *server-key-pem* into a single *server-cert* secret in cluster secret store|
 |server-key-pem|dispatcher|Server certificate for TLS termination. Combined with *server-cert-pem* into a single *server-cert* secret in cluster secret store|
-|grafana-db-password|grafana|Password for PostgreSQL DSN for Grafana database (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
-|als-ro-db-password|grafana|Password for PostgreSQL DSN for read-only access to ALS database (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
-|als-json-log-ro-db-password|grafana|Password for PostgreSQL DSN for read-only access to ALS JSON logs database (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
-|uls-state-ro-db-password|grafana|Password for PostgreSQL DSN for read-only acces to database with ULS Downloader state (may be redirected to *postgres-password* - see [Database DSNs and their passwords](#dsns_and_passwords))|
+|grafana-db-password|grafana|Password for PostgreSQL DSN for Grafana database|
+|als-ro-db-password|grafana|Password for PostgreSQL DSN for read-only access to ALS database|
+|als-json-log-ro-db-password|grafana|Password for PostgreSQL DSN for read-only access to ALS JSON logs database|
+|uls-state-ro-db-password|grafana|Password for PostgreSQL DSN for read-only acces to database with ULS Downloader state|
 |grafana-admin-password|grafana|Grafana admin user password|
 
 
 ### Database DSNs and their passwords <a name="dsns_and_passwords">
 
-As of time of this writing OpenAFC uses usernames and passwords in `PostgreSQL` database authentication. Passwords are parts of `PostgreSQL` connection strings (`DSN`s).
+Several containers of OPenAFC use `PostgreSQL` databases to store various data. In development environment (e.g. `k3d`) databases run in two containers: `ratdb` - that contains `fbrat` database and `bulk-postgres` taht contains all other databases. In production environment all `PostgreSQL` databases expected to be on infrastructure-provided server (most likely - single, but this is not required).
 
-Passwords have to be stored in secrets, whereas `DSN`s better be stored less restrictively. Thus, all connection strings passed to OpenAFC use default passwords (usually `postgres`), actual passwords being supplied by means of secrets on `GCP` and not at all on `k3d` (i.3. `k3d` uses default passwords).
+Databases supplied to containers with pairs environment variablaes - one for DSN (without password or with some default password), another with name of file containing password (this file is a mapping of secret from the secret store).
 
+OpenAFC also needs to create thosew databases. All database creation performed in `rat-server` container that is supplied with DSNs and passwords of user capable of database creation on each of database server. Usually it is credentials of 'postgres' user of 'postgres' database, albeity this is not mandatory (it is, howevewr, mandatory for database used in DSN to preexist).
+
+OpenAFC uses at least 9 distinct DSNs - ad in ideally secured world each should have its own username and password. In the relaxed version of this ideal world all DSNs may use `postgres` user and all DB password secrets may be mapped to a single external secret with password of this user - see [`GCP` deployment](#gcp_deployment") for an example.
 
 ## Helmcharts <a name="helmcharts">
 
@@ -598,7 +601,7 @@ As before, *--build* might be omitted if images are up to date
 Initial provisioning of `GCP` clusters (two of them: external that runs *dispatcher* pod and internal that runs everything else - see [here](#clusters)) is out of scope of this document. Before starting OpenAFC following preparations should be made:
 
 - **SQL**. `PostgreSQL+PostGIS` SQL resource should be allocated (one is enough). For sake of simplicity, below it would be demonstrated how to make all connection strings use same *postgres* user (albeit secret structure allows for more granular approach - see [here](#secrets)).  
-  Besides obligatory *postgres* database, OpenAFC uses following databases: *AFC_LOGS*, *ALS*, *fbrat*, *fs_state*, *rcache*. Of them *fbrat* may require some prefill (copying content from some previous instance (if any), running `helm/bin/preload_ratdb.py` after cluster started, etc.), other will help themselves.
+  Besides obligatory *postgres* database, OpenAFC uses following databases: *AFC_LOGS*, *ALS*, *fbrat*, *fs_state*, *rcache*, *grafana*. OpenAFC creates them automagically, but *fbrat* may require some prefill (copying content from some previous instance (if any), running `helm/bin/preload_ratdb.py` after cluster started, etc.)
 
 - **Secret Manager (aka `gcpsm`)**. Overview of secrets is [here](#secrets).
 
@@ -608,7 +611,7 @@ Initial provisioning of `GCP` clusters (two of them: external that runs *dispatc
 
   - **postgres-password** (*postgres* user database password) should be created and put to `gcpsm`
 
-  - **ratdb-password, uls-state-db-password, als-db-password, als-json-log-db-password**, as said above, will be skipped for simplicity.
+  - **ratdb-password, uls-state-db-password, als-db-password, als-json-log-db-password, grafana-db-password, als-ro-db-password, als-json-log-ro-db-password, |uls-state-ro-db-password**, as said above, will be skipped for simplicity (`postgres` user will be used in all DSNs, all password secrets will be mapped to `postgres-password` external secret).
 
   - **flask-secret-key, google-apikey, ratapi-captcha-secret, ratapi-captcha-sitekey, ratapi-mail-password, oidc-client-id, oidc-client-secret** should be created and put to `gcpsm`. Figuring them out is out of scope of this document (refer `Customization.md` for inspiration)
 
@@ -616,7 +619,7 @@ Initial provisioning of `GCP` clusters (two of them: external that runs *dispatc
 
 - **IP Addresses**. Internal server uses two external IP addresses (one by `ingress-nginx`, another by `RabbitMQ`), external server uses one external IP address (by `Nginx` working on *dispatcher*)
 
-- **NFS** Used to store static data files (mainly geospatial databases and `AFC Engine` parameter files) and resulting files of WebUI requests. Some inspiration may be found in `database_readme.md`.
+- **NFS** Used to store static data files (mainly geospatial databases and `AFC Engine` parameter files), resulting files of WebUI requests, optionally Loki and Prometheus files. Some inspiration may be found in `database_readme.md`.
 
 - **Jumphost** Host from which Kubernetes cluster control is performed. Should have `kubectl` and `helm` installed, kubeconfig properly filled (with information about internal and external clusters). Also this clusters should have access to files in `helm` folder and to config override files described in next chapter.
 
@@ -682,16 +685,13 @@ In all files below site-specific placeholders denoted with `<...>`.
       USER_APP_NAME: <see Customization.md>
     oidc-configurator:
       OIDC_DISCOVERY_URL: <see Customization.md>
+    als-db:
+      POSTGRES_ALS_CONN_STR: postgresql://postgres@{{ip:postgres}}/ALS
+      POSTGRES_LOG_CONN_STR: postgresql://postgres@{{ip:postgres}}/AFC_LOGS
+    uls-db:
+      ULS_SERVICE_STATE_DB_DSN: postgresql://postgres@{{ip:postgres}}/fs_state
   
   components:
-    als-siphon:
-      env:
-        POSTGRES_INIT_CONN_STR: postgresql://postgres@{{ip:postgres}}/postgres
-        POSTGRES_ALS_CONN_STR: postgresql://postgres@{{ip:postgres}}/ALS
-        POSTGRES_LOG_CONN_STR: postgresql://postgres@{{ip:postgres}}/AFC_LOGS
-    uls-downloader:
-      env:
-        ULS_SERVICE_STATE_DB_DSN: postgresql://postgres@{{ip:postgres}}/fs_state
     bulk-postgres:
       imageName: null
     ratdb:
@@ -727,6 +727,17 @@ In all files below site-specific placeholders denoted with `<...>`.
             stabilizationWindowSeconds: 0
           scaleDown:
             stabilizationWindowSeconds: 120
+    grafana:
+      env:
+        GRAFANA_DATABASE_URL: postgresql://postgres@{{ip:postgres}}/grafana
+    rat-server:
+      env:
+        AFC_DB_CREATOR_DSN_POSTGRES: >-
+          postgresql://postgres:postgres@{{ip:postgres}}/postgres
+        AFC_DB_CREATOR_PASSWORD_FILE_POSTGRES: >-
+          {{secretFile:db-creator-password-postgres:optional}}
+      mountedSecrets:
+        db-creator-password-postgres:
   
   staticVolumes:
     # Here IPs should be specified verbatim, using values from externalIps is not possible
@@ -754,7 +765,18 @@ In all files below site-specific placeholders denoted with `<...>`.
     als-db-password:
       remoteSecretName: postgres-password
     als-json-log-db-password:
-          remoteSecretName: postgres-password
+      remoteSecretName: postgres-password
+    grafana-db-password:
+      remoteSecretName: postgres-password
+    als-ro-db-password:
+      remoteSecretName: postgres-password
+    als-json-log-ro-db-password:
+      remoteSecretName: postgres-password
+    uls-state-ro-db-password:
+      remoteSecretName: postgres-password
+    db-creator-password-postgres:
+      property: DB_CREATOR_PASSWORD_POSTGRES
+      remoteSecretName: postgres-password
   ```
 
 - **`values-afc-ext.yaml`** Override file for `values.yaml` of external cluster  
