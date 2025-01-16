@@ -775,7 +775,6 @@ class CreateDb(MethodView):
     # Prefix for correspondent password filename environment variables
     PASSWORD_FILE_ENV_PREFIX = "AFC_DB_CREATOR_PASSWORD_FILE_"
 
-
     def post(self):
         """ Postgres database creation REST API
 
@@ -792,7 +791,7 @@ class CreateDb(MethodView):
             raise
 
     @classmethod
-    def create_database(cls, dsn, recreate = False):
+    def create_database(cls, dsn, recreate=False):
         """ Creates/recreates Postgres database of given DSN
 
         Raises erkzeug.exceptions.HTTPException on failure
@@ -853,7 +852,7 @@ class CreateDb(MethodView):
                 f"{desired_host}:{desired_port}/{desired_db}: {ex}")
 
     @classmethod
-    def _parse_dsn(cls, dsn, fail_on_error = False):
+    def _parse_dsn(cls, dsn, fail_on_error=False):
         """ Parses given DSN, returns (host, port, database) tuple
 
         Raises erkzeug.exceptions.HTTPException on failure
