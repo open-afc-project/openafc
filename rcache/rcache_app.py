@@ -12,7 +12,6 @@
 import fastapi
 import logging
 import uvicorn
-import sys
 from typing import Annotated, Optional
 
 from log_utils import dp, get_module_logger, set_dp_printer, set_parent_logger
@@ -66,10 +65,8 @@ async def startup() -> None:
     if not settings.enabled:
         return
     service = get_service()
-    if not service.check_db_server():
-        LOGGER.error("Can't connect to postgres database server")
-        sys.exit()
     await service.connect_db(
+        db_creator_url=settings.db_creator_url,
         create_if_absent=True,
         recreate_db=settings.if_db_exists == IfDbExists.recreate,
         recreate_tables=settings.if_db_exists == IfDbExists.clean)

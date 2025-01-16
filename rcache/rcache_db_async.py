@@ -242,6 +242,7 @@ class RcacheDbAsync(RcacheDb):
 
     async def delete(self, pk: ApDbPk) -> None:
         """ Delete row by primary key """
+        assert self._engine is not None
         try:
             d = sa.delete(self.ap_table)
             for k, v in pk.dict().items():
@@ -253,6 +254,7 @@ class RcacheDbAsync(RcacheDb):
 
     async def get_switch(self, sw: FuncSwitch) -> bool:
         """ Gets value of given switch """
+        assert self._engine is not None
         if self.SWITCHES_TABLE_NAME not in self.metadata.tables:
             return True
         try:
@@ -268,6 +270,7 @@ class RcacheDbAsync(RcacheDb):
 
     async def set_switch(self, sw: FuncSwitch, state: bool) -> None:
         """ Sets value of given switch """
+        assert self._engine is not None
         error_if(self.SWITCHES_TABLE_NAME not in self.metadata.tables,
                  f"Table '{self.SWITCHES_TABLE_NAME}' not found in "
                  f"'{self.db_name}' database")
@@ -296,5 +299,6 @@ class RcacheDbAsync(RcacheDb):
         try:
             return sa_async.create_async_engine(dsn, pool_pre_ping=True)
         except sa.exc.SQLAlchemyError as ex:
-            error(f"Invalid database DSN: '{safe_dsn(dsn)}': {ex}")
+            error(
+                f"Invalid database DSN: '{secret_utils.safe_dsn(dsn)}': {ex}")
         return None  # Will never happen. Appeasing pylint
