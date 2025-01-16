@@ -57,10 +57,8 @@ def error_if(condition: Any, errmsg: str) -> None:
 class Settings(pydantic.BaseSettings):
     """ Command line arguments that also may be specified through environment
     variables """
-    init_db_dsn: Optional[pydantic.PostgresDsn] = \
-        pydantic.Field(None, env="GRAFANA_DATABASE_INIT_URL")
-    init_db_password_file: Optional[str] = \
-        pydantic.Field(None, env="GRAFANA_DATABASE_INIT_PASSWORD_FILE")
+    db_creator_url: Optional[pydantic.AnyHttpUrl] = \
+        pydantic.Field(None, env="AFC_DB_CREATOR_URL")
     grafana_db_dsn: Optional[pydantic.PostgresDsn] = \
         pydantic.Field(None, env="GRAFANA_DATABASE_URL")
     grafana_db_password_file: Optional[str] = \
@@ -124,33 +122,15 @@ def do_create_db(args: Any) -> None:
         exists = False
     if exists and not args.recreate_db:
         return
-    error_if(not settings.init_db_dsn,
-             "Initialization database DSN not specified")
+    error_if(not settings.db_creator_url,
+             "Database creation REST API URL not specified")
     try:
-        init_dsn = \
-            secret_utils.substitute_password(
-                dsc="Initialization database", dsn=settings.init_db_dsn,
-                password_file=settings.init_db_password_file)
-    except RuntimeError as ex:
-        error(str(ex))
-    grafana_db_name = urllib.parse.urlsplit(grafana_dsn).path.strip("/")
-    if exists and args.recreate_db:
-        try:
-            init_engine = sa.create_engine(init_dsn)
-            with init_engine.connect() as conn:
-                conn.execute("COMMIT")
-                conn.execute(f'DROP DATABASE IF EXISTS "{grafana_db_name}"')
-            init_engine.dispose()
-        except sa.exc.SQLAlchemyError as ex:
-            error(f"Unable to drop database '{grafana_db_name}': {ex}")
-    try:
-        init_engine = sa.create_engine(init_dsn)
-        with init_engine.connect() as conn:
-            conn.execute("COMMIT")
-            conn.execute(f'CREATE DATABASE "{grafana_db_name}"')
-        init_engine.dispose()
-    except sa.exc.SQLAlchemyError as ex:
-        error(f"Unable to create database '{grafana_db_name}': {ex}")
+        requests.post(settings.db_creator_url,
+                      params={"dsn": settings.grafana_db_dsn,
+                              "recreate": str(bool(args.recreate_db))})
+    except requests.exceptions.RequestException as ex:
+        error(f"Grafana database {'re' if args.recreate_db else ''}creation "
+              f"error: {ex}")
 
 
 def dsn_parse_filter(dsn: str, part: str) -> str:
@@ -632,15 +612,10 @@ def main(argv: List[str]) -> None:
         subparsers.add_parser(
             "create_db", help="Create Grafana database")
     parser_create_db.add_argument(
-        "--init_db_dsn", metavar="DSN_OF_INIT_DB",
-        help=f"DSN of Postgres database used to create Grafana database "
-        f"(usually it is database named 'postgres'). Ignored if Grafana "
-        f"database creation is not required"
-        f"{pydantic_utils.env_help(Settings, 'init_db_dsn')}")
-    parser_create_db.add_argument(
-        "--init_db_password_file", metavar="PASSWORD_FILE_OF_INIT_DB",
-        help=f"File with password for DSN, specified by --init_db_dsn"
-        f"{pydantic_utils.env_help(Settings, 'init_db_password_file')}")
+        "--db_creator_url", metavar="DB_CREATOR_URL",
+        help=f"REST API URL for Postgres databasse creation. Ignored if "
+        f"Grafana database creation is not required"
+        f"{pydantic_utils.env_help(Settings, 'db_creator_url')}")
     parser_create_db.add_argument(
         "--grafana_db_dsn", metavar="DSN_OF_GRAFANA_DB",
         help=f"Grafana Postgres database DSN. This parameter is required"

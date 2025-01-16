@@ -39,15 +39,8 @@ ENV GF_SECURITY_ADMIN_USER=admin
 # File with password to use in $GRAFANA_DATABASE_URL
 # ENV GRAFANA_DATABASE_PASSWORD_FILE
 
-
-# DSN to database server to create Grafana database, provided it is not yet
-# there. Default is to not create Grafana database even if it down ot exist
-# ENV GRAFANA_DATABASE_INIT_URL
-
-# File with password to use with $GRAFANA_DATABASE_INIT_URL. Default is to use
-# password provided in $GRAFANA_DATABASE_INIT_URL
-# ENV GRAFANA_DATABASE_INIT_PASSWORD_FILE
-
+# REST API URL that performs database creation
+ENV AFC_DB_CREATOR_URL=http://rat_server/fbrat/admin/CreateDb
 
 # DSN for read-only access to ALS database
 # ENV GRAFANA_DS_ALS_RO_DSN
