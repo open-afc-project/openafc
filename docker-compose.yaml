@@ -79,6 +79,8 @@ services:
       - OIDC_CLIENT_ID
       - OIDC_CLIENT_SECRET
       - RCACHE_DB_PASSWORD
+      - DB_CREATOR_PASSWORD_RATDB
+      - DB_CREATOR_PASSWORD_BULK_POSTGRES
     dns_search: [.]
     environment:
       - FLASKFILE_SQLALCHEMY_DATABASE_PASSWORD=${VOL_C_SECRETS}/RATDB_PASSWORD
@@ -106,6 +108,11 @@ services:
       - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
       - RCACHE_RMQ_DSN=${RCACHE_RMQ_DSN}
+      # Database Creator parameters and endpoint
+      - AFC_DB_CREATOR_DSN_RATDB=postgresql://postgres:postgres@ratdb/postgres
+      - AFC_DB_CREATOR_PASSWORD_FILE_RATDB=${VOL_C_SECRETS}/DB_CREATOR_PASSWORD_RATDB
+      - AFC_DB_CREATOR_DSN_BULK_POSTGRES=postgresql://postgres:postgres@bulk_postgres/postgres
+      - AFC_DB_CREATOR_PASSWORD_FILE_BULK_POSTGRES=${VOL_C_SECRETS}/DB_CREATOR_PASSWORD_BULK_POSTGRES
       # OIDC and Captcha conf can be added here:
       # - OIDC_ARG=/OIDC/oidc_env.cfg
       # - RATAPI_ARG=/OIDC/ratapi_env.cfg
@@ -270,18 +277,15 @@ services:
     restart: always
     environment:
       - KAFKA_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
-      - POSTGRES_INIT_CONN_STR=bulk_postgres
       - POSTGRES_ALS_CONN_STR=bulk_postgres
       - POSTGRES_LOG_CONN_STR=bulk_postgres
-      - POSTGRES_INIT_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_INIT_DB_PASSWORD
       - POSTGRES_ALS_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_DB_PASSWORD
       - POSTGRES_LOG_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_JSON_LOG_DB_PASSWORD
-      - INIT_IF_EXISTS=skip
       - KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
+      - AFC_DB_CREATOR_URL=http://${AFC_RAT_SERVER_NAME}/fbrat/admin/CreateDb
     secrets:
       - ALS_DB_PASSWORD
       - ALS_JSON_LOG_DB_PASSWORD
-      - ALS_INIT_DB_PASSWORD
     depends_on:
       - als_kafka
       - bulk_postgres
@@ -319,6 +323,8 @@ services:
       # ALS params
       - ALS_KAFKA_SERVER_ID=fs_downloader
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      # DB Creator API
+      - AFC_DB_CREATOR_URL=http://${AFC_RAT_SERVER_NAME}/fbrat/admin/CreateDb
     volumes:
       - ${VOL_H_DB}:/rat_transfer
       # May be useful in prod deployment
@@ -374,6 +380,8 @@ services:
       - ALS_KAFKA_SERVER_ID=rcache
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
+      # DB Creator API
+      - AFC_DB_CREATOR_URL=http://${AFC_RAT_SERVER_NAME}/fbrat/admin/CreateDb
     secrets:
       - RCACHE_DB_PASSWORD
     depends_on:
@@ -390,8 +398,6 @@ services:
       - GRAFANA_ADMIN_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_ADMIN_PASSWORD
       - GRAFANA_DATABASE_URL=postgres://postgres:postgres@bulk_postgres/grafana
       - GRAFANA_DATABASE_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_DB_PASSWORD
-      - GRAFANA_DATABASE_INIT_URL=postgresql://postgres:postgres@bulk_postgres/postgres
-      - GRAFANA_DATABASE_INIT_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_INIT_DB_PASSWORD
       - GRAFANA_DS_ALS_RO_DSN=postgresql://postgres:postgres@bulk_postgres/ALS
       - GRAFANA_DS_ALS_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_RO_DB_PASSWORD
       - GRAFANA_DS_JSON_LOG_RO_DSN=postgresql://postgres:postgres@bulk_postgres/AFC_LOGS
@@ -402,12 +408,13 @@ services:
       - GRAFANA_DS_RCACHE_URL=http://rcache:8000
       - GRAFANA_DS_LOKI_URL=http://loki:3100
       - GRAFANA_COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
+      # DB Creator API
+      - AFC_DB_CREATOR_URL=http://${AFC_RAT_SERVER_NAME}/fbrat/admin/CreateDb
     depends_on:
       - prometheus
       - bulk_postgres
     secrets:
       - GRAFANA_DB_PASSWORD
-      - GRAFANA_INIT_DB_PASSWORD
       - ALS_RO_DB_PASSWORD
       - ALS_JSON_LOG_RO_DB_PASSWORD
       - ULS_STATE_RO_DB_PASSWORD
@@ -478,20 +485,18 @@ secrets:
     file: ${VOL_H_SECRETS}/OIDC_CLIENT_ID
   OIDC_CLIENT_SECRET:
     file: ${VOL_H_SECRETS}/OIDC_CLIENT_SECRET
-  POSTGRES_PASSWORD:
-    file: ${VOL_H_SECRETS}/POSTGRES_PASSWORD
   RATDB_PASSWORD:
     file: ${VOL_H_SECRETS}/RATDB_PASSWORD
+  DB_CREATOR_PASSWORD_RATDB:
+    file: ${VOL_H_SECRETS}/DB_CREATOR_PASSWORD_RATDB
+  DB_CREATOR_PASSWORD_BULK_POSTGRES:
+    file: ${VOL_H_SECRETS}/DB_CREATOR_PASSWORD_BULK_POSTGRES
   RCACHE_DB_PASSWORD:
     file: ${VOL_H_SECRETS}/RCACHE_DB_PASSWORD
   ULS_STATE_DB_PASSWORD:
     file: ${VOL_H_SECRETS}/ULS_STATE_DB_PASSWORD
-  ALS_INIT_DB_PASSWORD:
-    file: ${VOL_H_SECRETS}/ALS_INIT_DB_PASSWORD
   GRAFANA_DB_PASSWORD:
     file: ${VOL_H_SECRETS}/GRAFANA_DB_PASSWORD
-  GRAFANA_INIT_DB_PASSWORD:
-    file: ${VOL_H_SECRETS}/GRAFANA_INIT_DB_PASSWORD
   ALS_RO_DB_PASSWORD:
     file: ${VOL_H_SECRETS}/ALS_RO_DB_PASSWORD
   ALS_JSON_LOG_RO_DB_PASSWORD:
