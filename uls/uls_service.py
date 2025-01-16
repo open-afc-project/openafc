@@ -127,14 +127,10 @@ class Settings(pydantic.BaseSettings):
             None, env="ULS_SERVICE_STATE_DB_PASSWORD_FILE",
             description="Optional name of file with password for state "
             "database DSN")
-    service_state_db_create_if_absent: bool = \
+    db_creator_url: Optional[str] = \
         pydantic.Field(
-            True, env="ULS_SERVICE_STATE_DB_CREATE_IF_ABSENT",
-            description="Create service state database if it is absent")
-    service_state_db_recreate: bool = \
-        pydantic.Field(
-            False, env="ULS_SERVICE_STATE_DB_RECREATE",
-            description="Recreate service state database if it exists")
+            None, env="AFC_DB_CREATOR_URL",
+            description="Postgres database creator REST API URL")
     alembic_config: Optional[str] = \
         pydantic.Field(
             None, env="ULS_ALEMBIC_CONFIG",
@@ -985,15 +981,9 @@ def main(argv: List[str]) -> None:
         help=f"Name of file with password to use in state database connection "
         f"string{env_help(Settings, 'service_state_db_password_file')}")
     argument_parser.add_argument(
-        "--service_state_db_create_if_absent", action="store_true",
-        help=f"Create state database if absent. This functionaliity is "
-        f"deprecated in favor of Alembic"
-        f"{env_help(Settings, 'service_state_db_create_if_absent')}")
-    argument_parser.add_argument(
-        "--service_state_db_recreate", action="store_true",
-        help=f"Recreate state DB if it exists. This functionaliity is "
-        f"deprecated in favor of Alembic"
-        f"{env_help(Settings, 'service_state_db_recreate')}")
+        "--db_creator_url", metavar="URL",
+        help=f"Postgres database creation REST API URL"
+        f"{env_help(Settings, 'db_creator_url')}")
     argument_parser.add_argument(
         "--alembic_config", metavar="ALEMBIC_CONFIG_FILE",
         help=f"Alembic config file for state database. No Alembic "
@@ -1089,13 +1079,11 @@ def main(argv: List[str]) -> None:
         state_db = \
             StateDb(db_dsn=cast(str, settings.service_state_db_dsn),
                     db_password_file=settings.service_state_db_password_file)
-        state_db.check_server()
-        if settings.service_state_db_create_if_absent:
-            state_db.create_db(
-                recreate_tables=settings.service_state_db_recreate,
-                alembic_config=settings.alembic_config,
-                alembic_initial_version=settings.alembic_initial_version,
-                alembic_head_version=settings.alembic_head_version)
+        state_db.create_db(
+            db_creator_url=settings.db_creator_url,
+            alembic_config=settings.alembic_config,
+            alembic_initial_version=settings.alembic_initial_version,
+            alembic_head_version=settings.alembic_head_version)
 
         status_updater = \
             StatusUpdater(state_db=state_db,
