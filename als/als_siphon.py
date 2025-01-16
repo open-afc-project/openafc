@@ -34,6 +34,7 @@ import os
 import prometheus_client                            # type: ignore
 import random
 import re
+import requests
 import shlex
 import sqlalchemy as sa                             # type: ignore
 import sqlalchemy.dialects.postgresql as sa_pg      # type: ignore
@@ -45,6 +46,7 @@ from typing import Any, Callable, cast, Dict, Generic, List, NamedTuple, \
 import urllib.parse
 import uuid
 
+import secret_utils
 import utils
 
 # This script version
@@ -507,6 +509,41 @@ class DatabaseBase(ABC):
             error(str(ex))
 
     @classmethod
+    def create_db(cls, db_creator_url: str, arg_conn_str: str,
+                  arg_password_file: Optional[str], recreate: bool) -> bool:
+        """ Create/recreate given database
+
+        Arguments:
+        db_creator_url    -- REST API URL for database creation
+        arg_conn_str      -- Connection string from command line
+        arg_password_file -- Name of file with password or None
+        recreate          -- True to recreate database if exists, False to
+                             leave it as is if it exists
+        Returns True if database was created anew, False if existing was used
+        """
+        if not recreate:
+            try:
+                engine = cls.create_engine(arg_conn_str=arg_conn_str,
+                                           arg_password_file=arg_password_file)
+                with engine.connect():
+                    return False
+            except sa.exc.SQLAlchemyError:
+                pass
+            finally:
+                engine.dispose()
+        try:
+            requests.post(
+                db_creator_url,
+                params={"dsn": utils.dsn(arg_dsn=arg_conn_str,
+                                         default_dsn=cls.default_conn_str(),
+                                         name_for_logs=cls.name_for_logs()),
+                        "recreate": str(bool(recreate))})
+        except requests.exceptions.RequestException as ex:
+            error(f"Failed to create database "
+                  f"'{secret_utils.safe_dsn(arg_conn_str)}': {ex}")
+        return True
+
+    @classmethod
     @abstractmethod
     def default_conn_str(cls) -> str:
         """ Default connection string """
@@ -578,69 +615,6 @@ class LogsDatabase(DatabaseBase):
             self.conn.execute(ins)
         except sa.exc.SQLAlchemyError as ex:
             logging.error(f"Error writing {topic} log table: {ex}")
-
-
-class InitialDatabase(DatabaseBase):
-    """ Initial Postgres database (context fro creation of other databases)
-    handler """
-
-    class IfExists(enum.Enum):
-        """ What to do if database being created already exists """
-        Skip = "skip"
-        Drop = "drop"
-        Exc = "exc"
-
-    @classmethod
-    def default_conn_str(cls) -> str:
-        """ Default connection string """
-        return "postgresql://postgres:postgres@localhost:5432/postgres"
-
-    @classmethod
-    def name_for_logs(cls) -> str:
-        """ Database alias name to use for logs and error messages """
-        return "Initial"
-
-    def create_db(self, db_name: str,
-                  if_exists: "InitialDatabase.IfExists",
-                  conn_str: str, password_file: Optional[str] = None,
-                  template: Optional[str] = None) -> bool:
-        """ Create database
-
-        Arguments:
-        db_name       -- Name of database to create
-        if_exists     -- What to do if database already exists
-        conn_str      -- Connection string to database being created
-        password_file -- Optional name of file with password
-        template      -- Name of template database to use
-        Returns True if database was created, False if it already exists
-        """
-        with self.engine.connect() as conn:
-            try:
-                if if_exists == self.IfExists.Drop:
-                    conn.execute(sa.text("commit"))
-                    conn.execute(
-                        sa.text(f'drop database if exists "{db_name}"'))
-                conn.execute(sa.text("commit"))
-                template_clause = f' template "{template}"' if template else ""
-                conn.execute(
-                    sa.text(f'create database "{db_name}"{template_clause}'))
-                logging.info(f"Database '{db_name}' successfully created")
-                return True
-            except sa.exc.ProgrammingError:
-                if if_exists != self.IfExists.Skip:
-                    raise
-                engine = self.create_engine(arg_conn_str=conn_str,
-                                            arg_password_file=password_file)
-                engine.dispose()
-                logging.info(
-                    f"Already existing database '{db_name}' will be used")
-                return False
-
-    def drop_db(self, db_name: str) -> None:
-        """ Drop given database """
-        with self.engine.connect() as conn:
-            conn.execute(sa.text("commit"))
-            conn.execute(sa.text(f'drop database "{db_name}"'))
 
 
 # Fully qualified position in Kafka queue on certain Kafka cluster
@@ -3597,29 +3571,19 @@ def do_init_db(args: Any) -> None:
     """
     databases: Set[DatabaseBase] = set()
     try:
-        try:
-            init_db = \
-                InitialDatabase(
-                    arg_conn_str=args.init_postgres,
-                    arg_password_file=args.init_postgres_password_file)
-            databases.add(init_db)
-        except sa.exc.SQLAlchemyError as ex:
-            error(f"Connection to {InitialDatabase.name_for_logs()} database "
-                  f"failed: {ex}")
+        error_if(not args.db_creator_url,
+                 "Database creator REST API URL not specified")
         nothing_done = True
         patch: List[str]
-        for conn_str, password_file, sql_file, template, db_class, \
-                sql_required, patch, alembic_config, alembic_initial_version, \
-                alembic_head_version in \
-                [(args.als_postgres, args.als_postgres_password_file,
-                  args.als_sql, args.als_template, AlsDatabase, True,
-                  ALS_PATCH, args.als_alembic_config,
-                  args.als_alembic_initial_version,
-                  args.als_alembic_head_version),
-                 (args.log_postgres, args.log_postgres_password_file,
-                  args.log_sql, args.log_template, LogsDatabase, False, [],
-                  None, None, None)]:
-            if not (conn_str or sql_file or template):
+        for conn_str, password_file, sql_file, db_class, sql_required, patch, \
+                alembic_config, alembic_initial_version, alembic_head_version \
+                in [(args.als_postgres, args.als_postgres_password_file,
+                     args.als_sql, AlsDatabase, True, ALS_PATCH,
+                     args.als_alembic_config, args.als_alembic_initial_version,
+                     args.als_alembic_head_version),
+                    (args.log_postgres, args.log_postgres_password_file,
+                     args.log_sql, LogsDatabase, False, [], None, None, None)]:
+            if not (conn_str or sql_file):
                 continue
             nothing_done = False
             error_if(sql_file and (not os.path.isfile(sql_file)),
@@ -3628,15 +3592,12 @@ def do_init_db(args: Any) -> None:
                 sql_required and not sql_file,
                 f"SQL file is required for {db_class.name_for_logs()} "
                 f"database")
-            created = False
+            created = \
+                db_class.create_db(
+                    db_creator_url=args.db_creator_url, arg_conn_str=conn_str,
+                    arg_password_file=password_file, recreate=args.recreate)
             try:
                 database = db_class.get_db_name(conn_str)
-                created = \
-                    init_db.create_db(
-                        db_name=database,
-                        if_exists=InitialDatabase.IfExists(args.if_exists),
-                        template=template, conn_str=conn_str,
-                        password_file=password_file)
                 db = db_class(arg_conn_str=conn_str,
                               arg_password_file=password_file)
                 databases.add(db)
@@ -3647,11 +3608,6 @@ def do_init_db(args: Any) -> None:
                         for cmd in patch:
                             conn.execute(sa.text(cmd))
             except sa.exc.SQLAlchemyError as ex:
-                if created:
-                    try:
-                        init_db.drop_db(database)
-                    except sa.exc.SQLAlchemyError:
-                        pass
                 error(f"{db_class.name_for_logs()} database initialization "
                       f"failed: {ex}")
             if alembic_config:
@@ -3848,35 +3804,13 @@ def main(argv: List[str]) -> None:
 
     switches_init = argparse.ArgumentParser(add_help=False)
     switches_init.add_argument(
-        "--init_postgres",
-        metavar="[driver://][user][@host][:port][/database][?...]",
+        "--db_creator_url", metavar="DB_CREATOR_URL",
         type=docker_arg_type(str),
-        help=f"Connection string to initial database used as a context for "
-        "other databases' creation. If some part (driver, user, host port "
-        f"database) is missing - it is taken from the default connection "
-        f"string (which is '{InitialDatabase.default_conn_str()}'. Connection "
-        f"parameters may be specified after '?' - see "
-        f"https://www.postgresql.org/docs/current/libpq-connect.html"
-        f"#LIBPQ-CONNSTRING for details")
+        help=f"REST API URL for Postgres database creation")
     switches_init.add_argument(
-        "--init_postgres_password_file", metavar="PASSWORD_FILE",
-        type=docker_arg_type(str),
-        help="File with password to substitute to initial database connection "
-        "string")
-    switches_init.add_argument(
-        "--if_exists", choices=["skip", "drop"],
-        type=docker_arg_type(str, default="exc"),
-        help="What to do if database already exist: nothing (skip) or "
-        "recreate (drop). Default is to fail")
-    switches_init.add_argument(
-        "--als_template", metavar="DB_NAME", type=docker_arg_type(str),
-        help="Template database (e.g. bearer of required extensions) to use "
-        "for ALS database creation. E.g. postgis/postgis image strangely "
-        "assigns PostGIS extension on 'template_postgis' database instead of "
-        "on default 'template0/1'")
-    switches_init.add_argument(
-        "--log_template", metavar="DB_NAME", type=docker_arg_type(str),
-        help="Template database to use for JSON Logs database creation")
+        "--recreate", action="store_true",
+        help="Recreate database if it exists. Default is to use existing "
+        "database")
     switches_init.add_argument(
         "--als_sql", metavar="SQL_FILE", type=docker_arg_type(str),
         help="SQL command file that creates tables, relations, etc. in ALS "
