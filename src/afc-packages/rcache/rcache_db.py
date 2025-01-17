@@ -14,7 +14,7 @@ try:
 except ImportError:
     pass
 import sqlalchemy as sa
-import secret_utils
+import db_utils
 import sys
 from typing import Any, cast, Dict, List, Optional, Tuple
 import urllib.parse
@@ -95,7 +95,7 @@ class RcacheDb:
             sa.Column("name", sa.String(), nullable=False, primary_key=True),
             sa.Column("state", sa.Boolean(), nullable=False))
         self.rcache_db_dsn = \
-            secret_utils.substitute_password(
+            db_utils.substitute_password(
                 dsc="rcache database", dsn=rcache_db_dsn,
                 password_file=rcache_db_password_file, optional=True)
         self.db_name: Optional[str] = \
@@ -262,12 +262,12 @@ class RcacheDb:
                 error_if(
                     table_name not in metadata.tables,
                     f"Table '{table_name}' not present in the database "
-                    f"'{secret_utils.safe_dsn(self.rcache_db_dsn)}'")
+                    f"'{db_utils.safe_dsn(self.rcache_db_dsn)}'")
             self.metadata = metadata
             self._update_ap_table()
         except sa.exc.SQLAlchemyError as ex:
             error(f"Can't connect to database "
-                  f"'{secret_utils.safe_dsn(self.rcache_db_dsn)}': {ex}")
+                  f"'{db_utils.safe_dsn(self.rcache_db_dsn)}': {ex}")
         finally:
             if engine is not None:
                 engine.dispose()
@@ -302,6 +302,6 @@ class RcacheDb:
         try:
             return sa.create_engine(dsn, pool_pre_ping=True)
         except sa.exc.SQLAlchemyError as ex:
-            error(f"Invalid database DSN: '{secret_utils.safe_dsn(dsn)}': "
+            error(f"Invalid database DSN: '{db_utils.safe_dsn(dsn)}': "
                   f"{ex}")
         return None  # Will never happen, appeasing pylint

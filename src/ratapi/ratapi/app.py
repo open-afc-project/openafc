@@ -24,7 +24,7 @@ from afcmodels.aaa import User
 import als
 import prometheus_utils
 import prometheus_client
-import secret_utils
+import db_utils
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ def create_app(config_override=None):
 
     # Substitute DB password
     flaskapp.config['SQLALCHEMY_DATABASE_URI'] = \
-        secret_utils.substitute_password(
+        db_utils.substitute_password(
             dsc='fbrat', dsn=flaskapp.config.get('SQLALCHEMY_DATABASE_URI'),
             password=flaskapp.config.get('SQLALCHEMY_DATABASE_PASSWORD'),
             optional=True)

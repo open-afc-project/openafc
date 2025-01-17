@@ -21,7 +21,7 @@ import json
 import os
 import random
 import re
-import secret_utils
+import db_utils
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sa_async
 import sys
@@ -523,7 +523,7 @@ async def do_mass_lookup(args: Any) -> None:
     reporter = Reporter(total_count=per_worker_count * args.threads)
     metadata: Optional[sa.MetaData] = None
     postgres_dsn = \
-        secret_utils.substitute_password(
+        db_utils.substitute_password(
             dsc="rcache database", dsn=args.postgres,
             password_file=args.postgres_password_file, optional=args.dry)
     if not args.dry:

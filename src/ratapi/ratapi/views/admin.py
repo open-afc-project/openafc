@@ -27,7 +27,7 @@ import afcmodels.aaa as aaa
 from afcmodels.hardcoded_relations import RulesetVsRegion
 from .auth import auth
 from afcmodels.base import db
-import secret_utils
+import db_utils
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -818,7 +818,7 @@ class CreateDb(MethodView):
                 f"database server")
         # Substituting password from file
         creator_dsn = \
-            secret_utils.substitute_password(
+            db_utils.substitute_password(
                 dsc='creator', dsn=creator_dsn,
                 password_file=creator_password_file)
         try:

@@ -41,7 +41,7 @@ import als
 from rcache_client import RcacheClient
 from rcache_models import LatLonRect, RcacheClientSettings
 from pydantic_utils import env_help, merge_args
-from secret_utils import safe_dsn
+from db_utils import safe_dsn
 from uls_service_common import *
 from uls_service_state_db import CheckType, DownloaderMilestone, LogType, \
     StateDb

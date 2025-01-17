@@ -9,7 +9,7 @@ import sys
 
 from alembic import context
 
-import secret_utils
+import db_utils
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -38,7 +38,7 @@ if not dsn:
           file=sys.stderr)
     sys.exit(1)
 dsn = \
-    secret_utils.substitute_password(
+    db_utils.substitute_password(
         dsc="ULS Service State Database", dsn=dsn,
         password_file=os.environ.get("ULS_SERVICE_STATE_DB_PASSWORD_FILE"))
 

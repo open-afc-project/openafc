@@ -23,7 +23,7 @@ import afc_worker
 import fst
 from log_utils import dp, error, error_if, get_module_logger
 import rcache_models
-import secret_utils
+import db_utils
 
 # Logger for this module
 LOGGER = get_module_logger()
@@ -160,7 +160,7 @@ class AfcServerCompute:
         """ Worker function of RMQ reader task """
         try:
             full_dsn = \
-                secret_utils.substitute_password(
+                db_utils.substitute_password(
                     dsc="RabbitMQ", dsn=self._rmq_dsn,
                     password_file=self._rmq_password_file, optional=True)
             connection = await aio_pika.connect_robust(full_dsn)

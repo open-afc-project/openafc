@@ -46,7 +46,7 @@ from typing import Any, Callable, cast, Dict, Generic, List, NamedTuple, \
 import urllib.parse
 import uuid
 
-import secret_utils
+import db_utils
 import utils
 
 # This script version
@@ -540,7 +540,7 @@ class DatabaseBase(ABC):
                         "recreate": str(bool(recreate))})
         except requests.exceptions.RequestException as ex:
             error(f"Failed to create database "
-                  f"'{secret_utils.safe_dsn(arg_conn_str)}': {ex}")
+                  f"'{db_utils.safe_dsn(arg_conn_str)}': {ex}")
         return True
 
     @classmethod

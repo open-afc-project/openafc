@@ -9,4 +9,4 @@
 /wd/afc-packages/healthchecks
 /wd/afc-packages/als
 /wd/afc-packages/prometheus_utils
-/wd/afc-packages/secret_utils
+/wd/afc-packages/db_utils

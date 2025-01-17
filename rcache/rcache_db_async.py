@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 from log_utils import dp, error, error_if, FailOnError
 from rcache_db import RcacheDb
 from rcache_models import ApDbRespState, FuncSwitch, LatLonRect, ApDbPk
-import secret_utils
+import db_utils
 
 __all__ = ["RcacheDbAsync"]
 
@@ -290,7 +290,7 @@ class RcacheDbAsync(RcacheDb):
             parts = urllib.parse.urlsplit(dsn)
         except ValueError as ex:
             error(f"Invalid database DSN syntax: "
-                  f"'{secret_utils.safe_dsn(dsn)}': {ex}")
+                  f"'{db_utils.safe_dsn(dsn)}': {ex}")
         if self.ASYNC_DRIVER_NAME not in parts:
             dsn = \
                 urllib.parse.urlunsplit(
@@ -300,5 +300,5 @@ class RcacheDbAsync(RcacheDb):
             return sa_async.create_async_engine(dsn, pool_pre_ping=True)
         except sa.exc.SQLAlchemyError as ex:
             error(
-                f"Invalid database DSN: '{secret_utils.safe_dsn(dsn)}': {ex}")
+                f"Invalid database DSN: '{db_utils.safe_dsn(dsn)}': {ex}")
         return None  # Will never happen. Appeasing pylint

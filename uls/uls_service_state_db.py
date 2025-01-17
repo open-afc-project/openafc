@@ -21,7 +21,7 @@ import subprocess
 from typing import Any, cast, Dict, Iterable, List, NamedTuple, Optional, Set
 import urllib.parse
 
-import secret_utils
+import db_utils
 from uls_service_common import *
 
 # FS database downloader milestone. Names used in database and Prometheus
@@ -143,7 +143,7 @@ class StateDb:
         self._arg_db_dsn = db_dsn
         self._password_file = db_password_file
         self._full_db_dsn = \
-            secret_utils.substitute_password(
+            db_utils.substitute_password(
                 dsc="ULS Service State Database", dsn=db_dsn,
                 password_file=db_password_file)
         self.db_name: str = \
@@ -217,13 +217,13 @@ class StateDb:
                                   params={"dsn": self._arg_db_dsn})
                 except requests.exceptions.RequestException as ex:
                     error(f"Unable to create database "
-                          f"'{secret_utils.safe_dsn(self._arg_db_dsn)}': {ex}")
+                          f"'{db_utils.safe_dsn(self._arg_db_dsn)}': {ex}")
             try:
                 with engine.connect():
                     pass
             except sa.exc.SQLAlchemyError as ex:
                 error(f"Unable to connect to database "
-                      f"'{secret_utils.safe_dsn(self._arg_db_dsn)}': {ex}")
+                      f"'{db_utils.safe_dsn(self._arg_db_dsn)}': {ex}")
             if not db_existed:
                 self.metadata.create_all(engine)
             if alembic_config:
@@ -292,11 +292,11 @@ class StateDb:
                 error_if(
                     table_name not in metadata.tables,
                     f"Table '{table_name}' not present in the database "
-                    f"'{secret_utils.safe_dsn(self._full_db_dsn)}'")
+                    f"'{db_utils.safe_dsn(self._full_db_dsn)}'")
             self.metadata = metadata
         except sa.exc.SQLAlchemyError as ex:
             error(f"Can't connect to database "
-                  f"'{secret_utils.safe_dsn(self._full_db_dsn)}': {repr(ex)}")
+                  f"'{db_utils.safe_dsn(self._full_db_dsn)}': {repr(ex)}")
         finally:
             if engine is not None:
                 engine.dispose()
@@ -341,7 +341,7 @@ class StateDb:
             return sa.create_engine(dsn)
         except sa.exc.SQLAlchemyError as ex:
             error(
-                f"Invalid database DSN: '{secret_utils.safe_dsn(dsn)}': {ex}")
+                f"Invalid database DSN: '{db_utils.safe_dsn(dsn)}': {ex}")
 
     def _alembic(self, alembic_config: str, args: List[str],
                  return_stdout: bool = False) -> Optional[str]:

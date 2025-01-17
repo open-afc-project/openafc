@@ -7,4 +7,4 @@
 /wd/afc-packages/fstorage
 /wd/afc-packages/prometheus_utils
 /wd/afc-packages/rcache
-/wd/afc-packages/secret_utils
+/wd/afc-packages/db_utils
