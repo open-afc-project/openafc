@@ -39,7 +39,7 @@ if not dsn:
     sys.exit(1)
 dsn = \
     db_utils.substitute_password(
-        dsc="ULS Service State Database", dsn=dsn,
+        dsn=dsn,
         password_file=os.environ.get("ULS_SERVICE_STATE_DB_PASSWORD_FILE"))
 
 

@@ -645,8 +645,7 @@ class AfcServerDb:
                         scheme=f"{parts.scheme}+{self._ASYNC_DRIVER_NAME}"))
         dsn = \
             db_utils.substitute_password(
-                dsc="rcache database", dsn=dsn, password_file=password_file,
-                optional=True)
+                dsn=dsn, password_file=password_file, optional=True)
         try:
             engine = sa_async.create_async_engine(dsn, pool_pre_ping=True)
         except (sa.exc.SQLAlchemyError, OSError) as ex:

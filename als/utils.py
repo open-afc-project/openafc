@@ -70,6 +70,6 @@ def dsn(*, name_for_logs: str, arg_dsn: Optional[str] = None,
         raise ValueError(f"Database name not specified for {name_for_logs}")
     return \
         db_utils.substitute_password(
-            dsc=name_for_logs, dsn=arg_parts.geturl(),
+            dsn=arg_parts.geturl(),
             password_file=password_file or
             (os.environ.get(password_file_env) if password_file_env else None))

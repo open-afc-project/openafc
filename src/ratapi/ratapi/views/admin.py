@@ -819,8 +819,7 @@ class CreateDb(MethodView):
         # Substituting password from file
         creator_dsn = \
             db_utils.substitute_password(
-                dsc='creator', dsn=creator_dsn,
-                password_file=creator_password_file)
+                dsn=creator_dsn, password_file=creator_password_file)
         try:
             engine = sa.create_engine(creator_dsn)
             with engine.connect() as conn:

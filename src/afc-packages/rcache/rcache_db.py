@@ -96,8 +96,8 @@ class RcacheDb:
             sa.Column("state", sa.Boolean(), nullable=False))
         self.rcache_db_dsn = \
             db_utils.substitute_password(
-                dsc="rcache database", dsn=rcache_db_dsn,
-                password_file=rcache_db_password_file, optional=True)
+                dsn=rcache_db_dsn, password_file=rcache_db_password_file,
+                optional=True)
         self.db_name: Optional[str] = \
             urllib.parse.urlsplit(self.rcache_db_dsn).path.strip("/") \
             if self.rcache_db_dsn else None

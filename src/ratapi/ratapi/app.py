@@ -119,7 +119,7 @@ def create_app(config_override=None):
     # Substitute DB password
     flaskapp.config['SQLALCHEMY_DATABASE_URI'] = \
         db_utils.substitute_password(
-            dsc='fbrat', dsn=flaskapp.config.get('SQLALCHEMY_DATABASE_URI'),
+            dsn=flaskapp.config.get('SQLALCHEMY_DATABASE_URI'),
             password=flaskapp.config.get('SQLALCHEMY_DATABASE_PASSWORD'),
             optional=True)
 

@@ -21,7 +21,6 @@ import json
 import os
 import random
 import re
-import db_utils
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sa_async
 import sys
@@ -29,6 +28,7 @@ import tabulate
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import urllib.parse
 
+import db_utils
 from log_utils import dp, error, error_if
 from rcache_models import AfcReqRespKey, ApDbRecord, ApDbRespState, \
     LatLonRect, RcacheInvalidateReq, RcacheSpatialInvalidateReq, \
@@ -524,8 +524,8 @@ async def do_mass_lookup(args: Any) -> None:
     metadata: Optional[sa.MetaData] = None
     postgres_dsn = \
         db_utils.substitute_password(
-            dsc="rcache database", dsn=args.postgres,
-            password_file=args.postgres_password_file, optional=args.dry)
+            dsn=args.postgres, password_file=args.postgres_password_file,
+            optional=args.dry)
     if not args.dry:
         engine = sa.create_engine(postgres_dsn)
         metadata = sa.MetaData()

@@ -103,7 +103,7 @@ def do_create_db(args: Any) -> None:
     try:
         grafana_dsn = \
             db_utils.substitute_password(
-                dsc="Grafana database", dsn=settings.grafana_db_dsn,
+                dsn=settings.grafana_db_dsn,
                 password_file=settings.grafana_db_password_file)
     except RuntimeError as ex:
         error(str(ex))

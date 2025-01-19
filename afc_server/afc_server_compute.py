@@ -161,8 +161,8 @@ class AfcServerCompute:
         try:
             full_dsn = \
                 db_utils.substitute_password(
-                    dsc="RabbitMQ", dsn=self._rmq_dsn,
-                    password_file=self._rmq_password_file, optional=True)
+                    dsn=self._rmq_dsn, password_file=self._rmq_password_file,
+                    optional=True)
             connection = await aio_pika.connect_robust(full_dsn)
             async with connection:
                 channel = await connection.channel()

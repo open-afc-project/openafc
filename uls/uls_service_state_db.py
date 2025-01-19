@@ -144,8 +144,7 @@ class StateDb:
         self._password_file = db_password_file
         self._full_db_dsn = \
             db_utils.substitute_password(
-                dsc="ULS Service State Database", dsn=db_dsn,
-                password_file=db_password_file)
+                dsn=db_dsn, password_file=db_password_file)
         self.db_name: str = \
             urllib.parse.urlsplit(self._full_db_dsn).path.strip("/")
         self.metadata = sa.MetaData()
