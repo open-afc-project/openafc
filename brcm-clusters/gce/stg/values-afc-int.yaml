@@ -28,7 +28,6 @@ sharedEnv:
     OIDC_DISCOVERY_URL: >-
       https://login.broadcom.com/oauth2/default/.well-known/openid-configuration
   als-db:
-    POSTGRES_INIT_CONN_STR: postgresql://postgres@{{ip:postgres}}/postgres
     POSTGRES_ALS_CONN_STR: postgresql://postgres@{{ip:postgres}}/ALS
     POSTGRES_LOG_CONN_STR: postgresql://postgres@{{ip:postgres}}/AFC_LOGS
   uls-db:
@@ -72,8 +71,14 @@ components:
   grafana:
     env:
       GRAFANA_DATABASE_URL: postgresql://postgres@{{ip:postgres}}/grafana
-      GRAFANA_DATABASE_INIT_URL: postgresql://postgres@{{ip:postgres}}/postgres
-
+  rat-server:
+    env:
+      AFC_DB_CREATOR_DSN_POSTGRES: >-
+        postgresql://postgres:postgres@{{ip:postgres}}/postgres
+      AFC_DB_CREATOR_PASSWORD_FILE_POSTGRES: >-
+        {{secretFile:db-creator-password-postgres:optional}}
+    mountedSecrets:
+      db-creator-password-postgres:
 
 staticVolumes:
   rat_transfer:
@@ -89,7 +94,7 @@ staticVolumes:
       server: 10.255.170.2
       path: /vol1/storage
 
-# Redirecting all password secrets to 'postgres' user password secret
+# Redirecting all database password secrets to 'postgres' user password secret
 externalSecrets:
   ratdb-password:
     remoteSecretName: postgres-password
@@ -97,19 +102,18 @@ externalSecrets:
     remoteSecretName: postgres-password
   rcache-db-password:
     remoteSecretName: postgres-password
-  als-init-db-password:
-    remoteSecretName: postgres-password
   als-db-password:
     remoteSecretName: postgres-password
   als-json-log-db-password:
     remoteSecretName: postgres-password
   grafana-db-password:
     remoteSecretName: postgres-password
-  grafana-init-db-password:
-    remoteSecretName: postgres-password
   als-ro-db-password:
     remoteSecretName: postgres-password
   als-json-log-ro-db-password:
     remoteSecretName: postgres-password
   uls-state-ro-db-password:
+    remoteSecretName: postgres-password
+  db-creator-password-postgres:
+    property: DB_CREATOR_PASSWORD_POSTGRES
     remoteSecretName: postgres-password
