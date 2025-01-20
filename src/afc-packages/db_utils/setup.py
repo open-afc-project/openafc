@@ -15,11 +15,11 @@ class InstallCmdWrapper(install):
 
 
 setup(
-    name='secret_utils',
+    name='db_utils',
     # Label compatible with PEP 440
     version='0.1.0',
-    description='Utilities to deal with compose/kubernetes secrets',
-    py_modules=["secret_utils"],
+    description='Database-related common utilities',
+    py_modules=["db_utils"],
     cmdclass={
         'install': InstallCmdWrapper,
     }

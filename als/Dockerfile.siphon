@@ -42,38 +42,44 @@ ENV PATH=$PATH:$WORKDIR
 # Comma-separated list of Kafka (bootstrap) servers, each having 'host[:port]'
 # form. Port, if not specified, is 9092
 ENV KAFKA_SERVERS=localhost
+
 # Client ID to use in Kafka logs. If ends with '@' - suffixed by unique random
 # string
 ENV KAFKA_CLIENT_ID=siphon_@
+
 # 'SSL' or 'PLAINTEXT'. Default is 'PLAINTEXT'
 ENV KAFKA_SECURITY_PROTOCOL=
+
 # SSL keyfile
 ENV KAFKA_SSL_KEYFILE=
+
 # SSL CA (Certificate Authority) file
 ENV KAFKA_SSL_CAFILE=
+
 # Maximum message size (default is 1MB)
 ENV KAFKA_MAX_REQUEST_SIZE=
-# Connection string to init database (may be partial, leaving default parts).
-# Hostname better be specified, as default is 'localhost'
-# ENV POSTGRES_INIT_CONN_STR
-# Optional name of file with password for init database connection string
-# ENV POSTGRES_INIT_PASSWORD_FILE
+
 # Connection string to ALS database (may be partial, leaving default parts).
 # Hostname better be specified, as default is 'localhost'
 # ENV POSTGRES_ALS_CONN_STR
+
 # Optional name of file with password for ALS database connection string
 # ENV POSTGRES_ALS_PASSWORD_FILE
+
 # Connection string to JSON logs database (may be partial, leaving default
 # parts). Hostname better be specified, as default is 'localhost'
 # ENV POSTGRES_LOG_CONN_STR
+
 # Optional name of of file with password for JSON logs database connection
 # string
 # ENV POSTGRES_LOG_PASSWORD_FILE
-# What to do if database being created already exists: 'skip', 'drop'. Default
-# is to fail
-ENV INIT_IF_EXISTS=skip
+
+# REST API URL for Postgres database creation
+ENV AFC_DB_CREATOR_URL=http://rat_server/fbrat/admin/CreateDb
+
 # Port to serve Prometheus metrics on (none/empty is to not serve)
 ENV SIPHON_PROMETHEUS_PORT=8080
+
 # File to touch after each successful Kafka poll, used for healthcheck
 ENV SIPHON_TOUCH_FILE=$WORKDIR/touch_file
 
@@ -99,16 +105,13 @@ ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_ssl_keyfile=$KAFKA_SSL_KEYFILE \
     --kafka_ssl_cafile=$KAFKA_SSL_CAFILE \
     --kafka_max_partition_fetch_bytes=$KAFKA_MAX_REQUEST_SIZE \
-    --init_postgres=$POSTGRES_INIT_CONN_STR \
-    --init_postgres_password_file=$POSTGRES_INIT_PASSWORD_FILE \
-    --if_exists=$INIT_IF_EXISTS \
+    --db_creator_url=$AFC_DB_CREATOR_URL \
     --als_postgres=$POSTGRES_ALS_CONN_STR \
     --als_postgres_password_file=$POSTGRES_ALS_PASSWORD_FILE \
     --log_postgres=$POSTGRES_LOG_CONN_STR \
     --log_postgres_password_file=$POSTGRES_LOG_PASSWORD_FILE \
     --prometheus_port=$SIPHON_PROMETHEUS_PORT \
     --touch_file=$SIPHON_TOUCH_FILE \
-    --if_exists=$INIT_IF_EXISTS \
     --als_sql $WORKDIR/ALS.sql \
     --als_alembic_config=$ALEMBIC_CONFIG \
     --als_alembic_initial_version=$ALS_ALEMBIC_INITIAL_VERSION

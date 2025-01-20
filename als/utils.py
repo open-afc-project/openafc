@@ -12,7 +12,7 @@ import os
 from typing import Optional
 import urllib.parse
 
-import secret_utils
+import db_utils
 
 # Connection string scheme that should be ultimately used
 ACTUAL_SCHEME = "postgresql+psycopg2"
@@ -69,7 +69,7 @@ def dsn(*, name_for_logs: str, arg_dsn: Optional[str] = None,
     if getattr(arg_parts, "path") == "__REQUIRED__":
         raise ValueError(f"Database name not specified for {name_for_logs}")
     return \
-        secret_utils.substitute_password(
-            dsc=name_for_logs, dsn=arg_parts.geturl(),
+        db_utils.substitute_password(
+            dsn=arg_parts.geturl(),
             password_file=password_file or
             (os.environ.get(password_file_env) if password_file_env else None))

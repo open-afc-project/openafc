@@ -6,3 +6,4 @@
 #
 prometheus-client==0.17.1
 python-statsd==2.1.0
+requests==2.32.3

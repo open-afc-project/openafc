@@ -170,12 +170,30 @@ class Data(Manager):
 class DbCreate(Command):
     ''' Create a full new database outside of alembic migrations. '''
 
-    def __call__(self, flaskapp):
+    option_list = (
+        Option('--if_absent', action='store_true', dest='if_absent',
+               help="Do nothing if database already exists"),
+    )
+
+    def __call__(self, flaskapp, if_absent):
         LOGGER.debug('DbCreate.__call__()')
         with flaskapp.app_context():
             from afcmodels.aaa import Role, Ruleset
             from flask_migrate import stamp
+            from .views import admin
+            if if_absent:
+                try:
+                    with db.engine.connect():
+                        LOGGER.info("Database already exists")
+                        return
+                except sqlalchemy.exc.SQLAlchemyError:
+                    pass
             ruleset_list = RulesetVsRegion.ruleset_list()
+            try:
+                admin.CreateDb.create_database(
+                    dsn=flaskapp.config.get('SQLALCHEMY_DATABASE_URI'))
+            except werkzeug.exceptions.HTTPException as ex:
+                raise RuntimeError(ex.description)
             db.create_all()
             get_or_create(db.session, Role, name='Admin')
             get_or_create(db.session, Role, name='Super')

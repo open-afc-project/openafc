@@ -611,7 +611,7 @@ Declaration of static volumes (inhabitants of $.Values.staticVolumes) and mounte
 {{- define "afc.staticVolumes" -}}
 {{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $volumes := get $compDef "staticVolumeMounts" -}}
-{{- $mountedSecrets := get $compDef "mountedSecrets" -}}
+{{- $mountedSecrets := (get $compDef "mountedSecrets" | default (dict)) | keys -}}
 {{- if $volumes }}
 {{-   range $name := keys $volumes }}
 {{-     $volumeDef := get $.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $.component) -}}
@@ -636,7 +636,7 @@ Mount of static volumes (inhabitatnts of $.Values.staticVolumes) and mounted sec
 {{- define "afc.staticVolumeMounts" -}}
 {{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $volumes := get $compDef "staticVolumeMounts" -}}
-{{- $mountedSecrets := get $compDef "mountedSecrets" -}}
+{{- $mountedSecrets := (get $compDef "mountedSecrets" | default (dict)) | keys -}}
 {{- if $volumes }}
 {{-   range $name, $mount := $volumes }}
 {{-     $volumeDef := get $.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $.component) -}}

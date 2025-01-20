@@ -71,6 +71,10 @@ class RcacheServiceSettings(pydantic.BaseSettings):
             title="What to do if cache database already exists: 'leave' "
             "(leave as is - default), 'recreate' (completely recreate - e.g. "
             "removing alembic, if any), 'clean' (only clean the cache table)")
+    db_creator_url: Optional[pydantic.AnyHttpUrl] = \
+        pydantic.Field(
+            None, title="REST API URL for Postgres database creation",
+            env="AFC_DB_CREATOR_URL")
     precompute_quota: int = \
         pydantic.Field(
             10, title="Number of simultaneous precomputing requests in flight")

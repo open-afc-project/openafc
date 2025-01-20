@@ -170,6 +170,11 @@ http {
             return 403;
         }
 
+        # forbid internal request
+        location /fbrat/admin/CreateDb {
+            return 403;
+        }
+
         location /prometheus {
             set $prometheus_enabled "${AFC_PROMETHEUS_ENABLED}";
             if ($prometheus_enabled != true) {

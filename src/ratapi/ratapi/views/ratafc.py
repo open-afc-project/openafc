@@ -60,18 +60,22 @@ from rcache_models import RcacheClientSettings
 from rcache_client import RcacheClient
 from rcache_req_cfg_hash import RequestConfigHash
 import prometheus_client
+import prometheus_utils
 import afc_traffic_metrics
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(AFC_RATAPI_LOG_LEVEL)
 
-# Metrics for autoscaling
-prometheus_metric_flask_afc_waiting_reqs = \
-    prometheus_client.Gauge('msghnd_flask_afc_waiting_reqs',
-                            'Number of requests waiting for afc engine',
-                            ['host'], multiprocess_mode='sum')
-prometheus_metric_flask_afc_waiting_reqs = \
-    prometheus_metric_flask_afc_waiting_reqs.labels(host=platform.node())
+# Metrics for autoscaling - only works in gunicorn (not on apache)
+if prometheus_utils.multiprocess_prometheus_configured():
+    prometheus_metric_flask_afc_waiting_reqs = \
+        prometheus_client.Gauge('msghnd_flask_afc_waiting_reqs',
+                                'Number of requests waiting for afc engine',
+                                ['host'], multiprocess_mode='sum')
+    prometheus_metric_flask_afc_waiting_reqs = \
+        prometheus_metric_flask_afc_waiting_reqs.labels(host=platform.node())
+else:
+    prometheus_metric_flask_afc_waiting_reqs = None
 
 # We want to dynamically trim this this list e.g.
 # via environment variable, for the current deployment
@@ -735,12 +739,15 @@ class RatAfc(MethodView):
                     # though). Can be fixed if anybody cares
                     return flask.jsonify(taskId=task.getId(),
                                          taskState=task.get()["status"])
-                responses.update(
-                    self._compute_responses(
-                        dataif=dataif, use_tasks=use_tasks,
-                        req_infos={k: v for k, v in req_infos.items()
-                                   if k not in responses},
-                        is_internal_request=is_internal_request))
+                with prometheus_metric_flask_afc_waiting_reqs.track_inprogress() \
+                        if prometheus_metric_flask_afc_waiting_reqs \
+                        else contextlib.nullcontext():
+                    responses.update(
+                        self._compute_responses(
+                            dataif=dataif, use_tasks=use_tasks,
+                            req_infos={k: v for k, v in req_infos.items()
+                                       if k not in responses},
+                            is_internal_request=is_internal_request))
             computed_duration = time.time() - flask.g.afc_start_time
 
             # Preparing responses for requests
@@ -896,7 +903,6 @@ class RatAfc(MethodView):
                                 is_internal_request=is_internal_request)
         return None
 
-    @prometheus_metric_flask_afc_waiting_reqs.track_inprogress()
     def _compute_responses(self, dataif, use_tasks, req_infos,
                            is_internal_request):
         """ Prepares worker tasks and waits their completion

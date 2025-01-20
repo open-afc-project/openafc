@@ -8,7 +8,7 @@
 
 # pylint: disable=wrong-import-order, invalid-name, too-many-arguments
 # pylint: disable=too-many-instance-attributes, too-few-public-methods
-# pylint: disable=too-many-nested-blocks
+# pylint: disable=too-many-nested-blocks, too-many-positional-arguments
 
 import aiohttp
 import asyncio
@@ -215,21 +215,19 @@ class RcacheService:
         error_if(value < 0, f"Precompute quota of {value} is invalid")
         self._precompute_quota = value
 
-    def check_db_server(self) -> bool:
-        """ Check if database server can be connected to """
-        return self._db.check_server()
-
     def healthy(self) -> bool:
         """ Service is in healthy status """
         return self._all_tasks_running and \
             self._db_connected_event.is_set()
 
-    async def connect_db(self, create_if_absent=False, recreate_db=False,
+    async def connect_db(self, db_creator_url: Optional[str],
+                         create_if_absent=False, recreate_db=False,
                          recreate_tables=False) -> None:
         """ Connect to database """
         if create_if_absent or recreate_db or recreate_tables:
-            self._db.create_db(recreate_db=recreate_db,
-                               recreate_tables=recreate_db)
+            self._db.create_db(db_creator_url=db_creator_url,
+                               recreate_db=recreate_db,
+                               recreate_tables=recreate_tables)
         await self._db.connect()
         err = ApDbRecord.check_db_table(self._db.ap_table)
         error_if(err, f"Request cache database has unexpected format: {err}")

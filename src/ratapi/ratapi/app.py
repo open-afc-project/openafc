@@ -24,7 +24,7 @@ from afcmodels.aaa import User
 import als
 import prometheus_utils
 import prometheus_client
-import secret_utils
+import db_utils
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -33,20 +33,21 @@ LOGGER = logging.getLogger(__name__)
 owndir = os.path.abspath(os.path.dirname(__file__))
 
 # Metrics for autoscaling
-prometheus_metric_flask_workers = \
-    prometheus_client.Gauge('msghnd_flask_workers',
-                            'Total number of Flask workers in container',
-                            ['host'], multiprocess_mode='max')
-prometheus_metric_flask_workers.labels(host=platform.node())
-prometheus_metric_flask_workers = \
-    prometheus_metric_flask_workers.labels(host=platform.node()).\
-    set(os.environ.get('AFC_MSGHND_WORKERS', 0))
-prometheus_metric_flask_active_reqs = \
-    prometheus_client.Gauge('msghnd_flask_active_reqs',
-                            'Number of currently processed Flask requests',
-                            ['host'], multiprocess_mode='sum')
-prometheus_metric_flask_active_reqs = \
-    prometheus_metric_flask_active_reqs.labels(host=platform.node())
+if prometheus_utils.multiprocess_prometheus_configured():
+    prometheus_metric_flask_workers = \
+        prometheus_client.Gauge('msghnd_flask_workers',
+                                'Total number of Flask workers in container',
+                                ['host'], multiprocess_mode='max')
+    prometheus_metric_flask_workers.labels(host=platform.node())
+    prometheus_metric_flask_workers = \
+        prometheus_metric_flask_workers.labels(host=platform.node()).\
+        set(os.environ.get('AFC_MSGHND_WORKERS', 0))
+    prometheus_metric_flask_active_reqs = \
+        prometheus_client.Gauge('msghnd_flask_active_reqs',
+                                'Number of currently processed Flask requests',
+                                ['host'], multiprocess_mode='sum')
+    prometheus_metric_flask_active_reqs = \
+        prometheus_metric_flask_active_reqs.labels(host=platform.node())
 
 
 def create_app(config_override=None):
@@ -117,8 +118,8 @@ def create_app(config_override=None):
 
     # Substitute DB password
     flaskapp.config['SQLALCHEMY_DATABASE_URI'] = \
-        secret_utils.substitute_password(
-            dsc='fbrat', dsn=flaskapp.config.get('SQLALCHEMY_DATABASE_URI'),
+        db_utils.substitute_password(
+            dsn=flaskapp.config.get('SQLALCHEMY_DATABASE_URI'),
             password=flaskapp.config.get('SQLALCHEMY_DATABASE_PASSWORD'),
             optional=True)
 

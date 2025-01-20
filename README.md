@@ -445,8 +445,10 @@ rat-manage-api db-create
 If you do it with the server which is run thru the docker-compose script described above, you can do it using this command:
 
 ```
-docker-compose exec rat_server rat-manage-api db-create
+docker-compose exec rat_server rat-manage-api db-create [--if_absent]
 ```
+
+Here --if_absent means to do nothing if database already exists.
 
 ### Initial Super Administrator account
 

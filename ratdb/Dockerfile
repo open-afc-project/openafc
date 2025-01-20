@@ -1,7 +1,6 @@
 FROM postgres:14.9-alpine
 ENV POSTGRES_PASSWORD=postgres
 ENV PGDATA=/mnt/nfs/psql/data
-ENV POSTGRES_DB=fbrat
 #
 ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 COPY ratdb/devel.sh /
