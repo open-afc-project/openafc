@@ -13,6 +13,7 @@
 
 import datetime
 import enum
+import requests
 import shlex
 import sqlalchemy as sa
 import sqlalchemy.dialects.postgresql as sa_pg
@@ -20,7 +21,7 @@ import subprocess
 from typing import Any, cast, Dict, Iterable, List, NamedTuple, Optional, Set
 import urllib.parse
 
-import secret_utils
+import db_utils
 from uls_service_common import *
 
 # FS database downloader milestone. Names used in database and Prometheus
@@ -132,54 +133,6 @@ class StateDb:
     ALL_TABLE_NAMES = [MILESTONE_TABLE_NAME, ALARM_TABLE_NAME, LOG_TABLE_NAME,
                        CHECKS_TABLE]
 
-    class _RootDb:
-        """ Context wrapper to work with everpresent root database
-
-        Public attributes:
-        dsn  -- Connection string to root database
-        conn -- Sqlalchemy connection object to root database
-
-        Private attributes:
-        _engine -- SqlAlchemy connection object
-        """
-        # Name of Postgres root database
-        ROOT_DB_NAME = "postgres"
-
-        def __init__(self, dsn: str) -> None:
-            """ Constructor
-
-            Arguments:
-            dsn -- Connection string to (nonroot) database of interest
-            """
-            self.dsn = \
-                urllib.parse.urlunsplit(
-                    urllib.parse.urlsplit(dsn).
-                    _replace(path=f"/{self.ROOT_DB_NAME}"))
-            self._engine: Any = None
-            self.conn: Any = None
-            try:
-                self._engine = sa.create_engine(self.dsn)
-                self.conn = self._engine.connect()
-            except sa.exc.SQLAlchemyError as ex:
-                error(
-                    f"Can't connect to root database "
-                    f"'{secret_utils.safe_dsn(self.dsn)}': {ex}")
-            finally:
-                if (self.conn is None) and (self._engine is not None):
-                    # Connection failed
-                    self._engine.dispose()
-
-        def __enter__(self) -> "StateDb._RootDb":
-            """ Context entry """
-            return self
-
-        def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-            """ Context exit """
-            if self.conn is not None:
-                self.conn.close()
-            if self._engine is not None:
-                self._engine.dispose()
-
     def __init__(self, db_dsn: str, db_password_file: Optional[str]) -> None:
         """ Constructor
 
@@ -190,9 +143,8 @@ class StateDb:
         self._arg_db_dsn = db_dsn
         self._password_file = db_password_file
         self._full_db_dsn = \
-            secret_utils.substitute_password(
-                dsc="ULS Service State Database", dsn=db_dsn,
-                password_file=db_password_file)
+            db_utils.substitute_password(
+                dsn=db_dsn, password_file=db_password_file)
         self.db_name: str = \
             urllib.parse.urlsplit(self._full_db_dsn).path.strip("/")
         self.metadata = sa.MetaData()
@@ -229,24 +181,14 @@ class StateDb:
             sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False))
         self._engine: Any = None
 
-    def check_server(self) -> bool:
-        """ True if database server can be connected """
-        with self._RootDb(self._full_db_dsn) as rdb:
-            rdb.conn.execute("SELECT 1")
-            return True
-        return False
-
-    def create_db(self, recreate_db=False, recreate_tables=False,
+    def create_db(self, db_creator_url: Optional[str],
                   alembic_config: Optional[str] = None,
                   alembic_initial_version: Optional[str] = None,
                   alembic_head_version: Optional[str] = None) -> bool:
         """ Creates database if absent, optionally adjust if present
 
         Arguments:
-        recreate_db             -- Recreate database if it exists. Better use
-                                   Alembic!
-        recreate_tables         -- Recreate known database tables if database
-                                   exists. Better use Alembic!
+        db_creator_url          -- REST API URL for database creation
         alembic_config          -- Alembic config file name. None to do no
                                    Alembic manipulations
         alembic_initial_version -- Alembic version to stamp alembicless
@@ -261,49 +203,34 @@ class StateDb:
                 self._engine.dispose()
                 self._engine = None
             engine = self._create_engine(self._full_db_dsn)
-            created = False
-            if recreate_db:
-                with self._RootDb(self._full_db_dsn) as rdb:
-                    try:
-                        rdb.conn.execute("COMMIT")
-                        rdb.conn.execute(
-                            f'DROP DATABASE IF EXISTS "{self.db_name}"')
-                    except sa.exc.SQLAlchemyError as ex:
-                        error(f"Unable to drop database '{self.db_name}': "
-                              f"{repr(ex)}")
+            try:
+                with engine.connect():
+                    db_existed = True
+            except sa.exc.SQLAlchemyError:
+                db_existed = False
+            if not db_existed:
+                error_if(not db_creator_url,
+                         "Database creation REST API URL not provided")
+                try:
+                    requests.post(db_creator_url,
+                                  params={"dsn": self._arg_db_dsn})
+                except requests.exceptions.RequestException as ex:
+                    error(f"Unable to create database "
+                          f"'{db_utils.safe_dsn(self._arg_db_dsn)}': {ex}")
             try:
                 with engine.connect():
                     pass
-            except sa.exc.SQLAlchemyError:
-                with self._RootDb(self._full_db_dsn) as rdb:
-                    try:
-                        rdb.conn.execute("COMMIT")
-                        rdb.conn.execute(
-                            f'CREATE DATABASE "{self.db_name}"')
-                        with engine.connect():
-                            pass
-                        created = True
-                    except sa.exc.SQLAlchemyError as ex1:
-                        error(f"Unable to create target database: {ex1}")
-            try:
-                if recreate_tables:
-                    with engine.connect() as conn:
-                        conn.execute("COMMIT")
-                        for table_name in self.ALL_TABLE_NAMES:
-                            conn.execute(
-                                f'DROP TABLE IF EXISTS "{table_name}"')
-                    created = True
-                self.metadata.create_all(engine, checkfirst=True)
-                self._read_metadata()
             except sa.exc.SQLAlchemyError as ex:
-                error(f"Unable to (re)create tables in the database "
-                      f"'{self.db_name}': {repr(ex)}")
+                error(f"Unable to connect to database "
+                      f"'{db_utils.safe_dsn(self._arg_db_dsn)}': {ex}")
+            if not db_existed:
+                self.metadata.create_all(engine)
             if alembic_config:
                 error_if(not os.path.isfile(alembic_config),
                          f"Alembic directory config file '{alembic_config}' "
                          "not found")
                 alembic_head_version = alembic_head_version or "head"
-                if created:
+                if not db_existed:
                     self._alembic(alembic_config=alembic_config,
                                   args=["stamp", alembic_head_version])
                 else:
@@ -320,6 +247,7 @@ class StateDb:
                                       args=["stamp", alembic_initial_version])
                     self._alembic(alembic_config=alembic_config,
                                   args=["upgrade", alembic_head_version])
+            self._read_metadata()
 
             self._engine = engine
             engine = None
@@ -363,11 +291,11 @@ class StateDb:
                 error_if(
                     table_name not in metadata.tables,
                     f"Table '{table_name}' not present in the database "
-                    f"'{secret_utils.safe_dsn(self._full_db_dsn)}'")
+                    f"'{db_utils.safe_dsn(self._full_db_dsn)}'")
             self.metadata = metadata
         except sa.exc.SQLAlchemyError as ex:
             error(f"Can't connect to database "
-                  f"'{secret_utils.safe_dsn(self._full_db_dsn)}': {repr(ex)}")
+                  f"'{db_utils.safe_dsn(self._full_db_dsn)}': {repr(ex)}")
         finally:
             if engine is not None:
                 engine.dispose()
@@ -412,7 +340,7 @@ class StateDb:
             return sa.create_engine(dsn)
         except sa.exc.SQLAlchemyError as ex:
             error(
-                f"Invalid database DSN: '{secret_utils.safe_dsn(dsn)}': {ex}")
+                f"Invalid database DSN: '{db_utils.safe_dsn(dsn)}': {ex}")
 
     def _alembic(self, alembic_config: str, args: List[str],
                  return_stdout: bool = False) -> Optional[str]:

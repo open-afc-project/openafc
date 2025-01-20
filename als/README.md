@@ -9,8 +9,6 @@ License, a copy of which is included with this software program.
 - [Databases ](#databases)
   - [`ALS` Database ](#als_database)
   - [`AFC_LOGS` database ](#afc_logs_database)
-  - [Initial database ](#initial_database)
-  - [Template databases ](#template_databases)
 - [`als_siphon.py` - moving logs from Kafka to Postgres](#als_siphon_py)
 - [`als_query.py` - querying logs from Postgres databases](#als_query_py)
   - [Installation/invocation](#als_query_install)
@@ -58,15 +56,6 @@ For each JSON log type (*topic* on Kafka parlance) this database has separate ta
 - `source` String that uniquely identifies entity that created log record
 
 - `log` JSON log record.
-
-### Initial database <a name="initial_database">
-
-To create database `als_siphon.py` script should connect to already existing database. This already existing database named *initial database*, by default it is built-in database named `postgres`.
-
-### Template databases <a name="template_database">
-
-Template databases, used for creation of `ALS` and `AFC_LOGS` databases. Something other than default might be used (but not yet, as of time of this writing).
-
 
 ## `als_siphon.py` - moving logs from Kafka to Postgres<a name="als_siphon_py">
 

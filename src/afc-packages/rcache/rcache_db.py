@@ -9,8 +9,13 @@
 # pylint: disable=wrong-import-order, invalid-name, too-many-statements,
 # pylint: disable=too-many-branches
 
+try:
+    import requests
+except ImportError:
+    pass
 import sqlalchemy as sa
-import secret_utils
+import db_utils
+import sys
 from typing import Any, cast, Dict, List, Optional, Tuple
 import urllib.parse
 
@@ -38,55 +43,6 @@ class RcacheDb:
     Private attributes:
     _engine        -- SqlAlchemy Engine object. None before connect()
     """
-
-    class _RootDb:
-        """ Context manager that encapsulates everexisting Postgres root
-        database
-
-        Public attributes:
-        dsn  -- Root database connection string
-        conn -- Root database connection
-
-        Private attributes:
-        _engine -- Root database engine
-        """
-        # Name of root database (used for database creation
-        ROOT_DB_NAME = "postgres"
-
-        def __init__(self, dsn: str) -> None:
-            """ Constructor
-
-            Arguments:
-            dsn -- Connection string to some (nonroot) database on same server
-            """
-            self.dsn = \
-                urllib.parse.urlunsplit(
-                    urllib.parse.urlsplit(dsn).
-                    _replace(path=f"/{self.ROOT_DB_NAME}"))
-            self._engine: Any = None
-            self.conn: Any = None
-            try:
-                self._engine = sa.create_engine(self.dsn)
-                self.conn = self._engine.connect()
-            except sa.exc.SQLAlchemyError as ex:
-                error(
-                    f"Can't connect to root database "
-                    f"'{secret_utils.safe_dsn(self.dsn)}': {ex}")
-            finally:
-                if (self.conn is None) and (self._engine is not None):
-                    # Connection failed
-                    self._engine.dispose()
-
-        def __enter__(self) -> "RcacheDb._RootDb":
-            """ Context entry """
-            return self
-
-        def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-            """ Context exit """
-            if self.conn is not None:
-                self.conn.close()
-            if self._engine is not None:
-                self._engine.dispose()
 
     # Maximum number of fields in one UPDATE
     _MAX_UPDATE_FIELDS = 32767
@@ -139,9 +95,9 @@ class RcacheDb:
             sa.Column("name", sa.String(), nullable=False, primary_key=True),
             sa.Column("state", sa.Boolean(), nullable=False))
         self.rcache_db_dsn = \
-            secret_utils.substitute_password(
-                dsc="rcache database", dsn=rcache_db_dsn,
-                password_file=rcache_db_password_file, optional=True)
+            db_utils.substitute_password(
+                dsn=rcache_db_dsn, password_file=rcache_db_password_file,
+                optional=True)
         self.db_name: Optional[str] = \
             urllib.parse.urlsplit(self.rcache_db_dsn).path.strip("/") \
             if self.rcache_db_dsn else None
@@ -154,21 +110,12 @@ class RcacheDb:
         return self._MAX_UPDATE_FIELDS // \
             len(self.metadata.tables[self.AP_TABLE_NAME].c)
 
-    def check_server(self) -> bool:
-        """ True if database server can be connected """
-        error_if(not self.rcache_db_dsn,
-                 "AFC Response Cache URL was not specified")
-        assert self.rcache_db_dsn is not None
-        with FailOnError(False), self._RootDb(self.rcache_db_dsn) as rdb:
-            rdb.conn.execute("SELECT 1")
-            return True
-        return False
-
-    def create_db(self, recreate_db=False, recreate_tables=False,
-                  fail_on_error=True) -> bool:
+    def create_db(self, db_creator_url: Optional[str], recreate_db=False,
+                  recreate_tables=False, fail_on_error=True) -> bool:
         """ Creates database if absent, optionally adjust if present
 
         Arguments:
+        db_creator_url   -- REST API URL for Postgres database creation or None
         recreate_db      -- Recreate database if it exists
         recreate_tables  -- Recreate known database tables if database exists
         fail_on_error    -- True to fail on error, False to return success
@@ -184,29 +131,33 @@ class RcacheDb:
                 error_if(not self.rcache_db_dsn,
                          "AFC Response Cache URL was not specified")
                 assert self.rcache_db_dsn is not None
+                error_if("requests" not in sys.modules,
+                         "'requests' modules, used for Postgres database "
+                         "creation, not installed")
                 engine = self._create_sync_engine(self.rcache_db_dsn)
-                if recreate_db:
-                    with self._RootDb(self.rcache_db_dsn) as rdb:
-                        try:
-                            rdb.conn.execute("COMMIT")
-                            rdb.conn.execute(
-                                f'DROP DATABASE IF EXISTS "{self.db_name}"')
-                        except sa.exc.SQLAlchemyError as ex:
-                            error(f"Unable to drop database '{self.db_name}': "
-                                  f"{ex}")
-                try:
-                    with engine.connect():
+
+                creation_required = True
+                if not recreate_db:
+                    try:
+                        with engine.connect():
+                            creation_required = False
+                    except sa.exc.SQLAlchemyError:
                         pass
-                except sa.exc.SQLAlchemyError:
-                    with self._RootDb(self.rcache_db_dsn) as rdb:
-                        try:
-                            rdb.conn.execute("COMMIT")
-                            rdb.conn.execute(
-                                f'CREATE DATABASE "{self.db_name}"')
-                            with engine.connect():
-                                pass
-                        except sa.exc.SQLAlchemyError as ex1:
-                            error(f"Unable to create target database: {ex1}")
+
+                if creation_required:
+                    try:
+                        error_if(not db_creator_url,
+                                 "DB Creation REST API URL not specified")
+                        requests.post(
+                            db_creator_url,
+                            params={"dsn": self.rcache_db_dsn,
+                                    "recreate": str(bool(recreate_db))})
+                        with engine.connect():
+                            pass
+                    except (requests.exceptions.RequestException,
+                            sa.exc.SQLAlchemyError) as ex:
+                        error(f"Database creation error: {ex}")
+
                 try:
                     if recreate_tables:
                         with engine.connect() as conn:
@@ -311,12 +262,12 @@ class RcacheDb:
                 error_if(
                     table_name not in metadata.tables,
                     f"Table '{table_name}' not present in the database "
-                    f"'{secret_utils.safe_dsn(self.rcache_db_dsn)}'")
+                    f"'{db_utils.safe_dsn(self.rcache_db_dsn)}'")
             self.metadata = metadata
             self._update_ap_table()
         except sa.exc.SQLAlchemyError as ex:
             error(f"Can't connect to database "
-                  f"'{secret_utils.safe_dsn(self.rcache_db_dsn)}': {ex}")
+                  f"'{db_utils.safe_dsn(self.rcache_db_dsn)}': {ex}")
         finally:
             if engine is not None:
                 engine.dispose()
@@ -351,6 +302,6 @@ class RcacheDb:
         try:
             return sa.create_engine(dsn, pool_pre_ping=True)
         except sa.exc.SQLAlchemyError as ex:
-            error(f"Invalid database DSN: '{secret_utils.safe_dsn(dsn)}': "
+            error(f"Invalid database DSN: '{db_utils.safe_dsn(dsn)}': "
                   f"{ex}")
         return None  # Will never happen, appeasing pylint

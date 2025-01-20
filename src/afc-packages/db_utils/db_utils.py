@@ -4,7 +4,7 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-""" Utilities to deal with secrets """
+""" Assorted DSN-related utilities """
 
 # pylint: disable=too-many-arguments, invalid-name
 
@@ -12,7 +12,7 @@ import os
 from typing import Any, NoReturn, Optional
 import urllib.parse
 
-__all__ = ["substitute_password"]
+__all__ = ["substitute_password", "safe_dsn"]
 
 # Entry names in credential secret file
 CREDENTIAL_USERNAME_FIELD = "username"
@@ -30,14 +30,13 @@ def error_if(pred: Any, msg: str) -> None:
         error(msg)
 
 
-def substitute_password(dsc: str, dsn: Optional[str] = None,
+def substitute_password(dsn: Optional[str] = None,
                         password: Optional[str] = None,
                         password_file: Optional[str] = None,
                         optional: bool = False) -> Optional[str]:
     """ Substitutes password into given DSN
 
     Arguments:
-    dsc           -- DSN description for error messages
     dsn           -- DSN as string
     password      -- Optional password
     password_file -- Optional name of file with password. Ignored if `password`
@@ -47,13 +46,13 @@ def substitute_password(dsc: str, dsn: Optional[str] = None,
     """
     # What if DSN is unspecified/empty
     if not dsn:
-        error_if(not optional, f"DSN for {dsc} not specified")
+        error_if(not optional, f"DSN not specified")
         return dsn
 
     # Obtaining password
     if (password is None) and password_file:
         error_if(not os.path.isfile(password_file),
-                 f"Password file '{password_file}' for {dsc} not found")
+                 f"Password file '{password_file}' not found")
         with open(password_file, encoding="ascii") as f:
             password = f.read()
     if password is None:

@@ -175,13 +175,10 @@ sharedEnv:
     AFC_DEVEL_ENV: production
   # ALS database DSNs
   als-db:
-    POSTGRES_INIT_CONN_STR: >-
-      postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/postgres
     POSTGRES_ALS_CONN_STR: >-
       postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/ALS
     POSTGRES_LOG_CONN_STR: >-
       postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/AFC_LOGS
-    POSTGRES_INIT_PASSWORD_FILE: "{{secretFile:als-init-db-password:optional}}"
     POSTGRES_ALS_PASSWORD_FILE: "{{secretFile:als-db-password:optional}}"
     POSTGRES_LOG_PASSWORD_FILE: >-
       {{secretFile:als-json-log-db-password:optional}}
@@ -191,6 +188,10 @@ sharedEnv:
       postgresql://postgres:postgres@{{host:bulk-postgres}}/fs_state
     ULS_SERVICE_STATE_DB_PASSWORD_FILE: >-
       {{secretFile:uls-state-db-password:optional}}
+  # Database cxreator REST API URL
+  db-creator:
+    AFC_DB_CREATOR_URL: >-
+      http://{{host:rat-server}}:{{port:rat-server:rat-server}}/fbrat/admin/CreateDb
 
 # Dictionary of static (non-templated and non-secret) volume definitions.
 # Indexed by volume names
@@ -255,8 +256,9 @@ staticVolumes:
 #   staticVolumeMounts Dictionary of mount points of used static
 #           (non-templated, non-secret) volumes, indexed by staticVolumes
 #           dictionary keys
-#   mountedSecrets List of external secret names (keys in externalSecrets
-#           dictionary) to mount
+#   mountedSecrets Dictionary whose keys are external secret names (keys in
+#           externalSecrets dictionary) to mount, values are ignored. Not a
+#           list to allow adding secrets in platform-specific override files
 #   metrics Where to look for Prometheus metrics. Contains single entry in
 #           podmonitor's podMetricsEndpoints key (port, path, params, etc.)
 #     port Port name
@@ -354,7 +356,7 @@ components:
       - objst-common
       - devel-env
     mountedSecrets:
-      - server-cert
+      server-cert:
     ports:
       http:
         servicePort: 80
@@ -386,6 +388,9 @@ components:
         memory: 200Mi
     env:
       ALS_KAFKA_SERVER_ID: rat_server
+      # Platgorm-specific overides should add
+      # AFC_DB_CREATOR_DSN_.../AFC_DB_CREATOR_PASSWORD_FILE_... variable pairs
+      # with DSN/password for database creation on each server
     sharedEnvKeys:
       - flask-conf
       - ratapi-configurator
@@ -401,15 +406,17 @@ components:
       rat_transfer: /mnt/nfs/rat_transfer
       pipe: /pipe
     mountedSecrets:
-      - ratdb-password
-      - flask-secret-key
-      - google-apikey
-      - ratapi-captcha-secret
-      - ratapi-captcha-sitekey
-      - ratapi-mail-password
-      - oidc-client-id
-      - oidc-client-secret
-      - rcache-db-password
+      ratdb-password:
+      flask-secret-key:
+      google-apikey:
+      ratapi-captcha-secret:
+      ratapi-captcha-sitekey:
+      ratapi-mail-password:
+      oidc-client-id:
+      oidc-client-secret:
+      rcache-db-password:
+      # Platform override files add DB creator password secrets for each
+      # Postgres server
     ingress:
       rules:
         - path: /fbrat/ap-afc/availableSpectrumInquirySec
@@ -447,15 +454,15 @@ components:
       - rcache-common
       - devel-env
     mountedSecrets:
-      - ratdb-password
-      - flask-secret-key
-      - google-apikey
-      - ratapi-captcha-secret
-      - ratapi-captcha-sitekey
-      - ratapi-mail-password
-      - oidc-client-id
-      - oidc-client-secret
-      - rcache-db-password
+      ratdb-password:
+      flask-secret-key:
+      google-apikey:
+      ratapi-captcha-secret:
+      ratapi-captcha-sitekey:
+      ratapi-mail-password:
+      oidc-client-id:
+      oidc-client-secret:
+      rcache-db-password:
     noIngress: True
     ingress:
       annotations:
@@ -498,8 +505,8 @@ components:
       - als-client
       - devel-env
     mountedSecrets:
-      - ratdb-password
-      - rcache-db-password
+      ratdb-password:
+      rcache-db-password:
     ingress:
       annotations:
         nginx.ingress.kubernetes.io/proxy-read-timeout: "720"
@@ -536,14 +543,14 @@ components:
     staticVolumeMounts:
         objst-storage: /storage
     mountedSecrets:
-      - ratdb-password
-      - flask-secret-key
-      - google-apikey
-      - ratapi-captcha-secret
-      - ratapi-captcha-sitekey
-      - ratapi-mail-password
-      - oidc-client-id
-      - oidc-client-secret
+      ratdb-password:
+      flask-secret-key:
+      google-apikey:
+      ratapi-captcha-secret:
+      ratapi-captcha-sitekey:
+      ratapi-mail-password:
+      oidc-client-id:
+      oidc-client-secret:
     ingress:
       rules:
         - path: /certificate
@@ -642,10 +649,10 @@ components:
     sharedEnvKeys:
       - als-kafka-common
       - als-db
+      - db-creator
     mountedSecrets:
-      - als-init-db-password
-      - als-db-password
-      - als-json-log-db-password
+      als-db-password:
+      als-json-log-db-password:
   bulk-postgres:
     imageName: bulk-postgres-image
     imageRepositoryKey: public
@@ -685,11 +692,12 @@ components:
       - devel-env
       - als-client
       - uls-db
+      - db-creator
     staticVolumeMounts:
       rat_transfer: /rat_transfer
     mountedSecrets:
-      - ratapi-mail-password
-      - uls-state-db-password
+      ratapi-mail-password:
+      uls-state-db-password:
     ports:
       metrics:
         containerPort: 8000
@@ -706,15 +714,16 @@ components:
       - oidc-configurator
       - als-client
       - devel-env
+      - db-creator
     mountedSecrets:
-      - ratdb-password
-      - flask-secret-key
-      - google-apikey
-      - ratapi-captcha-secret
-      - ratapi-captcha-sitekey
-      - ratapi-mail-password
-      - oidc-client-id
-      - oidc-client-secret
+      ratdb-password:
+      flask-secret-key:
+      google-apikey:
+      ratapi-captcha-secret:
+      ratapi-captcha-sitekey:
+      ratapi-mail-password:
+      oidc-client-id:
+      oidc-client-secret:
   rcache:
     imageName: rcache-image
     imageRepositoryKey: public
@@ -737,8 +746,9 @@ components:
     sharedEnvKeys:
       - rcache-common
       - als-client
+      - db-creator
     mountedSecrets:
-      - rcache-db-password
+      rcache-db-password:
   grafana:
     imageName: grafana-image
     imageRepositoryKey: public
@@ -754,10 +764,6 @@ components:
         postgresql://postgres:postgres@{{host:bulk-postgres}}/grafana
       GRAFANA_DATABASE_PASSWORD_FILE: >-
         {{secretFile:grafana-db-password}}
-      GRAFANA_DATABASE_INIT_URL: >-
-        postgresql://postgres:postgres@{{host:bulk-postgres}}/postgres
-      GRAFANA_DATABASE_INIT_PASSWORD_FILE: >-
-        {{secretFile:grafana-init-db-password}}
       GRAFANA_DS_ALS_RO_DSN: >-
         {{sameAs:als-db:POSTGRES_ALS_CONN_STR}}
       GRAFANA_DS_ALS_RO_PASSWORD_FILE: >-
@@ -772,15 +778,16 @@ components:
         {{sameAs:uls-db:ULS_SERVICE_STATE_DB_PASSWORD_FILE}}
       GRAFANA_DS_PROMETHEUS_URL: >-
         http://prometheus-operated.monitoring:9090
-      GRAFANA_DS_RCACHE_HOST: >-
+      GRAFANA_DS_RCACHE_URL: >-
         http://{{host:rcache}}:{{port:rcache:rcache}}
+    sharedEnvKeys:
+      - db-creator
     mountedSecrets:
-      - grafana-db-password
-      - grafana-init-db-password
-      - als-ro-db-password
-      - als-json-log-ro-db-password
-      - uls-state-ro-db-password
-      - grafana-admin-password
+      grafana-db-password:
+      als-ro-db-password:
+      als-json-log-ro-db-password:
+      uls-state-ro-db-password:
+      grafana-admin-password:
     ingress:
       rules:
         - path: /grafana
@@ -869,8 +876,6 @@ externalSecrets:
     secretStore: secret-store
     refreshInterval: 5m
     mountPathPrefix: /secrets/
-  postgres-password:
-    property: POSTGRES_PASSWORD
   ratdb-password:
     property: RATDB_PASSWORD
   uls-state-db-password:
@@ -879,14 +884,10 @@ externalSecrets:
     property: RCACHE_DB_PASSWORD
   als-db-password:
     property: ALS_DB_PASSWORD
-  als-init-db-password:
-    property: ALS_INIT_DB_PASSWORD
   als-json-log-db-password:
     property: ALS_JSON_LOG_DB_PASSWORD
   grafana-db-password:
     property: GRAFANA_DB_PASSWORD
-  grafana-init-db-password:
-    property: GRAFANA_INIT_DB_PASSWORD
   als-ro-db-password:
     property: ALS_RO_DB_PASSWORD
   als-json-log-ro-db-password:
@@ -929,3 +930,7 @@ externalSecrets:
         remoteRef:
           key: server-key-pem
     mountPath: /certificates/servers
+  # Passwords for database creator DSNs should be added in platform overrides -
+  # one for each database server in use. Names must start with
+  # 'db-creator-password-' (to be proprly instantiated in
+  # externalsecret-db-creator-passwords.yaml)

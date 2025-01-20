@@ -13,6 +13,9 @@ FROM alpine:3.18
 # Port REST API service listen on
 # ENV RCACHE_CLIENT_PORT
 
+# REST API URL that performs database creation
+ENV AFC_DB_CREATOR_URL=http://rat_server/fbrat/admin/CreateDb
+
 # Connection string to Postgres DB
 # ENV RCACHE_POSTGRES_DSN=postgresql://[user[:password]@]host[:port]/database[?options]
 

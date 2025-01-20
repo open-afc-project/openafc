@@ -26,7 +26,7 @@ import afcmodels.hardcoded_relations as hardcoded_relations
 import afc_server_models
 from log_utils import dp, error, error_if, get_module_logger
 import rcache_models
-import secret_utils
+import db_utils
 
 __all__ = ["AfcCertReq", "AfcCertResp", "AfcServerDb"]
 
@@ -637,19 +637,18 @@ class AfcServerDb:
             parts = urllib.parse.urlsplit(dsn)
         except ValueError as ex:
             error(f"Invalid database DSN syntax: "
-                  f"'{secret_utils.safe_dsn(dsn)}': {ex}")
+                  f"'{db_utils.safe_dsn(dsn)}': {ex}")
         if not any(self._ASYNC_DRIVER_NAME in part for part in parts):
             dsn = \
                 urllib.parse.urlunsplit(
                     parts._replace(
                         scheme=f"{parts.scheme}+{self._ASYNC_DRIVER_NAME}"))
         dsn = \
-            secret_utils.substitute_password(
-                dsc="rcache database", dsn=dsn, password_file=password_file,
-                optional=True)
+            db_utils.substitute_password(
+                dsn=dsn, password_file=password_file, optional=True)
         try:
             engine = sa_async.create_async_engine(dsn, pool_pre_ping=True)
         except (sa.exc.SQLAlchemyError, OSError) as ex:
-            error(f"Error opening {dsc} DSN '{secret_utils.safe_dsn(dsn)}': "
+            error(f"Error opening {dsc} DSN '{db_utils.safe_dsn(dsn)}': "
                   f"{ex}")
         return engine
