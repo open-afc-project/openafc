@@ -10,9 +10,9 @@ services:
       POSTGRES_DB: fbrat
 
   dispatcher:
-    ports:
-      - "80:80"
-      - "443:443"
+    ports: !override
+      - "172.31.11.149:80:80"
+      - "172.31.11.149:443:443"
     volumes:
       - ./ssl/nginx:/certificates/servers
     environment:
@@ -43,3 +43,45 @@ services:
       - uls_downloader_state:/uls_downloader_state
 volumes:
   uls_downloader_state:
+
+secrets: !override
+  ALS_DB_PASSWORD:
+    file: ./secrets/ALS_DB_PASSWORD
+  ALS_JSON_LOG_DB_PASSWORD:
+    file: ./secrets/ALS_JSON_LOG_DB_PASSWORD
+  CAPTCHA_SECRET:
+    file: ./secrets/CAPTCHA_SECRET
+  CAPTCHA_SITEKEY:
+    file: ./secrets/CAPTCHA_SITEKEY
+  FLASK_SECRET_KEY:
+    file: ./secrets/FLASK_SECRET_KEY
+  GOOGLE_APIKEY:
+    file: ./secrets/GOOGLE_APIKEY
+  MAIL_PASSWORD:
+    file: ./secrets/MAIL_PASSWORD
+  OIDC_CLIENT_ID:
+    file: ./secrets/OIDC_CLIENT_ID
+  OIDC_CLIENT_SECRET:
+    file: ./secrets/OIDC_CLIENT_SECRET
+  POSTGRES_PASSWORD:
+    file: ./secrets/POSTGRES_PASSWORD
+  RATDB_PASSWORD:
+    file: ./secrets/RATDB_PASSWORD
+  RCACHE_DB_PASSWORD:
+    file: ./secrets/RCACHE_DB_PASSWORD
+  ULS_STATE_DB_PASSWORD:
+    file: ./secrets/ULS_STATE_DB_PASSWORD
+  ALS_INIT_DB_PASSWORD:
+    file: ./secrets/ALS_INIT_DB_PASSWORD
+  GRAFANA_DB_PASSWORD:
+    file: ./secrets/GRAFANA_DB_PASSWORD
+  GRAFANA_INIT_DB_PASSWORD:
+    file: ./secrets/GRAFANA_INIT_DB_PASSWORD
+  ALS_RO_DB_PASSWORD:
+    file: ./secrets/ALS_RO_DB_PASSWORD
+  ALS_JSON_LOG_RO_DB_PASSWORD:
+    file: ./secrets/ALS_JSON_LOG_RO_DB_PASSWORD
+  ULS_STATE_RO_DB_PASSWORD:
+    file: ./secrets/ULS_STATE_RO_DB_PASSWORD
+  GRAFANA_ADMIN_PASSWORD:
+    file: ./secrets/GRAFANA_ADMIN_PASSWORD

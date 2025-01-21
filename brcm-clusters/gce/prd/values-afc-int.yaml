@@ -24,9 +24,9 @@ sharedEnv:
       https://www.google.com/recaptcha/api/siteverify
     USER_APP_NAME: Broadcom AFC
   oidc-configurator:
-    OIDC_LOGIN: "False"
+    OIDC_LOGIN: "True"
     OIDC_DISCOVERY_URL: >-
-      https://login.broadcom.com/oauth2/default/.well-known/openid-configuration
+      https://access.broadcom.com/default/.well-known/openid-configuration
   als-db:
     POSTGRES_ALS_CONN_STR: postgresql://postgres@{{ip:postgres}}/ALS
     POSTGRES_LOG_CONN_STR: postgresql://postgres@{{ip:postgres}}/AFC_LOGS
