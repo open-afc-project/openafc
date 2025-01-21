@@ -16,7 +16,7 @@ License, a copy of which is included with this software program.
   - [Image registries](#registries)
   - [Secrets](#secrets)
   - [Database DSNs and their passwords](#dsns_and_passwords")
-  - [Postgres databases and their provisioning](#postgres_dsatabases")
+  - [Postgres databases and their provisioning](#postgres_databases")
     - [Databases](#databases)
     - [Provisioning](#provisioning")
       - [Explicit provisioning](#explicit_provisioning")
@@ -177,15 +177,15 @@ Here are list of secrets used by OpenAFC:
 |grafana-admin-password|grafana|Grafana admin user password|
 
 
-### Postgres databases and their provisioning <a name="postgres_dsatabases">
+### Postgres databases and their provisioning <a name="postgres_databases">
 
 #### Databases <a name="databases">
 
-OpenAFC usesvarious `PostgreSQL` databases. Databases passed to containers in pairs of environment variables: one for DSN (without password or with some default password), another with name of file containing password (this file is a mapping of secret from the secret store). Former have default values or parts thereof.
+OpenAFC uses various `PostgreSQL` databases. Databases passed to containers in pairs of environment variables: one for DSN (without password or with some default password), another with name of file containing password (this file is a mapping of secret from the secret store). Former have default values or parts thereof.
 
 Typically DSN's user 'own' database (may do read/write/management), but, say, Grafana datasources uses DSNs that can be made read-only.
 
-Deveelopment environment (e.g. `k3d`) stores all databases in two containers: `ratdb` - that contains `fbrat` database and `bulk-postgres` that contains all other databases. In production environment all `PostgreSQL` databases expected to be on infrastructure-provided server(s) (most likely - single, but multiple servers may be used as well).
+Development environment (e.g. `k3d`) stores all databases in two containers: `ratdb` - that contains `fbrat` database and `bulk-postgres` that contains all other databases. In production environment all `PostgreSQL` databases expected to be on infrastructure-provided (managed) server(s) (most likely - single, but multiple servers may be used as well).
 
 Here is a list of databases and their DSN environment variables of their 'owners':
 
@@ -199,7 +199,7 @@ Here is a list of databases and their DSN environment variables of their 'owners
 |grafana|GRAFANA_DATABASE_URL|GRAFANA_DATABASE_PASSWORD_FILE|grafana-db-password|bulk-postgres|grafana|
 
 
-Here is a list of nonowner (read-only) DSNs:
+Here is a list of non-owner (read-only) DSNs:
 
 |Database|DSN environment variable|Password file environment variable|Password external secret|Pods|
 |--------|------------------------|----------------------------------|------------------------|----|
@@ -210,7 +210,7 @@ Here is a list of nonowner (read-only) DSNs:
 
 #### Provisioning <a name="provisioning">
 
-Here are variosu approaches ti create these databases and their users (if different from default `postgres` user).
+Here are various approaches to create these databases and their users (if different from default `postgres` user).
 
 ##### Explicit provisioning <a name="explicit_provisioning">
 
@@ -225,9 +225,9 @@ E.g. on `k3d` environment variables are:
 - `AFC_DB_CREATOR_DSN_RATDB`, `AFC_DB_CREATOR_PASSWORD_FILE_RATDB`
 - `AFC_DB_CREATOR_DSN_BULK_POSTGRES`, `AFC_DB_CREATOR_PASSWORD_FILE_POSTGRES`
 
-On `GCP` with one database server singla pair would suffuce, e.g.: `AFC_DB_CREATOR_DSN_POSTGRES`, `AFC_DB_CREATOR_PASSWORD_FILE_POSTGRES`.
+On `GCP` with one database server single pair would suffice, e.g.: `AFC_DB_CREATOR_DSN_POSTGRES`, `AFC_DB_CREATOR_PASSWORD_FILE_POSTGRES`.
 
-This method does not create read-only DSNs (because automated creation of read-only users in `PostgreSQL` is too finicky), so the have to be the same as 'owning' DSNs.
+This method does not create read-only DSNs (because automated creation of read-only users in `PostgreSQL` is too finicky), so they have to be the same as 'owning' DSNs.
 
 This method has advantage of working automagically but it has it security flaws:
 
@@ -241,7 +241,7 @@ Here are various applications of this method to different environments:
 
 - `GCP` - simplified approach (described in examples below). All DSNs use `postgres' user. Password for this user stored in external secret (e.g. named 'postgres-password`), then all password secrets are mapped to this external secret. This creates some modicum of security.
 
-- `GCP` - more secure approach. Each 'owning' DSN has its own user and password. Passwords stored in respective external secrets. Still, one pod has `postgres` credentials, 'read-only' DSNs are in fact read-write. If better then this is needed - explicit porvisioning should be used.
+- `GCP` - more secure approach. Each 'owning' DSN has its own user and password. Passwords stored in respective external secrets. Still, one pod has `postgres` credentials, 'read-only' DSNs are in fact read-write. If better then this is needed - explicit provisioning  should be used.
 
 ## Helmcharts <a name="helmcharts">
 
