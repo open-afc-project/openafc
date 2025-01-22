@@ -28,10 +28,10 @@ RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
     pip3 install confluent-kafka==2.1.1 && \
     apk del python3-dev gcc musl-dev
 
-COPY als/requirements.txt $WORKDIR
+COPY als/requirements.txt $WORKDIR/
 RUN pip3 install --no-cache-dir --root-user-action=ignore -r requirements.txt
 
-COPY src/afc-packages /wd/afc-packages
+COPY src/afc-packages /wd/afc-packages/
 RUN pip3 install --use-pep517 --root-user-action=ignore \
         -r /wd/afc-packages/pkgs.als_siphon \
     && rm -rf /wd/afc-packages
@@ -92,11 +92,11 @@ ENV ALEMBIC_CONFIG=$WORKDIR/als_migrations/alembic.ini
 # Alembic version of last pre-alembic (first alembic) ALS database
 ENV ALS_ALEMBIC_INITIAL_VERSION=4aaf4b7e53f5
 
-COPY als/als_siphon.py als/als_query.py als/utils.py $WORKDIR
-COPY als/als_migrations $WORKDIR/als_migrations
+COPY als/als_siphon.py als/als_query.py als/utils.py $WORKDIR/
+COPY als/als_migrations $WORKDIR/als_migrations/
 
 RUN chmod a+x $WORKDIR/als_*.py
-COPY als/ALS.sql $WORKDIR
+COPY als/ALS.sql $WORKDIR/
 
 ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_servers=$KAFKA_SERVERS \
@@ -105,7 +105,6 @@ ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_ssl_keyfile=$KAFKA_SSL_KEYFILE \
     --kafka_ssl_cafile=$KAFKA_SSL_CAFILE \
     --kafka_max_partition_fetch_bytes=$KAFKA_MAX_REQUEST_SIZE \
-    --db_creator_url=$AFC_DB_CREATOR_URL \
     --als_postgres=$POSTGRES_ALS_CONN_STR \
     --als_postgres_password_file=$POSTGRES_ALS_PASSWORD_FILE \
     --log_postgres=$POSTGRES_LOG_CONN_STR \

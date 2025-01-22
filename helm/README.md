@@ -16,6 +16,11 @@ License, a copy of which is included with this software program.
   - [Image registries](#registries)
   - [Secrets](#secrets)
   - [Database DSNs and their passwords](#dsns_and_passwords")
+  - [Postgres databases and their provisioning](#postgres_databases")
+    - [Databases](#databases)
+    - [Provisioning](#provisioning")
+      - [Explicit provisioning](#explicit_provisioning")
+      - [Self-provisioning](#self_provisioning")
 - [Helmcharts](#helmcharts)
   - [File tree](#file_tree)
   - [Manifests](#manifests)
@@ -155,6 +160,7 @@ Here are list of secrets used by OpenAFC:
 |uls-state-db-password|uls-downloader|Password for PostgreSQL DSN for database with ULS Downloader state|
 |als-db-password|als-siphon|Password for PostgreSQL DSN for ALS database|
 |als-json-log-db-password|als-siphon|Password for PostgreSQL DSN for ALS JSON logs database|
+|rcache-db-password|rcache
 |flask-secret-key|rat-server, msghnd (deprecated, not really used), objst (not really used), cert-db (not really used)|Value for Flask's SECRET_KEY (used to cookie signing, CSRF token generation, etc.). Only used by *rat-server*, other Flask-based containers require it for initialization code not to crash|
 |google-apikey|rat-server, msghnd (deprecated, not really used), objst (not really used), cert-db (not really used)|Google API key. Passed to WebUI for map drawing. Only used by *rat-server*, other Flask-based containers require it for initialization code not to crash|
 |ratapi-captcha-secret|rat-server, msghnd (deprecated, not really used), objst (not really used), cert-db (not really used)|Secret for Google's `recaptcha`. Only used by *rat-server*, other Flask-based containers require it for initialization code not to crash|
@@ -171,15 +177,71 @@ Here are list of secrets used by OpenAFC:
 |grafana-admin-password|grafana|Grafana admin user password|
 
 
-### Database DSNs and their passwords <a name="dsns_and_passwords">
+### Postgres databases and their provisioning <a name="postgres_databases">
 
-Several containers of OPenAFC use `PostgreSQL` databases to store various data. In development environment (e.g. `k3d`) databases run in two containers: `ratdb` - that contains `fbrat` database and `bulk-postgres` taht contains all other databases. In production environment all `PostgreSQL` databases expected to be on infrastructure-provided server (most likely - single, but this is not required).
+#### Databases <a name="databases">
 
-Databases supplied to containers with pairs environment variablaes - one for DSN (without password or with some default password), another with name of file containing password (this file is a mapping of secret from the secret store).
+OpenAFC uses various `PostgreSQL` databases. Databases passed to containers in pairs of environment variables: one for DSN (without password or with some default password), another with name of file containing password (this file is a mapping of secret from the secret store). Former have default values or parts thereof.
 
-OpenAFC also needs to create thosew databases. All database creation performed in `rat-server` container that is supplied with DSNs and passwords of user capable of database creation on each of database server. Usually it is credentials of 'postgres' user of 'postgres' database, albeity this is not mandatory (it is, howevewr, mandatory for database used in DSN to preexist).
+Typically DSN's user 'own' database (may do read/write/management), but, say, Grafana datasources uses DSNs that can be made read-only.
 
-OpenAFC uses at least 9 distinct DSNs - ad in ideally secured world each should have its own username and password. In the relaxed version of this ideal world all DSNs may use `postgres` user and all DB password secrets may be mapped to a single external secret with password of this user - see [`GCP` deployment](#gcp_deployment") for an example.
+Development environment (e.g. `k3d`) stores all databases in two containers: `ratdb` - that contains `fbrat` database and `bulk-postgres` that contains all other databases. In production environment all `PostgreSQL` databases expected to be on infrastructure-provided (managed) server(s) (most likely - single, but multiple servers may be used as well).
+
+Here is a list of databases and their DSN environment variables of their 'owners':
+
+|Database|DSN environment variable|Password file environment variable|Password external secret|`k3d` server|Pods|
+|--------|------------------------|----------------------------------|------------------------|------------|----|
+|fbrat|FLASK_SQLALCHEMY_DATABASE_URI|FLASKFILE_SQLALCHEMY_DATABASE_PASSWORD|ratdb-password|ratdb|rat-server, msghnd (deprecated), afcserver, objst, cert-db|
+|ALS|POSTGRES_ALS_CONN_STR|POSTGRES_ALS_PASSWORD_FILE|als-db-password|bulk-postgres|als-siphon|
+|AFC_LOGS|POSTGRES_LOG_CONN_STR|POSTGRES_LOG_PASSWORD_FILE|als-json-log-db-password|bulk-postgres|als-siphon|
+|fs_state|ULS_SERVICE_STATE_DB_DSN|ULS_SERVICE_STATE_DB_PASSWORD_FILE|uls-state-db-password|bulk-postgres|uls-downloader|
+|rcache|RCACHE_POSTGRES_DSN|RCACHE_POSTGRES_PASSWORD_FILE|ratdb-password|bulk-postgres|rcache, msghnd (deprecated), afcserver|
+|grafana|GRAFANA_DATABASE_URL|GRAFANA_DATABASE_PASSWORD_FILE|grafana-db-password|bulk-postgres|grafana|
+
+
+Here is a list of non-owner (read-only) DSNs:
+
+|Database|DSN environment variable|Password file environment variable|Password external secret|Pods|
+|--------|------------------------|----------------------------------|------------------------|----|
+|ALS|GRAFANA_DS_ALS_RO_DSN|GRAFANA_DS_ALS_RO_PASSWORD_FILE|als-ro-db-password|grafana|
+|AFC_LOGS|GRAFANA_DS_JSON_LOG_RO_DSN|GRAFANA_DS_JSON_LOG_RO_PASSWORD_FILE|als-json-log-ro-db-password|grafana|
+|fs_state|GRAFANA_DS_FS_STATE_RO_DSN|GRAFANA_DS_FS_STATE_RO_PASSWORD_FILE|uls-state-ro-db-password|grafana|
+
+
+#### Provisioning <a name="provisioning">
+
+Here are various approaches to create these databases and their users (if different from default `postgres` user).
+
+##### Explicit provisioning <a name="explicit_provisioning">
+
+This is the most secure way to create databases and users. It is also the most laborious way. OpenAFC administrator manually creates datbases, users, grants permissions, etc. This is how things should be done on production environnemt - and this is outside of the scope of this document.
+
+##### Self-provisioning <a name="self_provisioning">
+
+Pods request REST API on *rat-server* to create databases and users (if different from `postgres`). To fulfill this role *rat-server* is endowed with pairs of environment variables (`AFC_DB_CREATOR_DSN_<SERVER>`/`AFC_DB_CREATOR_PASSWORD_FILE_<SERVER>`) with credentials of 'postgres' user - one pair per database server
+
+E.g. on `k3d` environment variables are:
+
+- `AFC_DB_CREATOR_DSN_RATDB`, `AFC_DB_CREATOR_PASSWORD_FILE_RATDB`
+- `AFC_DB_CREATOR_DSN_BULK_POSTGRES`, `AFC_DB_CREATOR_PASSWORD_FILE_POSTGRES`
+
+On `GCP` with one database server single pair would suffice, e.g.: `AFC_DB_CREATOR_DSN_POSTGRES`, `AFC_DB_CREATOR_PASSWORD_FILE_POSTGRES`.
+
+This method does not create read-only DSNs (because automated creation of read-only users in `PostgreSQL` is too finicky), so they have to be the same as 'owning' DSNs.
+
+This method has advantage of working automagically but it has it security flaws:
+
+  - Credentials of `postgres` user are given to pod
+  - Password is passed through the REST API in plain text (not happened if database and user already exist - e.g provisioned explicitly)
+  - Read-only DSNs have to use the same credentials as read/write DSNs
+
+Here are various applications of this method to different environments:
+
+- `k3d` - by default all databases have 'postgres' password for `postgres` users, all DSNs use this `postgres` user. Nothing neds to be done, it works out of the box.
+
+- `GCP` - simplified approach (described in examples below). All DSNs use `postgres' user. Password for this user stored in external secret (e.g. named 'postgres-password`), then all password secrets are mapped to this external secret. This creates some modicum of security.
+
+- `GCP` - more secure approach. Each 'owning' DSN has its own user and password. Passwords stored in respective external secrets. Still, one pod has `postgres` credentials, 'read-only' DSNs are in fact read-write. If better then this is needed - explicit provisioning  should be used.
 
 ## Helmcharts <a name="helmcharts">
 

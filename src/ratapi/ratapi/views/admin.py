@@ -27,6 +27,7 @@ import afcmodels.aaa as aaa
 from afcmodels.hardcoded_relations import RulesetVsRegion
 from .auth import auth
 from afcmodels.base import db
+import db_creator
 import db_utils
 
 #: Logger for this module
@@ -761,11 +762,7 @@ class MTLS(MethodView):
 
 
 class CreateDb(MethodView):
-    """ (Re)creator of absent Postgres databases
-
-    Implements REST API endpointg and static interface for direct call
-    Also implements static interface to be called directly
-    """
+    """ (Re)creator of absent Postgres databases """
 
     # Default PostgreSQL port
     DEFAULT_PORT = 5432
@@ -778,98 +775,16 @@ class CreateDb(MethodView):
     def post(self):
         """ Postgres database creation REST API
 
-        POST CreateDb?dsn=<DSN>[&recreate=<True/False>]
+        POST CreateDb?dsn=<DSN>[&recreate=<True/False>][&owner=<True/False>]
         """
+        dsn = db_utils.safe_dsn(flask.request.args.get('dsn', 'Unknown'))
         try:
-            self.create_database(
-                dsn=flask.request.args.get("dsn"),
-                recreate=(flask.request.args.get("recreate") or "").lower() ==
-                "true")
+            db_creator.ensure_dsn(**flask.request.args, local=True)
+            LOGGER.info(f"Database '{dsn}' created")
             return flask.make_response()
-        except werkzeug.exceptions.HTTPException as ex:
-            LOGGER.error(f"Database creation error: {ex}")
-            raise
-
-    @classmethod
-    def create_database(cls, dsn, recreate=False):
-        """ Creates/recreates Postgres database of given DSN
-
-        Raises erkzeug.exceptions.HTTPException on failure
-        """
-        # What database to create and on what server
-        desired_host, desired_port, desired_db = \
-            cls._parse_dsn(dsn, fail_on_error=True)
-        # Looking for creator ('postgres user') DSN matching requested server
-        for env in os.environ.keys():
-            if not env.startswith(cls.DSN_ENV_PREFIX):
-                continue
-            creator_dsn = os.environ[env]
-            creator_host, creator_port, _ = cls._parse_dsn(creator_dsn)
-            if (creator_host, creator_port) != (desired_host, desired_port):
-                continue
-            creator_password_file = \
-                os.environ.get(cls.PASSWORD_FILE_ENV_PREFIX +
-                               env[len(cls.DSN_ENV_PREFIX):])
-            break   # Found
-        else:
-            # Not found
-            raise werkzeug.exceptions.NotFound(
-                f"No creator DSN found for '{desired_host}:{desired_port}' "
-                f"database server")
-        # Substituting password from file
-        creator_dsn = \
-            db_utils.substitute_password(
-                dsn=creator_dsn, password_file=creator_password_file)
-        try:
-            engine = sa.create_engine(creator_dsn)
-            with engine.connect() as conn:
-                if recreate:
-                    # Dropping existing database if recreate requested
-                    conn.execute(sa.text("COMMIT"))
-                    conn.execute(
-                        sa.text(f'DROP DATABASE IF EXISTS "{desired_db}"'))
-                    db_exists = False
-                else:
-                    # Checking if database exists
-                    rp = conn.execute(
-                        sa.text(f"SELECT 1 FROM pg_database "
-                                f"WHERE datname = '{desired_db}'"))
-                    db_exists = bool(rp.fetchall())
-            if not db_exists:
-                # Creating database if needed
-                with engine.connect() as conn:
-                    conn.execute(sa.text("COMMIT"))
-                    conn.execute(sa.text(f'CREATE DATABASE "{desired_db}"'))
-                    LOGGER.info(f"Database '{desired_db}' created on "
-                                f"{desired_host}:{desired_db}")
-            else:
-                LOGGER.info(f"Database '{desired_db}' already exists on "
-                            f"{desired_host}:{desired_db}")
-        except sa.exc.SQLAlchemyError as ex:
-            raise werkzeug.exceptions.InternalServerError(
-                f"Failed to {'re' if recreate else ''}create "
-                f"{desired_host}:{desired_port}/{desired_db}: {ex}")
-
-    @classmethod
-    def _parse_dsn(cls, dsn, fail_on_error=False):
-        """ Parses given DSN, returns (host, port, database) tuple
-
-        Raises erkzeug.exceptions.HTTPException on failure
-        """
-        if not dsn:
-            if fail_on_error:
-                raise werkzeug.exceptions.BadRequest(
-                    "DSN to create not provided")
-            return (None, None, None)
-        parsed_dsn = urllib.parse.urlparse(dsn)
-        if (not parsed_dsn.hostname) and fail_on_error:
-            raise werkzeug.exceptions.BadRequest(
-                f"DSN '{dsn}' missing hostname")
-        db = parsed_dsn.path.lstrip("/")
-        if (not db) and fail_on_error:
-            raise werkzeug.exceptions.BadRequest(
-                f"DSN '{dsn}' missing database name")
-        return (parsed_dsn.hostname, parsed_dsn.port or cls.DEFAULT_PORT, db)
+        except RuntimeError as ex:
+            LOGGER.error(f"Error creating databse '{dsn}': {ex}")
+            raise werkzeug.exceptions.BadRequest(str(ex))
 
 
 module.add_url_rule("/user/<int:user_id>", view_func=User.as_view("User"))
