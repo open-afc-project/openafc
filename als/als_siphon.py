@@ -46,6 +46,7 @@ from typing import Any, Callable, cast, Dict, Generic, List, NamedTuple, \
 import urllib.parse
 import uuid
 
+import db_creator
 import db_utils
 import utils
 
@@ -509,39 +510,27 @@ class DatabaseBase(ABC):
             error(str(ex))
 
     @classmethod
-    def create_db(cls, db_creator_url: str, arg_conn_str: str,
-                  arg_password_file: Optional[str], recreate: bool) -> bool:
+    def create_db(cls, arg_conn_str: str, arg_password_file: Optional[str],
+                  recreate: bool) -> bool:
         """ Create/recreate given database
 
         Arguments:
-        db_creator_url    -- REST API URL for database creation
         arg_conn_str      -- Connection string from command line
         arg_password_file -- Name of file with password or None
         recreate          -- True to recreate database if exists, False to
                              leave it as is if it exists
         Returns True if database was created anew, False if existing was used
         """
-        if not recreate:
-            try:
-                engine = cls.create_engine(arg_conn_str=arg_conn_str,
-                                           arg_password_file=arg_password_file)
-                with engine.connect():
-                    return False
-            except sa.exc.SQLAlchemyError:
-                pass
-            finally:
-                engine.dispose()
         try:
-            requests.post(
-                db_creator_url,
-                params={"dsn": utils.dsn(arg_dsn=arg_conn_str,
-                                         default_dsn=cls.default_conn_str(),
-                                         name_for_logs=cls.name_for_logs()),
-                        "recreate": str(bool(recreate))})
-        except requests.exceptions.RequestException as ex:
-            error(f"Failed to create database "
+            return \
+                not db_creator.ensure_dsn(
+                    dsn=utils.dsn(arg_dsn=arg_conn_str,
+                                  default_dsn=cls.default_conn_str(),
+                                  name_for_logs=cls.name_for_logs()),
+                    password_file=arg_password_file, recreate=recreate)[1]
+        except RuntimeError as ex:
+            error(f"Error creating database "
                   f"'{db_utils.safe_dsn(arg_conn_str)}': {ex}")
-        return True
 
     @classmethod
     @abstractmethod
@@ -3571,8 +3560,6 @@ def do_init_db(args: Any) -> None:
     """
     databases: Set[DatabaseBase] = set()
     try:
-        error_if(not args.db_creator_url,
-                 "Database creator REST API URL not specified")
         nothing_done = True
         patch: List[str]
         for conn_str, password_file, sql_file, db_class, sql_required, patch, \
@@ -3594,8 +3581,8 @@ def do_init_db(args: Any) -> None:
                 f"database")
             created = \
                 db_class.create_db(
-                    db_creator_url=args.db_creator_url, arg_conn_str=conn_str,
-                    arg_password_file=password_file, recreate=args.recreate)
+                    arg_conn_str=conn_str, arg_password_file=password_file,
+                    recreate=args.recreate)
             try:
                 database = db_class.get_db_name(conn_str)
                 db = db_class(arg_conn_str=conn_str,
@@ -3803,10 +3790,6 @@ def main(argv: List[str]) -> None:
         "string")
 
     switches_init = argparse.ArgumentParser(add_help=False)
-    switches_init.add_argument(
-        "--db_creator_url", metavar="DB_CREATOR_URL",
-        type=docker_arg_type(str),
-        help=f"REST API URL for Postgres database creation")
     switches_init.add_argument(
         "--recreate", action="store_true",
         help="Recreate database if it exists. Default is to use existing "

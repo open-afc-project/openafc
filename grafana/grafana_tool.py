@@ -24,7 +24,6 @@ import os
 import pydantic
 import re
 import requests
-import sqlalchemy as sa
 import subprocess
 import sys
 import tabulate
@@ -33,9 +32,9 @@ import urllib.parse
 import yaml
 
 import pydantic_utils
+import db_creator
 import db_utils
 
-SQLALCHEMY_DB_SCHEME = "postgresql"
 DEFAULT_URL = "http://localhost:3000/grafana"
 ADMIN_USER_ENV = "GF_SECURITY_ADMIN_USER"
 DEFAULT_DOCKER_SOCKET = "/var/run/docker.sock"
@@ -57,8 +56,6 @@ def error_if(condition: Any, errmsg: str) -> None:
 class Settings(pydantic.BaseSettings):
     """ Command line arguments that also may be specified through environment
     variables """
-    db_creator_url: Optional[pydantic.AnyHttpUrl] = \
-        pydantic.Field(None, env="AFC_DB_CREATOR_URL")
     grafana_db_dsn: Optional[pydantic.PostgresDsn] = \
         pydantic.Field(None, env="GRAFANA_DATABASE_URL")
     grafana_db_password_file: Optional[str] = \
@@ -98,39 +95,13 @@ def do_create_db(args: Any) -> None:
         cast(Settings,
              pydantic_utils.merge_args(settings_class=Settings, args=args))
     error_if(not settings.grafana_db_dsn, "Grafana DB DSN not specified")
-    assert settings.grafana_db_dsn is not None
-
     try:
-        grafana_dsn = \
-            db_utils.substitute_password(
-                dsn=settings.grafana_db_dsn,
-                password_file=settings.grafana_db_password_file)
+        db_creator.ensure_dsn(
+            dsn=settings.grafana_db_dsn,
+            password_file=settings.grafana_db_password_file)
     except RuntimeError as ex:
-        error(str(ex))
-    assert isinstance(grafana_dsn, str)
-    grafana_dsn = \
-        urllib.parse.urlunsplit(
-            urllib.parse.urlsplit(grafana_dsn).
-            _replace(scheme=SQLALCHEMY_DB_SCHEME))
-    try:
-        grafana_engine = sa.create_engine(grafana_dsn)
-        with grafana_engine.connect():
-            pass
-        grafana_engine.dispose()
-        exists = True
-    except sa.exc.SQLAlchemyError:
-        exists = False
-    if exists and not args.recreate_db:
-        return
-    error_if(not settings.db_creator_url,
-             "Database creation REST API URL not specified")
-    try:
-        requests.post(settings.db_creator_url,
-                      params={"dsn": settings.grafana_db_dsn,
-                              "recreate": str(bool(args.recreate_db))})
-    except requests.exceptions.RequestException as ex:
-        error(f"Grafana database {'re' if args.recreate_db else ''}creation "
-              f"error: {ex}")
+        error(f"Error creating Grafana database "
+              f"'{db_utils.safe_dsn(settings.grafana_db_dsn)}': {ex}")
 
 
 def dsn_parse_filter(dsn: str, part: str) -> str:
@@ -611,11 +582,6 @@ def main(argv: List[str]) -> None:
     parser_create_db = \
         subparsers.add_parser(
             "create_db", help="Create Grafana database")
-    parser_create_db.add_argument(
-        "--db_creator_url", metavar="DB_CREATOR_URL",
-        help=f"REST API URL for Postgres databasse creation. Ignored if "
-        f"Grafana database creation is not required"
-        f"{pydantic_utils.env_help(Settings, 'db_creator_url')}")
     parser_create_db.add_argument(
         "--grafana_db_dsn", metavar="DSN_OF_GRAFANA_DB",
         help=f"Grafana Postgres database DSN. This parameter is required"

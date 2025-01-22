@@ -180,7 +180,8 @@ class DbCreate(Command):
         with flaskapp.app_context():
             from afcmodels.aaa import Role, Ruleset
             from flask_migrate import stamp
-            from .views import admin
+            import db_creator
+
             if if_absent:
                 try:
                     with db.engine.connect():
@@ -189,11 +190,10 @@ class DbCreate(Command):
                 except sqlalchemy.exc.SQLAlchemyError:
                     pass
             ruleset_list = RulesetVsRegion.ruleset_list()
-            try:
-                admin.CreateDb.create_database(
-                    dsn=flaskapp.config.get('SQLALCHEMY_DATABASE_URI'))
-            except werkzeug.exceptions.HTTPException as ex:
-                raise RuntimeError(ex.description)
+            db_creator.ensure_dsn(
+                dsn=flaskapp.config.get('SQLALCHEMY_DATABASE_URI'),
+                password=flaskapp.config.get('SQLALCHEMY_DATABASE_PASSWORD'),
+                local=True)
             db.create_all()
             get_or_create(db.session, Role, name='Admin')
             get_or_create(db.session, Role, name='Super')

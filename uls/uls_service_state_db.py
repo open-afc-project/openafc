@@ -21,6 +21,7 @@ import subprocess
 from typing import Any, cast, Dict, Iterable, List, NamedTuple, Optional, Set
 import urllib.parse
 
+import db_creator
 import db_utils
 from uls_service_common import *
 
@@ -202,27 +203,15 @@ class StateDb:
             if self._engine:
                 self._engine.dispose()
                 self._engine = None
-            engine = self._create_engine(self._full_db_dsn)
             try:
-                with engine.connect():
-                    db_existed = True
-            except sa.exc.SQLAlchemyError:
-                db_existed = False
-            if not db_existed:
-                error_if(not db_creator_url,
-                         "Database creation REST API URL not provided")
-                try:
-                    requests.post(db_creator_url,
-                                  params={"dsn": self._arg_db_dsn})
-                except requests.exceptions.RequestException as ex:
-                    error(f"Unable to create database "
-                          f"'{db_utils.safe_dsn(self._arg_db_dsn)}': {ex}")
-            try:
-                with engine.connect():
-                    pass
-            except sa.exc.SQLAlchemyError as ex:
-                error(f"Unable to connect to database "
+                db_existed = \
+                    db_creator.ensure_dsn(
+                        dsn=self._arg_db_dsn,
+                        password_file=self._password_file)[1]
+            except RuntimeError as ex:
+                error(f"Error creating state database "
                       f"'{db_utils.safe_dsn(self._arg_db_dsn)}': {ex}")
+            engine = self._create_engine(self._full_db_dsn)
             if not db_existed:
                 self.metadata.create_all(engine)
             if alembic_config:

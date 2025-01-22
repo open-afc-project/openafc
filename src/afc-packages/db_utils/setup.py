@@ -19,7 +19,7 @@ setup(
     # Label compatible with PEP 440
     version='0.1.0',
     description='Database-related common utilities',
-    py_modules=["db_utils"],
+    py_modules=["db_utils", "db_creator"],
     cmdclass={
         'install': InstallCmdWrapper,
     }

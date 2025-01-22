@@ -10,15 +10,15 @@
 # pylint: disable=too-many-branches
 
 try:
-    import requests
+    import db_creator
 except ImportError:
     pass
 import sqlalchemy as sa
-import db_utils
 import sys
 from typing import Any, cast, Dict, List, Optional, Tuple
 import urllib.parse
 
+import db_utils
 from log_utils import dp, error, error_if, FailOnError, get_module_logger
 from rcache_models import ApDbRespState, ApDbRecord
 
@@ -136,27 +136,12 @@ class RcacheDb:
                          "creation, not installed")
                 engine = self._create_sync_engine(self.rcache_db_dsn)
 
-                creation_required = True
-                if not recreate_db:
-                    try:
-                        with engine.connect():
-                            creation_required = False
-                    except sa.exc.SQLAlchemyError:
-                        pass
-
-                if creation_required:
-                    try:
-                        error_if(not db_creator_url,
-                                 "DB Creation REST API URL not specified")
-                        requests.post(
-                            db_creator_url,
-                            params={"dsn": self.rcache_db_dsn,
-                                    "recreate": str(bool(recreate_db))})
-                        with engine.connect():
-                            pass
-                    except (requests.exceptions.RequestException,
-                            sa.exc.SQLAlchemyError) as ex:
-                        error(f"Database creation error: {ex}")
+                try:
+                    db_creator.ensure_dsn(
+                        dsn=self.rcache_db_dsn, recreate=bool(recreate_db))
+                except RuntimeError as ex:
+                    error(f"Error creating Rcache database "
+                          f"'{db_utils.safe_dsn(self.rcache_db_dsn)}': {ex}")
 
                 try:
                     if recreate_tables:
