@@ -89,6 +89,7 @@ const StrTypeClass CConst::strPropEnvMethodList[] = {{CConst::nlcdPointPropEnvMe
 						     {CConst::urbanPropEnvMethod, "Urban"},
 						     {CConst::suburbanPropEnvMethod, "Suburban"},
 						     {CConst::ruralPropEnvMethod, "Rural"},
+						     {CConst::unknownPropEnvMethod, "Unknown"},
 						     {-1, (char *)0}};
 
 const StrTypeClass CConst::strULSAntennaTypeList[] = {{CConst::F1336OmniAntennaType, "F.1336 Omni"},
@@ -97,6 +98,9 @@ const StrTypeClass CConst::strULSAntennaTypeList[] = {{CConst::F1336OmniAntennaT
 						      {CConst::R2AIP07AntennaType, "WINNF-AIP-07"},
 						      {CConst::R2AIP07CANAntennaType,
 						       "WINNF-AIP-07-CAN"},
+						      {CConst::OmniAntennaType, "Omni"},
+						      {CConst::LUTAntennaType, "LUT"},
+						      {CConst::UnknownAntennaType, "Unknown"},
 						      {-1, (char *)0}};
 
 const StrTypeClass CConst::strHeightSourceList[] = {{CConst::unknownHeightSource, "UNKNOWN"},
@@ -113,6 +117,7 @@ const StrTypeClass CConst::strSpectralAlgorithmList[] = {{CConst::pwrSpectralAlg
 
 const StrTypeClass CConst::strPRTypeList[] = {{CConst::backToBackAntennaPRType, "Ant"},
 					      {CConst::billboardReflectorPRType, "Ref"},
+					      {CConst::unknownPRType, "Unknown"},
 					      {-1, (char *)0}};
 
 const StrTypeClass CConst::strAntennaCategoryList[] = {{CConst::HPAntennaCategory, "HP"},
