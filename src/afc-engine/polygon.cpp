@@ -1017,7 +1017,7 @@ PolygonClass *PolygonClass::combinePolygons(std::vector<PolygonClass *> polyList
 	PolygonClass *combinedPoly = new PolygonClass();
 
 	int totalNumSegment = 0;
-	for (int polyIdx = 0; (size_t)polyIdx < polyList.size(); ++polyIdx) {
+	for (int polyIdx = 0; polyIdx < polyList.size(); ++polyIdx) {
 		totalNumSegment += polyList[polyIdx]->num_segment;
 	}
 
@@ -1028,7 +1028,7 @@ PolygonClass *PolygonClass::combinePolygons(std::vector<PolygonClass *> polyList
 	combinedPoly->bdy_pt_y = (int **)malloc(totalNumSegment * sizeof(int *));
 
 	int segIdx = 0;
-	for (int polyIdx = 0; (size_t)polyIdx < polyList.size(); ++polyIdx) {
+	for (int polyIdx = 0; polyIdx < polyList.size(); ++polyIdx) {
 		PolygonClass *poly = polyList[polyIdx];
 		for (int segment_idx = 0; segment_idx <= poly->num_segment - 1; segment_idx++) {
 			int numPt = poly->num_bdy_pt[segment_idx];
