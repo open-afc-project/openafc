@@ -12331,7 +12331,7 @@ void AfcManager::importKeyHoleShapeParameters(const QJsonObject &jsonObj)
 	// - "minFreqMhz"
 	//   Minimum frequency in MHz. Default is CConst::unii5StartFreqMHz (=5925)
 	// - "maxFreqMhz"
-	//   Maximum frequency in MHz. Default is CConst::unii8StoptFreqMHz (=5925)
+	//   Maximum frequency in MHz. Default is CConst::unii8StoptFreqMHz (=7125)
 	// - "radiusKm"
 	//   Keyhole radius in kilometers. Default is "maxLinkDistance" from AFC
 	//   config file
