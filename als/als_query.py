@@ -713,7 +713,7 @@ class RuntimeOpt(enum.IntFlag):
     edebug = defs.RNTM_OPT_SLOW_DBG
 
     def out_repr(self) -> List[str]:
-        """ Returns output reresentation as list of options """
+        """ Returns output representation as list of options """
         ret: List[str] = []
         rest = self.value
         for opt in list(self):
@@ -1103,7 +1103,7 @@ class SimpleAlsOut(AlsOut):
 
     Private attributes:
     _column_name -- Name of column that contains desired value
-    _converter   -- Optional convertrer function for non-None value
+    _converter   -- Optional converter function for non-None value
     """
     def __init__(self, cmd: str, help_: str, table_names: List[str],
                  column_name: str,
@@ -1119,7 +1119,7 @@ class SimpleAlsOut(AlsOut):
                        to 'request_response_in_message' table (that itself
                        might be omitted, if not containing pertinent columns)
         column_name -- Name of column that contains desired value
-        converter   -- Optional convertrer function for non-None value
+        converter   -- Optional converter function for non-None value
         """
         super().__init__(cmd=cmd, help_=help_, table_names=table_names)
         self._column_name = column_name
@@ -2294,7 +2294,7 @@ def main(argv: List[str]) -> None:
     parser_als.add_argument(
         "--cn", metavar="[-]MTLS_COMMON_NAME", action="append",
         help="CN (Common Name) field of AFC Request message mTLS certificate. "
-        "Empty means messages without certificate. Ifprefixed with '-' - all "
+        "Empty means messages without certificate. If prefixed with '-' - all "
         "except this common name. This parameter may be specified several "
         "times")
     parser_als.add_argument(
