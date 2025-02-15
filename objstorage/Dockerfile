@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18
+FROM alpine:3.18.11
 
 RUN apk add py3-pip py3-gunicorn py3-gevent \
     gcc python3-dev libc-dev
@@ -24,4 +24,4 @@ ENV AFC_OBJST_HIST_PORT=${AFC_OBJST_HIST_PORT:-"4999"}
 ENV AFC_OBJST_HIST_WORKERS=${AFC_OBJST_HIST_WORKERS:-2}
 CMD ["/wd/docker-entrypoint.sh"]
 HEALTHCHECK CMD wget --no-verbose --tries=1 --spider \
-    http://localhost:${AFC_OBJST_PORT}/objst_healthy || exit 1
+    http://127.0.0.1:${AFC_OBJST_PORT}/objst_healthy || exit 1
