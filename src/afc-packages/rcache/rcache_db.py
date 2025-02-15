@@ -13,6 +13,7 @@ try:
     import db_creator
 except ImportError:
     pass
+import geoalchemy2 as ga
 import sqlalchemy as sa
 import sys
 from typing import Any, cast, Dict, List, Optional, Tuple
@@ -80,8 +81,9 @@ class RcacheDb:
                       index=True),
             sa.Column("config_ruleset", sa.String(), nullable=False,
                       index=True),
-            sa.Column("lat_deg", sa.Float(), nullable=False, index=True),
-            sa.Column("lon_deg", sa.Float(), nullable=False, index=True),
+            sa.Column("coordinates",
+                      ga.Geography(geometry_type="POINT", srid=4326),
+                      nullable=False, index=True),
             sa.Column("last_update", sa.DateTime(), nullable=False,
                       index=True),
             sa.Column("req_cfg_digest", sa.String(), nullable=False,
@@ -110,16 +112,22 @@ class RcacheDb:
         return self._MAX_UPDATE_FIELDS // \
             len(self.metadata.tables[self.AP_TABLE_NAME].c)
 
-    def create_db(self, db_creator_url: Optional[str], recreate_db=False,
-                  recreate_tables=False, fail_on_error=True) -> bool:
-        """ Creates database if absent, optionally adjust if present
+    def create_db(self, db_creator_url: Optional[str],
+                  alembic_config: Optional[str] = None,
+                  alembic_initial_version: Optional[str] = None,
+                  alembic_head_version: Optional[str] = None,
+                  fail_on_error=True) -> bool:
+        """ Creates database if absent, ensures correct alembic version
 
         Arguments:
-        db_creator_url   -- REST API URL for Postgres database creation or None
-        recreate_db      -- Recreate database if it exists
-        recreate_tables  -- Recreate known database tables if database exists
-        fail_on_error    -- True to fail on error, False to return success
-                            status
+        db_creator_url          -- REST API URL for Postgres database creation
+                                   or None
+        alembic_config          -- Alembic config file. None to do no Alembic
+        alembic_initial_version -- None or version to stamp alembicless
+                                   database with (before upgrade)
+        alembic_head_version    -- Current alembic version. None to use 'head'
+        fail_on_error           -- True to fail on error, False to return
+                                   success status
         Returns True on success, Fail on failure (if fail_on_error is False)
         """
         engine: Any = None
@@ -137,19 +145,20 @@ class RcacheDb:
                 engine = self._create_sync_engine(self.rcache_db_dsn)
 
                 try:
-                    db_creator.ensure_dsn(
-                        dsn=self.rcache_db_dsn, recreate=bool(recreate_db))
+                    _, existed = db_creator.ensure_dsn(dsn=self.rcache_db_dsn)
                 except RuntimeError as ex:
                     error(f"Error creating Rcache database "
                           f"'{db_utils.safe_dsn(self.rcache_db_dsn)}': {ex}")
 
+                if alembic_config:
+                    err = \
+                        db_utils.alembic_ensure_version(
+                            alembic_config=alembic_config,
+                            existing_database=existed,
+                            initial_version=alembic_initial_version,
+                            head_version=alembic_head_version)
+                    error_if(err, err)
                 try:
-                    if recreate_tables:
-                        with engine.connect() as conn:
-                            conn.execute("COMMIT")
-                            for table_name in self.ALL_TABLE_NAMES:
-                                conn.execute(
-                                    f'DROP TABLE IF EXISTS "{table_name}"')
                     self.metadata.create_all(engine)
                     self._read_metadata()
                 except sa.exc.SQLAlchemyError as ex:
