@@ -34,14 +34,13 @@ import os
 import prometheus_client                            # type: ignore
 import random
 import re
-import requests
 import shlex
 import sqlalchemy as sa                             # type: ignore
 import sqlalchemy.dialects.postgresql as sa_pg      # type: ignore
 import string
 import subprocess
 import sys
-from typing import Any, Callable, cast, Dict, Generic, List, NamedTuple, \
+from typing import Any, Callable, Dict, Generic, List, NamedTuple, \
     NoReturn, Optional, Set, Tuple, Type, TypeVar, Union
 import urllib.parse
 import uuid
@@ -3584,7 +3583,6 @@ def do_init_db(args: Any) -> None:
                     arg_conn_str=conn_str, arg_password_file=password_file,
                     recreate=args.recreate)
             try:
-                database = db_class.get_db_name(conn_str)
                 db = db_class(arg_conn_str=conn_str,
                               arg_password_file=password_file)
                 databases.add(db)
@@ -3598,26 +3596,13 @@ def do_init_db(args: Any) -> None:
                 error(f"{db_class.name_for_logs()} database initialization "
                       f"failed: {ex}")
             if alembic_config:
-                error_if(not os.path.isfile(alembic_config),
-                         f"Alembic directory config file'{alembic_config}' "
-                         "not found")
-                if created:
-                    execute(["alembic", "-c", alembic_config, "stamp",
-                             alembic_head_version or "head"])
-                else:
-                    current_version = \
-                        cast(str,
-                             execute(
-                                 ["alembic", "-c", alembic_config, "current"],
-                                 return_stdout=True)).strip()
-                    if not current_version:
-                        error_if(not alembic_initial_version,
-                                 "Initial Alembic version must be provided")
-                        assert alembic_initial_version is not None
-                        execute(["alembic", "-c", alembic_config, "stamp",
-                                 alembic_initial_version])
-                    execute(["alembic", "-c", alembic_config, "upgrade",
-                             alembic_head_version or "head"])
+                err = \
+                    db_utils.alembic_ensure_version(
+                        alembic_config=alembic_config,
+                        existing_database=not created,
+                        initial_version=alembic_initial_version,
+                        head_version=alembic_head_version)
+                error_if(err, err)
         error_if(nothing_done, "Nothing to do")
     finally:
         for db in databases:

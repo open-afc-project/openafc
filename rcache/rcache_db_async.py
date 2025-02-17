@@ -8,6 +8,7 @@
 
 # pylint: disable=wrong-import-order, invalid-name, useless-parent-delegation
 
+import geoalchemy2 as ga
 import urllib.parse
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sa_async
@@ -143,18 +144,19 @@ class RcacheDbAsync(RcacheDb):
         rect -- Lat/lon rectangle to invalidate
         """
         assert self._engine is not None
-        c_lat = self.ap_table.c.lat_deg
-        c_lon = self.ap_table.c.lon_deg
         try:
             upd = sa.update(self.ap_table).\
-                where((self.ap_table.c.state == ApDbRespState.Valid.name) &
-                      (c_lat >= rect.min_lat) & (c_lat <= rect.max_lat) &
-                      (((c_lon >= rect.min_lon) & (c_lon <= rect.max_lon)) |
-                       ((c_lon >= (rect.min_lon - 360)) &
-                        (c_lon <= (rect.max_lon - 360))) |
-                       ((c_lon >= (rect.min_lon + 360)) &
-                        (c_lon <= (rect.max_lon + 360))))).\
+                where(
+                    ga.functions.ST_Covers(
+                        ga.elements.WKTElement(
+                            f"POLYGON(({rect.min_lon} {rect.min_lat}, "
+                            f"{rect.max_lon} {rect.min_lat}, "
+                            f"{rect.max_lon} {rect.max_lat}, "
+                            f"{rect.min_lon} {rect.max_lat}, "
+                            f"{rect.min_lon} {rect.min_lat}))", srid=4326),
+                        self.ap_table.c.coordinates)).\
                 values(state=ApDbRespState.Invalid.name)
+            dp(str(upd.compile(dialect=sa.dialects.postgresql.dialect())))
             async with self._engine.begin() as conn:
                 await conn.execute(upd)
         except sa.exc.SQLAlchemyError as ex:
