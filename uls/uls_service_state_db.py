@@ -215,27 +215,16 @@ class StateDb:
             if not db_existed:
                 self.metadata.create_all(engine)
             if alembic_config:
-                error_if(not os.path.isfile(alembic_config),
-                         f"Alembic directory config file '{alembic_config}' "
-                         "not found")
-                alembic_head_version = alembic_head_version or "head"
-                if not db_existed:
-                    self._alembic(alembic_config=alembic_config,
-                                  args=["stamp", alembic_head_version])
-                else:
-                    current_version = \
-                        cast(str,
-                             self._alembic(alembic_config=alembic_config,
-                                           args=["current"],
-                                           return_stdout=True))
-                    if not current_version:
-                        error_if(not alembic_initial_version,
-                                 "Initial Alembic version must be provided")
-                        assert alembic_initial_version is not None
-                        self._alembic(alembic_config=alembic_config,
-                                      args=["stamp", alembic_initial_version])
-                    self._alembic(alembic_config=alembic_config,
-                                  args=["upgrade", alembic_head_version])
+                err = \
+                    db_utils.alembic_ensure_version(
+                        alembic_config=alembic_config,
+                        existing_database=db_existed,
+                        initial_version=alembic_initial_version,
+                        head_version=alembic_head_version,
+                        env={"ULS_SERVICE_STATE_DB_DSN": self._arg_db_dsn,
+                             "ULS_SERVICE_STATE_DB_PASSWORD_FILE":
+                             self._password_file or ""})
+                error_if(err, err)
             self._read_metadata()
 
             self._engine = engine

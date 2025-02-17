@@ -22,12 +22,6 @@ ENV AFC_DB_CREATOR_URL=http://rat_server/fbrat/admin/CreateDb
 # File with password for Rcache database DSN
 # ENV RCACHE_POSTGRES_PASSWORD_FILE
 
-# What to do if database already exists:
-#  - 'leave' (leave as is - default)
-#  - 'recreate' (completely recreate - e.g. removing alembic, if any)
-#  - 'clean' (only clean the cache table)
-ENV RCACHE_IF_DB_EXISTS=leave
-
 # Maximum number of simultaneous precomputation requests. Default is 10
 ENV RCACHE_PRECOMPUTE_QUOTA=10
 
@@ -46,6 +40,18 @@ ENV RCACHE_PRECOMPUTE_QUOTA=10
 
 # Additional command line parameters for uvicorn
 ENV RCACHE_UVICORN_PARAMS="--no-access-log --log-level info"
+
+# Alembic parameters
+ENV RCACHE_ALEMBIC_CONFIG=/wd/migrations/alembic.ini
+
+# Initial Alembic version (used to stamp existing alembicless database)
+ENV RCACHE_ALEMBIC_INITIAL_VERSION=5663cf8afbd7
+
+# Current Alembic version (used to stamp newly created database). Default is
+# 'head'
+# ENV RCACHE_ALEMBIC_HEAD_VERSION
+
+
 
 WORKDIR /wd
 
@@ -68,9 +74,9 @@ RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
 COPY rcache/requirements.txt /wd
 RUN pip3 install  --root-user-action=ignore -r /wd/requirements.txt
 COPY rcache/rcache_app.py rcache/rcache_app.py rcache/rcache_db_async.py \
-    rcache/rcache_service.py /wd/
-COPY tools/rcache/rcache_tool.py /wd
+    rcache/rcache_service.py tools/rcache/rcache_tool.py /wd/
 RUN chmod a+x /wd/rcache_tool.py
+COPY rcache/migrations /wd/migrations
 
 ENTRYPOINT uvicorn rcache_app:app --host 0.0.0.0 --port ${RCACHE_CLIENT_PORT} \
     ${RCACHE_UVICORN_PARAMS}

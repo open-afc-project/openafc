@@ -9,6 +9,8 @@ aio-pika==9.4.2
 asyncpg==0.29.0
 celery==5.4.0
 fastapi==0.111.1
+GeoAlchemy==0.7.2
+GeoAlchemy2==0.17.0
 gunicorn==23.0.0
 prometheus-client==0.17.1
 requests==2.32.3

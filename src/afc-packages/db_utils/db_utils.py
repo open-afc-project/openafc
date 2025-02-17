@@ -9,10 +9,12 @@
 # pylint: disable=too-many-arguments, invalid-name
 
 import os
-from typing import Any, NoReturn, Optional
+import shlex
+import subprocess
+from typing import Any, cast, Dict, List, NoReturn, Optional
 import urllib.parse
 
-__all__ = ["substitute_password", "safe_dsn"]
+__all__ = ["substitute_password", "safe_dsn", "alembic_ensure_version"]
 
 # Entry names in credential secret file
 CREDENTIAL_USERNAME_FIELD = "username"
@@ -46,7 +48,7 @@ def substitute_password(dsn: Optional[str] = None,
     """
     # What if DSN is unspecified/empty
     if not dsn:
-        error_if(not optional, f"DSN not specified")
+        error_if(not optional, "DSN not specified")
         return dsn
 
     # Obtaining password
@@ -87,3 +89,68 @@ def safe_dsn(dsn: Optional[str]) -> Optional[str]:
                                                  ":<PASSWORD>")))
     except Exception:
         return dsn
+
+
+def alembic_ensure_version(
+        alembic_config: Optional[str], existing_database: bool,
+        initial_version: Optional[str], head_version: Optional[str],
+        env: Optional[Dict[str, str]] = None) \
+        -> Optional[str]:
+    """ Ensures that database is of head alembic version
+
+    Arguments:
+    alembic_config    -- Alembic config file. None to use default
+    existing_database -- True if database already exists (and should be
+                         upgraded to head version), False if it newly created
+                         (and should be stamped by head version)
+    initial_version   -- Version to stamp existing database with (vefore
+                         upgrade) if it has none. Must present if database
+                         exists and not stamped, otherwise can be None
+    head_version      -- Head version. None to use default head version
+    env               -- None or dictionary with additional environment \
+                         variables
+    Returns None on success, error message on fail
+    """
+    if env:
+        env = {**os.environ, **env}
+    alembic_args = ["alembic"]
+    if alembic_config:
+        if not os.path.isfile(alembic_config):
+            return f"Alembic config file'{alembic_config}' not found"
+        alembic_args += ["-c", alembic_config]
+
+    try:
+        def alembic(args: List[str]) -> str:
+            """ Executes alembic command with given subcommand name and
+            arguments
+            Returns stdout
+            """
+            print(" ".join(shlex.quote(arg) for arg in (alembic_args + args)))
+            try:
+                cp = \
+                    subprocess.run(alembic_args + args, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, encoding="utf-8",
+                                   errors="ignore", env=env, check=False)
+                if cp.stdout:
+                    print(cp.stdout)
+                if cp.stderr:
+                    print(cp.stderr)
+                if cp.returncode:
+                    raise RuntimeError(f"Alembic execution failed with code "
+                                       f"{cp.returncode}: {cp.stderr}")
+                return cast(str, cp.stdout)
+            except OSError as ex:
+                raise RuntimeError(f"Unable to run alembic: {ex}")
+
+        if existing_database:
+            current_version = alembic(["current"]).strip()
+            if not current_version:
+                if not initial_version:
+                    return "Initial alembic version must be provided"
+                alembic(["stamp", initial_version])
+            alembic(["upgrade", head_version or "head"])
+        else:
+            alembic(["stamp", head_version or "head"])
+        return None
+    except RuntimeError as ex:
+        return str(ex)

@@ -67,9 +67,9 @@ async def startup() -> None:
     service = get_service()
     await service.connect_db(
         db_creator_url=settings.db_creator_url,
-        create_if_absent=True,
-        recreate_db=settings.if_db_exists == IfDbExists.recreate,
-        recreate_tables=settings.if_db_exists == IfDbExists.clean)
+        alembic_config=settings.alembic_config,
+        alembic_initial_version=settings.alembic_initial_version,
+        alembic_head_version=settings.alembic_head_version)
 
 
 @app.on_event("shutdown")
