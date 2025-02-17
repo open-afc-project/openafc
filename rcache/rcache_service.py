@@ -221,16 +221,24 @@ class RcacheService:
             self._db_connected_event.is_set()
 
     async def connect_db(self, db_creator_url: Optional[str],
-                         create_if_absent=False, recreate_db=False,
-                         recreate_tables=False) -> None:
-        """ Connect to database """
-        if create_if_absent or recreate_db or recreate_tables:
-            self._db.create_db(db_creator_url=db_creator_url,
-                               recreate_db=recreate_db,
-                               recreate_tables=recreate_tables)
+                         alembic_config: Optional[str],
+                         alembic_initial_version: Optional[str],
+                         alembic_head_version: Optional[str]) -> None:
+        """ Connect to database
+
+        Arguments:
+        db_creator_url          -- REST API URL for Postgres database creation
+                                   or None
+        alembic_config          -- Alembic config file. None to do no Alembic
+        alembic_initial_version -- None or version to stamp alembicless
+                                   database with (before upgrade)
+        alembic_head_version    -- Current alembic version. None to use 'head'
+        """
+        self._db.create_db(db_creator_url=db_creator_url,
+                           alembic_config=alembic_config,
+                           alembic_initial_version=alembic_initial_version,
+                           alembic_head_version=alembic_head_version)
         await self._db.connect()
-        err = ApDbRecord.check_db_table(self._db.ap_table)
-        error_if(err, f"Request cache database has unexpected format: {err}")
         self._db_connected_event.set()
 
     async def shutdown(self) -> None:
