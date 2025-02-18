@@ -4,7 +4,7 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-FROM alpine:3.18 as staging
+FROM alpine:3.18.11 as staging
 
 COPY worker/docker-entrypoint.sleep.sh /
 RUN chmod +x /docker-entrypoint.sleep.sh
@@ -12,6 +12,6 @@ RUN chmod +x /docker-entrypoint.sleep.sh
 RUN apk add build-base cmake samurai boost-dev \
 qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev gdal-dev
 
-FROM alpine:3.18
+FROM alpine:3.18.11
 COPY --from=staging / /
 LABEL version="openafc-alpine-build-image"
