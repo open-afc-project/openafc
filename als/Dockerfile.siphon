@@ -9,7 +9,7 @@
 # Kafka and puts them to PostgreSQL+PostGIS database (optionally creating
 # necessary database before operation)
 
-FROM alpine:3.18
+FROM alpine:3.18.11
 
 # Destination in docker image. Not a parameter (i.e. no reasons to change it)
 ARG WORKDIR=/usr/app
