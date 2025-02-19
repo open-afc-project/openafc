@@ -159,6 +159,14 @@ class RcacheDb:
                             head_version=alembic_head_version)
                     error_if(err, err)
                 try:
+                    with engine.connect() as conn:
+                        conn.execute("COMMIT")
+                        conn.execute(
+                            "CREATE EXTENSION IF NOT EXISTS postgis")
+                except sa.exc.SQLAlchemyError as ex:
+                    error(f"Unable to create PostGIS extension in "
+                          f"'{self.db_name}': {ex}")
+                try:
                     self.metadata.create_all(engine)
                     self._read_metadata()
                 except sa.exc.SQLAlchemyError as ex:
