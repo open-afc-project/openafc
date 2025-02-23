@@ -10,7 +10,7 @@
 
 
 
-FROM osgeo/gdal:alpine-normal-3.6.3
+FROM ghcr.io/osgeo/gdal:alpine-normal-3.10.2
 
 RUN apk add py3-pip
 RUN pip install pyaml jsonschema

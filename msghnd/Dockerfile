@@ -6,7 +6,7 @@
 #
 # Install required packages
 #
-FROM alpine:3.18.11 as msghnd.preinstall
+FROM alpine:3.21.3 as msghnd.preinstall
 ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && \
 apk add --update --no-cache py3-six py3-numpy py3-cryptography py3-sqlalchemy \
@@ -29,7 +29,7 @@ RUN echo "AFC_APP_TYPE = 'msghnd'" >> /etc/xdg/fbrat/ratapi.conf
 #
 # Build Message Handler application
 #
-FROM alpine:3.18.11 as msghnd.build
+FROM alpine:3.21.3 as msghnd.build
 ENV PYTHONUNBUFFERED=1
 COPY --from=msghnd.preinstall / /
 # Development env
@@ -47,7 +47,7 @@ ninja -j$(nproc) install
 #
 # Install Message Handler application
 #
-FROM alpine:3.18.11 as msghnd.install
+FROM alpine:3.21.3 as msghnd.install
 ENV PYTHONUNBUFFERED=1
 COPY --from=msghnd.preinstall / /
 COPY --from=msghnd.build /wd/__install /usr/

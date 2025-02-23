@@ -1,4 +1,4 @@
-FROM postgres:14.9-alpine
+FROM postgres:14.17-alpine3.21
 ENV POSTGRES_PASSWORD=postgres
 ENV PGDATA=/mnt/nfs/psql/data
 #

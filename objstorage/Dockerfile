@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18.11
+FROM alpine:3.21.3
 
 RUN apk add py3-pip py3-gunicorn py3-gevent \
     gcc python3-dev libc-dev

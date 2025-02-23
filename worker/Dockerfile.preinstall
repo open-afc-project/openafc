@@ -4,7 +4,7 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-FROM alpine:3.18.11 as staging
+FROM alpine:3.21.3 as staging
 
 RUN addgroup -g 1003 fbrat
 RUN adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat
@@ -20,7 +20,7 @@ imagemagick zip
 COPY worker/requirements.txt /wd/
 RUN pip3 install --root-user-action=ignore -r /wd/requirements.txt
 
-FROM alpine:3.18.11
+FROM alpine:3.21.3
 COPY --from=staging / /
 LABEL version="openafc-worker-preinstall-alpine"
 

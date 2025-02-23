@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18.11
+FROM alpine:3.21.3
 
 # True if enabled (default is True)
 # ENV RCACHE_ENABLED=True

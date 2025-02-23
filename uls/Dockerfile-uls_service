@@ -59,7 +59,7 @@ RUN chmod +x /wd/uls_service.py /wd/uls_service_healthcheck.py \
 
 COPY uls/migrations wd/migrations/
 
-FROM alpine:3.18.11
+FROM alpine:3.21.3
 
 # DOWNLOADER SERVICE PARAMETERS
 
