@@ -57,7 +57,7 @@ class FormatInfo(NamedTuple):
 def postgis_dumps(polygon: shapely.Polygon) -> str:
     """ Returns string that defines keyhole image as a PostGIS geography
     polygon to use in WHERE ST_Covers() expression.
-    
+
     Returns definition with these Jinja-style template inserts:
     {{ CENTER_LAT_DEG }} -- Center latitude in north-positive WGS84 degrees
     {{ CENTER_LON_DEG }} -- Center longitude in east-positive WGS84 degrees
@@ -368,7 +368,6 @@ def main(argv: List[str]) -> None:
             matplotlib.pyplot.axis("equal")
             print("Close drawing window to continue")
             matplotlib.pyplot.show()
-
 
         # Writing to file
         if args.OUTPUT:

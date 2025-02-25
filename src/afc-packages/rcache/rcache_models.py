@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional
 
 from log_utils import dp
 
-__all__ = ["AfcReqRespKey", "ApDbPk", "ApDbRecord", "ApDbRespState", "Beam", \
+__all__ = ["AfcReqRespKey", "ApDbPk", "ApDbRecord", "ApDbRespState", "Beam",
            "FuncSwitch", "IfDbExists", "LatLonRect", "RatapiAfcConfig",
            "RatapiRulesetIds", "RcacheClientSettings",
            "RcacheDirectionalInvalidateReq", "RcacheInvalidateReq",
