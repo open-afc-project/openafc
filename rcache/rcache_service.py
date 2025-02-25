@@ -27,7 +27,8 @@ import als
 from log_utils import dp, error_if, get_module_logger
 from rcache_db_async import RcacheDbAsync
 from rcache_models import AfcReqRespKey, RcacheUpdateReq, ApDbPk, ApDbRecord, \
-    FuncSwitch, RatapiAfcConfig, RatapiRulesetIds, RcacheInvalidateReq, \
+    Beam, FuncSwitch, RatapiAfcConfig, RatapiRulesetIds, \
+    RcacheDirectionalInvalidateReq, RcacheInvalidateReq, \
     LatLonRect, RcacheSpatialInvalidateReq, RcacheStatus
 
 __all__ = ["RcacheService"]
@@ -123,7 +124,8 @@ class RcacheService:
                  rcache_db_password_file: Optional[str],
                  precompute_quota: int, afc_req_url: Optional[str],
                  rulesets_url: Optional[str],
-                 config_retrieval_url: Optional[str]) -> None:
+                 config_retrieval_url: Optional[str],
+                 keyhole_template_file: Optional[str]) -> None:
         """ Constructor
 
         Arguments:
@@ -140,12 +142,15 @@ class RcacheService:
         config_retrieval_url    -- REST API URL for retrieving AFC Config by
                                    Ruleset ID. None to use default maximum AP
                                    FS distance
+        keyhole_template_file   -- None or name of PostGIS keyhole template
+                                   file
         """
         als.als_initialize(client_id="rcache_sevice")
         self._start_time = datetime.datetime.now()
         self._db = \
             RcacheDbAsync(rcache_db_dsn=rcache_db_dsn,
-                          rcache_db_password_file=rcache_db_password_file)
+                          rcache_db_password_file=rcache_db_password_file,
+                          keyhole_template_file=keyhole_template_file)
         self._db_connected_event = asyncio.Event()
         self._afc_req_url = afc_req_url
         self._rulesets_url = rulesets_url.rstrip("/") if rulesets_url else None
@@ -220,6 +225,10 @@ class RcacheService:
         return self._all_tasks_running and \
             self._db_connected_event.is_set()
 
+    def directional_invalidation_supported(self) -> bool:
+        """ True if directional invalidation is suported """
+        return self._db.directional_invalidation_supported()
+
     async def connect_db(self, db_creator_url: Optional[str],
                          alembic_config: Optional[str],
                          alembic_initial_version: Optional[str],
@@ -259,7 +268,8 @@ class RcacheService:
     def invalidate(
             self,
             invalidation_req: Union[RcacheInvalidateReq,
-                                    RcacheSpatialInvalidateReq]) -> None:
+                                    RcacheSpatialInvalidateReq,
+                                    RcacheDirectionalInvalidateReq]) -> None:
         """ Enqueue arrived invalidation requests """
         if isinstance(invalidation_req, RcacheInvalidateReq):
             if invalidation_req.ruleset_ids is None:
@@ -270,6 +280,9 @@ class RcacheService:
         elif isinstance(invalidation_req, RcacheSpatialInvalidateReq):
             for tile in invalidation_req.tiles:
                 self._log_invalidation(invalidate_tile=tile)
+        elif isinstance(invalidation_req, RcacheDirectionalInvalidateReq):
+            for beam in invalidation_req.beams:
+                self._log_invalidation(invalidate_beam=beam)
         self._invalidation_queue.put_nowait(invalidation_req)
 
     async def get_status(self) -> RcacheStatus:
@@ -358,8 +371,7 @@ class RcacheService:
                                 await self._report_invalidation(
                                     f"AFC Config for ruleset '{ruleset_id}' "
                                     f"invalidation", invalid_before)
-                else:
-                    assert isinstance(req, RcacheSpatialInvalidateReq)
+                elif isinstance(req, RcacheSpatialInvalidateReq):
                     max_link_distance_km = \
                         await self._get_max_max_link_distance_km()
                     max_link_distance_deg = \
@@ -384,6 +396,10 @@ class RcacheService:
                                 f"<{rect.short_str()}> with clearance of "
                                 f"{max_link_distance_km}km",
                                 invalid_before)
+                else:
+                    assert isinstance(req, RcacheDirectionalInvalidateReq)
+                    for beam in req.beams:
+                        await self._db.directional_invalidate(beam)
                 self._precompute_event.set()
         except asyncio.CancelledError:
             return
@@ -524,7 +540,8 @@ class RcacheService:
     def _log_invalidation(
             self, enabled: Optional[bool] = None, invalidate_all: bool = False,
             invalidate_ruleset_id: Optional[str] = None,
-            invalidate_tile: Optional[LatLonRect] = None) -> None:
+            invalidate_tile: Optional[LatLonRect] = None,
+            invalidate_beam: Optional[Beam] = None) -> None:
         """ Make ALS log invalidation-related record
 
         Arguments:
@@ -532,6 +549,7 @@ class RcacheService:
         invalidate_all        -- True fie invalidate-all request
         invalidate_ruleset_id -- Ruleset ID ti invalidate or None
         invalidate_tile       -- Tile to invalidate or None
+        invalidate_beam       -- Beam to invalidate or None
         """
         als.als_json_log(
             "rcache_invalidation",
@@ -544,7 +562,14 @@ class RcacheService:
                      "max_lat": invalidate_tile.max_lat,
                      "min_lon": invalidate_tile.min_lon,
                      "max_lon": invalidate_tile.max_lon} if invalidate_tile
-                    else None})
+                    else None,
+                "invalidate_beam":
+                    {"rx_lat": invalidate_beam.rx_lat,
+                     "rx_lon": invalidate_beam.rx_lon,
+                     "tx_lat": invalidate_beam.tx_lat,
+                     "tx_lon": invalidate_beam.tx_lon,
+                     "azimuth_to_tx": invalidate_beam.azimuth_to_tx}
+                    if invalidate_beam else None})
 
     def _log_update(self, enabled: Optional[bool] = None) -> None:
         """ Make ALS log update-related record """
