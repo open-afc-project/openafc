@@ -157,6 +157,13 @@ ENV ULS_ALEMBIC_INITIAL_VERSION=b41cf8a00430
 # URL of Rcache service
 # ENV RCACHE_SERVICE_URL
 
+# YES (TRUE, ...) to use directional rcache invalidation, NO (FALSE, ...) to
+# use tiled invalidation. Former is more precise (as of 20/2/2025 - 13 times on
+# 230 km link distance - which is still woefully imprecise because of antenna
+# diagrams employed by AFC Engine), but requires keyhole shape to be prepared.
+# Default is YES
+# ENV RCACHE_DIRECTIONAL_INVALIDATE
+
 # HEALTHCHECKER PARAMETERS
 # Variables starting with ULS_HEALTH_ related to pronounce service healthy or
 # unhealthy
