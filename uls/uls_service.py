@@ -789,12 +789,14 @@ class UlsFileChecker:
         if not db_diff.valid:
             return (True, "Database difference can't be obtained")
         if ((db_diff.diff_len == 0) and (db_diff.ras_diff_len == 0)) != \
-                (len(db_diff.diff_tiles) == 0):
+                ((len(db_diff.diff_tiles) == 0) and
+                 (len(db_diff.diff_beams) == 0)):
             return \
                 (True,
                  f"Inconsistent indication of database difference: difference "
                  f"is in {db_diff.diff_len} paths and in "
                  f"{db_diff.ras_diff_len} RAS entries, but in "
+                 f"{len(db_diff.diff_beams)} beams and "
                  f"{len(db_diff.diff_tiles)} tiles")
         if self._max_change_percent is None:
             return (False, None)
