@@ -18,18 +18,19 @@ ENV WORKDIR=$WORKDIR
 RUN mkdir -p -m 777 $WORKDIR
 WORKDIR $WORKDIR
 
-RUN apk add --update --no-cache python3=~3.11 py3-sqlalchemy=~1.4 py3-pip \
-    py3-psycopg2 py3-pydantic=~1.10 py3-alembic py3-lz4
+RUN apk add --update --no-cache python3
 
-# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
-# installed as Alpine package (thus not requiring gcc and musl-dev install)
-RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1 && \
-    pip3 install confluent-kafka==2.1.1 && \
-    apk del python3-dev gcc musl-dev
+# Setting up venv in /venv and 'activating' it
+RUN python3 -m venv /venv
+ENV PATH=/venv/bin:$PATH
+ENV VIRTUAL_ENV=/venv
 
+# Installing Python libraries
+RUN apk add --update --no-cache librdkafka-dev=~2.1.1
 COPY als/requirements.txt $WORKDIR/
-RUN pip3 install --no-cache-dir --root-user-action=ignore -r requirements.txt
+RUN apk add --update --no-cache python3-dev gcc musl-dev && \
+    pip3 install --root-user-action=ignore -r $WORKDIR/requirements.txt && \
+    apk del --purge python3-dev gcc musl-dev && rm -f $WORKDIR/requirements.txt
 
 COPY src/afc-packages /wd/afc-packages/
 RUN pip3 install --use-pep517 --root-user-action=ignore \

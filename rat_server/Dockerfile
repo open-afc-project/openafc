@@ -6,37 +6,37 @@
 #
 # Install required packages
 #
-FROM httpd:2.4.58-alpine3.18 as rat_server.preinstall
+FROM httpd:2.4.58-alpine3.18
+# This variable should be set to default Python version for chosen Alpine
+# version. Unfortunately there is no way to get it automagically
+ENV PYTHONVERSION=3.11
+
 ENV PYTHONUNBUFFERED=1
-RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && \
-apk add --update --no-cache py3-six py3-numpy py3-cryptography py3-sqlalchemy \
-py3-requests py3-flask py3-psycopg2 py3-pydantic=~1.10 postfix && \
-python3 -m ensurepip && \
-pip3 install --no-cache --upgrade pip setuptools
+RUN apk add --update --no-cache python3=~${PYTHONVERSION} postfix
 
-# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
-# installed as Alpine package (thus not requiring gcc and musl-dev install)
-RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1 && \
-    pip3 install confluent-kafka==2.1.1 && \
-    apk del python3-dev gcc musl-dev
+# Setting up venv in /venv and 'activating' it
+RUN python3 -m venv /venv
+ENV PATH=/venv/bin:$PATH
+ENV VIRTUAL_ENV=/venv
+# This explicitly set variable and its forceful injection in some places helps
+# to alleviate various venv shortcomings
+ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${PYTHONVERSION}/site-packages:${PYTHONPATH}
 
+# Installing Python libraries
+RUN apk add --update --no-cache librdkafka-dev=~2.1.1
 COPY rat_server/requirements.txt /wd/
-RUN pip3 install -r /wd/requirements.txt && mkdir -p /etc/xdg/fbrat
+RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} gcc g++ musl-dev make expat expat-dev && \
+    pip3 install --no-cache-dir -r /wd/requirements.txt && \
+    apk del --purge python3-dev gcc g++ musl-dev make expat-dev && \
+    rm -f /wd/requirements.txt
+
+RUN mkdir -p /etc/xdg/fbrat
 COPY config/ratapi.conf /etc/xdg/fbrat/
 RUN echo "DEFAULT_ULS_DIR = '/mnt/nfs/rat_transfer/ULS_Database'" >> /etc/xdg/fbrat/ratapi.conf
 RUN echo "AFC_APP_TYPE = 'server'" >> /etc/xdg/fbrat/ratapi.conf
+
 #
 # Build Message Handler application
-#
-FROM httpd:2.4.58-alpine3.18 as rat_server.build
-COPY --from=rat_server.preinstall / /
-# Development env
-RUN apk add --update --no-cache build-base cmake ninja yarn \
-    apr-util-dev python3-dev
-RUN pip3 install --no-cache --upgrade mod_wsgi \
-    && mod_wsgi-express install-module
-#
 #
 COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /wd/
 COPY cmake /wd/cmake/
@@ -45,19 +45,23 @@ COPY src /wd/src/
 RUN mkdir -p -m 777 /wd/build
 ARG BUILDREV=localbuild
 ARG NODE_OPTIONS=--openssl-legacy-provider
-RUN cd /wd/build && \
-cmake -DCMAKE_INSTALL_PREFIX=/wd/__install -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiWebDebug -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
-ninja -j$(nproc) install
+
+RUN apk list -I && \
+    apk add --update --no-cache build-base cmake ninja yarn \
+        apr-util-dev python3-dev=~${PYTHONVERSION} && \
+    mod_wsgi-express install-module && \
+    cd /wd/build && \
+    cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiWebDebug -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
+    env PYTHONPATH=${PYTHONPATH} \
+        ninja -j$(nproc) install && \
+    yarn cache clean && \
+    apk del --purge build-base cmake ninja yarn apr-util-dev python3-dev && \
+    rm -rf /wd/cmake/ /wd/pkg/ /wd/src/ /wd/build
 #
 # Install Message Handler application
 #
-FROM httpd:2.4.58-alpine3.18 as install_image
-COPY --from=rat_server.preinstall / /
-COPY --from=rat_server.build /wd/__install /usr/
-COPY --from=rat_server.build /usr/lib/python3.11/site-packages/mod_wsgi /usr/lib/python3.11/site-packages/mod_wsgi
-#
 COPY src/afc-packages /wd/afc-packages
-RUN pip3 install --use-pep517 --root-user-action=ignore \
+RUN pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
         -r /wd/afc-packages/pkgs.rat_server \
     && rm -rf /wd/afc-packages
 #

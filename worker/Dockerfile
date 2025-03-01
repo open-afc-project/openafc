@@ -4,48 +4,80 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 
-# default value of args
-ARG BLD_TAG=1.0.1.0
-ARG PRINST_TAG=1.0.1.0
-ARG BLD_NAME=ghcr.io/open-afc-project/worker-al-build-image
-ARG PRINST_NAME=ghcr.io/open-afc-project/worker-al-preinstall
+FROM alpine:3.18.11
+# This variable should be set to default Python version for chosen Alpine
+# version. Unfortunately there is no way to get it automagically
+ENV PYTHONVERSION=3.11
 
-# Stage Build
-FROM ${BLD_NAME}:${BLD_TAG} as build_image
+LABEL revision="afc-worker-al"
+ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
+ENV AFC_WORKER_USER=${AFC_WORKER_USER}
+ENV AFC_WORKER_CELERY_WORKERS=${AFC_WORKER_CELERY_WORKERS:-"rat_1"}
+ENV AFC_WORKER_CELERY_LOG=${AFC_WORKER_CELERY_LOG:-WARNING}
+ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
+ARG AFC_WORKER_UID=${AFC_WORKER_UID}
 
+# True to update Rcache by AFC Response sender (Worker), False to update by
+# AFC REsponse receiver (MsgHandler, RatAPI)
+ENV RCACHE_UPDATE_ON_SEND=True
+
+RUN apk add --update --no-cache python3=~${PYTHONVERSION} \
+    boost1.82-program_options boost1.82-log boost1.82-filesystem \
+    boost1.82-thread qt5-qtbase armadillo minizip libgeotiff \
+    qt5-qtbase-sqlite libbsd gdal tzdata imagemagick zip
+
+# Setting up venv in /venv and 'activating' it
+RUN python3 -m venv /venv
+ENV PATH=/venv/bin:$PATH
+ENV VIRTUAL_ENV=/venv
+# This explicitly set variable and its forceful injection in some places helps
+# to alleviate various venv shortcomings
+ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${PYTHONVERSION}/site-packages:${PYTHONPATH}
+
+# Installing Python libraries
+RUN apk add --update --no-cache librdkafka-dev=~2.1.1
+COPY worker/requirements.txt /wd/
+RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} gcc g++ musl-dev make expat expat-dev && \
+    pip3 install --no-cache-dir -r /wd/requirements.txt && \
+    apk del --purge python3-dev gcc g++ musl-dev make expat-dev && \
+    rm -f /wd/requirements.txt
+
+# Building AFC Engine
 ARG BUILDREV=localbuild
-COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /root/afc/
-COPY cmake /root/afc/cmake/
-COPY pkg /root/afc/pkg/
-COPY selinux /root/afc/selinux/
-COPY src /root/afc/src/
-
-RUN mkdir -p -m 777 /root/afc/build
+COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /build/afc/
+COPY cmake /build/afc/cmake/
+COPY pkg /build/afc/pkg/
+COPY selinux /build/afc/selinux/
+COPY src /build/afc/src/
+    
+RUN mkdir -p -m 777 /build/afc/build
 ARG BUILDREV=localbuild
-RUN cd /root/afc/build && \
-cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /root/afc && \
-ninja -j$(nproc) install
-RUN cd /root/afc/src/afc-engine-preload && make && cp libaep.so /root/afc/__install/lib/ && cp parse_fs.py /root/afc/__install/bin/
-RUN strip --strip-unneeded /root/afc/__install/bin/afc-engine
-RUN strip --strip-unneeded /root/afc/__install/lib/*.so
-#
-# Stage Install
-#
-FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
-COPY --from=build_image /root/afc/__install /usr/
+    
+RUN cd /build/afc/build && \
+    apk add --update --no-cache build-base cmake samurai boost-dev \
+        qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev gdal-dev && \
+    cmake -DCMAKE_INSTALL_PREFIX=/build/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /build/afc && \
+    env PYTHONPATH=${PYTHONPATH} \
+        ninja -j$(nproc) install && \
+    cd /build/afc/src/afc-engine-preload && make && \
+    cp libaep.so /build/afc/__install/lib/ && \
+    cp parse_fs.py /build/afc/__install/bin/ && \
+    strip --strip-unneeded /build/afc/__install/bin/afc-engine && \
+    strip --strip-unneeded /build/afc/__install/lib/*.so && \
+    cp -r /build/afc/__install/* /usr && \
+    apk del --purge build-base cmake samurai boost-dev \
+        qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev gdal-dev && \
+    rm -rf /build
+
 
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
         -r /wd/afc-packages/pkgs.worker \
     && rm -rf /wd/afc-packages
 
-# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
-# installed as Alpine package (thus not requiring gcc and musl-dev install)
-RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1 && \
-    pip3 install confluent-kafka==2.1.1 && \
-    apk del python3-dev gcc musl-dev
-
+RUN addgroup -g 1003 fbrat
+RUN adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat
+    
 RUN mkdir -m 755 -p /var/spool/fbrat
 RUN mkdir -m 755 -p /var/lib/fbrat
 RUN mkdir -m 755 -p /var/celery
@@ -64,23 +96,8 @@ ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
 # set alternative user
 ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
-ARG AFC_WORKER_UID=${AFC_WORKER_UID}
 RUN /wd/devel.sh
 RUN rm -f /wd/devel.sh /wd/ddd.tar.gz
-
-FROM alpine:3.18.11
-COPY --from=install_image / /
-
-LABEL revision="afc-worker-al"
-ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
-ENV AFC_WORKER_USER=${AFC_WORKER_USER}
-ENV AFC_WORKER_CELERY_WORKERS=${AFC_WORKER_CELERY_WORKERS:-"rat_1"}
-ENV AFC_WORKER_CELERY_LOG=${AFC_WORKER_CELERY_LOG:-WARNING}
-ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
-
-# True to update Rcache by AFC Response sender (Worker), False to update by
-# AFC REsponse receiver (MsgHandler, RatAPI)
-ENV RCACHE_UPDATE_ON_SEND=True
 
 WORKDIR /wd
 ENV PGPORT=5432
