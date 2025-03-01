@@ -255,16 +255,10 @@ cd bulk_postgres && docker build . -t bulk_postgres -f Dockerfile; cd ../
 
 ### celery worker prereq containers
 
-```
-docker build . -t worker-preinst -f worker/Dockerfile.preinstall
-
-docker build . -t worker-build -f worker/Dockerfile.build
-```
-
 to build the worker using local preq containers:
 
 ```
-docker build . -t worker -f worker/Dockerfile --build-arg PRINST_NAME=worker-preinst --build-arg PRINST_TAG=latest --build-arg BLD_NAME=worker-build  --build-arg BLD_TAG=latest
+docker build . -t worker -f worker/Dockerfile
 ```
 
 ### Prometheus Monitoring images
