@@ -96,9 +96,9 @@ RUN pip3 install --use-pep517 --root-user-action=ignore \
 # Installing Pthon libraries
 RUN apk add --update --no-cache librdkafka-dev=~2.1.1
 COPY afc_server/requirements.txt /wd
-RUN apk add --update --no-cache python3-dev gcc musl-dev && \
+RUN apk add --update --no-cache python3-dev build-base && \
     pip3 install --no-cache-dir --root-user-action=ignore -r /wd/requirements.txt && \
-    apk del --purge python3-dev gcc musl-dev && rm -f /wd/requirements.txt
+    apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
 
 COPY afc_server/afc_server_app.py afc_server/afc_server_compute.py \
     afc_server/afc_server_db.py afc_server/afc_server_models.py \

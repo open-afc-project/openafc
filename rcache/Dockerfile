@@ -62,9 +62,9 @@ WORKDIR /wd
 
 RUN apk add --update --no-cache librdkafka-dev=~2.1.1
 COPY rcache/requirements.txt /wd
-RUN apk add --update --no-cache python3-dev gcc musl-dev && \
+RUN apk add --update --no-cache python3-dev build-base && \
     pip3 install --root-user-action=ignore  --no-cache-dir -r /wd/requirements.txt && \
-    apk del --purge python3-dev gcc musl-dev && rm -f /wd/requirements.txt
+    apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
 
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \

@@ -25,9 +25,9 @@ ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${P
 # Installing Python libraries
 RUN apk add --update --no-cache librdkafka-dev=~2.1.1
 COPY cert_db/requirements.txt /wd/
-RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} gcc g++ musl-dev && \
+RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} build-base && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \
-    apk del --purge python3-dev gcc g++ musl-dev && rm -f /wd/requirements.txt
+    apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
 
 RUN mkdir -p /etc/xdg/fbrat
 COPY config/ratapi.conf /etc/xdg/fbrat/

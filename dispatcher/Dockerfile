@@ -24,10 +24,10 @@ COPY dispatcher/requirements.txt /wd
 COPY src/afc-packages ./afc-packages
 # install
 RUN set -x \
-    &&  apk add --update --no-cache python3-dev gcc musl-dev linux-headers \
+    &&  apk add --update --no-cache python3-dev build-base linux-headers \
     && pip3 install --no-cache --root-user-action=ignore \
      -r /wd/requirements.txt \
-    && apk del --purge python3-dev gcc musl-dev linux-headers \
+    && apk del --purge python3-dev build-base linux-headers \
     && pip3 install --use-pep517 --root-user-action=ignore \
         -r /wd/afc-packages/pkgs.dispatcher \
     && rm -rf /wd/afc-packages /wd/requirements.txt \
