@@ -49,10 +49,10 @@ COPY cmake /build/afc/cmake/
 COPY pkg /build/afc/pkg/
 COPY selinux /build/afc/selinux/
 COPY src /build/afc/src/
-    
+
 RUN mkdir -p -m 777 /build/afc/build
 ARG BUILDREV=localbuild
-    
+
 RUN cd /build/afc/build && \
     apk add --update --no-cache build-base cmake samurai boost-dev \
         qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev gdal-dev && \
@@ -77,7 +77,7 @@ RUN pip3 install --use-pep517 --root-user-action=ignore \
 
 RUN addgroup -g 1003 fbrat
 RUN adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat
-    
+
 RUN mkdir -m 755 -p /var/spool/fbrat
 RUN mkdir -m 755 -p /var/lib/fbrat
 RUN mkdir -m 755 -p /var/celery

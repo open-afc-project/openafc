@@ -243,7 +243,7 @@ COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
         -r /wd/afc-packages/pkgs.uls \
     && rm -rf /wd/afc-packages
-    
+
 COPY uls/uls_service*.py uls/fsid_tool.py uls/fs_db_diff.py uls/fs_afc.py \
     uls/fs_afc.yaml /wd/
 RUN chmod -x /wd/*.py

@@ -93,7 +93,7 @@ RUN pip3 install --use-pep517 --root-user-action=ignore \
     --no-cache-dir -r /wd/afc-packages/pkgs.afc_server \
     && rm -rf /wd/afc-packages
 
-# Installing Pthon libraries 
+# Installing Pthon libraries
 RUN apk add --update --no-cache librdkafka-dev=~2.1.1
 COPY afc_server/requirements.txt /wd
 RUN apk add --update --no-cache python3-dev gcc musl-dev && \
