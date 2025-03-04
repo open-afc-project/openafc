@@ -93,7 +93,11 @@ ENV ALEMBIC_CONFIG=$WORKDIR/als_migrations/alembic.ini
 # Alembic version of last pre-alembic (first alembic) ALS database
 ENV ALS_ALEMBIC_INITIAL_VERSION=4aaf4b7e53f5
 
-COPY als/als_siphon.py als/als_query.py als/utils.py $WORKDIR/
+# Name of file containing heyhole shape for als_query directional search
+ENV KEYHOLE_TEMPLATE_FILE=$WORKDIR/keyhole_postgis.template
+
+COPY als/als_siphon.py als/als_query.py als/utils.py \
+    tools/keyhole/keyhole_postgis.template $WORKDIR/
 COPY als/als_migrations $WORKDIR/als_migrations/
 
 RUN chmod a+x $WORKDIR/als_*.py
