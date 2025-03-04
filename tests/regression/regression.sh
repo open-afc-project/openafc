@@ -29,8 +29,6 @@ NGINXEXPORTER="${PUB_REPO}/nginxexporter-image"               # Nginx-exporter
 GEO_CONVERTERS="${PUB_REPO}/geo-converters-image"             # Geodeti cconverters
 
 WORKER=${PRIV_REPO}"/afc-worker"                                    # msghnd image
-WORKER_AL_D4B="${PUB_REPO}/worker-al-build-image" # Alpine worker build img
-WORKER_AL_PRINST="${PUB_REPO}/worker-al-preinstall" # Alpine worker preinst
 
 ULS_UPDATER=${PRIV_REPO}"/uls-updater"                # ULS Updater image
 ULS_DOWNLOADER="${PUB_REPO}/uls-downloader" # ULS Downloader image
@@ -126,13 +124,6 @@ build_dev_server() {
   check_ret $?
 
   build_pids=(); build_names=(); failed_images=()
-
-  # build in parallel server docker prereq images (preinstall and docker_for_build)
-    docker_build_and_push ${wd}/worker/Dockerfile.build ${WORKER_AL_D4B}:${tag} ${push} &
-    build_pids+=( $! ) ; build_names+=( ${WORKER_AL_D4B} )
-
-    docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${WORKER_AL_PRINST}:${tag} ${push} &
-    build_pids+=( $! ) ; build_names+=( ${WORKER_AL_PRINST} )
 
   msg "wait for prereqs to be built"
   # wait for background jobs to be done

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 ''' This program is used to run a command in the background, with
 its output redirected to a log file. The program prints periodic
 status messages to avoid timeouts of the runner of this program.

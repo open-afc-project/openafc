@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 ''' This program takes a source RPM repository (or collection of packages)
 An divides them into two categories:
  - public, including only noarch and binary

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 ''' This program walks a "debuginfo" tree and extracts Google
 breakpad symbol data into a symbol tree.
 '''

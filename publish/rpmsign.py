@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 # Uses CentOS packages: python2-gnupg pexpect rpm-sign
 import argparse
 import contextlib

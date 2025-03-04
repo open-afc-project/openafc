@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 ''' This program takes a source RPM repository (or collection of packages)
 An moves files out of the source tree into a destination directory based
 on the package name and architecture.
