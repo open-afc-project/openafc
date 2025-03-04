@@ -13,8 +13,9 @@ import requests
 from typing import Any, Dict, List, Optional
 
 from log_utils import dp, error, FailOnError
-from rcache_models import AfcReqRespKey, RcacheUpdateReq, \
-    RcacheInvalidateReq, LatLonRect, RcacheSpatialInvalidateReq
+from rcache_models import AfcReqRespKey, Beam, LatLonRect, \
+    RcacheDirectionalInvalidateReq, RcacheInvalidateReq, \
+    RcacheSpatialInvalidateReq, RcacheUpdateReq
 
 
 class RcacheRcache:
@@ -79,6 +80,25 @@ class RcacheRcache:
             try:
                 self._post(command="spatial_invalidate",
                            json=RcacheSpatialInvalidateReq(tiles=tiles).dict())
+            except pydantic.ValidationError as ex:
+                error(f"Invalid argument format: {ex}")
+            return True
+        return False
+
+    def directional_invalidate_cache(self, beams: List[Beam],
+                                     fail_on_error: bool = True) -> bool:
+        """ Directional invalidation of request cache
+
+        Arguments:
+        beams         -- List of RX beams of changed FSs
+        fail_on_error -- True to fail on error, False to return False
+        Returns True on success, False on known fail if fail_on_error is False
+        """
+        with FailOnError(fail_on_error):
+            try:
+                self._post(
+                    command="directional_invalidate",
+                    json=RcacheDirectionalInvalidateReq(beams=beams).dict())
             except pydantic.ValidationError as ex:
                 error(f"Invalid argument format: {ex}")
             return True

@@ -23,9 +23,10 @@ from typing import Any, Dict, List, Optional
 
 from log_utils import dp
 
-__all__ = ["AfcReqRespKey", "ApDbPk", "ApDbRecord", "ApDbRespState",
+__all__ = ["AfcReqRespKey", "ApDbPk", "ApDbRecord", "ApDbRespState", "Beam",
            "FuncSwitch", "IfDbExists", "LatLonRect", "RatapiAfcConfig",
-           "RatapiRulesetIds", "RcacheClientSettings", "RcacheInvalidateReq",
+           "RatapiRulesetIds", "RcacheClientSettings",
+           "RcacheDirectionalInvalidateReq", "RcacheInvalidateReq",
            "RCACHE_RMQ_EXCHANGE_NAME", "RcacheServiceSettings",
            "RcacheSpatialInvalidateReq", "RcacheStatus", "RcacheUpdateReq",
            "RmqReqRespKey"]
@@ -40,7 +41,7 @@ RESP_EXPIRATION_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 class IfDbExists(enum.Enum):
-    """ What to do if cache database exists on RCache service startup """
+    """ What to do if cache database exists on Rcache service startup """
     # Leave as is (default)
     leave = "leave"
     # Completely recreate (extra stuff, like alembic, will be removed)
@@ -102,6 +103,9 @@ class RcacheServiceSettings(pydantic.BaseSettings):
         pydantic.Field(
             None,
             title="RestAPI URL to retrieve AFC Config for given Ruleset ID")
+    keyhole_template: Optional[str] = \
+        pydantic.Field(
+            None, title="Keyhole shape PostGIS template file")
 
     @classmethod
     @pydantic.root_validator(pre=True)
@@ -208,7 +212,7 @@ class LatLonRect(pydantic.BaseModel):
 
 
 class RcacheInvalidateReq(pydantic.BaseModel):
-    """ RCache REST API cache invalidation request """
+    """ Rcache REST API cache invalidation request """
     ruleset_ids: Optional[List[str]] = \
         pydantic.Field(None,
                        title="Optional list of ruleset IDs to invalidate. By "
@@ -216,9 +220,62 @@ class RcacheInvalidateReq(pydantic.BaseModel):
 
 
 class RcacheSpatialInvalidateReq(pydantic.BaseModel):
-    """ RCache REST API spatial invalidation request """
+    """ Rcache REST API spatial invalidation request """
     tiles: List[LatLonRect] = \
         pydantic.Field(..., title="List of rectangles, containing changed FSs")
+
+
+class Beam(pydantic.BaseModel):
+    rx_lat: float = \
+        pydantic.Field(
+            ...,
+            title="FS/PR RX WGS84 latitude in north-positive degrees")
+    rx_lon: float = \
+        pydantic.Field(
+            ...,
+            title="FS/PR RX WGS84 longitude in east-positive degrees")
+    tx_lat: Optional[float] = \
+        pydantic.Field(
+            None,
+            title="FS/PR TX WGS84 latitude in north-positive degrees. Absent "
+            "if azimuth to TX is specified")
+    tx_lon: Optional[float] = \
+        pydantic.Field(
+            None,
+            title="FS/PR TX WGS84 longitude in east-positive degrees. Absent "
+            "if azimuth to TX is specified")
+    azimuth_to_tx: Optional[float] = \
+        pydantic.Field(
+            None,
+            title="True WGS84 azimuth from RX to TX. Absent if TX position is "
+            "specified")
+
+    @classmethod
+    @pydantic.root_validator()
+    def one_definition(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        """ Verifies that direction to TX specified in exactly one way """
+        if (v.get("tx_lat") is None) != (v.get("tx_lon") is None):
+            raise ValueError("TX latitude/longitude should be specified both "
+                             "or not at all")
+        if (v.get("tx_lat") is None) == (v.get("azimuth_to_tx") is None):
+            raise ValueError("Either TX position or azimuth to TX (but not "
+                             "both) should be specified")
+
+    def short_str(self) -> str:
+        """ Condensed string representation """
+        return \
+            f"RX: {abs(self.rx_lat)}{'N' if self.rx_lat >= 0 else 'S'}, " \
+            f"{abs(self.rx_lon)}{'E' if self.rx_lon >= 0 else 'W'}; " + \
+            (f"azimith to TX: {self.azimuth_to_tx}"
+             if self.azimuth_to_tx is not None
+             else f"TX: {abs(self.tx_lat)}{'N' if self.tx_lat >= 0 else 'S'}, "
+             f"{abs(self.tx_lon)}{'E' if self.tx_lon >= 0 else 'W'}")
+
+
+class RcacheDirectionalInvalidateReq(pydantic.BaseModel):
+    """ Rcache REST API directional invalidation request """
+    beams: List[Beam] = \
+        pydantic.Field(..., title="List of beam definitions for changed FSs")
 
 
 class AfcReqRespKey(pydantic.BaseModel):
@@ -237,7 +294,7 @@ class AfcReqRespKey(pydantic.BaseModel):
 
 
 class RcacheUpdateReq(pydantic.BaseModel):
-    """ RCache REST API cache update request """
+    """ Rcache REST API cache update request """
     req_resp_keys: List[AfcReqRespKey] = \
         pydantic.Field(..., title="Computation results to add to cache")
 

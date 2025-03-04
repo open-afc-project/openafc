@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18
+FROM alpine:3.18.11
 
 # Port REST API service listen on. Mandatory
 # ENV AFC_SERVER_PORT

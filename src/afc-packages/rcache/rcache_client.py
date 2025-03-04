@@ -21,7 +21,8 @@ except ImportError:
     pass
 
 try:
-    from rcache_models import AfcReqRespKey, LatLonRect, RcacheClientSettings
+    from rcache_models import AfcReqRespKey, Beam, LatLonRect, \
+        RcacheClientSettings
     from rcache_rcache import RcacheRcache
 except ImportError:
     pass
@@ -178,11 +179,21 @@ class RcacheClient:
                                              if isinstance(ruleset_ids, str)
                                              else ruleset_ids)
 
-    def rcache_spatial_invalidate(self, tiles: List["LatLonRect"]) -> None:
+    def rcache_spatial_invalidate(self, tiles: List[LatLonRect]) -> None:
         """ Spatial invalidation
 
         Arguments:
-        tiles -- List of latitude/longitude rectangles containing changed FSs
+        tiles -- List of latitude/longitude rectangles containing changed
+                 FSs/RASs
         """
         assert self._rcache_rcache is not None
         self._rcache_rcache.spatial_invalidate_cache(tiles=tiles)
+
+    def rcache_directional_invalidate(self, beams: List[Beam]) -> None:
+        """ Spatial invalidation
+
+        Arguments:
+        beams -- List of RX beams of changed FSs
+        """
+        assert self._rcache_rcache is not None
+        self._rcache_rcache.directional_invalidate_cache(beams=beams)

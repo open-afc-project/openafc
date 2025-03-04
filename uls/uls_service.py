@@ -17,6 +17,7 @@
 import argparse
 import datetime
 import glob
+import json
 import logging
 import os
 import prometheus_client
@@ -40,7 +41,7 @@ import urllib.request
 import als
 from db_utils import safe_dsn
 from rcache_client import RcacheClient
-from rcache_models import LatLonRect, RcacheClientSettings
+from rcache_models import Beam, LatLonRect, RcacheClientSettings
 from pydantic_utils import env_help, merge_args
 from uls_service_common import *
 from uls_service_state_db import CheckType, DownloaderMilestone, LogType, \
@@ -185,6 +186,11 @@ class Settings(pydantic.BaseSettings):
         pydantic.Field(True, env="RCACHE_ENABLED",
                        description="Rcache spatial invalidation",
                        yes="Enabled", no="Disabled")
+    rcache_directional_invalidate: bool = \
+        pydantic.Field(
+            True, env="RCACHE_DIRECTIONAL_INVALIDATE",
+            description="True to use directional invalidation (default), "
+            "False to use tiled invalidation)")
     delay_hr: float = \
         pydantic.Field(0., env="ULS_DELAY_HR",
                        description="Hours to delay first download by")
@@ -611,17 +617,22 @@ class DbDiff:
     new_len      -- Number of paths in new database
     diff_len     -- Number of different paths
     ras_diff_len -- Number of different RAS entries
-    diff_tiles   -- Tiles containing receivers of different paths
+    diff_tiles   -- Tiles to invalidate
+    diff_beams   -- Beams to invalidate
     """
 
     def __init__(self, prev_filename: str, new_filename: str,
-                 executor: LoggingExecutor) -> None:
+                 executor: LoggingExecutor,
+                 allow_directional_invalidate: bool) -> None:
         """ Constructor
 
         Arguments:
-        prev_filename -- Previous file name
-        new_filename  -- New filename
-        executor      -- LoggingExecutor object
+        prev_filename                -- Previous file name
+        new_filename                 -- New filename
+        executor                     -- LoggingExecutor object
+        allow_directional_invalidate -- True if directional invalidate is
+                                        allowed, False if only tiled one is
+                                        allowed
         """
         self.valid = False
         self.prev_len = 0
@@ -630,14 +641,28 @@ class DbDiff:
         self.prev_filename = prev_filename
         self.new_filename = new_filename
         self.diff_tiles: List[LatLonRect] = []
+        self.diff_beams: List[Beam] = []
         logging.info("Getting differences with previous database")
-        output = \
-            executor.execute(
-                [FS_DB_DIFF, "--report_tiles", prev_filename, new_filename],
-                timeout_sec=10 * 60, return_output=True, fail_on_error=False)
-        if output is None:
-            logging.error("Database comparison failed")
-            return
+
+        invalidation_file: Optional[str] = None
+        try:
+            fd, invalidation_file = tempfile.mkstemp(suffix=".json",
+                                                     prefix="invalidation_")
+            os.close(fd)
+            output = \
+                executor.execute(
+                    [FS_DB_DIFF, "--invalidation", invalidation_file,
+                     prev_filename, new_filename],
+                    timeout_sec=10 * 60, return_output=True,
+                    fail_on_error=False)
+            if output is None:
+                logging.error("Database comparison failed")
+                return
+            with open(invalidation_file, encoding="utf-8") as f:
+                invalidation_dict = json.load(f)
+        finally:
+            if invalidation_file:
+                os.unlink(invalidation_file)
         m = re.search(r"Paths in DB1:\s+(?P<db1>\d+)(.|\n)+"
                       r"Paths in DB2:\s+(?P<db2>\d+)(.|\n)+"
                       r"Different paths:\s+(?P<diff>\d+)(.|\n)+"
@@ -651,20 +676,31 @@ class DbDiff:
         self.new_len = int(cast(str, m.group("db2")))
         self.diff_len = int(cast(str, m.group("diff")))
         self.ras_diff_len = int(cast(str, m.group("ras_diff")))
-        for m in re.finditer(
-                r"Difference in tile "
-                r"\[(?P<min_lat>[0-9.]+)-(?P<max_lat>[0-9.]+)\]"
-                r"(?P<lat_sign>[NS]), "
-                r"\[(?P<min_lon>[0-9.]+)-(?P<max_lon>[0-9.]+)\]"
-                r"(?P<lon_sign>[EW])", cast(str, output)):
-            lat_sign = 1 if m.group("lat_sign") == "N" else -1
-            lon_sign = 1 if m.group("lon_sign") == "E" else -1
+        for beam_dict in invalidation_dict["beams"]:
+            if not (allow_directional_invalidate and
+                    any(dir_key in beam_dict for dir_key in
+                        ("tx_lat_deg", "tx_lon_deg", "tx_azimuth_deg"))):
+                self.diff_tiles.append(
+                    LatLonRect(
+                        min_lat=beam_dict["rx_lat_deg"],
+                        max_lat=beam_dict["rx_lat_deg"],
+                        min_lon=beam_dict["rx_lon_deg"],
+                        max_lon=beam_dict["rx_lon_deg"]))
+            else:
+                self.diff_beams.append(
+                    Beam(
+                        rx_lat=beam_dict["rx_lat_deg"],
+                        rx_lon=beam_dict["rx_lon_deg"],
+                        tx_lat=beam_dict.get("tx_lat_deg"),
+                        tx_lon=beam_dict.get("tx_lon_deg"),
+                        azimuth_to_tx=beam_dict.get("tx_azimuth_deg")))
+        for rect_dict in invalidation_dict["rectangles"]:
             self.diff_tiles.append(
                 LatLonRect(
-                    min_lat=float(m.group("min_lat")) * lat_sign,
-                    max_lat=float(m.group("max_lat")) * lat_sign,
-                    min_lon=float(m.group("min_lon")) * lon_sign,
-                    max_lon=float(m.group("max_lon")) * lon_sign))
+                    min_lat=rect_dict["min_lat_deg"],
+                    max_lat=rect_dict["max_lat_deg"],
+                    min_lon=rect_dict["min_lon_deg"],
+                    max_lon=rect_dict["max_lon_deg"]))
         self.valid = True
         logging.info(str(self))
 
@@ -676,6 +712,7 @@ class DbDiff:
             f"paths, {os.path.basename(self.new_filename)} has " \
             f"{self.new_len} paths, difference is in {self.diff_len} paths, " \
             f"{self.ras_diff_len} RAS entries, " \
+            f"{len(self.diff_beams)} beams" \
             f"{len(self.diff_tiles)} tiles" \
             if self.valid else "Not computed"
 
@@ -752,12 +789,14 @@ class UlsFileChecker:
         if not db_diff.valid:
             return (True, "Database difference can't be obtained")
         if ((db_diff.diff_len == 0) and (db_diff.ras_diff_len == 0)) != \
-                (len(db_diff.diff_tiles) == 0):
+                ((len(db_diff.diff_tiles) == 0) and
+                 (len(db_diff.diff_beams) == 0)):
             return \
                 (True,
                  f"Inconsistent indication of database difference: difference "
                  f"is in {db_diff.diff_len} paths and in "
                  f"{db_diff.ras_diff_len} RAS entries, but in "
+                 f"{len(db_diff.diff_beams)} beams and "
                  f"{len(db_diff.diff_tiles)} tiles")
         if self._max_change_percent is None:
             return (False, None)
@@ -1249,7 +1288,9 @@ def main(argv: List[str]) -> None:
 
                     db_diff = DbDiff(prev_filename=current_uls_file,
                                      new_filename=temp_uls_file_name,
-                                     executor=executor) \
+                                     executor=executor,
+                                     allow_directional_invalidate=settings.
+                                     rcache_directional_invalidate) \
                         if has_previous else None
                     if db_diff:
                         als_record.db_difference = str(db_diff)
@@ -1277,20 +1318,34 @@ def main(argv: List[str]) -> None:
                             executor=executor)
                         als_record.fs_db_name = os.path.basename(new_uls_file)
                         als_record.now(field_name="updated_time")
-                        if rcache and (db_diff is not None) and \
-                                db_diff.diff_tiles:
-                            tile_list = \
-                                "<" + \
-                                ">, <".join(tile.short_str() for tile in
-                                            db_diff.diff_tiles[: 1000]) + \
-                                ">"
-                            logging.info(f"Requesting invalidation of the "
-                                         f"following tiles: {tile_list}")
-                            als_record.invalidation = \
-                                [tile.short_str() for tile in
-                                 db_diff.diff_tiles[: 1000]]
-                            rcache.rcache_spatial_invalidate(
-                                tiles=db_diff.diff_tiles)
+                        if rcache and (db_diff is not None):
+                            if db_diff.diff_beams:
+                                beam_list = \
+                                    "<" + \
+                                    ">, <".join(beam.short_str() for beam in
+                                                db_diff.diff_beams[: 1000]) + \
+                                    ">"
+                                logging.info(f"Requesting invalidation of the "
+                                             f"following beams: {beam_list}")
+                                als_record.invalidation = \
+                                    [beam.short_str() for beam in
+                                     db_diff.diff_beams[: 1000]]
+                                rcache.rcache_directional_invalidate(
+                                    beams=db_diff.diff_beams)
+                            if db_diff.diff_tiles:
+                                tile_list = \
+                                    "<" + \
+                                    ">, <".join(tile.short_str() for tile in
+                                                db_diff.diff_tiles[: 1000]) + \
+                                    ">"
+                                logging.info(f"Requesting invalidation of the "
+                                             f"following tiles: {tile_list}")
+                                als_record.invalidation = \
+                                    (als_record.invalidation or []) + \
+                                    [tile.short_str() for tile in
+                                     db_diff.diff_tiles[: 1000]]
+                                rcache.rcache_spatial_invalidate(
+                                    tiles=db_diff.diff_tiles)
 
                         # Update data change times (for health checker)
                         status_updater.milestone(
