@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # Portions copyright © 2022 Broadcom. All rights reserved.
 # The term "Broadcom" refers solely to the Broadcom Inc. corporate
 # affiliate that owns the software below.
