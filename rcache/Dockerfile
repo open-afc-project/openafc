@@ -80,6 +80,7 @@ COPY rcache/rcache_app.py rcache/rcache_app.py rcache/rcache_db_async.py \
     rcache/rcache_service.py tools/rcache/rcache_tool.py \
     tools/keyhole/keyhole_gen.py tools/keyhole/keyhole_postgis.template /wd/
 RUN chmod a+x /wd/rcache_tool.py /wd/keyhole_gen.py
+COPY rcache/migrations /wd/migrations
 
 ENTRYPOINT uvicorn rcache_app:app --host 0.0.0.0 --port ${RCACHE_CLIENT_PORT} \
     ${RCACHE_UVICORN_PARAMS}
