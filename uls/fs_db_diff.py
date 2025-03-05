@@ -11,17 +11,18 @@
 # pylint: disable=too-many-branches, too-many-nested-blocks
 # pylint: disable=too-many-instance-attributes, too-many-arguments
 # pylint: disable=too-few-public-methods, too-many-locals, protected-access
+# pylint: disable=too-many-positional-arguments
 
 import argparse
-from collections.abc import Iterator
 import enum
+import json
 import logging
 import math
 import os
 import sqlalchemy as sa
 import sys
-from typing import Any, cast, Dict, List, NamedTuple, NoReturn, Optional, \
-    Set, Tuple
+from typing import Any, cast, Dict, Iterator, List, NamedTuple, NoReturn, \
+    Optional, Set, Tuple
 
 
 # START OF DATABASE SCHEMA-DEPENDENT STUFF
@@ -64,17 +65,6 @@ PR_NO_HASH_FIELDS = ["id", "fsid", "prSeq"]
 # RAS table fields to NOT include into hash
 RAS_NO_HASH_FIELDS = ["rasid"]
 
-# Coordinate field names of some receiver in some database record
-RxCoordFields = NamedTuple("RxCoordFields", [("lat", str), ("lon", str)])
-
-# Fields in FS Path table that comprise coordinates of path points that affect
-# AFC Engine computations. Specified in (lat, lon) order
-FS_COORD_FIELDS = [RxCoordFields("rx_lat_deg", "rx_long_deg")]
-
-# Fields in Passive Repeater table that comprise coordinates of path points.
-# Specified in (lat, lon) order
-PR_COORD_FIELDS = [RxCoordFields("pr_lat_deg", "pr_lon_deg")]
-
 # Primary key field in FS Path table
 FS_FSID_FIELD = "fsid"
 
@@ -85,8 +75,69 @@ PR_FSID_FIELD = "fsid"
 # path
 FS_PR_FIELD = "p_rp_num"
 
+# Field in FS Path table containing optional TX latitude in north-positive
+# degrees
+FS_TX_LAT_DEG_FIELD = "tx_lat_deg"
+
+# Field in FS Path table containing optional TX longitude in east-positive
+# degrees
+FS_TX_LON_DEG_FIELD = "tx_long_deg"
+
+# Field in FS Path table containing optional azimuth from RX to TX in degrees
+FS_TX_AZIMUTH_FIELD = "azimuth_angle_to_tx"
+
+# Field in FS Path table containing TX latitude in north-positive degrees
+FS_RX_LAT_DEG_FIELD = "rx_lat_deg"
+
+# Field in FS Path table containing TX longitude in east-positive degrees
+FS_RX_LON_DEG_FIELD = "rx_long_deg"
+
 # Field in Passive Repeater table that sorts Repeater in due order
 PR_ORDER_FIELD = "prSeq"
+
+# Field in Passive Repeater table containing optional PR latitude in
+# north-positive degrees
+PR_LAT_DEG_FIELD = "pr_lat_deg"
+
+# Field in Passive Repeater table containing optional PR longitude in
+# east-positive degrees
+PR_LON_DEG_FIELD = "pr_lon_deg"
+
+# Field in Restricted Areas table containing restricted area region
+RAS_REGION_FIELD = "region"
+
+# Field in Restricted Areas table containing restricted area name
+RAS_NAME_FIELD = "name"
+
+# Field in Restricted Areas table containing restricted area location
+RAS_LOCATION_FIELD = "location"
+
+# Field in Restricted Areas table containing restricted area type name
+RAS_TYPE_FIELD = "exclusionZone"
+
+# Fields in Restricted Areas table containing latitudes/longitudes
+# (north/east positive degrees) of angle oints of first/second bounding
+# rectangles
+RAS_RECT1_LAT1_FIELD = "rect1lat1"
+RAS_RECT1_LON1_FIELD = "rect1lon1"
+RAS_RECT1_LAT2_FIELD = "rect1lat2"
+RAS_RECT1_LON2_FIELD = "rect1lon2"
+RAS_RECT2_LAT1_FIELD = "rect2lat1"
+RAS_RECT2_LON1_FIELD = "rect2lon1"
+RAS_RECT2_LAT2_FIELD = "rect2lat2"
+RAS_RECT2_LON2_FIELD = "rect2lon2"
+
+# Fields in Restricted Areas table containing latitude/longitude
+# (north/east positive degrees) of center point of restricted area
+RAS_CENTER_LAT_FIELD = "centerLat"
+RAS_CENTER_LON_FIELD = "centerLon"
+
+# Field in Restricted Areas table containing radius of restricted area in km
+RAS_RADIUS_KM_FIELD = "radiusKm"
+
+# Field in Restricted Areas table containing height of restricted area in m
+RAS_AGL_M_FIELD = "heightAGL"
+
 
 # END OF DATABASE SCHEMA-DEPENDENT STUFF
 
@@ -102,22 +153,6 @@ def error_if(cond: Any, msg: str) -> None:
     exits abnormally """
     if cond:
         error(msg)
-
-
-class Tile(NamedTuple):
-    """ 1x1 degree tile containing some receiver """
-    # Minimum latitude in north-positive degrees
-    min_lat: int
-
-    # Minimum longitude in east-positive degrees
-    min_lon: int
-
-    def __str__(self) -> str:
-        """ String representation for difference report """
-        return f"[{abs(self.min_lat)}-{abs(self.min_lat + 1)}]" \
-            f"{'N' if self.min_lat >= 0 else 'S'}, " \
-            f"[{abs(self.min_lon)}-{abs(self.min_lon + 1)}]" \
-            f"{'E' if self.min_lon >= 0 else 'W'}"
 
 
 class HashFields:
@@ -147,8 +182,7 @@ class HashFields:
                 self._field_infos.append(
                     self._FieldInfo(name=col.name, idx=idx))
 
-    def get_hash_fields(self, row: "sa.engine.RowProxy") \
-            -> "Iterator[Tuple[str, Any]]":
+    def get_hash_fields(self, row: sa.engine.Row) -> Iterator[Tuple[str, Any]]:
         """ Iterator over fields of given row
 
         Yields (filed_name, field_value) tuples
@@ -157,11 +191,33 @@ class HashFields:
             yield (fi.name, row[fi.idx])
 
 
+class Beam(NamedTuple):
+    """ Beam information """
+    # RX latitude in North positive degrees
+    rx_lat_deg: float
+    # RX longitude in east-positive degrees
+    rx_lon_deg: float
+    # TX latitude in north-positive degrees or None
+    tx_lat_deg: Optional[float] = None
+    # TX longitude in east-positive degrees or None
+    tx_lon_deg: Optional[float] = None
+    # Azimuth to TX or None
+    tx_azimuth_deg: Optional[float] = None
+
+    def as_dict(self) -> Dict[str, float]:
+        """ Returns dictionary representation where only non-None fields
+        present """
+        ret = self._asdict()
+        for f in [k for k, v in ret.items() if v is None]:
+            del ret[f]
+        return ret
+
+
 class FsPath:
     """ Information about FS Path
 
     Public attributes:
-    ident -- Globally unique FS Path identifier
+    ident -- PathIdent - globally unique FS Path identifier
     fsid  -- Path primary key in DB
 
     Private attributes:
@@ -170,26 +226,14 @@ class FsPath:
     _prs        -- List of per-repeater dictionaries of fields used in Path
                    Hash computation. None if fields computation was not
                    requested
-    _tiles      -- Set of tiles containing receivers. None if its computation
-                   was not requested
+    _beams      -- Liat of beams. None if its computation was not requested
     _path_hash  -- Path hash (hash of pertinent non-identification fields in
                    the path) if its computation was requested, None otherwise
     """
-    class _CoordFieldMapping(NamedTuple):
-        """ Latitude/longitude field names """
-        lat: str
-        lon: str
-
-        def make_tile(self, row: "sa.engine.RowProxy") -> Tile:
-            """ Makes tile from latitude/longitude fields in given DB row """
-            return Tile(min_lat=math.floor(row[self.lat]),
-                        min_lon=math.floor(row[self.lon]))
-
-    def __init__(self, fs_row: "sa.engine.RowProxy",
-                 conn: sa.engine.Connection,
+    def __init__(self, fs_row: sa.engine.Row, conn: sa.engine.Connection,
                  pr_table: sa.Table, fs_hash_fields: HashFields,
                  pr_hash_fields: HashFields, compute_hash: bool = False,
-                 compute_fields: bool = False, compute_tiles: bool = False) \
+                 compute_fields: bool = False, compute_beams: bool = False) \
             -> None:
         """ Constructor
 
@@ -202,7 +246,7 @@ class FsPath:
         pr_hash_fields -- Hash fields iterator for Passive Repeater table
         compute_hash   -- True to compute path hash
         compute_fields -- True to compute fields' dictionary
-        compute_tiles  -- True to compute receiver tiles
+        compute_beams  -- True to compute path beams
         """
         self.ident = PathIdent(**{f: fs_row[f] for f in PathIdent._fields})
         self.fsid = fs_row[FS_FSID_FIELD]
@@ -210,15 +254,17 @@ class FsPath:
             {} if compute_fields else None
         self._prs: Optional[List[Dict[str, Any]]] = \
             [] if compute_fields else None
-        self._tiles: Optional[Set[Tile]] = set() if compute_tiles else None
+        self._beams: Optional[List[Beam]] = [] if compute_beams else None
         hash_fields: Optional[List[Any]] = [] if compute_hash else None
         for field_name, field_value in fs_hash_fields.get_hash_fields(fs_row):
             if hash_fields is not None:
                 hash_fields.append(field_value)
             if self._row_fields is not None:
                 self._row_fields[field_name] = field_value
-        if self._tiles is not None:
-            self._tiles |= self._tiles_from_record(fs_row, FS_COORD_FIELDS)
+        prev_tx_lat_deg: Optional[float] = \
+            fs_row[FS_TX_LAT_DEG_FIELD] if self._beams is not None else None
+        prev_tx_lon_deg: Optional[float] = \
+            fs_row[FS_TX_LON_DEG_FIELD] if self._beams is not None else None
         if fs_row[FS_PR_FIELD]:
             sel = sa.select(pr_table).\
                 where(pr_table.c[PR_FSID_FIELD] == self.fsid).\
@@ -235,9 +281,22 @@ class FsPath:
                         hash_fields.append(field_value)
                     if pr is not None:
                         pr[field_name] = field_value
-                if self._tiles is not None:
-                    self._tiles |= \
-                        self._tiles_from_record(pr_row, PR_COORD_FIELDS)
+                if self._beams is not None:
+                    self._beams.append(
+                        Beam(rx_lat_deg=pr_row[PR_LAT_DEG_FIELD],
+                             rx_lon_deg=pr_row[PR_LON_DEG_FIELD],
+                             tx_lat_deg=prev_tx_lat_deg,
+                             tx_lon_deg=prev_tx_lon_deg))
+                    prev_tx_lat_deg, prev_tx_lon_deg = \
+                        self._beams[-1].rx_lat_deg, self._beams[-1].rx_lon_deg
+        if self._beams is not None:
+            self._beams.append(
+                Beam(rx_lat_deg=fs_row[FS_RX_LAT_DEG_FIELD],
+                     rx_lon_deg=fs_row[FS_RX_LON_DEG_FIELD],
+                     tx_lat_deg=prev_tx_lat_deg, tx_lon_deg=prev_tx_lon_deg,
+                     tx_azimuth_deg=fs_row[FS_TX_AZIMUTH_FIELD]
+                     if (prev_tx_lat_deg is None) or (prev_tx_lon_deg is None)
+                     else None))
         self._path_hash: Optional[int] = \
             hash(tuple(hash_fields)) if hash_fields is not None else None
 
@@ -246,10 +305,10 @@ class FsPath:
         assert self._path_hash is not None
         return self._path_hash
 
-    def tiles(self) -> Set[Tile]:
-        """ Returns receiver tiles """
-        assert self._tiles is not None
-        return self._tiles
+    def beams(self) -> List[Beam]:
+        """ Returns list of Beams """
+        assert self._beams is not None
+        return self._beams
 
     def diff_report(self, other: "FsPath") -> str:
         """ Returns report on difference with other FsPath object """
@@ -275,16 +334,6 @@ class FsPath:
                                      f"'{this_value}' vs '{other_value}'")
         return ", ".join(diffs)
 
-    def _tiles_from_record(self, row: "sa.engine.RowProxy",
-                           rx_fields: List[RxCoordFields]) -> Set[Tile]:
-        """ Make set of tiles according to given list of receiver coordinates
-        """
-        ret: Set[Tile] = set()
-        for rf in rx_fields:
-            ret.add(Tile(min_lat=math.floor(row[rf.lat]),
-                         min_lon=math.floor(row[rf.lon])))
-        return ret
-
     @classmethod
     def compute_hash_fields(cls, fs_table: sa.Table, pr_table: sa.Table) \
             -> Tuple[HashFields, HashFields]:
@@ -308,6 +357,23 @@ class FsPath:
              HashFields(table=pr_table, exclude=PR_NO_HASH_FIELDS))
 
 
+# Bounding rectangle ib north/east positive latitudes/longitudes
+class BoundingRect(NamedTuple):
+    """ Geographic bounding rectangle """
+    # Minimum latitude in north-positive degrees
+    min_lat_deg: float
+    # Maximum latitude in north-positive degrees
+    max_lat_deg: float
+    # Minimum longitude in east-positive degrees
+    min_lon_deg: float
+    # Maximum longitude in east-positive degrees
+    max_lon_deg: float
+
+    def as_dict(self) -> Dict[str, float]:
+        """ Self in dictionary format """
+        return self._asdict()
+
+
 class Ras:
     """ Information about single restricted area:
 
@@ -315,7 +381,7 @@ class Ras:
     location -- Location name
 
     Private attributes:
-    _figure      -- Restricted area figure (source of tile sequence)
+    _boundary    -- List of BoundingRect objects containing restricted area
     _hash_fields -- Hash fields (represent restricted area identity)
     """
     # Earth radius, same as cconst.cpp CConst::earthRadius
@@ -330,122 +396,7 @@ class Ras:
         Circle = "Circle"
         Horizon = "Horizon Distance"
 
-    class Point:
-        """ Geodetic point (latitude and longitude) """
-
-        def __init__(self, lat: float, lon: float) -> None:
-            if not isinstance(lat, float):
-                raise ValueError(f"Latitude {lat} has incorrect type")
-            if not isinstance(lon, float):
-                raise ValueError(f"Longitude {lon} has incorrect type")
-            self.lat = lat
-            self.lon = lon
-
-    class FigureBase:
-        """ Abstract base class for restricted area figure """
-
-        def tiles(self) -> List[Tile]:
-            """ Returns list of 1 degree tiles covering figure """
-            raise NotImplementedError(
-                f"{self.__class__}.tiles() not implemented")
-
-        @classmethod
-        def rect_tiles(cls, min_pt: "Ras.Point", max_pt: "Ras.Point") \
-                -> List[Tile]:
-            """ Returns list of 1 degree tiles covering given geodetic
-            rectangle
-
-            Arguments:
-            min_pt -- Left bottom point
-            max_pt -- Right top point
-            Returns sequence of 1 degree tiles
-            """
-            ret: List[Tile] = []
-            for min_lat in range(math.floor(min_pt.lat),
-                                 math.ceil(max_pt.lat)):
-                for min_lon in range(math.floor(min_pt.lon),
-                                     math.ceil(max_pt.lon)):
-                    adjusted_min_lon = min_lon
-                    if adjusted_min_lon < -180:
-                        adjusted_min_lon += 360
-                    elif adjusted_min_lon >= 180:
-                        adjusted_min_lon -= 360
-                    ret.append(Tile(min_lat=min_lat, min_lon=adjusted_min_lon))
-            return ret
-
-    class Rect(FigureBase):
-        """ Rectangular RAS
-
-        Private attributes:
-        _min -- Left bottom point
-        _max -- Right top point
-        """
-
-        def __init__(self, pt: "Ras.Point") -> None:
-            """ Constructor, constructs from one of corners """
-            self._min = pt
-            self._max = pt
-
-        def extend(self, pt: "Ras.Point") -> None:
-            """ Extending rectangle with corner point """
-            other_lon = pt.lon
-            center_lon = (self._min.lon + self._max.lon) / 2
-            if (other_lon - center_lon) > 180:
-                other_lon -= 360
-            elif (other_lon - center_lon) < -180:
-                other_lon += 360
-            self._min = Ras.Point(lat=min(pt.lat, self._min.lat),
-                                  lon=min(other_lon, self._min.lon))
-            self._max = Ras.Point(lat=max(pt.lat, self._max.lat),
-                                  lon=max(other_lon, self._max.lon))
-
-        def tiles(self) -> List[Tile]:
-            """ Returns sequence of covering 1 degree tiles """
-            return self.rect_tiles(min_pt=self._min, max_pt=self._max)
-
-    class Circle(FigureBase):
-        """ Round restricted area
-
-        Private attributes:
-        _center    -- Center geodetic point
-        _radius_km -- Radius in kilometers
-        """
-
-        def __init__(self, center: "Ras.Point") -> None:
-            """ Construct by center """
-            self._center = center
-            self._radius_km: float = 0
-
-        def set_radius(self, radius_km: float) -> None:
-            """ Sets Radius in kilometers """
-            if not isinstance(radius_km, float):
-                raise ValueError(f"Invalid circle radius: {radius_km}")
-            self._radius_km = radius_km
-
-        def set_horizon_radius(self, ant_agl_m: float) -> None:
-            """ Sets horizon radius by specifying central antenna height above
-            ground in meters """
-            if not isinstance(ant_agl_m, float):
-                raise ValueError(f"Invalid antenna elevation: {ant_agl_m}")
-            self._radius_km = math.sqrt(2 * Ras.EARTH_RADIUS_KM * 4 / 3) * \
-                (math.sqrt(ant_agl_m / 1000) + math.sqrt(Ras.MAX_AP_AGL_KM))
-
-        def tiles(self) -> List[Tile]:
-            """ Returns sequence of covering 1 degree tiles """
-            radian_radius = self._radius_km / Ras.EARTH_RADIUS_KM
-            lat_radius_deg = math.degrees(radian_radius)
-            lon_radius_deg = \
-                math.degrees(radian_radius /
-                             math.cos(math.radians(self._center.lat)))
-            return \
-                self.rect_tiles(
-                    min_pt=Ras.Point(lat=self._center.lat - lat_radius_deg,
-                                     lon=self._center.lon - lon_radius_deg),
-                    max_pt=Ras.Point(lat=self._center.lat + lat_radius_deg,
-                                     lon=self._center.lon + lon_radius_deg))
-
-    def __init__(self, fs_row: "sa.engine.RowProxy", hash_fields: HashFields) \
-            -> None:
+    def __init__(self, fs_row: sa.engine.Row, hash_fields: HashFields) -> None:
         """ Constructor
 
         Arguments:
@@ -453,31 +404,52 @@ class Ras:
         hash_fields -- Retriever of identity fields
         """
         try:
-            self.location = \
-                f"{fs_row.region}: {fs_row.name} @ {fs_row.location}"
+            self.location = f"{fs_row[RAS_REGION_FIELD]}: " \
+                f"{fs_row[RAS_NAME_FIELD]} @ {fs_row[RAS_LOCATION_FIELD]}"
+            self._boundary: List[BoundingRect] = []
             ras_type = [rt for rt in self.RasType
-                        if rt.value == fs_row.exclusionZone][0]
-            self._figure: "Ras.FigureBase"
+                        if rt.value == fs_row[RAS_TYPE_FIELD]][0]
             if ras_type in (self.RasType.Rect, self.RasType.TwoRect):
-                rect = self.Rect(self.Point(lat=fs_row.rect1lat1,
-                                            lon=fs_row.rect1lon1))
-                rect.extend(self.Point(lat=fs_row.rect1lat2,
-                                       lon=fs_row.rect1lon2))
-                if ras_type == self.RasType.TwoRect:
-                    rect.extend(self.Point(lat=fs_row.rect2lat1,
-                                           lon=fs_row.rect2lon1))
-                    rect.extend(self.Point(lat=fs_row.rect2lat2,
-                                           lon=fs_row.rect2lon2))
-                self._figure = rect
+                for lat1_f, lon1_f, lat2_f, lon2_f in \
+                        [(RAS_RECT1_LAT1_FIELD, RAS_RECT1_LON1_FIELD,
+                          RAS_RECT1_LAT2_FIELD, RAS_RECT1_LON2_FIELD)] + \
+                        ([(RAS_RECT2_LAT1_FIELD, RAS_RECT2_LON1_FIELD,
+                           RAS_RECT2_LAT2_FIELD, RAS_RECT2_LON2_FIELD)]
+                         if ras_type == self.RasType.TwoRect else []):
+                    lon1 = fs_row[lon1_f]
+                    lon2 = fs_row[lon2_f]
+                    center_lon = (lon1 + lon2) / 2
+                    if (lon2 - center_lon) > 180:
+                        lon2 -= 360
+                    elif (lon2 - center_lon) < -180:
+                        lon2 += 360
+                    self._boundary.append(
+                        BoundingRect(
+                            min_lat_deg=min(fs_row[lat1_f], fs_row[lat2_f]),
+                            max_lat_deg=max(fs_row[lat1_f], fs_row[lat2_f]),
+                            min_lon_deg=min(lon1, lon2),
+                            max_lon_deg=max(lon1, lon2)))
             elif ras_type in (self.RasType.Circle, self.RasType.Horizon):
-                circle = self.Circle(self.Point(lat=fs_row.centerLat,
-                                                lon=fs_row.centerLon))
+                center_lat_deg = fs_row[RAS_CENTER_LAT_FIELD]
+                center_lon_deg = fs_row[RAS_CENTER_LON_FIELD]
                 if ras_type == self.RasType.Circle:
-                    circle.set_radius(fs_row.radiusKm)
+                    radius_km = fs_row[RAS_RADIUS_KM_FIELD]
                 else:
-                    assert ras_type == self.RasType.Horizon
-                    circle.set_horizon_radius(ant_agl_m=fs_row.heightAGL)
-                self._figure = circle
+                    radius_km = \
+                        math.sqrt(2 * Ras.EARTH_RADIUS_KM * 4 / 3) * \
+                        (math.sqrt(fs_row[RAS_AGL_M_FIELD] / 1000) +
+                         math.sqrt(Ras.MAX_AP_AGL_KM))
+                radius_rad = radius_km / Ras.EARTH_RADIUS_KM
+                lat_radius_deg = math.degrees(radius_rad)
+                lon_radius_deg = \
+                    math.degrees(
+                        radius_rad / math.cos(math.radians(center_lat_deg)))
+                self._boundary.append(
+                    BoundingRect(
+                        min_lat_deg=center_lat_deg - lat_radius_deg,
+                        max_lat_deg=center_lat_deg + lat_radius_deg,
+                        min_lon_deg=center_lon_deg - lon_radius_deg,
+                        max_lon_deg=center_lon_deg + lon_radius_deg))
             else:
                 raise ValueError(f"Unsupported RAS type: {ras_type.name}")
         except (LookupError, ValueError, sa.exc.SQLAlchemyError) as ex:
@@ -486,9 +458,9 @@ class Ras:
         self._hash_fields = \
             tuple(v for _, v in hash_fields.get_hash_fields(fs_row))
 
-    def tiles(self) -> List[Tile]:
-        """ Returns sequence of covering 1 degree tiles """
-        return self._figure.tiles()
+    def boundary(self) -> List[BoundingRect]:
+        """ Returns sequence of coveriing bounding rectangles """
+        return self._boundary
 
     def __eq__(self, other: Any) -> bool:
         """ Equality comparator """
@@ -527,9 +499,10 @@ class Db:
             self._engine = sa.create_engine("sqlite:///" + self.filename)
             self._metadata = sa.MetaData()
             self._metadata.reflect(bind=self._engine)
-            self.conn = self._engine.connect()
+            self.conn = cast(sa.engine.Connection, self._engine.connect())
         except sa.exc.SQLAlchemyError as ex:
             error(f"Error opening FS database '{self.filename}': {ex}")
+        assert self._metadata.tables is not None
         error_if(FS_TABLE_NAME not in self._metadata.tables,
                  f"'{self.filename}' does not contain table '{FS_TABLE_NAME}'")
         self.fs_table = self._metadata.tables[FS_TABLE_NAME]
@@ -548,17 +521,15 @@ class Db:
         """ Close connection """
         self.conn.close()
 
-    def all_fs_rows(self) -> "Iterator[sa.engine.RowProxy]":
+    def all_fs_rows(self) -> Iterator[sa.engine.Row]:
         """ Iterator that reads all FS Path rows """
         try:
-            for fs_row in self.conn.execute(sa.select(self.fs_table)).\
-                    fetchall():
-                yield fs_row
+            yield from self.conn.execute(sa.select(self.fs_table)).fetchall()
         except sa.exc.SQLAlchemyError as ex:
             error(f"Error reading '{self.fs_table.name}' table from FS "
                   f"database '{self.filename}': {ex}")
 
-    def fs_row_by_fsid(self, fsid: int) -> "sa.engine.RowProxy":
+    def fs_row_by_fsid(self, fsid: int) -> sa.engine.Row:
         """ Fetch FS row by FSID """
         try:
             ret = \
@@ -574,16 +545,13 @@ class Db:
         except sa.exc.SQLAlchemyError as ex:
             error(f"Error reading '{self.fs_table.name}' table from FS "
                   f"database '{self.filename}': {ex}")
-            raise  # Will never happen, just to pacify pylint
 
-    def all_ras_rows(self) -> "Iterator[sa.engine.RowProxy]":
+    def all_ras_rows(self) -> Iterator[sa.engine.Row]:
         """ Iterator that reads all RAS rows """
         if self.ras_table is None:
             return
         try:
-            for fs_row in self.conn.execute(sa.select(self.ras_table)).\
-                    fetchall():
-                yield fs_row
+            yield from self.conn.execute(sa.select(self.ras_table)).fetchall()
         except sa.exc.SQLAlchemyError as ex:
             error(f"Error reading '{self.ras_table.name}' table from FS "
                   f"database '{self.filename}': {ex}")
@@ -600,11 +568,11 @@ def main(argv: List[str]) -> None:
             description="Computes path difference between two FS (aka ULS) "
             "Databases")
     argument_parser.add_argument(
-        "--report_tiles", action="store_true",
-        help="Print 1x1 degree tiles affected by difference")
+        "--paths", action="store_true",
+        help="Print what paths/RASs were changed")
     argument_parser.add_argument(
-        "--report_paths", action="store_true",
-        help="Print paths that constitute difference")
+        "--invalidation", metavar="FILENAME",
+        help="Write invalidation details into JSON file")
     argument_parser.add_argument(
         "DB1",
         help="First FS (aka ULS) sqlite3 database file to compare")
@@ -633,13 +601,11 @@ def main(argv: List[str]) -> None:
 
         IdentHash = NamedTuple("IdentHash", [("ident", PathIdent),
                                              ("hash", int)])
-        IdentHashToFsid = Dict[IdentHash, int]
-
         # Per-database dictionaries that map (FS Ident, FS Hash) pairs to FSIDs
         # Building them...
-        ident_hash_to_fsid_by_db: List[IdentHashToFsid] = []
+        ident_hash_to_fsid_by_db: List[Dict[IdentHash, int]] = []
         for db in dbs:
-            ident_hash_to_fsid: IdentHashToFsid = {}
+            ident_hash_to_fsid: Dict[IdentHash, int] = {}
             ident_hash_to_fsid_by_db.append(ident_hash_to_fsid)
             try:
                 for fs_row in db.all_fs_rows():
@@ -686,36 +652,35 @@ def main(argv: List[str]) -> None:
         print(f"Different RAS entries: {len(ras_difference)}")
 
         # Detailed reports
-        if args.report_paths or args.report_tiles:
-            # RX tiles belonging to unique paths
-            tiles_of_difference: Set[Tile] = set()
+        if args.paths or args.invalidation:
+            invalidation_dict: Dict[str, Any] = {"beams": [], "rectangles": []}
             # Loop by unique FS identifiers
             for path_ident in sorted(ident_to_fsids_diff.keys()):
                 # Per-database FsPoath objects
                 paths: List[Optional[FsPath]] = []
-                # Filling it (and adding tiles)
+                # Filling it (and adding beams)
                 for db_idx, db in enumerate(dbs):
                     fsid = ident_to_fsids_diff[path_ident].get(db_idx)
                     if fsid is None:
                         paths.append(None)
                         continue
                     try:
-                        fs_row = db.fs_row_by_fsid(fsid)
                         fs_path = \
                             FsPath(
-                                fs_row=fs_row, conn=db.conn,
+                                fs_row=db.fs_row_by_fsid(fsid), conn=db.conn,
                                 pr_table=db.pr_table,
                                 fs_hash_fields=db.fs_hash_fields,
                                 pr_hash_fields=db.pr_hash_fields,
-                                compute_fields=args.report_paths,
-                                compute_tiles=args.report_tiles)
+                                compute_fields=args.paths,
+                                compute_beams=bool(args.invalidation))
                     except sa.exc.SQLAlchemyError as ex:
                         error(
                             f"Error reading FS database '{db.filename}': {ex}")
-                    if args.report_tiles:
-                        tiles_of_difference |= fs_path.tiles()
+                    if args.invalidation:
+                        invalidation_dict["beams"] += \
+                            [beam.as_dict() for beam in fs_path.beams()]
                     paths.append(fs_path)
-                if args.report_paths:
+                if args.paths:
                     if paths[0] is not None:
                         if paths[1] is not None:
                             diff_report = paths[0].diff_report(paths[1])
@@ -725,17 +690,22 @@ def main(argv: List[str]) -> None:
                         assert paths[1] is not None
                         diff_report = "Only present in DB2"
                     print(f"Difference in path {path_ident}: {diff_report}")
-            if args.report_paths:
+            if args.paths:
                 for db_idx, ras_set in enumerate(ras_sets):
                     for ras in (ras_set - ras_sets[1 - db_idx]):
                         print(f"RAS '{ras.location}' from DB{db_idx + 1} not "
                               f"present in or different from "
                               f"DB{1 - db_idx + 1}")
-            if args.report_tiles:
+            if args.invalidation:
                 for ras in ras_difference:
-                    tiles_of_difference |= set(ras.tiles())
-                for tile in sorted(tiles_of_difference):
-                    print(f"Difference in tile {tile}")
+                    invalidation_dict["rectangles"] += \
+                        [br.as_dict() for br in ras.boundary()]
+                try:
+                    with open(args.invalidation, "w", encoding="utf-8") as f:
+                        json.dump(invalidation_dict, f, indent=4)
+                except OSError as ex:
+                    error(f"Error writing invalidation report to "
+                          f"'{args.invalidation}': {ex}")
     except KeyboardInterrupt:
         pass
     finally:

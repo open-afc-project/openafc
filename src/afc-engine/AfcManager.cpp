@@ -7652,7 +7652,7 @@ void AfcManager::compute()
 
 	// initialize all channels to max EIRP before computing
 	for (auto& channel : _channelList) {
-		for(int freqSegIdx=0; (size_t)freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+		for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
 			double segEIRP;
 			if (channel.type == INQUIRED_FREQUENCY) {
 				segEIRP = _inquiredFrequencyMaxPSD_dBmPerMHz + 10.0*log10((double) channel.bandwidth(freqSegIdx));
@@ -8365,7 +8365,7 @@ void AfcManager::runPointAnalysis()
 					int chanIdx;
 					for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 						ChannelStruct *channel = &(_channelList[chanIdx]);
-						for(int freqSegIdx=0; (size_t)freqSegIdx<channel->segList.size(); ++freqSegIdx) {
+						for(int freqSegIdx=0; freqSegIdx<channel->segList.size(); ++freqSegIdx) {
 							if (std::get<2>(channel->segList[freqSegIdx]) != BLACK) {
 								double chanStartFreq = channel->freqMHzList[freqSegIdx]*1.0e6;
 								double chanStopFreq = channel->freqMHzList[freqSegIdx+1]* 1.0e6;
@@ -8591,7 +8591,7 @@ void AfcManager::runPointAnalysis()
 							ChannelStruct *channel = &(_channelList[chanIdx]);
 							ChannelType channelType = channel->type;
 							bool useACI = (channelType == INQUIRED_FREQUENCY ? false : _aciFlag);
-							for(int freqSegIdx=0; (size_t)freqSegIdx<channel->segList.size(); ++freqSegIdx) {
+							for(int freqSegIdx=0; freqSegIdx<channel->segList.size(); ++freqSegIdx) {
 								ChannelColor chanColor = std::get<2>(channel->segList[freqSegIdx]);
 								if ( (chanColor != BLACK) ) {
 									double chanStartFreq = channel->freqMHzList[freqSegIdx] * 1.0e6;
@@ -9196,7 +9196,7 @@ void AfcManager::runPointAnalysis()
 
 										if (state == 0) {
 											freqSegIdx++;
-											if ((size_t)freqSegIdx == channel->segList.size()) {
+											if (freqSegIdx == channel->segList.size()) {
 												std::string txClutterStr;
 												std::string rxClutterStr;
 												std::string pathLossModelStr;
@@ -9279,7 +9279,7 @@ void AfcManager::runPointAnalysis()
 											}
 										} else {
 											itmSegIdx++;
-											if ((size_t)itmSegIdx == itmSegList.size()) {
+											if (itmSegIdx == itmSegList.size()) {
 												contFlag = false;
 											}
 										}
@@ -9657,7 +9657,7 @@ void AfcManager::runPointAnalysis()
 	int chanIdx;
 	for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 		ChannelStruct *channel = &(_channelList[chanIdx]);
-		for(int freqSegIdx=0; (size_t)freqSegIdx<channel->segList.size(); ++freqSegIdx) {
+		for(int freqSegIdx=0; freqSegIdx<channel->segList.size(); ++freqSegIdx) {
 			ChannelColor chanColor = std::get<2>(channel->segList[freqSegIdx]);
 			if ( (channel->type == ChannelType::INQUIRED_CHANNEL) && (chanColor != BLACK) && (chanColor != RED) ) {
 				double chanEirpLimit = std::min(std::get<0>(channel->segList[freqSegIdx]), std::get<1>(channel->segList[freqSegIdx]));
@@ -10247,7 +10247,7 @@ void AfcManager::runScanAnalysis()
 			/* Initialize eirpLimit_dBm to _maxEIRP_dBm for all channels                          */
 			/**************************************************************************************/
 			for (auto& channel : _channelList) {
-				for(int freqSegIdx=0; (size_t)freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+				for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
 					channel.segList[freqSegIdx] = std::make_tuple(_maxEIRP_dBm, _maxEIRP_dBm, GREEN);
 				}
 			}
@@ -10260,7 +10260,7 @@ void AfcManager::runScanAnalysis()
 				DeniedRegionClass *dr = _deniedRegionList[drIdx];
 				if (dr->intersect(rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, 0.0, rlanHtAboveTerrain)) {
 					for (auto& channel : _channelList) {
-						for(int freqSegIdx=0; (size_t)freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+						for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
 							if (std::get<2>(channel.segList[freqSegIdx]) != BLACK) {
 								double chanStartFreq = channel.freqMHzList[freqSegIdx]*1.0e6;
 								double chanStopFreq = channel.freqMHzList[freqSegIdx+1]* 1.0e6;
@@ -10327,7 +10327,7 @@ void AfcManager::runScanAnalysis()
 					/**************************************************************************************/
 
 					for (auto& channel : _channelList) {
-						for(int freqSegIdx=0; (size_t)freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+						for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
 							if (std::get<2>(channel.segList[freqSegIdx]) != BLACK) {
 								double chanStartFreq = channel.freqMHzList[freqSegIdx]*1.0e6;
 								double chanStopFreq = channel.freqMHzList[freqSegIdx+1]* 1.0e6;
@@ -10410,7 +10410,7 @@ void AfcManager::runScanAnalysis()
 			}
 
 			for (auto& channel : _channelList) {
-				for(int freqSegIdx=0; (size_t)freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+				for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
 					if (channel.type == ChannelType::INQUIRED_CHANNEL) {
 						bwIdx = bw_index_map[channel.bandwidth(freqSegIdx)];
 						double channelEirp = std::min(std::get<0>(channel.segList[freqSegIdx]), std::get<1>(channel.segList[freqSegIdx]));
@@ -11169,7 +11169,7 @@ void AfcManager::runHeatmapAnalysis()
 	double chanStartFreq = channel->freqMHzList[freqSegIdx]*1.0e6;
 	double chanStopFreq = channel->freqMHzList[freqSegIdx+1]* 1.0e6;
 	double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
-	// double chanBandwidth  = chanStopFreq - chanStartFreq;
+	double chanBandwidth  = chanStopFreq - chanStartFreq;
 	bool useACI = (channel->type == INQUIRED_FREQUENCY ? false : _aciFlag);
 	CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel->type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
 
@@ -11412,7 +11412,7 @@ void AfcManager::runHeatmapAnalysis()
 						} else if (distKmSquared < maxRadiusKmSquared) {
 
 							double ulsRxHeightAGL  = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain()) : uls->getPR(segIdx).heightAboveTerrainRx);
-							// double ulsRxHeightAMSL = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAMSL() : uls->getDiversityHeightAMSL()) : uls->getPR(segIdx).heightAMSLRx);
+							double ulsRxHeightAMSL = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAMSL() : uls->getDiversityHeightAMSL()) : uls->getPR(segIdx).heightAMSLRx);
 							double ulsSegmentDistance = (segIdx == numPR ? uls->getLinkDistance() : uls->getPR(segIdx).segmentDistance);
 
 							/**************************************************************************************/
@@ -11437,7 +11437,7 @@ void AfcManager::runHeatmapAnalysis()
 							}
 							/**************************************************************************************/
 
-							// Vector3 ulsAntennaPointing = (segIdx == numPR ? (divIdx == 0 ? uls->getAntennaPointing() : uls->getDiversityAntennaPointing()) : uls->getPR(segIdx).pointing);
+							Vector3 ulsAntennaPointing = (segIdx == numPR ? (divIdx == 0 ? uls->getAntennaPointing() : uls->getDiversityAntennaPointing()) : uls->getPR(segIdx).pointing);
 
 							// Use Haversine formula with average earth radius of 6371 km
 							double groundDistanceKm;
@@ -11515,8 +11515,8 @@ void AfcManager::runHeatmapAnalysis()
 									double angleOffBoresightDeg;
 									double rxPowerDBW;
 									double I2NDB;
-									// double marginDB;
-									// double eirpLimit_dBm;
+									double marginDB;
+									double eirpLimit_dBm;
 									double nearFieldOffsetDB;
 									double nearField_xdb;
 									double nearField_u;
@@ -11586,7 +11586,7 @@ void AfcManager::runHeatmapAnalysis()
 										double d2;
 										double pathDifference;
 										double fresnelIndex = -1.0;
-										// double ulsLinkDistance = uls->getLinkDistance();
+										double ulsLinkDistance = uls->getLinkDistance();
 										double ulsWavelength = CConst::c / ((uls->getStartFreq() + uls->getStopFreq()) / 2);
 										if (ulsSegmentDistance != -1.0) {
 											const Vector3 ulsTxPos = (segIdx ? uls->getPR(segIdx-1).positionTx : uls->getTxPosition());
@@ -12840,7 +12840,7 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 	for(auto& channel : _channelList) {
 		if (channel.type == INQUIRED_FREQUENCY) {
 			psdFreqRangeClass psdFreqRange;
-			for(int freqSegIdx=0; (size_t)freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+			for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
 				if (freqSegIdx == 0) {
 					psdFreqRange.freqMHzList.push_back(channel.freqMHzList[0]);
 				}
@@ -12953,17 +12953,17 @@ void AfcManager::createChannelList()
 
 				int idxA = 0;
 				bool overlapA;
-				while (((size_t)idxA < freqSegmentList.size())&&(startFreq > freqSegmentList[idxA].second)) {
+				while ((idxA < freqSegmentList.size())&&(startFreq > freqSegmentList[idxA].second)) {
 					idxA++;
 				}
-				overlapA = (((size_t)idxA < freqSegmentList.size()) && (startFreq >= freqSegmentList[idxA].first));
+				overlapA = ((idxA < freqSegmentList.size()) && (startFreq >= freqSegmentList[idxA].first));
 
 				int idxB = 0;
 				bool overlapB;
-				while (((size_t)idxB < freqSegmentList.size())&&(stopFreq > freqSegmentList[idxB].second)) {
+				while ((idxB < freqSegmentList.size())&&(stopFreq > freqSegmentList[idxB].second)) {
 					idxB++;
 				}
-				overlapB = (((size_t)idxB < freqSegmentList.size()) && (stopFreq >= freqSegmentList[idxB].first));
+				overlapB = ((idxB < freqSegmentList.size()) && (stopFreq >= freqSegmentList[idxB].first));
 
 				int start = overlapA ? freqSegmentList[idxA].first  : startFreq;
 				int stop  = overlapB ? freqSegmentList[idxB].second : stopFreq;
@@ -13117,7 +13117,7 @@ void AfcManager::splitFrequencyRanges()
 		ChannelStruct *channel = &(_channelList[chanIdx]);
 		if (channel->type == INQUIRED_FREQUENCY) {
 			int segIdx = 0;
-			while((size_t)segIdx<channel->segList.size()) {
+			while(segIdx<channel->segList.size()) {
 				ChannelColor segColor = std::get<2>(channel->segList[segIdx]);
 				if (segColor != BLACK) {
 					int chanStartFreqMHz = channel->freqMHzList[segIdx];

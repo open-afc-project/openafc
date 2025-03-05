@@ -4,62 +4,10 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-# default value of args
-ARG BLD_TAG=latest
-ARG PRINST_TAG=latest
-ARG BLD_NAME=ghcr.io/open-afc-project/worker-al-build-image
-ARG PRINST_NAME=ghcr.io/open-afc-project/worker-al-preinstall
-
-# Stage Build
-FROM ${BLD_NAME}:${BLD_TAG} as build_image
-ARG BUILDREV=localbuild
-COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /root/afc/
-COPY cmake /root/afc/cmake/
-COPY pkg /root/afc/pkg/
-COPY selinux /root/afc/selinux/
-COPY src /root/afc/src/
-
-RUN apk add py3-setuptools py3-pip
-
-RUN mkdir -p -m 777 /root/afc/build
-RUN cd /root/afc/build && \
-cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install \
-    -DCMAKE_BUILD_TYPE=Ulsprocessor -DSVN_LAST_REVISION=$BUILDREV \
-    -G Ninja /root/afc && \
-    ninja -j$(nproc --all --ignore=2) install
-
-FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
-RUN apk add py3-sqlalchemy py3-numpy py3-yaml py3-pydantic=~1.10 py3-psycopg2 \
-    py3-alembic
-COPY uls/requirements.txt /wd
-RUN pip3 install -r /wd/requirements.txt && rm /wd/requirements.txt
-
-# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
-# installed as Alpine package (thus not requiring gcc and musl-dev install)
-RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1 && \
-    pip3 install confluent-kafka==2.1.1 && \
-    apk del python3-dev gcc musl-dev
-
-RUN mkdir -p /mnt/nfs/rat_transfer/daily_uls_parse/data_files \
-            /mnt/nfs/rat_transfer/daily_uls_parse/temp \
-            /mnt/nfs/rat_transfer/ULS_Database \
-            /mnt/nfs/rat_transfer/Antenna_Patterns \
-            /output_folder
-
-COPY --from=build_image /root/afc/__install/bin \
-    /mnt/nfs/rat_transfer/daily_uls_parse/
-COPY --from=build_image /root/afc/build/src/ratapi/pkg/ratapi/db/ \
-    /mnt/nfs/rat_transfer/daily_uls_parse/
-COPY uls/uls_service*.py uls/fsid_tool.py uls/fs_db_diff.py uls/fs_afc.py \
-    uls/fs_afc.yaml /wd/
-RUN chmod -x /wd/*.py
-RUN chmod +x /wd/uls_service.py /wd/uls_service_healthcheck.py \
-    wd/fsid_tool.py wd/fs_db_diff.py wd/fs_afc.py
-
-COPY uls/migrations wd/migrations/
-
-FROM alpine:3.18
+FROM alpine:3.18.11
+# This variable should be set to default Python version for chosen Alpine
+# version. Unfortunately there is no way to get it automagically
+ENV PYTHONVERSION=3.11
 
 # DOWNLOADER SERVICE PARAMETERS
 
@@ -157,6 +105,13 @@ ENV ULS_ALEMBIC_INITIAL_VERSION=b41cf8a00430
 # URL of Rcache service
 # ENV RCACHE_SERVICE_URL
 
+# YES (TRUE, ...) to use directional rcache invalidation, NO (FALSE, ...) to
+# use tiled invalidation. Former is more precise (as of 20/2/2025 - 13 times on
+# 230 km link distance - which is still woefully imprecise because of antenna
+# diagrams employed by AFC Engine), but requires keyhole shape to be prepared.
+# Default is YES
+# ENV RCACHE_DIRECTIONAL_INVALIDATE
+
 # HEALTHCHECKER PARAMETERS
 # Variables starting with ULS_HEALTH_ related to pronounce service healthy or
 # unhealthy
@@ -242,12 +197,67 @@ ENV ULS_ALEMBIC_INITIAL_VERSION=b41cf8a00430
 # ENV ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
 # ENV ALS_KAFKA_MAX_REQUEST_SIZE
 
-COPY --from=install_image / /
+RUN apk add --update --no-cache python3=~${PYTHONVERSION} \
+    boost1.82-program_options boost1.82-log boost1.82-filesystem \
+    boost1.82-thread armadillo minizip qt5-qtbase-sqlite libbsd
+
+# Setting up venv in /venv and 'activating' it
+RUN python3 -m venv /venv
+ENV PATH=/venv/bin:$PATH
+ENV VIRTUAL_ENV=/venv
+# This explicitly set variable and its forceful injection in some places helps
+# to alleviate various venv shortcomings
+ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${PYTHONVERSION}/site-packages:${PYTHONPATH}
+
+# Installing Python libraries
+RUN apk add --update --no-cache librdkafka-dev=~2.1.1
+COPY uls/requirements.txt /wd/
+RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} build-base expat expat-dev && \
+    pip3 install --no-cache-dir -r /wd/requirements.txt && \
+    apk del --purge python3-dev build-base expat-dev && \
+    rm -f /wd/requirements.txt
+
+# Building ulsprocessor
+ARG BUILDREV=localbuild
+COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /build/afc/
+COPY cmake /build/afc/cmake/
+COPY pkg /build/afc/pkg/
+COPY selinux /build/afc/selinux/
+COPY src /build/afc/src/
+
+RUN mkdir -p /mnt/nfs/rat_transfer/daily_uls_parse/data_files \
+            /mnt/nfs/rat_transfer/daily_uls_parse/temp \
+            /mnt/nfs/rat_transfer/ULS_Database \
+            /mnt/nfs/rat_transfer/Antenna_Patterns \
+            /output_folder
+
+RUN mkdir -p -m 777 /build/afc/build
+RUN cd /build/afc/build && \
+    apk add build-base cmake samurai boost-dev \
+        qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev && \
+    cmake -DCMAKE_INSTALL_PREFIX=/build/afc/__install \
+        -DCMAKE_BUILD_TYPE=Ulsprocessor -DSVN_LAST_REVISION=$BUILDREV \
+        -G Ninja /build/afc && \
+    env PYTHONPATH=${PYTHONPATH} \
+        ninja -j$(nproc --all --ignore=2) install && \
+    mv /build/afc/__install/bin/* /mnt/nfs/rat_transfer/daily_uls_parse/ && \
+    mv /build/afc/build/src/ratapi/pkg/ratapi/db/* /mnt/nfs/rat_transfer/daily_uls_parse/ && \
+    apk del --purge build-base cmake samurai boost-dev \
+        qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev && \
+    cd / && rm -rf /build
 
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
         -r /wd/afc-packages/pkgs.uls \
     && rm -rf /wd/afc-packages
+
+COPY uls/uls_service*.py uls/fsid_tool.py uls/fs_db_diff.py uls/fs_afc.py \
+    uls/fs_afc.yaml /wd/
+RUN chmod -x /wd/*.py
+RUN chmod +x /wd/uls_service.py /wd/uls_service_healthcheck.py \
+    /wd/fsid_tool.py /wd/fs_db_diff.py /wd/fs_afc.py
+
+COPY uls/migrations /wd/migrations/
 
 WORKDIR /wd
 

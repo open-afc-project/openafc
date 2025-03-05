@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18
+FROM alpine:3.18.11
 
 # Port REST API service listen on. Mandatory
 # ENV AFC_SERVER_PORT
@@ -81,24 +81,24 @@ COPY gunicorn/config.py /wd/gunicorn_config.py
 ENV PROMETHEUS_MULTIPROC_DIR=/wd/prometheus_multiproc_dir
 RUN mkdir -p $PROMETHEUS_MULTIPROC_DIR
 
-RUN apk add --update --no-cache python3=~3.11 py3-sqlalchemy=~1.4 py3-pip \
-    py3-pydantic=~1.10 py3-psycopg2 py3-greenlet curl
+RUN apk add --update --no-cache python3 curl
+
+# Setting up venv in /venv and 'activating' it
+RUN python3 -m venv /venv
+ENV PATH=/venv/bin:$PATH
+ENV VIRTUAL_ENV=/venv
 
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
-        -r /wd/afc-packages/pkgs.afc_server \
+    --no-cache-dir -r /wd/afc-packages/pkgs.afc_server \
     && rm -rf /wd/afc-packages
 
-# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
-# installed as Alpine package (thus not requiring gcc and musl-dev install)
-RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1 && \
-    pip3 install confluent-kafka==2.1.1 && \
-    apk del python3-dev gcc musl-dev
-
+# Installing Pthon libraries
+RUN apk add --update --no-cache librdkafka-dev=~2.1.1
 COPY afc_server/requirements.txt /wd
-RUN pip3 install --root-user-action=ignore -r /wd/requirements.txt && \
-    rm -f /wd/requirements.txt
+RUN apk add --update --no-cache python3-dev build-base && \
+    pip3 install --no-cache-dir --root-user-action=ignore -r /wd/requirements.txt && \
+    apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
 
 COPY afc_server/afc_server_app.py afc_server/afc_server_compute.py \
     afc_server/afc_server_db.py afc_server/afc_server_models.py \

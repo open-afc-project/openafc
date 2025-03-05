@@ -59,6 +59,7 @@ except ImportError:
 import json
 import logging
 import lz4.frame
+import math
 import os
 import pytimeparse
 import pytz
@@ -81,6 +82,7 @@ ALS_CONN_ENV = "POSTGRES_ALS_CONN_STR"
 LOG_CONN_ENV = "POSTGRES_LOG_CONN_STR"
 ALS_PASSWORD_ENV = "POSTGRES_ALS_PASSWORD_FILE"
 LOG_PASSWORD_ENV = "POSTGRES_LOG_PASSWORD_FILE"
+KEYHOLE_TEMPLATE_ENV = "KEYHOLE_TEMPLATE_FILE"
 
 
 class PrintFormat(enum.Enum):
@@ -677,8 +679,8 @@ class Point:
     """ WGS84 point
 
     Private attributes:
-    _lat -- North-positive latitude in degrees
-    _lon -- East-positive longitude in degrees
+    lat -- North-positive latitude in degrees
+    lon -- East-positive longitude in degrees
     """
     def __init__(self, lat_lon: str) -> None:
         """ Constructor
@@ -693,14 +695,14 @@ class Point:
                 lat_lon)
         error_if(not m, f"Geodetic position '{lat_lon}' has invalid format")
         assert m is not None
-        self._lat = float(m.group("lat")) * \
-            (-1 if (m.group("lathem") or "") in "sS" else 1)
-        self._lon = float(m.group("lon")) * \
-            (-1 if (m.group("lonhem") or "") in "wW" else 1)
+        self.lat = float(m.group("lat")) * \
+            (-1 if (m.group("lathem") or "n") in "sS" else 1)
+        self.lon = float(m.group("lon")) * \
+            (-1 if (m.group("lonhem") or "e") in "wW" else 1)
 
     def as_ga2(self) -> str:
         """ Returns FeoAlchemy point representation string """
-        return f"POINT({self._lon} {self._lat})"
+        return f"POINT({self.lon} {self.lat})"
 
 
 class RuntimeOpt(enum.IntFlag):
@@ -713,7 +715,7 @@ class RuntimeOpt(enum.IntFlag):
     edebug = defs.RNTM_OPT_SLOW_DBG
 
     def out_repr(self) -> List[str]:
-        """ Returns output reresentation as list of options """
+        """ Returns output representation as list of options """
         ret: List[str] = []
         rest = self.value
         for opt in list(self):
@@ -752,11 +754,14 @@ class AlsSelectComponent:
         """ Common context used in components' generation
 
         Private attributes:
-        _metadata      -- ALS Database metadata
-        _table_aliases -- Dictionary of table aliases, indexed by alias name
-        _position      -- None or position, specified by --pos
-        _use_miles     -- True to use miles in command line and output
-                          distances, False for kilometers
+        _metadata             -- ALS Database metadata
+        _table_aliases        -- Dictionary of table aliases, indexed by alias
+                                 name
+        _position             -- None or position, specified by --pos
+        _use_miles            -- True to use miles in command line and output
+                                 distances, False for kilometers
+        keyhole_template_file -- Keyhole template file name or None
+        _engine               -- Engine to database (initially None)
         """
         # Meters in mile
         METERS_IN_MILE = 1609.344
@@ -769,6 +774,8 @@ class AlsSelectComponent:
             self._table_aliases: Dict[str, Any] = {}
             self._position: Optional[Point] = None
             self._use_miles = False
+            self._keyhole_template_file: Optional[str] = None
+            self._engine: Optional[sa.engine.Engine] = None
 
         def set_metadata(self, metadata: sa.MetaData) -> None:
             """ Sets ALS Database metadata """
@@ -781,6 +788,37 @@ class AlsSelectComponent:
         def set_use_miles(self, use_miles: bool) -> None:
             """ Sets use miles or kilometers """
             self._use_miles = use_miles
+
+        def set_engine(self, engine: sa.engine.Engine) -> None:
+            """ Sets engine """
+            self._engine = engine
+
+        def get_engine(self) -> sa.engine.Engine:
+            """ Returns previously set engine """
+            assert self._engine is not None
+            return self._engine
+
+        def set_keyhole_template_file(self,
+                                      keyhole_template_file: Optional[str]) \
+                -> None:
+            """ Sets optional keyhole file name """
+            self._keyhole_template_file = keyhole_template_file
+
+        def get_keyhole_template(self) -> str:
+            """ Returns keyhole template """
+            error_if(not self._keyhole_template_file,
+                     f"--keyhole template (or '{KEYHOLE_TEMPLATE_ENV}' "
+                     f"environment variable) should be specified")
+            assert self._keyhole_template_file is not None
+            error_if(not os.path.isfile(self._keyhole_template_file),
+                     f"Keyhole template file '{self._keyhole_template_file}' "
+                     f"not found")
+            try:
+                with open(self._keyhole_template_file, encoding="ascii") as f:
+                    return f.read()
+            except OSError as ex:
+                error(f"Error reading keyhole template file "
+                      f"'{self._keyhole_template_file}: {ex}")
 
         def make_aias(self, src_name: str, alias_name: str) -> None:
             """ Creates table alias
@@ -817,6 +855,12 @@ class AlsSelectComponent:
             error_if(not self._position, "Position not specified")
             assert self._position is not None
             return self._position.as_ga2()
+
+        def get_position(self) -> str:
+            """ Returns --pos position as Point object """
+            error_if(not self._position, "Position not specified")
+            assert self._position is not None
+            return self._position
 
         def to_meters(self, km_or_mile: float) -> float:
             """ Converts distance in external measurement units (miles or
@@ -1057,6 +1101,9 @@ class AlsOut(AlsSelectComponent):
                     DistanceAlsOut(
                         cmd="distance",
                         help_="AP distance from request point"),
+                    AzimuthAlsOut(
+                        cmd="azimuth",
+                        help_="AP azimuth from request point"),
                     PsdAlsOut(
                         cmd="psd", help_="Max PSD results"),
                     EirpAlsOut(
@@ -1103,7 +1150,7 @@ class SimpleAlsOut(AlsOut):
 
     Private attributes:
     _column_name -- Name of column that contains desired value
-    _converter   -- Optional convertrer function for non-None value
+    _converter   -- Optional converter function for non-None value
     """
     def __init__(self, cmd: str, help_: str, table_names: List[str],
                  column_name: str,
@@ -1119,7 +1166,7 @@ class SimpleAlsOut(AlsOut):
                        to 'request_response_in_message' table (that itself
                        might be omitted, if not containing pertinent columns)
         column_name -- Name of column that contains desired value
-        converter   -- Optional convertrer function for non-None value
+        converter   -- Optional converter function for non-None value
         """
         super().__init__(cmd=cmd, help_=help_, table_names=table_names)
         self._column_name = column_name
@@ -1370,6 +1417,37 @@ class DistanceAlsOut(AlsOut):
                 self._get_row0(rows, column_name="distance"))
 
 
+class AzimuthAlsOut(AlsOut):
+    """ Azimuth from given position """
+    def __init__(self, cmd: str, help_: str) -> None:
+        """ Constructor
+
+        Arguments:
+        cmd   -- Command line name (OUT and --order_by parameters)
+        help_ -- Description of output element
+        """
+        super().__init__(cmd=cmd, help_=help_,
+                         table_names=["location", "request_response"])
+
+    def add_columns(self, column_dict: Dict[str, Any]) -> None:
+        """ Add columns to select list """
+        self._add_column(
+            column_dict, column_name="azimuth",
+            expr=ga.functions.ST_Azimuth(
+                ga.functions.ST_GeographyFromText
+                (self.context.get_position_ga2()),
+                sa.cast(self.column(column_name="location_wgs84"),
+                        ga.types.Geography())) * 180. / math.pi)
+
+    def order_by(self) -> List[Any]:
+        """ Order by clause """
+        return [self.column(column_name="azimuth")]
+
+    def collate(self, rows: List[Any]) -> Any:
+        """ Read value from row list """
+        return self._get_row0(rows, column_name="azimuth")
+
+
 class PsdAlsOut(AlsOut):
     """ PSD Responses """
     def __init__(self, cmd: str, help_: str) -> None:
@@ -1541,6 +1619,7 @@ class AlsFilter(AlsSelectComponent):
         if not cls._all:
             for af in [
                     DistAlsFilter(arg_name="dist"),
+                    AzimuthAlsFilter(arg_name="azimuth"),
                     SimpleAlsFilter(
                         arg_name="region",
                         table_names=["customer", "request_response"],
@@ -1597,6 +1676,7 @@ class SimpleAlsFilter(AlsFilter):
         Arguments:
         s         -- Select statement to apply clause to
         arg_value -- Command line parameter value
+        args      -- Parsed command line arguments
         Returns modified select statement """
         args = cast(List[str], arg_value)
         positives = [arg for arg in args if not arg.startswith("-")]
@@ -1639,6 +1719,51 @@ class DistAlsFilter(AlsFilter):
                     sa.cast(self.column(column_name="location_wgs84"),
                             ga.types.Geography())) <=
                 self.context.to_meters(arg_value))
+
+
+class AzimuthAlsFilter(AlsFilter):
+    """ Filter by azimuth """
+    def __init__(self, arg_name: str) -> None:
+        """ Constructor
+
+        Arguments:
+        arg_name    -- Name of command line filtering parameter
+        """
+        super().__init__(arg_name=arg_name,
+                         table_names=["location", "request_response"])
+
+    def apply_filter(self, s: sa.sql.selectable.Select, arg_value: Any) \
+            -> sa.sql.selectable.Select:
+        """ 'Applies 'where' clause to select statement
+
+        Arguments:
+        s         -- Select statement to apply clause to
+        arg_value -- Command line parameter value
+        Returns modified select statement """
+        # Raw postgis ST_Polygon expression that defines positioned and rotated
+        # keyhole shape
+        keyhole_polygon = \
+            self.context.get_keyhole_template().\
+            replace("{{ CENTER_LAT_DEG }}",
+                    str(self.context.get_position().lat)).\
+            replace("{{ CENTER_LON_DEG }}",
+                    str(self.context.get_position().lon)).\
+            replace("{{ ROTATION_RAD }}", str(math.radians(arg_value)))
+        # Now rendering it as EWKT
+        try:
+            with self.context.get_engine().connect() as conn:
+                keyhole_wkt = \
+                    conn.execute(
+                        sa.text(
+                            f"SELECT ST_AsEWKT({keyhole_polygon})")).scalar()
+        except sa.exc.SQLAlchemyError as ex:
+            error(f"Keyhole rendering error: {ex}")
+        return \
+            s.where(
+                ga.functions.ST_Covers(
+                    ga.elements.WKTElement(keyhole_wkt),
+                    sa.cast(self.column(column_name="location_wgs84"),
+                            ga.types.Geography())))
 
 
 class MtlsCnAlsFilter(AlsFilter):
@@ -2066,6 +2191,8 @@ def do_als(args: Any) -> None:
                                          alias_name="compressed_json_tx")
     AlsSelectComponent.context.make_aias(src_name="compressed_json",
                                          alias_name="compressed_json_rx")
+    AlsSelectComponent.context.set_engine(engine)
+    AlsSelectComponent.context.set_keyhole_template_file(args.keyhole_template)
     unknown_outs = \
         [out for out in args.OUT if out not in AlsOut.all()]
     error_if(unknown_outs,
@@ -2255,6 +2382,13 @@ def main(argv: List[str]) -> None:
         "als", parents=[switches_dsn, switches_time, switches_output],
         help="Query AFC request/response log")
     parser_als.add_argument(
+        "--keyhole_template", metavar="TEMPLSTE_FILE",
+        default=os.environ.get(KEYHOLE_TEMPLATE_ENV),
+        help=f"Keyhole template file, generated by 'keyhole_gen.py --format "
+        f"sql' from results of AFC Engine 'KeyHoleShape' analysis. Used by "
+        f"--azimuth. May be specified with '{KEYHOLE_TEMPLATE_ENV}' "
+        f"environment variable")
+    parser_als.add_argument(
         "--decode_errors", action="store_true",
         help="Print table of decode errors, encountered by ALS Siphon ordered "
         "by time")
@@ -2268,11 +2402,16 @@ def main(argv: List[str]) -> None:
         "--pos", metavar="LAT,LON", type=Point,
         help="FS position specified by WGS84 latitude and longitude degrees. "
         "Hemispheres specified with sign (north/east positive) or suffix "
-        "(N/S/E/W). --dist (or, in future --azimuth) should also be specified")
+        "(N/S/E/W). This parameter is required and used by --dist and "
+        "--azimuth parameters")
     parser_als.add_argument(
         "--dist", metavar="DISTANCE", type=float,
         help="Maximum AP distance from position, specified by --pos. In "
         "kilometers or miles (see --miles)")
+    parser_als.add_argument(
+        "--azimuth", metavar="AZIMUTH", type=float,
+        help="Antenna azimuth at position specified by --pos. If specified, "
+        "only APs inside 'keyhole shape' from given position are returned")
     parser_als.add_argument(
         "--region", metavar="[-]REGION", action="append",
         help="Region (aka customer) name, that identifies AFC Config. If "
@@ -2294,7 +2433,7 @@ def main(argv: List[str]) -> None:
     parser_als.add_argument(
         "--cn", metavar="[-]MTLS_COMMON_NAME", action="append",
         help="CN (Common Name) field of AFC Request message mTLS certificate. "
-        "Empty means messages without certificate. Ifprefixed with '-' - all "
+        "Empty means messages without certificate. If prefixed with '-' - all "
         "except this common name. This parameter may be specified several "
         "times")
     parser_als.add_argument(
