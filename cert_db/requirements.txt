@@ -16,7 +16,6 @@ Flask-SQLAlchemy==2.5.1
 Flask-User==1.0.2.2
 Flask-WTF==1.2.1
 Flask-Migrate==2.6.0
-Flask-Script==2.0.5
 gevent==23.9.1
 Jinja2==3.1.5
 json5==0.9.10
