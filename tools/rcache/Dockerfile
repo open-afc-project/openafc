@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18.11
+FROM alpine:3.21.3
 
 # Default Rcache service port
 ENV RCACHE_CLIENT_PORT=8000

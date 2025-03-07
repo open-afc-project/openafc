@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18.11
+FROM alpine:3.21.3
 
 # Port REST API service listen on. Mandatory
 # ENV AFC_SERVER_PORT
@@ -94,7 +94,9 @@ RUN pip3 install --use-pep517 --root-user-action=ignore \
     && rm -rf /wd/afc-packages
 
 # Installing Pthon libraries
-RUN apk add --update --no-cache librdkafka-dev=~2.1.1
+#   Version of librdkafka-dev depends on Alpine version. confluent-kafka
+#   version in requirements.txt may need to be updated on Alpine version change
+RUN apk add --update --no-cache librdkafka-dev
 COPY afc_server/requirements.txt /wd
 RUN apk add --update --no-cache python3-dev build-base && \
     pip3 install --no-cache-dir --root-user-action=ignore -r /wd/requirements.txt && \

@@ -4,10 +4,10 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 
-FROM alpine:3.18.11
+FROM alpine:3.21.3
 # This variable should be set to default Python version for chosen Alpine
 # version. Unfortunately there is no way to get it automagically
-ENV PYTHONVERSION=3.11
+ENV PYTHONVERSION=3.12
 
 LABEL revision="afc-worker-al"
 ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
@@ -22,8 +22,8 @@ ARG AFC_WORKER_UID=${AFC_WORKER_UID}
 ENV RCACHE_UPDATE_ON_SEND=True
 
 RUN apk add --update --no-cache python3=~${PYTHONVERSION} \
-    boost1.82-program_options boost1.82-log boost1.82-filesystem \
-    boost1.82-thread qt5-qtbase armadillo minizip libgeotiff \
+    boost1.84-program_options boost1.84-log boost1.84-filesystem \
+    boost1.84-thread qt5-qtbase armadillo minizip libgeotiff \
     qt5-qtbase-sqlite libbsd gdal tzdata imagemagick zip
 
 # Setting up venv in /venv and 'activating' it
@@ -35,7 +35,9 @@ ENV VIRTUAL_ENV=/venv
 ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${PYTHONVERSION}/site-packages:${PYTHONPATH}
 
 # Installing Python libraries
-RUN apk add --update --no-cache librdkafka-dev=~2.1.1
+#   Version of librdkafka-dev depends on Alpine version. confluent-kafka
+#   version in requirements.txt may need to be updated on Alpine version change
+RUN apk add --update --no-cache librdkafka-dev
 COPY worker/requirements.txt /wd/
 RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} build-base expat expat-dev && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \

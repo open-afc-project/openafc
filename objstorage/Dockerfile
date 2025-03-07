@@ -5,10 +5,10 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18.11
+FROM alpine:3.21.3
 # This variable should be set to default Python version for chosen Alpine
 # version. Unfortunately there is no way to get it automagically
-ENV PYTHONVERSION=3.11
+ENV PYTHONVERSION=3.12
 
 RUN apk add --update --no-cache python3=~${PYTHONVERSION}
 
