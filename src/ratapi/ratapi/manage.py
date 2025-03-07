@@ -931,6 +931,7 @@ def _sweep_fcc_data(data, location):
             'action': 'sweep', 'country': 'US', 'status': 'failed download'})
     _mail_alert('US', str(location))
 
+
 def _mail_alert(country, other):
     from flask_mail import Mail, Message
 
@@ -958,6 +959,7 @@ def org_cli():
 def org_create(name):
     """Create a new Organization."""
     org_create_internal(name)
+
 
 def org_create_internal(name):
     from contextlib import closing
