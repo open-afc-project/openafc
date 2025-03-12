@@ -81,6 +81,7 @@ def get_or_create(session, model, **kwargs):
 def data_group(log_level):
     pass
 
+
 @data_group.command('clean-history')
 @with_appcontext
 def clean_history():
@@ -368,7 +369,7 @@ class DbUpgrade:
                     LOGGER.error("upgrade from preOIDC version")
                     stamp(directory=os.path.join(os.path.dirname(__file__),
                                                  "migrations"),
-                                                 revision='4c904e86218d')
+                          revision='4c904e86218d')
                 elif 'aaa_user.org does not exist' in str(exception.args):
                     LOGGER.error("upgrade from mtls version")
                     stamp(directory=os.path.join(os.path.dirname(__file__),
@@ -1652,7 +1653,7 @@ class ConfigShow:
 
 def create_cli_app():
     """Create an application instance with the CLI."""
-    
+
     log_level = "info"
     for idx, arg in enumerate(sys.argv):
         if (arg == "--log-level") and ((idx + 1) < len(sys.argv)):
