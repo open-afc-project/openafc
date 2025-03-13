@@ -17,7 +17,12 @@ import ratapi
 import shutil
 import sqlalchemy
 import time
+import sys
+import click
+import flask
 from flask_migrate import MigrateCommand
+from flask.cli import FlaskGroup, with_appcontext
+from flask_migrate import Migrate
 import werkzeug.exceptions
 from . import create_app
 from afcmodels.base import db
@@ -25,7 +30,6 @@ from afcmodels.hardcoded_relations import RulesetVsRegion, \
     CERT_ID_LOCATION_UNKNOWN, CERT_ID_LOCATION_OUTDOOR, CERT_ID_LOCATION_INDOOR
 from .db.generators import shp_to_spatialite, spatialite_to_raster
 from prettytable import PrettyTable
-from flask_script import Manager, Command, Option, commands
 from . import cmd_utils
 import als
 from .util import als_log_afc_config_change
@@ -71,12 +75,22 @@ def get_or_create(session, model, **kwargs):
         return instance
 
 
-class CleanHistory(Command):  # pylint: disable=abstract-method
+# 'data' group
+@click.group(name='data')
+@click.option('--log-level', help='Console logging lowest level displayed.')
+def data_group(log_level):
+    pass
+
+
+@data_group.command('clean-history')
+@with_appcontext
+def clean_history():
+    CleanHistory()(flaskapp=flask.current_app)
+
+
+class CleanHistory:  # pylint: disable=abstract-method
     ''' Remove old history files
     '''
-
-    # no extra options needed
-    option_list = ()
 
     def __call__(self, flaskapp):  # pylint: disable=signature-differs
 
@@ -99,12 +113,15 @@ class CleanHistory(Command):  # pylint: disable=abstract-method
                 shutil.rmtree(os.path.join(history_dir, record))
 
 
-class CleanTmpFiles(Command):
+@data_group.command('clean-tmp-files')
+@with_appcontext
+def clean_tmp_files():
+    CleanTmpFiles()(flaskapp=flask.current_app)
+
+
+class CleanTmpFiles:
     ''' Remove old temporary files that have been orphaned by web clients
     '''
-
-    # no extra options needed
-    option_list = ()
 
     def __call__(self, flaskapp):
 
@@ -126,20 +143,20 @@ class CleanTmpFiles(Command):
                 shutil.rmtree(os.path.join(task_queue, record))
 
 
-class RasterizeBuildings(Command):
+@data_group.command('rasterize-buildings')
+@click.option('--source', '-s', type=str, required=True, help="source shape file")
+@click.option('--target', '-t', type=str, default=None, help="target raster file")
+@click.option('--layer', '-l', type=str, required=True, help="layer name to access polygons from")
+@click.option('--attribute', '-a', type=str, required=True, help="attribute name to access height data from")
+@with_appcontext
+def rasterize_buildings(source, target, layer, attribute):
+    RasterizeBuildings()(flaskapp=flask.current_app, source=source,
+                         target=target, layer=layer, attribute=attribute)
+
+
+class RasterizeBuildings:
     ''' Convert building shape file into tiff raster
     '''
-
-    option_list = (
-        Option('--source', '-s', type=str, dest='source', required=True,
-               help="source shape file"),
-        Option('--target', '-t', type=str, dest='target', default=None,
-               help="target raster file"),
-        Option('--layer', '-l', type=str, dest='layer', required=True,
-               help="layer name to access polygons from"),
-        Option('--attribute', '-a', type=str, dest='attribute', required=True,
-               help="attribute name to access height data from"),
-    )
 
     def __call__(self, flaskapp, source, target, layer, attribute):
         from db.generators import shp_to_spatialite, spatialite_to_raster
@@ -157,23 +174,8 @@ class RasterizeBuildings(Command):
                              '.sqlite3', layer, attribute)
 
 
-class Data(Manager):
-    ''' View and manage data files in RAT '''
-
-    def __init__(self, *args, **kwargs):
-        Manager.__init__(self, *args, **kwargs)
-        self.add_command('clean-history', CleanHistory())
-        self.add_command('clean-tmp-files', CleanTmpFiles())
-        self.add_command('rasterize-buildings', RasterizeBuildings())
-
-
-class DbCreate(Command):
+class DbCreate:
     ''' Create a full new database outside of alembic migrations. '''
-
-    option_list = (
-        Option('--if_absent', action='store_true', dest='if_absent',
-               help="Do nothing if database already exists"),
-    )
 
     def __call__(self, flaskapp, if_absent):
         LOGGER.debug('DbCreate.__call__()')
@@ -202,10 +204,12 @@ class DbCreate(Command):
             get_or_create(db.session, Role, name='Trial')
             for rule in ruleset_list:
                 get_or_create(db.session, Ruleset, name=rule)
-            stamp(revision='head')
+            stamp(directory=os.path.join(os.path.dirname(__file__),
+                                         "migrations"),
+                  revision='head')
 
 
-class DbDrop(Command):
+class DbDrop:
     ''' Create a full new database outside of alembic migrations. '''
 
     def __call__(self, flaskapp):
@@ -215,12 +219,8 @@ class DbDrop(Command):
             db.drop_all()
 
 
-class DbExport(Command):
+class DbExport:
     ''' Export database in db to a file in json. '''
-
-    option_list = (
-        Option('--dst', type=str, help='export user data file'),
-    )
 
     def __init__(self, *args, **kwargs):
         LOGGER.debug('DbExport.__init__()')
@@ -294,11 +294,8 @@ def setUserIdNextVal():
     db.session.commit()
 
 
-class DbImport(Command):
+class DbImport:
     ''' Import User Database. '''
-    option_list = (
-        Option('--src', type=str, help='configuration source file'),
-    )
 
     def __init__(self, *args, **kwargs):
         LOGGER.debug('DbImport.__init__()')
@@ -351,7 +348,7 @@ class DbImport(Command):
                 setUserIdNextVal()
 
 
-class DbUpgrade(Command):
+class DbUpgrade:
     ''' Upgrade User Database. '''
 
     def __init__(self, *args, **kwargs):
@@ -370,33 +367,43 @@ class DbUpgrade(Command):
             except Exception as exception:
                 if 'aaa_user.username does not exist' in str(exception.args):
                     LOGGER.error("upgrade from preOIDC version")
-                    stamp(revision='4c904e86218d')
+                    stamp(directory=os.path.join(os.path.dirname(__file__),
+                                                 "migrations"),
+                          revision='4c904e86218d')
                 elif 'aaa_user.org does not exist' in str(exception.args):
                     LOGGER.error("upgrade from mtls version")
-                    stamp(revision='230b7680b81e')
+                    stamp(directory=os.path.join(os.path.dirname(__file__),
+                                                 "migrations"),
+                          revision='230b7680b81e')
             db.session.commit()
-            upgrade()
+            upgrade(directory=os.path.join(os.path.dirname(__file__),
+                                           "migrations"))
             ruleset_list = RulesetVsRegion.ruleset_list()
             for rule in ruleset_list:
                 get_or_create(db.session, Ruleset, name=rule)
 
 
-class UserCreate(Command):
-    ''' Create a new user functionality. '''
+# 'user' group
+@click.group(name='user')
+@click.option('--log-level', help='Console logging lowest level displayed.')
+def user_group(log_level):
+    pass
 
-    option_list = (
-        Option('username', type=str,
-               help='User name'),
-        Option('password_in', type=str,
-               help='Users password\n'
-                    'example: rat-manage-api'
-                    ' user create email password'),
-        Option('--role', type=str, default=[], action='append',
-               choices=['Admin', 'Super', 'Analysis', 'AP', 'Trial'],
-               help='role to include with the new user'),
-        Option('--org', type=str, help='Organization'),
-        Option('--email', type=str, help='User email'),
-    )
+
+@user_group.command('create')
+@click.argument('username', type=str)
+@click.argument('password_in', type=str)
+@click.option('--role', type=click.Choice(['Admin', 'Super', 'Analysis', 'AP', 'Trial']), multiple=True, help='role to include with the new user')
+@click.option('--org', type=str, help='Organization')
+@click.option('--email', type=str, help='User email')
+@with_appcontext
+def user_create(username, password_in, role, org, email):
+    UserCreate()(flaskapp=flask.current_app, username=username,
+                 password_in=password_in, role=role, org=org, email=email)
+
+
+class UserCreate:
+    ''' Create a new user functionality. '''
 
     def _create_user(self, flaskapp, id, username, email, password_in, role,
                      hashed, org=None):
@@ -515,17 +522,17 @@ class UserCreate(Command):
                           hashed, org)
 
 
-class UserUpdate(Command):
-    ''' Create a new user functionality. '''
+@user_group.command('update')
+@click.option('--email', type=str, required=True, help='Email')
+@click.option('--role', type=click.Choice(['Admin', 'Super', 'Analysis', 'AP', 'Trial']), multiple=True, help='role to include with the new user')
+@click.option('--org', type=str, help='Organization')
+@with_appcontext
+def user_update(email, role, org):
+    UserUpdate()(flaskapp=flask.current_app, email=email, role=role, org=org)
 
-    option_list = (
-        Option('--email', type=str,
-               help='Email'),
-        Option('--role', type=str, default=[], action='append',
-               choices=['Admin', 'Super', 'Analysis', 'AP', 'Trial'],
-               help='role to include with the new user'),
-        Option('--org', type=str, help='Organization'),
-    )
+
+class UserUpdate:
+    ''' Create a new user functionality. '''
 
     def _update_user(self, flaskapp, email, role, org=None):
         ''' Create user in database. '''
@@ -572,13 +579,15 @@ class UserUpdate(Command):
         self._update_user(flaskapp, email, role, org)
 
 
-class UserRemove(Command):
-    ''' Remove a user by email. '''
+@user_group.command('remove')
+@click.option('--email', type=str, required=True, help="user's email address")
+@with_appcontext
+def user_remove(email):
+    UserRemove()(flaskapp=flask.current_app, email=email)
 
-    option_list = (
-        Option('email', type=str,
-               help="user's email address"),
-    )
+
+class UserRemove:
+    ''' Remove a user by email. '''
 
     def _remove_user(self, flaskapp, email):
         from afcmodels.aaa import User, Role
@@ -602,7 +611,13 @@ class UserRemove(Command):
         self._remove_user(flaskapp, email)
 
 
-class UserList(Command):
+@user_group.command('list')
+@with_appcontext
+def user_list():
+    UserList()(flaskapp=flask.current_app)
+
+
+class UserList:
     '''Lists all users.'''
 
     def __call__(self, flaskapp):
@@ -645,31 +660,26 @@ class UserList(Command):
             print(table)
 
 
-class User(Manager):
-    ''' View and manage AAA state '''
-
-    def __init__(self, *args, **kwargs):
-        LOGGER.debug('User.__init__()')
-        Manager.__init__(self, *args, **kwargs)
-        self.add_command('update', UserUpdate())
-        self.add_command('create', UserCreate())
-        self.add_command('remove', UserRemove())
-        self.add_command('list', UserList())
+# 'ap-deny' group
+@click.group(name='ap-deny')
+@click.option('--log-level', help='Console logging lowest level displayed.')
+def ap_deny_group(log_level):
+    pass
 
 
-class AccessPointDenyCreate(Command):
+@ap_deny_group.command('create')
+@click.option('--serial', type=str, default=None, help='serial number of the ap')
+@click.option('--cert_id', type=str, required=True, help='certification id of the ap')
+@click.option('--ruleset', type=str, required=True, help='ruleset of the ap')
+@click.option('--org', type=str, required=True, help='org of the ap')
+@with_appcontext
+def ap_deny_create(serial, cert_id, ruleset, org):
+    AccessPointDenyCreate()(flaskapp=flask.current_app, serial=serial,
+                            cert_id=cert_id, ruleset=ruleset, org=org)
+
+
+class AccessPointDenyCreate:
     ''' Create a new access point. '''
-
-    option_list = (
-        Option('--serial', type=str, default=None,
-               help='serial number of the ap'),
-        Option('--cert_id', type=str, default=None, required=True,
-               help='certification id of the ap'),
-        Option('--ruleset', type=str, default=None, required=True,
-               help='ruleset of the ap'),
-        Option('--org', type=str, default=None, required=True,
-               help='org of the ap'),
-    )
 
     def _create_ap(self, flaskapp, serial, cert_id, ruleset, org):
         from contextlib import closing
@@ -715,15 +725,17 @@ class AccessPointDenyCreate(Command):
         self._create_ap(flaskapp, serial, cert_id, ruleset, org)
 
 
-class AccessPointDenyRemove(Command):
-    '''Removes an access point by serial number and or certification id'''
+@ap_deny_group.command('remove')
+@click.option('--serial', type=str, default=None, help='Serial number of an Access Point')
+@click.option('--cert_id', type=str, default=None, help='certification id of the ap')
+@with_appcontext
+def ap_deny_remove(serial, cert_id):
+    AccessPointDenyRemove()(flaskapp=flask.current_app, serial=serial,
+                            cert_id=cert_id)
 
-    option_list = (
-        Option('--serial', type=str, default=None,
-               help='Serial number of an Access Point'),
-        Option('--cert_id', type=str, default=None,
-               help='certification id of the ap'),
-    )
+
+class AccessPointDenyRemove:
+    '''Removes an access point by serial number and or certification id'''
 
     def _remove_ap(self, flaskapp, serial, cert_id):
         from afcmodels.aaa import AccessPointDeny
@@ -751,7 +763,13 @@ class AccessPointDenyRemove(Command):
         self._remove_ap(flaskapp, serial, cert_id)
 
 
-class AccessPointDenyList(Command):
+@ap_deny_group.command('list')
+@with_appcontext
+def ap_deny_list():
+    AccessPointDenyList()(flaskapp=flask.current_app)
+
+
+class AccessPointDenyList:
     '''Lists all access points'''
 
     def __call__(self, flaskapp):
@@ -767,28 +785,20 @@ class AccessPointDenyList(Command):
             print(table)
 
 
-class AccessPointsDeny(Manager):
-    '''View and manage Access Points Denied'''
-
-    def __init__(self, *args, **kwargs):
-        Manager.__init__(self, *args, **kwargs)
-        self.add_command("create", AccessPointDenyCreate())
-        self.add_command("remove", AccessPointDenyRemove())
-        self.add_command("list", AccessPointDenyList())
+# 'cert_id' group
+@click.group(name='cert_id')
+@click.option('--log-level', help='Console logging lowest level displayed.')
+def cert_id_group(log_level):
+    pass
 
 
-class CertificationId(Manager):
-    '''View and manage CertificationId '''
-
-    def __init__(self, *args, **kwargs):
-        Manager.__init__(self, *args, **kwargs)
-        self.add_command("create", CertIdCreate())
-        self.add_command("remove", CertIdRemove())
-        self.add_command("list", CertIdList())
-        self.add_command("sweep", CertIdSweep())
+@cert_id_group.command('list')
+@with_appcontext
+def cert_id_list():
+    CertIdList()(flaskapp=flask.current_app)
 
 
-class CertIdList(Command):
+class CertIdList:
     '''Lists all access points'''
 
     def __call__(self, flaskapp):
@@ -804,14 +814,15 @@ class CertIdList(Command):
             print(table)
 
 
-class CertIdRemove(Command):
-    '''Removes an Certificate Id by certificate id '''
+@cert_id_group.command('remove')
+@click.option('--cert_id', type=str, required=True, help='certificate id')
+@with_appcontext
+def cert_id_remove(cert_id):
+    CertIdRemove()(flaskapp=flask.current_app, cert_id=cert_id)
 
-    option_list = (
-        Option('--cert_id', type=str,
-               help='certificate id',
-               required=True),
-    )
+
+class CertIdRemove:
+    '''Removes an Certificate Id by certificate id '''
 
     def _remove_cert_id(self, flaskapp, cert_id):
         from afcmodels.aaa import CertId
@@ -834,19 +845,19 @@ class CertIdRemove(Command):
         self._remove_cert_id(flaskapp, cert_id)
 
 
-class CertIdCreate(Command):
+@cert_id_group.command('create')
+@click.option('--cert_id', type=str, required=True, help='certification id')
+@click.option('--ruleset_id', type=str, required=True, help='ruleset id')
+@click.option('--location', type=int, required=True,
+              help="location. 1 indoor - 2 outdoor - 3 both")
+@with_appcontext
+def cert_id_create(cert_id, ruleset_id, location):
+    CertIdCreate()(flaskapp=flask.current_app, cert_id=cert_id,
+                   ruleset_id=ruleset_id, location=location)
+
+
+class CertIdCreate:
     ''' Create a new certification Id. '''
-    option_list = (
-        Option('--cert_id', type=str,
-               help='certification id',
-               required=True),
-        Option('--ruleset_id', type=str,
-               help='ruleset id',
-               required=True),
-        Option('--location', type=int,
-               help="location. 1 indoor - 2 outdoor - 3 both",
-               required=True)
-    )
 
     def _create_cert_id(self, flaskapp, cert_id, ruleset_id, location=0):
         from contextlib import closing
@@ -884,12 +895,15 @@ class CertIdCreate(Command):
         self._create_cert_id(flaskapp, cert_id, ruleset_id, location)
 
 
-class CertIdSweep(Command):
+@cert_id_group.command('sweep')
+@click.option('--country', type=str, help='country e.g. US or CA')
+@with_appcontext
+def cert_id_sweep(country):
+    CertIdSweep()(flaskapp=flask.current_app, country=country)
+
+
+class CertIdSweep:
     '''Lists all access points'''
-    option_list = (
-        Option('--country', type=str,
-               help='country e.g. US or CA'),
-    )
 
     def sweep_canada(self, flaskapp):
         import csv
@@ -1062,24 +1076,22 @@ class CertIdSweep(Command):
             self.sweep_canada(flaskapp)
 
 
-class Organization(Manager):
-    '''View and manage Organizations '''
-
-    def __init__(self, *args, **kwargs):
-        Manager.__init__(self, *args, **kwargs)
-        self.add_command("create", OrganizationCreate())
-        self.add_command("remove", OrganizationRemove())
-        self.add_command("list", OrganizationList())
+# 'org' group
+@click.group(name='org')
+@click.option('--log-level', help='Console logging lowest level displayed.')
+def org_group(log_level):
+    pass
 
 
-class OrganizationCreate(Command):
+@org_group.command('create')
+@click.option('--name', type=str, required=True, help='Name of Organization')
+@with_appcontext
+def org_create(name):
+    OrganizationCreate()(flaskapp=flask.current_app, name=name)
+
+
+class OrganizationCreate:
     ''' Create a new Organization. '''
-
-    option_list = (
-        Option('--name', type=str, default=None,
-               help='Name of Organization',
-               required=True),
-    )
 
     def _create_org(self, flaskapp, name):
         from contextlib import closing
@@ -1107,13 +1119,15 @@ class OrganizationCreate(Command):
         self._create_org(flaskapp, name)
 
 
-class OrganizationRemove(Command):
+@org_group.command('remove')
+@click.option('--name', type=str, required=True, help='Name of Organization')
+@with_appcontext
+def org_remove(name):
+    OrganizationRemove()(flaskapp=flask.current_app, name=name)
+
+
+class OrganizationRemove:
     '''Removes an access point by serial number and or certification id'''
-    option_list = (
-        Option('--name', type=str, default=None,
-               help='Name of Organization',
-               required=True),
-    )
 
     def _remove_org(self, flaskapp, name):
         from afcmodels.aaa import Organization
@@ -1142,7 +1156,13 @@ class OrganizationRemove(Command):
         self._remove_org(flaskapp, name)
 
 
-class OrganizationList(Command):
+@org_group.command('list')
+@with_appcontext
+def org_list(name):
+    OrganizationList()(flaskapp=flask.current_app)
+
+
+class OrganizationList:
     '''Lists all access points'''
 
     def __call__(self, flaskapp):
@@ -1156,17 +1176,24 @@ class OrganizationList(Command):
             print(table)
 
 
-class MTLSCreate(Command):
-    ''' Create a new mtls certificate. '''
+# 'mtls' group
+@click.group(name='mtls')
+@click.option('--log-level', help='Console logging lowest level displayed.')
+def mtls_group(log_level):
+    pass
 
-    option_list = (
-        Option('--note', type=str, default=None,
-               help="note"),
-        Option('--src', type=str, default=None,
-               help="certificate file"),
-        Option('--org', type=str, default="",
-               help="email of user assocated with this access point.")
-    )
+
+@mtls_group.command('create')
+@click.option('--note', type=str, default=None, help="note")
+@click.option('--src', type=str, default=None, help="certificate file")
+@click.option('--org', type=str, default="", help="email of user assocated with this access point.")
+@with_appcontext
+def mtls_create(note, org, src):
+    MTLSCreate()(flaskapp=flask.current_app, note=note, org=org, src=src)
+
+
+class MTLSCreate:
+    ''' Create a new mtls certificate. '''
 
     def _create_mtls(self, flaskapp, note="", org="", src=None):
         from contextlib import closing
@@ -1192,20 +1219,22 @@ class MTLSCreate(Command):
 
     def __init__(self, flaskapp=None, note="",
                  org="", src=None):
-        if flaskapp and cert:
+        if flaskapp and src:
             self._create_mtls(flaskapp, note, org, src)
 
     def __call__(self, flaskapp, note, org, src):
         self._create_mtls(flaskapp, note, org, src)
 
 
-class MTLSRemove(Command):
-    ''' Remove MTLS certificate by id. '''
+@mtls_group.command('remove')
+@click.option('--id', type=int, default=None, help="id")
+@with_appcontext
+def mtls_remove(id):
+    MTLSRemove()(flaskapp=flask.current_app, id=id)
 
-    option_list = (
-        Option('--id', type=int, default=None,
-               help="id"),
-    )
+
+class MTLSRemove:
+    ''' Remove MTLS certificate by id. '''
 
     def _remove_mtls(self, flaskapp, id=None):
         from contextlib import closing
@@ -1233,7 +1262,13 @@ class MTLSRemove(Command):
         self._remove_mtls(flaskapp, id)
 
 
-class MTLSList(Command):
+@mtls_group.command('list')
+@with_appcontext
+def mtls_list():
+    MTLSList()(flaskapp=flask.current_app)
+
+
+class MTLSList:
     '''Lists all mtls certificates'''
 
     def __call__(self, flaskapp):
@@ -1251,15 +1286,16 @@ class MTLSList(Command):
             print(table)
 
 
-class MTLSDump(Command):
-    ''' Remove MTLS certificate by id. '''
+@mtls_group.command('dump')
+@click.option('--id', type=int, default=None, help="id")
+@click.option('--dst', type=str, default=None, help="output file")
+@with_appcontext
+def mtls_dump(id, dst):
+    MTLSDump()(flaskapp=flask.current_app, id=id, dst=dst)
 
-    option_list = (
-        Option('--id', type=int, default=None,
-               help="id"),
-        Option('--dst', type=str, default=None,
-               help="output file"),
-    )
+
+class MTLSDump:
+    ''' Remove MTLS certificate by id. '''
 
     def _dump_mtls(self, flaskapp, id=None, dst=None):
         from contextlib import closing
@@ -1290,18 +1326,20 @@ class MTLSDump(Command):
         self._dump_mtls(flaskapp, id, dst)
 
 
-class MTLS(Manager):
-    '''View and manage Access Points'''
-
-    def __init__(self, *args, **kwargs):
-        Manager.__init__(self, *args, **kwargs)
-        self.add_command("create", MTLSCreate())
-        self.add_command("remove", MTLSRemove())
-        self.add_command("list", MTLSList())
-        self.add_command("dump", MTLSDump())
+# 'celery' group
+@click.group(name='celery')
+@click.option('--log-level', help='Console logging lowest level displayed.')
+def celery_group(log_level):
+    pass
 
 
-class CeleryStatus(Command):  # pylint: disable=abstract-method
+@celery_group.command('status')
+@with_appcontext
+def celery_status():
+    CeleryStatus()(flaskapp=flask.current_app)
+
+
+class CeleryStatus:  # pylint: disable=abstract-method
     ''' Get status of celery workers '''
 
     def __call__(self, flaskapp):  # pylint: signature-differs
@@ -1309,27 +1347,30 @@ class CeleryStatus(Command):  # pylint: disable=abstract-method
         subprocess.call(['celery', 'status'])
 
 
-class TestCelery(Command):  # pylint: disable=abstract-method
-    ''' Run celery task in isolation '''
+@celery_group.command('test')
+@click.argument('request_type', type=click.Choice(['PointAnalysis', 'ExclusionZoneAnalysis', 'HeatmapAnalysis']))
+@click.argument('request_file', type=click.Path(exists=True))
+@click.argument('afc_config', type=click.Path(exists=True))
+@click.option('--response-file', default=None, help='destination for json results')
+@click.option('--afc-engine', default=None)
+@click.option('--user-id', type=int, default=1)
+@click.option('--username', default='test_user')
+@click.option('--response-dir', default=None)
+@click.option('--temp-dir', default='./test-celery-tmp')
+@click.option('--history-dir', default=None)
+@click.option('--debug', is_flag=True)
+@with_appcontext
+def celery_test(request_type, request_file, afc_config, response_file, user_id,
+                username, response_dir, temp_dir, history_dir):
+    TestCelery()(flaskapp=flask.current_app, request_type=request_type,
+                 request_file=request_file, afc_config=afc_config,
+                 response_file=response_file, user_id=user_id,
+                 username=username, response_dir=response_dir,
+                 temp_dir=temp_dir, history_dir=history_dir)
 
-    option_list = (
-        Option('request_type', type=str,
-               choices=['PointAnalysis',
-                        'ExclusionZoneAnalysis', 'HeatmapAnalysis'],
-               help='analysis type'),
-        Option('request_file', type=str,
-               help='request input file path'),
-        Option('afc_config', type=str, help="path to afc config file"),
-        Option('--response-file', default=None,
-               help='destination for json results'),
-        Option('--afc-engine', default=None),
-        Option('--user-id', type=int, default=1),
-        Option('--username', default='test_user'),
-        Option('--response-dir', default=None),
-        Option('--temp-dir', default='./test-celery-tmp'),
-        Option('--history-dir', default=None),
-        Option('--debug', action='store_true', dest='debug'),
-    )
+
+class TestCelery:  # pylint: disable=abstract-method
+    ''' Run celery task in isolation '''
 
     def __call__(
             self,
@@ -1403,20 +1444,22 @@ class TestCelery(Command):  # pylint: disable=abstract-method
                 raise Exception('Invalid task state')
 
 
-class Celery(Manager):
-    ''' Celery commands '''
-
-    def __init__(self, *args, **kwargs):
-        Manager.__init__(self, *args, **kwargs)
-        self.add_command('status', CeleryStatus())
-        self.add_command('test', TestCelery())
+# 'cfg' group
+@click.group(name='cfg')
+@click.option('--log-level', help='Console logging lowest level displayed.')
+def cfg_group(log_level):
+    pass
 
 
-class ConfigAdd(Command):
+@cfg_group.command('add')
+@click.argument('src', metavar='SRC=FILENAME')
+@with_appcontext
+def cfg_add(src):
+    ConfigAdd()(flaskapp=flask.current_app, src=src)
+
+
+class ConfigAdd:
     ''' Create a new admin configuration. '''
-    option_list = (
-        Option('src', type=str, help='configuration source file'),
-    )
 
     def __init__(self, *args, **kwargs):
         LOGGER.debug('ConfigAdd.__init__()')
@@ -1519,11 +1562,15 @@ class ConfigAdd(Command):
                         eval(f)
 
 
-class ConfigRemove(Command):
+@cfg_group.command('del')
+@click.argument('src', metavar='SRC=FILENAME')
+@with_appcontext
+def cfg_del(src):
+    ConfigRemove()(flaskapp=flask.current_app, src=src)
+
+
+class ConfigRemove:
     ''' Remove a user by email. '''
-    option_list = (
-        Option('src', type=str, help='configuration source file'),
-    )
 
     def __init__(self, *args, **kwargs):
         LOGGER.debug('ConfigRemove.__init__()')
@@ -1562,11 +1609,15 @@ class ConfigRemove(Command):
                         LOGGER.debug('Missing user %s in DB', username[0])
 
 
-class ConfigShow(Command):
+@cfg_group.command('show')
+@click.argument('src', metavar='SRC=FILENAME')
+@with_appcontext
+def cfg_show(src):
+    ConfigShow()(flaskapp=flask.current_app, src=src)
+
+
+class ConfigShow:
     '''Show all configurations.'''
-    option_list = (
-        Option('src', type=str, help="user's source file"),
-    )
 
     def __init__(self, *args, **kwargs):
         LOGGER.debug('ConfigShow.__init__()')
@@ -1600,15 +1651,39 @@ class ConfigShow(Command):
                 LOGGER.info(cfg_rcrd)
 
 
-class Config(Manager):
-    ''' View and manage configuration records '''
+def create_cli_app():
+    """Create an application instance with the CLI."""
 
-    def __init__(self, *args, **kwargs):
-        LOGGER.debug('Config.__init__()')
-        Manager.__init__(self, *args, **kwargs)
-        self.add_command('add', ConfigAdd())
-        self.add_command('del', ConfigRemove())
-        self.add_command('list', ConfigShow())
+    log_level = "info"
+    for idx, arg in enumerate(sys.argv):
+        if (arg == "--log-level") and ((idx + 1) < len(sys.argv)):
+            log_level = sys.argv[idx + 1]
+            break
+    log_level = log_level.upper()
+    conf = dict(
+        DEBUG=(log_level == 'DEBUG'),
+        PROPAGATE_EXCEPTIONS=(log_level == 'DEBUG'),
+        # converts str log_level to int value
+        LOG_LEVEL=log_level,
+        LOG_HANDLERS=[logging.StreamHandler()]
+        )
+
+    app = create_app(config_override=conf)
+
+    # Initialize Flask Migrate with the app
+    migrate = Migrate(app, db)
+
+    # Register all CLI command groups
+    app.cli.add_command(data_group)
+    app.cli.add_command(user_group)
+    app.cli.add_command(mtls_group)
+    app.cli.add_command(celery_group)
+    app.cli.add_command(ap_deny_group)
+    app.cli.add_command(org_group)
+    app.cli.add_command(cert_id_group)
+    app.cli.add_command(cfg_group)
+
+    return app
 
 
 def main():
@@ -1628,32 +1703,52 @@ def main():
 
     version_name = cmd_utils.packageversion(__package__)
 
-    manager = Manager(appfact)
+    cli = FlaskGroup(create_app=lambda: create_cli_app())
 
+    # Add version command
+    version_name = cmd_utils.packageversion(__package__)
     if version_name is not None:
-        dispver = '%(prog)s {0}'.format(version_name)
-        manager.add_option('--version', action='version',
-                           version=dispver)
-    manager.add_option('--log-level', dest='log_level', default='info',
-                       help='Console logging lowest level displayed.')
-    manager.add_command('showurls', commands.ShowUrls())
-    manager.add_command('db', MigrateCommand)
-    manager.add_command('db-create', DbCreate())
-    manager.add_command('db-drop', DbDrop())
-    manager.add_command('db-export', DbExport())
-    manager.add_command('db-import', DbImport())
-    manager.add_command('db-upgrade', DbUpgrade())
-    manager.add_command('user', User())
-    manager.add_command('mtls', MTLS())
-    manager.add_command('data', Data())
-    manager.add_command('celery', Celery())
-    manager.add_command('ap-deny', AccessPointsDeny())
-    manager.add_command('org', Organization())
-    manager.add_command('cert_id', CertificationId())
-    manager.add_command('cfg', Config())
+        @cli.command('version')
+        def version():
+            """Show the application version."""
+            click.echo(f"{sys.argv[0]} {version_name}")
+
+    # Add other ungrouped commands
+    @cli.command('db-create')
+    @click.option('--log-level', help='Console logging lowest level displayed.')
+    @click.option('--if_absent', is_flag=True, help="Do nothing if database already exists")
+    @with_appcontext
+    def db_create(log_level, if_absent):
+        DbCreate()(flaskapp=flask.current_app, if_absent=if_absent)
+
+    @cli.command('db-drop')
+    @click.option('--log-level', help='Console logging lowest level displayed.')
+    @with_appcontext
+    def db_drop(log_level):
+        DbDrop()(flaskapp=flask.current_app)
+
+    @cli.command('db-export')
+    @click.option('--log-level', help='Console logging lowest level displayed.')
+    @click.option('--dst', type=str, required=True, help='export user data file')
+    @with_appcontext
+    def db_export(log_level, dst):
+        DbExport()(flaskapp=flask.current_app, dst=dst)
+
+    @cli.command('db-import')
+    @click.option('--log-level', help='Console logging lowest level displayed.')
+    @click.option('--src', type=str, required=True, help='configuration source file')
+    @with_appcontext
+    def db_import(log_level, src):
+        DbImport()(flaskapp=flask.current_app, src=src)
+
+    @cli.command('db-upgrade')
+    @click.option('--log-level', help='Console logging lowest level displayed.')
+    @with_appcontext
+    def db_upgrade(log_level):
+        DbUpgrade()(flaskapp=flask.current_app)()
 
     try:
-        manager.run()
+        cli()
     finally:
         als.als_flush()
 

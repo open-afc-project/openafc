@@ -6,10 +6,10 @@
 #
 # Install required packages
 #
-FROM httpd:2.4.58-alpine3.18
+FROM httpd:2.4.63-alpine3.21
 # This variable should be set to default Python version for chosen Alpine
 # version. Unfortunately there is no way to get it automagically
-ENV PYTHONVERSION=3.11
+ENV PYTHONVERSION=3.12
 
 ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache python3=~${PYTHONVERSION} postfix
@@ -23,11 +23,14 @@ ENV VIRTUAL_ENV=/venv
 ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${PYTHONVERSION}/site-packages:${PYTHONPATH}
 
 # Installing Python libraries
-RUN apk add --update --no-cache librdkafka-dev=~2.1.1
+#   Version of librdkafka-dev depends on Alpine version. confluent-kafka
+#   version in requirements.txt may need to be updated on Alpine version change
+RUN apk add --update --no-cache librdkafka-dev libffi
 COPY rat_server/requirements.txt /wd/
-RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} build-base expat expat-dev && \
+RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} build-base \
+    expat expat-dev libffi-dev && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \
-    apk del --purge python3-dev build-base expat-dev && \
+    apk del --purge python3-dev build-base expat-dev libffi-dev && \
     rm -f /wd/requirements.txt
 
 RUN mkdir -p /etc/xdg/fbrat

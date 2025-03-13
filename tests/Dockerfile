@@ -28,7 +28,7 @@ dispatcher/certs/clients/test_ca_crt.pem \
 dispatcher/certs/clients/test_ca_key.pem \
 /usr/app/
 
-ENV AFC_CA_CERT_PATH ${AFC_CA_CERT_PATH:-/usr/app}
+ENV AFC_CA_CERT_PATH=${AFC_CA_CERT_PATH:-/usr/app}
 ENV PYTHONPATH=/usr/app
 
 ENTRYPOINT ["/usr/app/afc_tests.py"]
