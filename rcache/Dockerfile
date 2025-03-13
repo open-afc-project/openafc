@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18.11
+FROM alpine:3.21.3
 
 # True if enabled (default is True)
 # ENV RCACHE_ENABLED=True
@@ -65,7 +65,10 @@ ENV VIRTUAL_ENV=/venv
 
 WORKDIR /wd
 
-RUN apk add --update --no-cache librdkafka-dev=~2.1.1
+# Installing Python libraries
+#   Version of librdkafka-dev depends on Alpine version. confluent-kafka
+#   version in requirements.txt may need to be updated on Alpine version change
+RUN apk add --update --no-cache librdkafka-dev
 COPY rcache/requirements.txt /wd
 RUN apk add --update --no-cache python3-dev build-base && \
     pip3 install --root-user-action=ignore  --no-cache-dir -r /wd/requirements.txt && \

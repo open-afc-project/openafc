@@ -1,4 +1,4 @@
-FROM rabbitmq:3.12.2-alpine
+FROM rabbitmq:3.13.7-alpine
 
 # LOG level for console output (debug, info, warning, error, critical, none)
 ENV RMQ_LOG_CONSOLE_LEVEL=warning

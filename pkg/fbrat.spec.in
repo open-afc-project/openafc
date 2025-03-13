@@ -38,7 +38,6 @@ BuildRequires: selinux-policy-targeted, checkpolicy
 Requires: httpd
 Requires: mod_wsgi
 Requires: python-flask
-Requires: python-flask-script
 Requires: python-flask_jsonrpc
 Requires: python2-flask-sqlalchemy
 Requires: python2-flask-migrate

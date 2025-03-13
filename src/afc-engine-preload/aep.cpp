@@ -83,7 +83,7 @@ struct __dirstream {
 		char buf[2048];
 };
 
-#ifndef __GLIBC__
+#if !defined(__GLIBC__) && !defined(STATX_ALL)
 /* from musl-1.2.3/src/stat/fstatat.c */
 struct statx {
 		uint32_t stx_mask;
@@ -109,7 +109,9 @@ struct statx {
 		uint32_t stx_dev_minor;
 		uint64_t spare[14];
 };
+#endif /* !defined(__GLIBC__) && !defined(STATX_ALL) */
 
+#ifndef __GLIBC__
 /* from musl-1.2.3/src/internal/stdio_impl.h */
 struct _IO_FILE {
 		unsigned flags;

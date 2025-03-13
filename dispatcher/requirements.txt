@@ -6,8 +6,8 @@
 
 amqp==5.1.1
 gevent==23.9.1
-greenlet==2.0.2
-kombu==5.2.4
+greenlet==3.1.1
+kombu==5.4.2
 psutil==5.9.4
 requests==2.32.3
-vine==5.0.0
+vine==5.1.0
