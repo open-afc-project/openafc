@@ -1,5 +1,39 @@
 # Release Note
 
+|Version|1.0.1.0|
+| :- | :- |
+|**Date**|**10/28/2024**|
+| tag 1.0.3.0|
+
+## **Issues Addressed**
+* 307. Rcache alembic migrations copy to docker image restored (#308)
+* 300. Switch Python in Alpine images to venv (#301)
+* 302. Fix last rcache upgrade script (#303)
+* 288. Add keyhole support (#299)
+* 295. PostGIS extension for newly created rcache database added (#296)
+* 290. Fixing Alpine to 3.18.11, changing localhost to 127.0.0.1 in wget-based healtchecks (#293)
+* 289. Migrating Rcache DB from latitude/longitude to PostGIS geometry (#292)
+* Revert "281. AFC Enginr facelift (#282)" (#283)
+* 281. AFC Enginr facelift (#282)
+* 279. User creation added to database creation code (#280)
+* 276. Database creation centralization (#277)
+* Bump jinja2 from 3.1.4 to 3.1.5 in /cert_db (#268)
+* 260. Grafana for compose environment (#273)
+* 274. Resuscitation of FCC certificate downloading (#275)
+* 271. Fixing use of $__file directives in Grafana-related Jinja templates (#272)
+* 269. Adding timezones to ULS-related timetags (#270)
+* 266. AFC traffic metrics (#267)
+* adding variables for base and custom docker-compose files (#263)
+* 264. ULS logging improvements (#265)
+* Bump jinja2 from 3.1.2 to 3.1.4 in /grafana (#258)
+* Unify and put to one place the docker-compose.yaml file (#242)
+* 261. Fixing ULS download failure (#262)
+* 257.  cert_db fixes and improvements (#259)
+* 249. Further Grafana arrangements (#255)
+* 251. Add IP and request flags to ALS (#253)
+* 246. als_siphon improvements (#247)
+* 243. Grafana relocation to top level (#244)
+
 ## **Version and Date**
 |Version|**135*|
 | :- | :- |
