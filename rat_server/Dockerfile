@@ -7,12 +7,13 @@
 # Install required packages
 #
 FROM httpd:2.4.63-alpine3.21
-# This variable should be set to default Python version for chosen Alpine
+# These variables should be set to Python version for chosen Alpine
 # version. Unfortunately there is no way to get it automagically
-ENV PYTHONVERSION=3.12
+ENV AFC_PYTHONVERSION=3.12
+ENV AFC_PYTHONVERSION_NO_DOT=312
 
 ENV PYTHONUNBUFFERED=1
-RUN apk add --update --no-cache python3=~${PYTHONVERSION} postfix
+RUN apk add --update --no-cache python3=~${AFC_PYTHONVERSION} postfix
 
 # Setting up venv in /venv and 'activating' it
 RUN python3 -m venv /venv
@@ -20,14 +21,14 @@ ENV PATH=/venv/bin:$PATH
 ENV VIRTUAL_ENV=/venv
 # This explicitly set variable and its forceful injection in some places helps
 # to alleviate various venv shortcomings
-ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${PYTHONVERSION}/site-packages:${PYTHONPATH}
+ENV PYTHONPATH=/venv/lib/python${AFC_PYTHONVERSION}/site-packages:/usr/lib/python${AFC_PYTHONVERSION}/site-packages:${PYTHONPATH}
 
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka
 #   version in requirements.txt may need to be updated on Alpine version change
 RUN apk add --update --no-cache librdkafka-dev libffi
 COPY rat_server/requirements.txt /wd/
-RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} build-base \
+RUN apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base \
     expat expat-dev libffi-dev && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base expat-dev libffi-dev && \
@@ -51,7 +52,7 @@ ARG NODE_OPTIONS=--openssl-legacy-provider
 
 RUN apk list -I && \
     apk add --update --no-cache build-base cmake ninja yarn \
-        apr-util-dev python3-dev=~${PYTHONVERSION} && \
+        apr-util-dev python3-dev=~${AFC_PYTHONVERSION} && \
     mod_wsgi-express install-module && \
     cd /wd/build && \
     cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiWebDebug -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
