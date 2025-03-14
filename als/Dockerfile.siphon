@@ -9,7 +9,7 @@
 # Kafka and puts them to PostgreSQL+PostGIS database (optionally creating
 # necessary database before operation)
 
-FROM alpine:3.21.3
+FROM python:3.12-alpine3.21
 
 # Destination in docker image. Not a parameter (i.e. no reasons to change it)
 ARG WORKDIR=/usr/app
@@ -17,13 +17,6 @@ ENV WORKDIR=$WORKDIR
 
 RUN mkdir -p -m 777 $WORKDIR
 WORKDIR $WORKDIR
-
-RUN apk add --update --no-cache python3
-
-# Setting up venv in /venv and 'activating' it
-RUN python3 -m venv /venv
-ENV PATH=/venv/bin:$PATH
-ENV VIRTUAL_ENV=/venv
 
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka

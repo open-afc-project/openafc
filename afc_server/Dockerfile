@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.21.3
+FROM python:3.12-alpine3.21
 
 # Port REST API service listen on. Mandatory
 # ENV AFC_SERVER_PORT
@@ -81,12 +81,7 @@ COPY gunicorn/config.py /wd/gunicorn_config.py
 ENV PROMETHEUS_MULTIPROC_DIR=/wd/prometheus_multiproc_dir
 RUN mkdir -p $PROMETHEUS_MULTIPROC_DIR
 
-RUN apk add --update --no-cache python3 curl
-
-# Setting up venv in /venv and 'activating' it
-RUN python3 -m venv /venv
-ENV PATH=/venv/bin:$PATH
-ENV VIRTUAL_ENV=/venv
+RUN apk add --update --no-cache curl
 
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \

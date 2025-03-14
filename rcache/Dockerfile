@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.21.3
+FROM python:3.12-alpine3.21
 
 # True if enabled (default is True)
 # ENV RCACHE_ENABLED=True
@@ -56,12 +56,7 @@ ENV RCACHE_ALEMBIC_INITIAL_VERSION=5663cf8afbd7
 # 'head'
 # ENV RCACHE_ALEMBIC_HEAD_VERSION
 
-RUN apk add --update --no-cache python3 curl
-
-# Setting up venv in /venv and 'activating' it
-RUN python3 -m venv /venv
-ENV PATH=/venv/bin:$PATH
-ENV VIRTUAL_ENV=/venv
+RUN apk add --update --no-cache curl
 
 WORKDIR /wd
 

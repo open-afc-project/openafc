@@ -6,28 +6,21 @@
 #
 # Install required packages
 #
-FROM alpine:3.21.3
-# This variable should be set to default Python version for chosen Alpine
-# version. Unfortunately there is no way to get it automagically
-ENV PYTHONVERSION=3.12
+FROM python:3.12-alpine3.21
+# This variable should be set to used Python version (major.minor only)
+ENV AFC_PYTHONVERSION=3.12
 
 ENV PYTHONUNBUFFERED=1
-RUN apk add --update --no-cache python3=~${PYTHONVERSION}
 
-# Setting up venv in /venv and 'activating' it
-RUN python3 -m venv /venv
-ENV PATH=/venv/bin:$PATH
-ENV VIRTUAL_ENV=/venv
-# This explicitly set variable and its forceful injection in some places helps
-# to alleviate various venv shortcomings
-ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${PYTHONVERSION}/site-packages:${PYTHONPATH}
+# CMake installs packages to /usr/lib even though this image uses /usr/local/lib
+ENV PYTHONPATH=/usr/lib/python${AFC_PYTHONVERSION}/site-packages:/usr/local/lib/python${AFC_PYTHONVERSION}/site-packages:${PYTHONPATH}
 
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka
 #   version in requirements.txt may need to be updated on Alpine version change
 RUN apk add --update --no-cache librdkafka-dev
 COPY cert_db/requirements.txt /wd/
-RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} build-base && \
+RUN apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
 
