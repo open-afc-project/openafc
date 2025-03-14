@@ -12,28 +12,29 @@
 
 REPO="ghcr.io/open-afc-project"
 
-# please keep sorted: 
-AFC_SERVER="afcserver-image"     # AFC Server image
-ALS_KAFKA="als-kafka-image"       # Kafka for ALS
-ALS_SIPHON="als-siphon-image"     # ALS Siphon image
-BULK_POSTGRES="bulk-postgres-image" # PostgreSQL for ALS
+# please keep sorted:
+AFC_SERVER="afcserver-image"
+ALS_KAFKA="als-kafka-image"
+ALS_SIPHON="als-siphon-image"
+BULK_POSTGRES="bulk-postgres-image"
 CADVISOR="cadvisor-image"
-CERT_DB="cert_db"                 # cert db
-DISPATCHER="dispatcher-image"     # dispatcher image
-GEO_CONVERTERS="geo-converters-image"             # Geodetic converters
+CERT_DB="cert_db"
+DISPATCHER="dispatcher-image"
+GEO_CONVERTERS="geo-converters-image"
 GRAFANA="grafana-image"
-MSGHND="afc-msghnd"               # msghnd image
-NGINXEXPORTER="nginxexporter-image"               # Nginx-exporter
-OBJST="objstorage-image"          # object storage
+LOKI="loki-image"
+MSGHND="afc-msghnd"
+NGINXEXPORTER="nginxexporter-image"
+OBJST="objstorage-image"
 PROMETHEUS="prometheus-image"
-RATDB="ratdb-image"               # ratdb image
-RCACHE="rcache-image"             # Respo Cache service
-RMQ="rmq-image"                   # rabbitmq image
-ULS_DOWNLOADER="uls-downloader"   # uls downloader
-WEBUI="webui-image"               # server image
-WORKER="afc-worker"        # msghnd image
-WORKER_AL_D4B="worker-al-build-image"   # Alpine worker build img
-WORKER_AL_PRINST="worker-al-preinstall" # Alpine worker preinst
+PROMTAIL="promtail-image"
+RATDB="ratdb-image"
+RCACHE="rcache-image"
+RMQ="rmq-image"
+ULS_DOWNLOADER="uls-downloader"
+ULS_UPDATER="uls-updater"
+WEBUI="webui-image"
+WORKER="afc-worker"
 
 from=$1
 to=$2
@@ -49,18 +50,19 @@ images=(
   ${DISPATCHER}
   ${GEO_CONVERTERS}
   ${GRAFANA}
+  ${LOKI}
   ${MSGHND}
   ${NGINXEXPORTER}
   ${OBJST}
   ${PROMETHEUS}
+  ${PROMTAIL}
   ${RATDB}
   ${RCACHE}
   ${RMQ}
   ${ULS_DOWNLOADER}
+  ${ULS_UPDATER}
   ${WEBUI}
   ${WORKER}
-  ${WORKER_AL_D4B}
-  ${WORKER_AL_PRINST}
 )
 
 for img in ${images[@]}; do
