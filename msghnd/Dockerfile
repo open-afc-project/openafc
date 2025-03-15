@@ -46,7 +46,7 @@ apk del --purge cmake ninja && rm -rf /wd/cmake/ /wd/pkg/ /wd/src/ /wd/build/
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
         -r /wd/afc-packages/pkgs.msghnd \
-    && rm -rf /wd/afc-package
+    && rm -rf /wd/afc-packages
 #
 RUN mkdir -m 750 -p /var/lib/fbrat/AntennaPatterns && \
 mkdir -m 755 -p /var/spool/fbrat /var/lib/fbrat /var/celery /var/run/celery /var/log/celery
