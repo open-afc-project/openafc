@@ -1417,7 +1417,7 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
                 for value_month in new_value_months:
                     s = sa.select([self._table]).\
                         where(self._value_column == value_month[0])
-                    result = self._adb.conn.execute(s)
+                    result = self._adb.conn.execute(s).fetchall()
                     self._by_value[value_month] = \
                         self._key_from_row(list(result)[0])
         except (sa.exc.SQLAlchemyError, TypeError, ValueError) as ex:
@@ -1448,7 +1448,8 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
             return
         by_key: Dict[Tuple[LookupKey, int], LookupValue] = {}
         try:
-            for row in self._adb.conn.execute(sa.select(self._table)):
+            for row in \
+                    self._adb.conn.execute(sa.select(self._table)).fetchall():
                 key = (self._key_from_row(row),
                        row[AlsTableBase.MONTH_IDX_COL_NAME])
                 value = by_key.get(key)
@@ -1751,8 +1752,9 @@ class TableUpdaterBase(AlsTableBase,
                                          month_idx=month_idx)
         except (LookupError, TypeError, ValueError) as ex:
             raise JsonFormatError(
-                f"Invalid {self._json_obj_name} object format: {ex}",
-                code_line=LineNumber.exc())
+                f"Invalid {self._json_obj_name} object format when updating "
+                f"{self._table_name} table or its subordinates: {ex}",
+                code_line=LineNumber.exc(), data=data_dict)
         if not rows:
             return
         ins = sa_pg.insert(self._table).values(rows).on_conflict_do_nothing()
@@ -2510,7 +2512,7 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
         result_row_idx -- 0-based index in insert results
         Returns the latter
         """
-        ret = result_row[result_row_idx]
+        ret = result_row[0]
         if isinstance(ret, (str, bytes)):
             ret = uuid.UUID(ret)
         return ret
@@ -3174,10 +3176,11 @@ class KafkaClient:
             ret: Dict[str, List["KafkaClient.MessageInfo"]] = {}
             start_time = datetime.datetime.now()
             for _ in range(max_records):
+                if (datetime.datetime.now() - start_time).total_seconds() > \
+                        timeout_s:
+                    break
                 message = self._consumer.poll(timeout_s)
-                if (message is None) or \
-                        ((datetime.datetime.now() -
-                          start_time).total_seconds() > timeout_s):
+                if message is None:
                     break
                 kafka_error = message.error()
                 topic = message.topic()
@@ -3495,6 +3498,9 @@ class Siphon:
             self._lookups.reread()
             self._decode_error_writer.write_decode_error(
                 ex.msg, line=ex.code_line, data=ex.data)
+        except DbFormatError as ex:
+            self._metrics.siphon_als_malformed().inc()
+            logging.error(f"Error writing ALS database: {repr(ex)}")
         finally:
             if transaction is not None:
                 transaction.rollback()
