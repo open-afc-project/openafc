@@ -40,6 +40,7 @@ import sqlalchemy.dialects.postgresql as sa_pg      # type: ignore
 import string
 import subprocess
 import sys
+import time
 from typing import Any, Callable, Dict, Generic, List, NamedTuple, \
     NoReturn, Optional, Set, Tuple, Type, TypeVar, Union
 import urllib.parse
@@ -3170,16 +3171,12 @@ class KafkaClient:
         max_records    -- Maximum number of records to poll
         Returns by-topic dictionary of MessageInfo objects
         """
-        timeout_s = timeout_ms / 1000
         try:
             fetched_offsets: Dict[Tuple[str, int], int] = {}
             ret: Dict[str, List["KafkaClient.MessageInfo"]] = {}
-            start_time = datetime.datetime.now()
+            end_time = time.time() + timeout_ms / 1000
             for _ in range(max_records):
-                if (datetime.datetime.now() - start_time).total_seconds() > \
-                        timeout_s:
-                    break
-                message = self._consumer.poll(timeout_s)
+                message = self._consumer.poll(max(0, end_time - time.time()))
                 if message is None:
                     break
                 kafka_error = message.error()
@@ -3203,6 +3200,8 @@ class KafkaClient:
                         fetched_offsets.setdefault((topic, partition), -1)
                     fetched_offsets[(topic, partition)] = \
                         max(previous_offset, offset)
+                if end_time <= time.time():
+                    break
         except confluent_kafka.KafkaException as ex:
             logging.error(f"Message fetch error: {ex.args[0].str}")
             raise
