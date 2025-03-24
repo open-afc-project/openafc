@@ -19,7 +19,8 @@ html/index.html#kafka-client-configuration
 """
 
 # pylint: disable=invalid-name, too-many-arguments, global-statement
-# pylint: disable=broad-exception-caught
+# pylint: disable=broad-exception-caught, too-many-positional-arguments
+# pylint: disable=global-variable-not-assigned
 
 import collections
 import datetime
@@ -508,7 +509,7 @@ class Als:
         data         -- Data - string or JSON dictionary
         extra_fields -- None or dictionary of message-type-specific fields
         """
-        json_dict = \
+        json_dict: Dict[str, Any] = \
             collections.OrderedDict(
                 [(ALS_FIELD_VERSION, ALS_FORMAT_VERSION),
                  (ALS_FIELD_SERVER_ID, self._server_id),
