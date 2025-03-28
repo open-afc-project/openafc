@@ -255,6 +255,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
                 runtime_opts=runtime_opts, exit_code=retcode)
 
     except Exception as exc:
+        LOGGER.info('Uncaught Exception in running afc-engine: '+ type(exc).__name__)
         raise exc
 
     finally:
@@ -266,6 +267,13 @@ def run(prot, host, port, request_type, task_id, hash_val,
             LOGGER.debug('terminating afc-engine')
             proc.terminate()
             LOGGER.debug('afc-engine terminated')
-        if os.path.exists(tmpdir):
-            shutil.rmtree(tmpdir)
-        LOGGER.info('Worker resources cleaned up')
+        if os.path.exists(os.path.join(tmpdir, "engine-error.txt")):
+             with open(os.path.join(tmpdir, "engine-error.txt"),
+                      encoding="utf-8", errors="replace") as infile:
+                 LOGGER.info("engine-error: " + infile.read())
+        if not(runtime_opts & (defs.RNTM_OPT_DBG | defs.RNTM_OPT_SLOW_DBG)):
+            if os.path.exists(tmpdir):
+                shutil.rmtree(tmpdir)
+            LOGGER.info('Worker resources cleaned up')
+        else:
+            LOGGER.info('Worker temp directory preserved at: '+tmpdir)
