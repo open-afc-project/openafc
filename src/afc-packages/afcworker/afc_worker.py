@@ -180,8 +180,14 @@ def run(prot, host, port, request_type, task_id, hash_val,
             except subprocess.SubprocessError as e:
                 timeout_expired = isinstance(e, subprocess.TimeoutExpired)
                 error_msg += f"afc-engine failure: {e}"
+                LOGGER.error(
+                f"run(): afc-engine killed for timeout. Task ID={task_id}, error "
+                f"message:\n{error_msg}")
                 raise subprocess.CalledProcessError(retcode, cmd)
             if retcode:
+                LOGGER.error(
+                f"run(): afc-engine killed for bad retcode. Task ID={task_id}, error "
+                f"message:{retcode}")
                 raise subprocess.CalledProcessError(retcode, cmd)
             success = True
 
