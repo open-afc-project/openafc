@@ -6,11 +6,9 @@
 #
 # Install required packages
 #
-FROM httpd:2.4.63-alpine3.21
-# These variables should be set to Python version for chosen Alpine
-# version. Unfortunately there is no way to get it automagically
+FROM python:3.12-alpine3.21
+# This variable should be set to used Python version (major.minor only)
 ENV AFC_PYTHONVERSION=3.12
-ENV AFC_PYTHONVERSION_NO_DOT=312
 
 ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache python3=~${AFC_PYTHONVERSION} postfix
@@ -34,7 +32,8 @@ RUN apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base \
     apk del --purge python3-dev build-base expat-dev libffi-dev && \
     rm -f /wd/requirements.txt
 
-RUN mkdir -p /etc/xdg/fbrat
+RUN mkdir -p /run/gunicorn /etc/xdg/fbrat
+COPY gunicorn/wsgi.py /wd/
 COPY config/ratapi.conf /etc/xdg/fbrat/
 RUN echo "DEFAULT_ULS_DIR = '/mnt/nfs/rat_transfer/ULS_Database'" >> /etc/xdg/fbrat/ratapi.conf
 RUN echo "AFC_APP_TYPE = 'server'" >> /etc/xdg/fbrat/ratapi.conf
@@ -50,10 +49,12 @@ RUN mkdir -p -m 777 /wd/build
 ARG BUILDREV=localbuild
 ARG NODE_OPTIONS=--openssl-legacy-provider
 
+#
+# Install Message Handler application
+#
 RUN apk list -I && \
     apk add --update --no-cache build-base cmake ninja yarn \
         apr-util-dev python3-dev=~${AFC_PYTHONVERSION} && \
-    mod_wsgi-express install-module && \
     cd /wd/build && \
     cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiWebDebug -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
     env PYTHONPATH=${PYTHONPATH} \
@@ -61,9 +62,7 @@ RUN apk list -I && \
     yarn cache clean && \
     apk del --purge build-base cmake ninja yarn apr-util-dev python3-dev && \
     rm -rf /wd/cmake/ /wd/pkg/ /wd/src/ /wd/build
-#
-# Install Message Handler application
-#
+
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
         -r /wd/afc-packages/pkgs.rat_server \
@@ -77,19 +76,24 @@ RUN chown fbrat:fbrat /var/spool/fbrat /usr/share/fbrat /var/lib/fbrat /var/lib/
 #
 LABEL revision="afc-rat_server"
 WORKDIR /wd
-EXPOSE 80 443
-COPY rat_server/httpd.conf /usr/local/apache2/conf/
-COPY rat_server/httpd-default.conf rat_server/httpd-info.conf rat_server/httpd-vhosts.conf \
-rat_server/httpd-mpm.conf rat_server/httpd-ssl.conf /usr/local/apache2/conf/extra/
-COPY rat_server/fbrat.wsgi /usr/local/apache2/fbrat.wsgi
+EXPOSE 80
+
 RUN mkdir /wd/private
 COPY rat_server/copy-private.sh private* /wd/private/
 RUN chmod +x /wd/private/copy-private.sh
 RUN /wd/private/copy-private.sh
 RUN rm -rf /wd/private
 
-RUN mkdir -p /usr/share/ca-certificates/certs
-COPY rat_server/http.key rat_server/http.crt /usr/share/ca-certificates/certs/
+# msghnd environment variables default values
+ENV AFC_RAT_SERVER_PORT=${AFC_RAT_SERVER_PORT:-"80"}
+ENV AFC_RAT_SERVER_BIND=${AFC_RAT_SERVER_BIND:-"0.0.0.0"}
+ENV AFC_RAT_SERVER_PID=${AFC_RAT_SERVER_PID:-"/run/gunicorn/openafc_app.pid"}
+ENV AFC_RAT_SERVER_ACCESS_LOG=
+ENV AFC_RAT_SERVER_ERROR_LOG=${AFC_RAT_SERVER_ERROR_LOG:-"/proc/self/fd/2"}
+ENV AFC_RAT_SERVER_TIMEOUT=${AFC_RAT_SERVER_TIMEOUT:-180}
+ENV AFC_RAT_SERVER_WORKERS=${AFC_RAT_SERVER_WORKERS:-20}
+ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
+
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 # Add debugging env if configured
 ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
