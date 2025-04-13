@@ -24,7 +24,7 @@ case "$AFC_DEVEL_ENV" in
     BIN=nginx
     ;;
 esac
-ACCEPTOR_LOG_LEVEL="--log debug"
+
 /docker-entrypoint.sh $BIN -g "daemon off;" &
 
 /wd/acceptor.py $ACCEPTOR_LOG_LEVEL --cmd run
