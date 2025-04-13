@@ -561,7 +561,9 @@ def get_uls_identity(uls_file: str) -> Optional[Dict[str, str]]:
     """
     if not os.path.isfile(uls_file):
         return None
-    engine = sa.create_engine("sqlite:///" + uls_file)
+    engine = \
+        sa.create_engine(f"sqlite:///{uls_file}?mode=ro",
+                         connect_args={"uri": True})
     conn = engine.connect()
     try:
         metadata = sa.MetaData()
