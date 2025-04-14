@@ -191,10 +191,12 @@ ENV ULS_ALEMBIC_INITIAL_VERSION=b41cf8a00430
 # message body
 # ENV ULS_ALARM_SENDER_LOCATION
 
-# ALS client parameters (see arg_dscs in als.py)
+# ALS client parameters (see comments in als.py)
 # ENV ALS_KAFKA_SERVER_ID
 # ENV ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
 # ENV ALS_KAFKA_MAX_REQUEST_SIZE
+# ENV AFC_ALS_TOPIC_NAME
+# ENV AFC_JSON_TOPIC_PREFIX
 
 RUN apk add --update --no-cache python3=~${AFC_PYTHONVERSION} \
     boost1.84-program_options boost1.84-log boost1.84-filesystem \

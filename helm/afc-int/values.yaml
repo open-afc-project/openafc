@@ -157,6 +157,8 @@ sharedEnv:
   # Environment variables common to als-kafka and als_siphon
   als-kafka-common:
     KAFKA_MAX_REQUEST_SIZE@I: 10485760
+    AFC_ALS_TOPIC_NAME: ALS
+    AFC_JSON_TOPIC_PREFIX: ""
   # Common Environment variables for Rcache container(s) and clients of Rcache
   # service
   rcache-common:
