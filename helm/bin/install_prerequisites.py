@@ -244,6 +244,7 @@ class InstallHandler(abc.ABC):
                     all(cs.get("ready") for cs in
                         pod_infos[0].get("status", {}).
                         get("containerStatuses", [])):
+                time.sleep(10)
                 break
             time.sleep(10)
         return True

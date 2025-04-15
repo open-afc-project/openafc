@@ -15,8 +15,10 @@ The configuration for the server is managed by the *.conf files in this director
       - AFC_OBJST_SCHEME=HTTP
       # ALS params
       - ALS_KAFKA_SERVER_ID=rat_server
-      - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
-      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
+      - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER}:${ALS_KAFKA_CLIENT_PORT}
+      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE}
+      - AFC_ALS_TOPIC_NAME=${AFC_ALS_TOPIC_NAME}
+      - AFC_JSON_TOPIC_PREFIX=${AFC_JSON_TOPIC_PREFIX}
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
