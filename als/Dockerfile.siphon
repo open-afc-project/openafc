@@ -55,6 +55,12 @@ ENV KAFKA_SSL_CAFILE=
 # Maximum message size (default is 1MB)
 ENV KAFKA_MAX_REQUEST_SIZE=
 
+# Kafka topic name for ALS records. Default is "ALS"
+# ENV AFC_ALS_TOPIC_NAME
+
+# Prefix for Kafka topic names for JSON log records. Default is empty
+# ENV AFC_JSON_TOPIC_PREFIX
+
 # Connection string to ALS database (may be partial, leaving default parts).
 # Hostname better be specified, as default is 'localhost'
 # ENV POSTGRES_ALS_CONN_STR
@@ -105,6 +111,8 @@ ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_ssl_keyfile=$KAFKA_SSL_KEYFILE \
     --kafka_ssl_cafile=$KAFKA_SSL_CAFILE \
     --kafka_max_partition_fetch_bytes=$KAFKA_MAX_REQUEST_SIZE \
+    --als_topic=$AFC_ALS_TOPIC_NAME \
+    --json_topic_prefix=$AFC_JSON_TOPIC_PREFIX \
     --als_postgres=$POSTGRES_ALS_CONN_STR \
     --als_postgres_password_file=$POSTGRES_ALS_PASSWORD_FILE \
     --log_postgres=$POSTGRES_LOG_CONN_STR \
