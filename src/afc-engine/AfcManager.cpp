@@ -5,6 +5,8 @@
 #include "AfcManager.h"
 #include "RlanRegion.h"
 #include "lininterp.h"
+#include <boost/filesystem.hpp>
+#include <boost/regex.hpp>
 
 // "--runtime_opt" masks
 // These bits corresponds to RNTM_OPT_... bits in src/ratapi/ratapi/defs.py
@@ -891,98 +893,102 @@ void AfcManager::initializeDatabases()
 		return;
 	}
 
-	/**************************************************************************************/
-	/* Read region polygons and confirm that rlan is inside simulation region             */
-	/**************************************************************************************/
-	std::vector<std::string> regionPolygonFileStrList = split(_regionPolygonFileList, ',');
-	_numRegion = regionPolygonFileStrList.size();
+	double ulsMinFreq;
+	double ulsMaxFreq;
 
-	for(int regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
-		std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(regionPolygonFileStrList[regionIdx], _regionPolygonResolution);
-		PolygonClass *regionPoly = PolygonClass::combinePolygons(polyList);
-		regionPoly->name = _regionPolygonFileList[regionIdx];
+	if (_analysisType == "KeyHoleShape") {
+		ulsMinFreq = CConst::unii5StartFreqMHz * 1.0e6;
+		ulsMaxFreq = CConst::unii8StopFreqMHz * 1.0e6;
+	} else {
+		/**************************************************************************************/
+		/* Read region polygons and confirm that rlan is inside simulation region             */
+		/**************************************************************************************/
+		std::vector<std::string> regionPolygonFileStrList = split(_regionPolygonFileList, ',');
+		_numRegion = regionPolygonFileStrList.size();
 
-		double regionArea = regionPoly->comp_bdy_area();
+		for(int regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
+			std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(regionPolygonFileStrList[regionIdx], _regionPolygonResolution);
+			PolygonClass *regionPoly = PolygonClass::combinePolygons(polyList);
+			regionPoly->name = _regionPolygonFileList[regionIdx];
 
-		double checkArea = 0.0;
-		for(int polyIdx=0; polyIdx<(int) polyList.size(); ++polyIdx) {
-			PolygonClass *poly = polyList[polyIdx];
-			checkArea += poly->comp_bdy_area();
-			delete poly;
+			double regionArea = regionPoly->comp_bdy_area();
+
+			double checkArea = 0.0;
+			for(int polyIdx=0; polyIdx<(int) polyList.size(); ++polyIdx) {
+				PolygonClass *poly = polyList[polyIdx];
+				checkArea += poly->comp_bdy_area();
+				delete poly;
+			}
+
+			if (fabs(regionArea - checkArea) > 1.0e-6) {
+				throw std::runtime_error(ErrStream() << "ERROR: INVALID region polygon file = " << regionPolygonFileStrList[regionIdx]);
+			}
+
+			_regionPolygonList.push_back(regionPoly);
+			LOGGER_INFO(logger) << "REGION: " << regionPolygonFileStrList[regionIdx] << " AREA: " << regionArea;
 		}
 
-		if (fabs(regionArea - checkArea) > 1.0e-6) {
-			throw std::runtime_error(ErrStream() << "ERROR: INVALID region polygon file = " << regionPolygonFileStrList[regionIdx]);
+		double rlanLatitude, rlanLongitude, rlanHeightInput;
+		std::tie(rlanLatitude, rlanLongitude, rlanHeightInput) = _rlanLLA;
+		int xIdx = (int) floor(rlanLongitude/_regionPolygonResolution + 0.5);
+		int yIdx = (int) floor(rlanLatitude/_regionPolygonResolution + 0.5);
+
+		bool found = false;
+		for(int polyIdx=0; (polyIdx<(int) _regionPolygonList.size())&&(!found); ++polyIdx) {
+			PolygonClass *poly = _regionPolygonList[polyIdx];
+
+			if (poly->in_bdy_area(xIdx, yIdx)) {
+				found = true;
+			}
+		}
+		if (!found) {
+			_responseInfo.reset(new ResponseInfo(CConst::invalidValueResponseCode));
+			_invalidParams << "latitude";
+			_invalidParams << "longitude";
+			return;
+		}
+		/**************************************************************************************/
+
+		if (_analysisType == "HeatmapAnalysis") {
+			defineHeatmapColors();
 		}
 
-		_regionPolygonList.push_back(regionPoly);
-		LOGGER_INFO(logger) << "REGION: " << regionPolygonFileStrList[regionIdx] << " AREA: " << regionArea;
-	}
+		createChannelList();
 
-	double rlanLatitude, rlanLongitude, rlanHeightInput;
-	std::tie(rlanLatitude, rlanLongitude, rlanHeightInput) = _rlanLLA;
-	int xIdx = (int) floor(rlanLongitude/_regionPolygonResolution + 0.5);
-	int yIdx = (int) floor(rlanLatitude/_regionPolygonResolution + 0.5);
-
-	bool found = false;
-	for(int polyIdx=0; (polyIdx<(int) _regionPolygonList.size())&&(!found); ++polyIdx) {
-		PolygonClass *poly = _regionPolygonList[polyIdx];
-
-		if (poly->in_bdy_area(xIdx, yIdx)) {
-			found = true;
+		if (!_responseInfo->success()) {
+			return;
 		}
-	}
-	if (!found) {
-		_responseInfo.reset(new ResponseInfo(CConst::invalidValueResponseCode));
-		_invalidParams << "latitude";
-		_invalidParams << "longitude";
-		return;
-	}
-	/**************************************************************************************/
 
-	// Following lines are finding the minimum and maximum longitudes and latitudes with the 150km rlan range
-	double minLon, maxLon, minLat, maxLat;
-	double minLonBldg, maxLonBldg, minLatBldg, maxLatBldg;
-
-	if (_analysisType == "HeatmapAnalysis") {
-		defineHeatmapColors();
-	}
-
-	createChannelList();
-
-	if (!_responseInfo->success()) {
-		return;
-	}
-
-	/**************************************************************************************/
-	/* Compute ulsMinFreq, and ulsMaxFreq                                                 */
-	/**************************************************************************************/
-	int chanIdx;
-	int ulsMinFreqMHz = 0;
-	int ulsMaxFreqMHz = 0;
-	for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
-		ChannelStruct *channel = &(_channelList[chanIdx]);
-		int minFreqMHz;
-		int maxFreqMHz;
-		int startFreqMHz = channel->freqMHzList.front();
-		int stopFreqMHz = channel->freqMHzList.back();
-		if ((channel->type == ChannelType::INQUIRED_CHANNEL)&&(_aciFlag)) {
-			minFreqMHz = 2*startFreqMHz - stopFreqMHz;
-			maxFreqMHz = 2*stopFreqMHz - startFreqMHz;
-		} else {
-			minFreqMHz = startFreqMHz;
-			maxFreqMHz = stopFreqMHz;
+		/**************************************************************************************/
+		/* Compute ulsMinFreq, and ulsMaxFreq                                                 */
+		/**************************************************************************************/
+		int chanIdx;
+		int ulsMinFreqMHz = 0;
+		int ulsMaxFreqMHz = 0;
+		for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
+			ChannelStruct *channel = &(_channelList[chanIdx]);
+			int minFreqMHz;
+			int maxFreqMHz;
+			int startFreqMHz = channel->freqMHzList.front();
+			int stopFreqMHz = channel->freqMHzList.back();
+			if ((channel->type == ChannelType::INQUIRED_CHANNEL)&&(_aciFlag)) {
+				minFreqMHz = 2*startFreqMHz - stopFreqMHz;
+				maxFreqMHz = 2*stopFreqMHz - startFreqMHz;
+			} else {
+				minFreqMHz = startFreqMHz;
+				maxFreqMHz = stopFreqMHz;
+			}
+			if ((ulsMinFreqMHz == 0) || (minFreqMHz < ulsMinFreqMHz)) {
+				ulsMinFreqMHz = minFreqMHz;
+			}
+			if ((ulsMaxFreqMHz == 0) || (maxFreqMHz > ulsMaxFreqMHz)) {
+				ulsMaxFreqMHz = maxFreqMHz;
+			}
 		}
-		if ((ulsMinFreqMHz == 0) || (minFreqMHz < ulsMinFreqMHz)) {
-			ulsMinFreqMHz = minFreqMHz;
-		}
-		if ((ulsMaxFreqMHz == 0) || (maxFreqMHz > ulsMaxFreqMHz)) {
-			ulsMaxFreqMHz = maxFreqMHz;
-		}
-	}
 
-	double ulsMinFreq = ulsMinFreqMHz*1.0e6;
-	double ulsMaxFreq = ulsMaxFreqMHz*1.0e6;
+		ulsMinFreq = ulsMinFreqMHz*1.0e6;
+		ulsMaxFreq = ulsMaxFreqMHz*1.0e6;
+	}
 	/**************************************************************************************/
 
 	/**************************************************************************************/
@@ -1007,6 +1013,12 @@ void AfcManager::initializeDatabases()
 	}
 
 	ULSClass::pathLossModel = _pathLossModel;
+
+	/**************************************************************************************/
+
+	// Following lines are finding the minimum and maximum longitudes and latitudes with the 150km rlan range
+	double minLon, maxLon, minLat, maxLat;
+	double minLonBldg, maxLonBldg, minLatBldg, maxLatBldg;
 
 	/**************************************************************************************/
 
@@ -1121,6 +1133,8 @@ void AfcManager::initializeDatabases()
 			minLonBldg = minLon;
 			maxLonBldg = maxLon;
 		}
+	} else if (_analysisType == "KeyHoleShape") {
+		// Do nothing
 #if DEBUG_AFC
 	} else if (_analysisType == "test_winner2") {
 		// Do nothing
@@ -1261,6 +1275,8 @@ void AfcManager::initializeDatabases()
 		readDeniedRegionData(_deniedRegionFile);
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		fixFSTerrain();
+	} else if (_analysisType == "KeyHoleShape") {
+		readULSData(_ulsDatabaseList, _popGrid, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation);
 #if DEBUG_AFC
 	} else if (_analysisType == "test_itm") {
 		// Do nothing
@@ -1374,7 +1390,9 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	QString fName = QString(inputJSONpath.c_str());
 	QByteArray data;
 
-	if (AfcManager::_dataIf->readFile(fName, data)) {
+	if (!boost::filesystem::exists(inputJSONpath) && (_analysisType == "KeyHoleShape")) {
+		// Defaults would suffice
+	} else if (AfcManager::_dataIf->readFile(fName, data)) {
 		jsonDoc = QJsonDocument::fromJson(data);
 	} else {
 		throw std::runtime_error("AfcManager::importGUIjson(): Failed to open JSON file specifying user's input parameters.");
@@ -1387,20 +1405,24 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	// Read JSON from file
 	QJsonObject jsonObj = jsonDoc.object();
 
-	if (jsonObj.contains("version") && !jsonObj["version"].isUndefined()) {
-		_guiJsonVersion = jsonObj["version"].toString();
+	if (_analysisType == "KeyHoleShape") {
+		importKeyHoleShapeParameters(jsonObj);
 	} else {
-		_guiJsonVersion = QString("1.4");
-	}
+		if (jsonObj.contains("version") && !jsonObj["version"].isUndefined()) {
+			_guiJsonVersion = jsonObj["version"].toString();
+		} else {
+			_guiJsonVersion = QString("1.4");
+		}
 
-	if (_guiJsonVersion == "1.4") {
-		importGUIjsonVersion1_4(jsonObj);
-	} else {
-		_responseInfo.reset(new ResponseInfo(
-			CConst::versionNotSupportedResponseCode,
-			std::ostringstream() <<
-			"VERSION NOT SUPPORTED: GUI JSON FILE \"" << inputJSONpath << "\": version: " << _guiJsonVersion));
-		return;
+		if (_guiJsonVersion == "1.4") {
+			importGUIjsonVersion1_4(jsonObj);
+		} else {
+			_responseInfo.reset(new ResponseInfo(
+				CConst::versionNotSupportedResponseCode,
+				std::ostringstream() <<
+				"VERSION NOT SUPPORTED: GUI JSON FILE \"" << inputJSONpath << "\": version: " << _guiJsonVersion));
+			return;
+		}
 	}
 
 	return;
@@ -2448,7 +2470,7 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 	// Create command line options
 	optDescript.add_options()
 		("help,h", "Use input-file-path, config-file-path, or output-file-path.")
-		("request-type,r", po::value<std::string>()->default_value("AP-AFC"), "set request-type (AP-AFC, HeatmapAnalysis, ExclusionZoneAnalysis)")
+		("request-type,r", po::value<std::string>()->default_value("AP-AFC"), "set request-type (AP-AFC, HeatmapAnalysis, ExclusionZoneAnalysis, KeyHoleShape)")
 		("state-root,s", po::value<std::string>()->default_value("/var/lib/fbrat"), "set fbrat state root directory")
 		("mnt-path,s", po::value<std::string>()->default_value("/mnt/nfs"), "set share with GeoData and config data")
 		("input-file-path,i", po::value<std::string>()->default_value("inputFile.json"), "set input-file-path level")
@@ -3984,7 +4006,9 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath, const std::string&
 		// Do nothing
 #endif
 	}
-	else
+	else if (_analysisType == "KeyHoleShape") {
+		outputDocument = generateKeyHoleShapeJson();
+	} else
 	{
 		throw std::runtime_error(ErrStream() << "ERROR: Unrecognized analysis type = \"" << _analysisType << "\"");
 	}
@@ -7648,6 +7672,8 @@ void AfcManager::compute()
 		runExclusionZoneAnalysis();
 	} else if (_analysisType == "HeatmapAnalysis") {
 		runHeatmapAnalysis();
+	} else if (_analysisType == "KeyHoleShape") {
+		runKeyHoleShapeAnalysis();
 #if DEBUG_AFC
 	} else if (_analysisType == "test_itm") {
 		runTestITM("path_trace_afc.csv");
@@ -12289,6 +12315,185 @@ void AfcManager::runHeatmapAnalysis()
 	_terrainDataModel->printStats();
 }
 /******************************************************************************************/
+
+/******************************************************************************************/
+/* KeyHoleShape methods                                                                   */
+/******************************************************************************************/
+void AfcManager::importKeyHoleShapeParameters(const QJsonObject &jsonObj)
+{
+	// Keyhole parameters file - optional. Keys:
+	// - "aobStepDeg"
+	//   Angle off boresight step in degrees. Default is 0.1 (takes ~10 minutes).
+	//   Frankly, 1 is good enough
+	// - "freqStepMhz"
+	//   Frequency step in MHz. 0 to only use minimum and maximum frequency.
+	//   Default is 0
+	// - "minFreqMhz"
+	//   Minimum frequency in MHz. Default is CConst::unii5StartFreqMHz (=5925)
+	// - "maxFreqMhz"
+	//   Maximum frequency in MHz. Default is CConst::unii8StoptFreqMHz (=7125)
+	// - "radiusKm"
+	//   Keyhole radius in kilometers. Default is "maxLinkDistance" from AFC
+	//   config file
+	// - "rxAntennaModelRegex"
+	//   Regex for FS RX antenna model (full match - ^ to $). Default is ^.*$
+	//   i.e. include all
+	_keyHoleAobStepDeg = jsonObj.value("aobStepDeg").toDouble(0.1);
+	_keyHoleFreqStepMhz = jsonObj.value("freqStepMhz").toDouble(0.);
+	_keyHoleMinFreqMhz = jsonObj.value("minFreqMhz").toDouble(CConst::unii5StartFreqMHz);
+	_keyHoleMaxFreqMhz = jsonObj.value("maxFreqMhz").toDouble(CConst::unii8StopFreqMHz);
+	_keyHoleRadiusKm = jsonObj.value("radiusKm").toDouble(_maxRadius / 1.e3);
+	_keyHoleRxAntennaRegex = jsonObj.value("rxAntennaModelRegex").toString("^.*$").toStdString();
+	boost::regex e(_keyHoleRxAntennaRegex, boost::regex_constants::no_except);
+	if (e.status()) {
+		throw std::runtime_error(ErrStream() << "ERROR: Invalid regex syntax: " << _keyHoleRxAntennaRegex);
+	}
+
+}
+
+void AfcManager::runKeyHoleShapeAnalysis()
+{
+	// Frequencies on which gains/fsp will be computed
+	double minFreqHz = _keyHoleMinFreqMhz * 1.0e6;
+	double maxFreqHz = _keyHoleMaxFreqMhz * 1.0e6;
+	std::vector<double> freqsHz;
+	freqsHz.push_back(minFreqHz);
+	if (_keyHoleFreqStepMhz) {
+		for (double freqHz = minFreqHz + _keyHoleFreqStepMhz * 1.0e6; freqHz <= maxFreqHz;
+			freqHz += _keyHoleFreqStepMhz * 1.0e6)
+		{
+			freqsHz.push_back(freqHz);
+		}
+	}
+	freqsHz.push_back(maxFreqHz);
+
+	// Formulae from runPointAnalysis() for free space no RX clutter propagation:
+	// rxPowerDBW = (_maxEIRP_dBm - 30.0) + rxGainDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB() - pathLoss - pathClutterTxDB
+	// I2NDB = rxPowerDBW - uls->getNoiseLevelDBW()
+	// marginDB = _IoverN_threshold_dB - I2NDB =
+	//   (_IoverN_threshold_dB - (_maxEIRP_dBm - 30.0) - rxGainDB + _polarizationLossDB + uls->getRxAntennaFeederLossDB() + uls->getNoiseLevelDBW()) + (pathLoss + pathClutterTxDB)
+	// First term is distance-independent, partialEirpMargins dictionary maps angles off boresight to first term
+	std::map<double, std::map<double, double>> partialEirpMargins;
+	boost::regex antennaRegex(_keyHoleRxAntennaRegex);
+	for (auto ulsIdx = 0; ulsIdx < _ulsList->getSize(); ++ulsIdx) {
+		ULSClass *uls = (*_ulsList)[ulsIdx];
+		if (!boost::regex_match(uls->getRxAntennaModel(), antennaRegex)) {
+			continue;
+		}
+		LOGGER_DEBUG(logger) << "FS ID: " << uls->getID() << ", RX Antenna: " << uls->getRxAntennaModel();
+		int numPr = uls->getNumPR();
+		int numDiversity = uls->getHasDiversity() ? 2 : 1;
+		int segStart = _passiveRepeaterFlag ? 0 : numPr;
+		for (double aobDeg = 0; aobDeg < 180.00000001; aobDeg += _keyHoleAobStepDeg) {
+			aobDeg = round(aobDeg / _keyHoleAobStepDeg) * _keyHoleAobStepDeg;
+			partialEirpMargins.insert(std::pair<double, std::map<double, double>>(aobDeg, std::map<double, double>()));
+			for (double freqHz : freqsHz) {
+				partialEirpMargins[aobDeg].insert(std::pair<double, double>(freqHz, std::numeric_limits<double>::infinity()));
+				for(int segIdx=segStart; segIdx<numPr+1; ++segIdx) {
+					for(int divIdx=0; divIdx<numDiversity; ++divIdx) {
+						double rxGainDb;
+						if (segIdx == numPr) {
+							std::string dummy;
+							rxGainDb = uls->computeRxGain(aobDeg, 0, freqHz, dummy, divIdx);
+						} else {
+							auto pr = uls->getPR(segIdx);
+							// These billboards from certain country with beam parallel to surface
+							// (and infinite RX gain) excluded as too incredible
+							if ((pr.type == CConst::billboardReflectorPRType) && (pr.reflectorThetaIN > 89)) {
+								continue;
+							}
+							double dummy;
+							double discriminationGain = pr.computeDiscriminationGain(aobDeg, 0, freqHz, dummy, dummy);
+							rxGainDb = uls->getPR(segIdx).effectiveGain + discriminationGain;
+						}
+						partialEirpMargins[aobDeg][freqHz] = std::min(partialEirpMargins[aobDeg][freqHz],
+							_IoverN_threshold_dB - (_maxEIRP_dBm - 30.0) - rxGainDb + _polarizationLossDB + uls->getRxAntennaFeederLossDB() + uls->getNoiseLevelDBW());
+					}
+				}
+			}
+		}
+	}
+	if (partialEirpMargins.size() == 0) {
+		throw std::runtime_error(ErrStream() << "ERROR: No FS entries were found for keyhole shape generation");
+	}
+	// Now computing second term (distance-dependent), chosing distance outside of _closeInDist
+	// and having at least 1dB margin. Results accumulated in _keyHoleShape
+	for (const auto &aob_byFreq : partialEirpMargins) {
+		double aobDeg = aob_byFreq.first;
+		_keyHoleShape[aobDeg] = -std::numeric_limits<double>::infinity();
+		for (const auto &freq_margin : aob_byFreq.second) {
+			double freqHz = freq_margin.first;
+			double partialMarginDb = freq_margin.second;
+			double minDistM = _closeInDist;
+			double maxDistM = _keyHoleRadiusKm * 1.e3;
+			double pathLoss, pathClutterTxDb;
+			while ((maxDistM - minDistM) > 1) {
+				double midDistM = (minDistM + maxDistM) / 2;
+				double dummyDouble, *dummyDoublePtr;
+				std::string dummyStr;
+#if DEBUG_AFC
+				std::vector<std::string> dummyStrVec;
+#endif
+				computePathLoss(
+					_pathLossModel,               /* CConst::PathLossModelEnum pathLossModel, */
+					true,                         /* bool itmFSPLFlag, */
+					CConst::barrenPropEnv,        /* CConst::PropEnvEnum propEnv, */
+					CConst::barrenPropEnv,        /* CConst::PropEnvEnum propEnvRx, */
+					CConst::unknownNLCDLandCat,   /* CConst::NLCDLandCatEnum nlcdLandCatTx, */
+					CConst::unknownNLCDLandCat,   /* CConst::NLCDLandCatEnum nlcdLandCatRx, */
+					midDistM / 1.e3,              /* double distKm, */
+					midDistM / 1.e3,              /* double fsplDistKm, */
+					midDistM / 1.e3,              /* double win2DistKm, */
+					freqHz,                       /* double frequency, */
+					0.,                           /* double txLongitudeDeg, */
+					0.,                           /* double txLatitudeDeg, */
+					0.,                           /* double txHeightM, */
+					0.,                           /* double elevationAngleTxDeg, */
+					0.,                           /* double rxLongitudeDeg, */
+					0.,                           /* double rxLatitudeDeg, */
+					0.,                           /* double rxHeightM, */
+					0.,                           /* double elevationAngleRxDeg, */
+					pathLoss,                     /* double &pathLoss, */
+					pathClutterTxDb,              /* double &pathClutterTxDB, */
+					dummyDouble,                  /* double &pathClutterRxDB, */
+					dummyStr,                     /* std::string &pathLossModelStr, */
+					dummyDouble,                  /* double &pathLossCDF, */
+					dummyStr,                     /* std::string &pathClutterTxModelStr, */
+					dummyDouble,                  /* double &pathClutterTxCDF, */
+					dummyStr,                     /* std::string &pathClutterRxModelStr, */
+					dummyDouble,                  /* double &pathClutterRxCDF, */
+					&dummyStr,                    /* std::string *txClutterStrPtr, */
+					&dummyStr,                    /* std::string *rxClutterStrPtr, */
+					&dummyDoublePtr,              /* double **ITMProfilePtr, */
+					&dummyDoublePtr,              /* double **isLOSProfilePtr, */
+					&dummyDouble                  /* double *isLOSSurfaceFracPtr */
+#if DEBUG_AFC
+					, dummyStrVec                 /* , std::vector<std::string> &ITMHeightType */
+#endif
+					);
+				if ((partialMarginDb + pathLoss + pathClutterTxDb) > 1) {
+					maxDistM = midDistM;
+				} else {
+					minDistM = midDistM;
+				}
+			}
+			_keyHoleShape[aobDeg] = std::max(_keyHoleShape[aobDeg], maxDistM);
+		}
+	}
+}
+
+QJsonDocument AfcManager::generateKeyHoleShapeJson()
+{
+	QJsonObject docObj;
+	QJsonArray angles, values;
+	for (const auto& deg_dist : _keyHoleShape) {
+		angles.push_back(deg_dist.first);
+		values.push_back(double(int(deg_dist.second)));
+	}
+	docObj.insert("anglesDeg", angles);
+	docObj.insert("distancesM", values);
+	return QJsonDocument(docObj);
+}
 
 /******************************************************************************************/
 /* AfcManager::printUserInputs                                                            */
