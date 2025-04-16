@@ -39,6 +39,9 @@ DEFAULT_POSTGRES_USER = "postgres"
 # Default PostgreSQL password
 DEFAULT_POSTGRES_PASSWORD = "postgres"
 
+# DSN scheme for Postgres
+POSTGRES_SCHEME = "postgresql"
+
 
 class DsnInfo:
     """ Parsed PostgreSQL DSN
@@ -49,7 +52,7 @@ class DsnInfo:
     user     -- Username. Default is DEFAULT_POSTGRES_USER
     password -- Password. Default is DEFAULT_POSTGRES_PASSWORD
     db       -- Database name
-    dsn      -- DSN with password properly substituted
+    dsn      -- DSN with password and schema properly substituted
     """
     def __init__(self, dsn: str, password_file: Optional[str] = None,
                  password: Optional[str] = None) -> None:
@@ -88,7 +91,8 @@ class DsnInfo:
             self.password = password
         else:
             self.password = parsed_dsn.password or DEFAULT_POSTGRES_PASSWORD
-
+        if parsed_dsn.scheme != POSTGRES_SCHEME:
+            dsn = parsed_dsn._replace(scheme=POSTGRES_SCHEME).geturl()
         self.dsn = cast(str,
                         substitute_password(dsn=dsn, password=self.password))
 
@@ -206,6 +210,7 @@ def ensure_dsn(dsn: str, password_file: Optional[str] = None,
         same_user = creator_dsn_info.user == desired_dsn_info.user
 
         # Creating user if it does not exist
+        user_created = False
         try:
             with creator_engine.connect() as conn:
                 rp = conn.execute(
@@ -216,6 +221,7 @@ def ensure_dsn(dsn: str, password_file: Optional[str] = None,
                         sa.text(f'CREATE USER "{desired_dsn_info.user}" '
                                 f'WITH PASSWORD :password LOGIN'),
                         password=desired_dsn_info.password)
+                    user_created = True
         except sa.exc.SQLAlchemyError as ex:
             error(f"Error creating user '{desired_dsn_info.user}': {ex}")
 
