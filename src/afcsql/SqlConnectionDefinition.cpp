@@ -30,6 +30,7 @@ void SqlConnectionDefinition::configureDb(QSqlDatabase &db) const
 	db.setUserName(userName);
 	db.setPassword(password);
 	db.setConnectOptions(options);
+	db.setConnectOptions("QSQLITE_OPEN_READONLY");
 }
 
 QSqlDatabase SqlConnectionDefinition::newConnection() const
