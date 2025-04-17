@@ -1,8 +1,5 @@
 #
-# This Python file uses the following encoding: utf-8
-#
 # Portions copyright (C) 2021 Broadcom.
-# All rights reserved. The term “Broadcom” refers solely
 # to the Broadcom Inc. corporate affiliate that owns the software below.
 # This work is licensed under the OpenAFC Project License, a copy of which
 # is included with this software program.
@@ -879,7 +876,8 @@ class CertIdCreate:
                 raise RuntimeError(
                     'Existing certificate found with id "{0}"'.format(cert_id))
 
-            cert = CertId(certification_id=cert_id, location=location)
+            cert = CertId(certification_id=cert_id, location=location,
+                          downloaded=False)
             ruleset.cert_ids.append(cert)
 
             db.session.add(cert)  # pylint: disable=no-member
@@ -935,6 +933,10 @@ class CertIdSweep:
 
                 with open(local_filename, newline='') as csvfile:
                     rdr = csv.reader(csvfile, delimiter=',')
+                    cert_ids = []
+                    ruleset_id_str = \
+                        RulesetVsRegion.region_to_ruleset(
+                            "CA", exc=werkzeug.exceptions.NotFound)
                     for row in rdr:
                         try:
                             cert_id = row[7]
@@ -942,9 +944,7 @@ class CertIdSweep:
                             if code == 103:
                                 location = CERT_ID_LOCATION_OUTDOOR
                             elif code == 111:
-                                location = \
-                                    CERT_ID_LOCATION_INDOOR | \
-                                    CERT_ID_LOCATION_OUTDOOR
+                                location = CERT_ID_LOCATION_INDOOR
                             else:
                                 location = CERT_ID_LOCATION_UNKNOWN
                             if not location == CERT_ID_LOCATION_UNKNOWN:
@@ -953,20 +953,27 @@ class CertIdSweep:
                                 if cert:
                                     cert.refreshed_at = now
                                     cert.location = location
+                                    cert.downloaded = True
                                 else:
                                     cert = CertId(certification_id=cert_id,
-                                                  location=location)
-                                    ruleset_id_str = \
-                                        RulesetVsRegion.region_to_ruleset(
-                                            "CA",
-                                            exc=werkzeug.exceptions.NotFound)
+                                                  location=location,
+                                                  downloaded=True)
                                     ruleset = Ruleset.query.filter_by(
                                         name=ruleset_id_str).first()
                                     ruleset.cert_ids.append(cert)
                                     db.session.add(cert)
+                            cert_ids.append(cert_id)
                         except BaseException:
                             # ignore badly formatted rows
                             pass
+                    ruleset_id = \
+                        Ruleset.query.filter_by(name=ruleset_id_str).first().id
+                    db.engine.execute(
+                        CertId.__table__.delete().where(
+                            (CertId.downloaded == True) &
+                            (CertId.certification_id.notin_(cert_ids)) &
+                            (CertId.ruleset_id == ruleset_id)))
+
                     als.als_json_log(
                         'cert_db', {
                             'action': 'sweep', 'country': 'CA', 'status': 'success'})
@@ -977,78 +984,91 @@ class CertIdSweep:
                         'action': 'sweep', 'country': 'CA', 'status': 'failed download'})
                 self.mailAlert(flaskapp, 'CA', 'none')
 
-    def sweep_fcc_id(self, flaskapp):
-        from afcmodels.aaa import CertId
-        id_data = "grantee_code=&product_code=&applicant_name=&grant_date_from=&grant_date_to=&comments=&application_purpose=&application_purpose_description=&grant_code_1=&grant_code_2=&grant_code_3=&test_firm=&application_status=&application_status_description=&equipment_class=243&equipment_class_description=6ID-15E+6+GHz+Low+Power+Indoor+Access+Point&lower_frequency=&upper_frequency=&freq_exact_match=on&bandwidth_from=&emission_designator=&tolerance_from=&tolerance_to=&tolerance_exact_match=on&power_output_from=&power_output_to=&power_exact_match=on&rule_part_1=&rule_part_2=&rule_part_3=&rule_part_exact_match=on&product_description=&modular_type_description=&tcb_code=&tcb_code_description=&tcb_scope=&tcb_scope_description=&outputformat=XML&show_records=10&fetchfrom=0&calledFromFrame=N"  # noqa
-        self.sweep_fcc_data(flaskapp, id_data, CERT_ID_LOCATION_INDOOR)
-
-    def sweep_fcc_sd(self, flaskapp):
-        from afcmodels.aaa import CertId
-
-        sd_data = "grantee_code=&product_code=&applicant_name=&grant_date_from=&grant_date_to=&comments=&application_purpose=&application_purpose_description=&grant_code_1=&grant_code_2=&grant_code_3=&test_firm=&application_status=&application_status_description=&equipment_class=250&equipment_class_description=6SD-15E+6+GHz+Standard+Power+Access+Point&lower_frequency=&upper_frequency=&freq_exact_match=on&bandwidth_from=&emission_designator=&tolerance_from=&tolerance_to=&tolerance_exact_match=on&power_output_from=&power_output_to=&power_exact_match=on&rule_part_1=&rule_part_2=&rule_part_3=&rule_part_exact_match=on&product_description=&modular_type_description=&tcb_code=&tcb_code_description=&tcb_scope=&tcb_scope_description=&outputformat=XML&show_records=10&fetchfrom=0&calledFromFrame=N"  # noqa
-        self.sweep_fcc_data(flaskapp, sd_data, CERT_ID_LOCATION_OUTDOOR)
-
-    def sweep_fcc_data(self, flaskapp, data, location):
+    def sweep_fcc(self, flaskapp):
         from afcmodels.aaa import CertId, Ruleset
         import requests
         import datetime
 
-        url = f'https://apps.fcc.gov/oetcf/eas/reports/GenericSearchResult.cfm?RequestTimeout={os.environ.get("REQUEST_TIMEOUT_SEC", "500")}'
+        now = datetime.datetime.now()
+        url = f'https://apps.fcc.gov/OETLabServices/getAFCAuthorizations'
         headers = {
-            'accept': 'text/html,application/xhtml+xml,application/xml',
-            'accept-encoding': 'deflate, gzip, br, zstd',
-            'cache-control': 'max-age=0',
-            'content-type': 'application/x-www-form-urlencoded',
-            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15'
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
         }
+        params={'beginDate': '01-01-2020', 'endDate': now.strftime("%m-%d-%Y")}
         for _ in range(5):
-            now = datetime.datetime.now()
             with flaskapp.app_context():
                 try:
                     timeout = os.environ.get("REQUEST_TIMEOUT_SEC")
                     if timeout is not None:
                         timeout = float(timeout)
-                    resp = requests.post(url, headers=headers, data=data, timeout=timeout)
+                    resp = requests.get(url, headers=headers, params=params,
+                                        timeout=timeout)
                     if resp.status_code == 200:
+                        cert_ids = []
+                        ruleset_id_str = \
+                            RulesetVsRegion.region_to_ruleset(
+                                "US", exc=werkzeug.exceptions.NotFound)
                         try:
-                            from xml.etree import ElementTree
-                            tree = ElementTree.fromstring(resp.content)
-                            for node in tree:
-                                fcc_id = node.find('fcc_id').text
+                            for cert_info in resp.json():
+                                if cert_info.get('equipmentClass') != '6SD':
+                                    continue
+                                fcc_id = cert_info.get('fccid')
+                                if not fcc_id:
+                                    continue
+                                location = CERT_ID_LOCATION_OUTDOOR
+                                for spec_info in cert_info.get('lSpecs', {}).\
+                                        get('specs', []):
+                                    if any(note_info.get('grantNoteId') == 'BX'
+                                           for note_info in
+                                           spec_info.get('lNotes', {}).
+                                           get('notes', [])):
+                                        location = CERT_ID_LOCATION_INDOOR
+                                        break
                                 cert = CertId.query.filter_by(
                                     certification_id=fcc_id).first()
-
                                 if cert:
                                     cert.refreshed_at = now
-                                    cert.location = cert.location | location
-                                elif location == CERT_ID_LOCATION_OUTDOOR:
-                                    # add new entries that are in 6SD list.
+                                    cert.location = location
+                                    cert.downloaded = True
+                                else:
                                     cert = CertId(certification_id=fcc_id,
-                                                  location=CERT_ID_LOCATION_OUTDOOR)
+                                                  location=location,
+                                                  downloaded=True)
                                     ruleset_id_str = \
                                         RulesetVsRegion.region_to_ruleset(
-                                            "US", exc=werkzeug.exceptions.NotFound)
+                                            "US",
+                                            exc=werkzeug.exceptions.NotFound)
                                     ruleset = Ruleset.query.filter_by(
                                         name=ruleset_id_str).first()
                                     ruleset.cert_ids.append(cert)
                                     db.session.add(cert)
+                                cert_ids.append(fcc_id)
+                            ruleset_id = \
+                                Ruleset.query.filter_by(name=ruleset_id_str).\
+                                    first().id
+                            db.engine.execute(
+                                CertId.__table__.delete().where(
+                                    (CertId.downloaded == True) &
+                                    (CertId.certification_id.notin_(cert_ids)) &
+                                    (CertId.ruleset_id == ruleset_id)))
 
                             als.als_json_log(
-                                'cert_db', {
-                                    'action': 'sweep', 'country': 'US', 'status': 'success'})
-                        except BaseException:
-                            raise RuntimeError("Bad XML in Cert Id download")
-                    else:
-                        raise RuntimeError("Bad Cert Id download")
-                    db.session.commit()  # pylint: disable=no-member
+                                'cert_db',{
+                                    'action': 'sweep', 'country': 'US',
+                                    'status': 'success'})
+                        finally:
+                            db.session.commit()  # pylint: disable=no-member
                     return
                 except BaseException:
+                    raise
                     time.sleep(5)
         als.als_json_log(
             'cert_db', {
-                'action': 'sweep', 'country': 'US', 'status': 'failed download'})
+                'action': 'sweep', 'country': 'US',
+                'status': 'failed download'})
         with flaskapp.app_context():
-            self.mailAlert(flaskapp, 'US', str(location))
+            self.mailAlert(flaskapp, 'US', 'none')
 
     def mailAlert(self, flaskapp, country, other):
         import flask
@@ -1069,11 +1089,11 @@ class CertIdSweep:
         als.als_json_log('cert_db', {'action': 'sweep', 'country': country,
                                      'status': 'starting'})
         if country == "US":
-            # first sweep SD (outdoor) entries, then sweep ID list.
-            self.sweep_fcc_sd(flaskapp)
-            self.sweep_fcc_id(flaskapp)
-        else:
+            self.sweep_fcc(flaskapp)
+        elif country == "CA":
             self.sweep_canada(flaskapp)
+        else:
+            raise RuntimeError('Unknown country: {0}'.format(country))
 
 
 # 'org' group
