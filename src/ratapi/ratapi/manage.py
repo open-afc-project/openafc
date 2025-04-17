@@ -995,7 +995,8 @@ class CertIdSweep:
             'Accept': 'application/json',
             'Content-Type': 'application/json',
         }
-        params={'beginDate': '01-01-2020', 'endDate': now.strftime("%m-%d-%Y")}
+        params = \
+            {'beginDate': '01-01-2020', 'endDate': now.strftime("%m-%d-%Y")}
         for _ in range(5):
             with flaskapp.app_context():
                 try:
@@ -1046,7 +1047,7 @@ class CertIdSweep:
                                 cert_ids.append(fcc_id)
                             ruleset_id = \
                                 Ruleset.query.filter_by(name=ruleset_id_str).\
-                                    first().id
+                                first().id
                             db.engine.execute(
                                 CertId.__table__.delete().where(
                                     (CertId.downloaded == True) &
@@ -1054,9 +1055,9 @@ class CertIdSweep:
                                     (CertId.ruleset_id == ruleset_id)))
 
                             als.als_json_log(
-                                'cert_db',{
-                                    'action': 'sweep', 'country': 'US',
-                                    'status': 'success'})
+                                'cert_db',
+                                {'action': 'sweep', 'country': 'US',
+                                 'status': 'success'})
                         finally:
                             db.session.commit()  # pylint: disable=no-member
                     return
