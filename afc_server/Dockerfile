@@ -55,10 +55,13 @@ ENV AFC_SERVER_ERROR_LOG=/proc/self/fd/2
 # Root of static data files in Worker's file system
 # ENV NFS_MOUNT_PATH
 
-# ALS client parameters (see arg_dscs in als.py)
+# ALS client parameters (see comments in als.py)
 # ENV ALS_KAFKA_SERVER_ID
 # ENV ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
 # ENV ALS_KAFKA_MAX_REQUEST_SIZE
+# ENV AFC_ALS_TOPIC_NAME
+# ENV AFC_JSON_TOPIC_PREFIX
+
 
 # Parts of RMQ Celery URL (see BrokerConfigurator constructor)
 # ENV BROKER_PROT
