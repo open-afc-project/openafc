@@ -13,5 +13,6 @@ do
 done
 if [ "$result" == "success" ]
 then
+	echo Certificates for $SWEEP_REGIONS successfully downloaded
 	touch /wd/touchfile
 fi
