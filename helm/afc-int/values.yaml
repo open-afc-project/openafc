@@ -171,6 +171,7 @@ sharedEnv:
     RCACHE_SERVICE_URL: "http://{{host:rcache}}:{{port:rcache:rcache}}"
     RCACHE_RMQ_DSN: >-
       amqp://rcache:rcache@{{host:rmq}}:{{port:rmq:amqp}}/rcache
+    AFC_STATE_VENDOR_EXTENSIONS: openAfc.engineState
   # Setting AFC_DEVEL_ENV to 'devel' enables certain development options in
   # certain containers
   devel-env:

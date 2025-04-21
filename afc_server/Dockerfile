@@ -52,6 +52,10 @@ ENV AFC_SERVER_GUNICORN_PID=/run/gunicorn/afc_server_app.pid
 # Error log file
 ENV AFC_SERVER_ERROR_LOG=/proc/self/fd/2
 
+# Comma separated list of vendor extensions from previously computed responses
+# to be appended to AFC requests
+# ENV AFC_STATE_VENDOR_EXTENSIONS
+
 # Root of static data files in Worker's file system
 # ENV NFS_MOUNT_PATH
 
