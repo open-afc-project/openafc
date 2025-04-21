@@ -7,26 +7,38 @@
 #
 
 # pylint: disable=wrong-import-order, invalid-name, too-many-statements,
-# pylint: disable=too-many-branches
+# pylint: disable=too-many-branches, too-many-positional-arguments
+# pylint: disable=too-many-arguments
 
 try:
     import db_creator
 except ImportError:
     pass
-import geoalchemy2 as ga
+try:
+    import geoalchemy2 as ga
+except ImportError:
+    pass
 import sqlalchemy as sa
 import sys
-from typing import Any, cast, Dict, List, Optional, Tuple
+from typing import Any, cast, Dict, List, NamedTuple, Optional, Tuple
 import urllib.parse
 
 import db_utils
 from log_utils import dp, error, error_if, FailOnError, get_module_logger
 from rcache_models import ApDbRespState, ApDbRecord
 
-__all__ = ["RcacheDb"]
+__all__ = ["RcacheDb", "RcacheLookupResult"]
 
 # Logger for this module
 LOGGER = get_module_logger()
+
+
+class RcacheLookupResult(NamedTuple):
+    """ Rcache lookup result """
+    # True if valid response for given request/config digest found
+    found: bool
+    # Response for given request/config digest - valid or invalidated
+    response: str
 
 
 class RcacheDb:
@@ -216,13 +228,15 @@ class RcacheDb:
             self._engine.dispose()
             self._engine = None
 
-    def lookup(self, req_cfg_digests: List[str],
-               try_reconnect=False) -> Dict[str, str]:
+    def lookup(self, req_cfg_digests: List[str], return_invalidated: bool,
+               try_reconnect=False) -> Dict[str, RcacheLookupResult]:
         """ Request cache lookup
 
         Arguments:
-        req_cfg_digests -- List of request/config digests
-        try_reconnect   -- On failure try reconnect
+        req_cfg_digests    -- List of request/config digests
+        return_invalidated -- True to return valid and invalidated responses,
+                              False to return only valid ones
+        try_reconnect      -- On failure try reconnect
         Returns Dictionary of found requests, indexed by request/config digests
         """
         retry = False
@@ -231,13 +245,18 @@ class RcacheDb:
                 self.connect()
             assert (self._engine is not None) and (self.ap_table is not None)
             s = sa.select([self.ap_table]).\
-                where((self.ap_table.c.req_cfg_digest.in_(req_cfg_digests)) &
-                      (self.ap_table.c.state == ApDbRespState.Valid.name))
+                where(self.ap_table.c.req_cfg_digest.in_(req_cfg_digests))
+            if not return_invalidated:
+                s = s.where(self.ap_table.c.state == ApDbRespState.Valid.name)
             try:
                 with self._engine.connect() as conn:
                     rp = conn.execute(s)
-                    return {rec.req_cfg_digest:
-                            ApDbRecord.parse_obj(rec).get_patched_response()
+                    return \
+                        {rec.req_cfg_digest:
+                         RcacheLookupResult(
+                             found=rec.state == ApDbRespState.Valid.name,
+                             response=ApDbRecord.parse_obj(rec).
+                             get_patched_response())
                             for rec in rp}
             except sa.exc.SQLAlchemyError as ex:
                 if retry or (not try_reconnect):
