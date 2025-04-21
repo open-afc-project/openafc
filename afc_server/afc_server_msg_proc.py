@@ -10,6 +10,7 @@
 # pylint: disable=too-few-public-methods, too-many-branches, too-many-locals
 # pylint: disable=broad-exception-caught, too-many-statements
 # pylint: disable=consider-using-from-import, too-many-positional-arguments
+# pylint: disable=too-many-nested-blocks
 
 import asyncio
 import datetime
@@ -19,7 +20,7 @@ import pydantic
 import sys
 import time
 import traceback
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, Dict, List, NamedTuple, Optional, Union
 import uuid
 
 import afcmodels.hardcoded_relations as hardcoded_relations
@@ -27,9 +28,10 @@ import afc_server_compute
 import afc_server_db
 from afc_server_models import OpenAfcUsedDataVendorExtParams, \
     Rest_AvailableSpectrumInquiryRequest_1_4, \
-    Rest_AvailableSpectrumInquiryResponseMinGen, Rest_ReqMsg, \
+    Rest_AvailableSpectrumInquiryResponseMinGen, \
+    Rest_AvailableSpectrumInquiryResponseMinParse, Rest_ReqMsg, \
     Rest_ReqMsg_1_4, Rest_RespMsg_1_4, Rest_Response, Rest_ResponseCode, \
-    Rest_SupplementalInfo, Rest_SupportedVersions
+    Rest_SupplementalInfo, Rest_SupportedVersions, Rest_VendorExtension
 import afc_traffic_metrics
 import als
 import defs
@@ -46,13 +48,15 @@ class AfcServerMessageProcessor:
     """ Processor of AFC Request messages
 
     Private attributes:
-    _db                         -- DB Accessor
-    _compute                    -- AFC Engine computer
-    _request_timeout_sec        -- Timeout for normal request computation in
-                                   seconds
-    _edebug_request_timeout_sec -- Timeout for EDEBUG request computation in
-                                   seconds
-    _config_dispenser           -- AfcConfigDispenser object
+    _db                          -- DB Accessor
+    _compute                     -- AFC Engine computer
+    _request_timeout_sec         -- Timeout for normal request computation in
+                                    seconds
+    _edebug_request_timeout_sec  -- Timeout for EDEBUG request computation in
+                                    seconds
+    _config_dispenser            -- AfcConfigDispenser object
+    _afc_state_vendor_extensions -- List of vendor extensions from response
+                                    to send to AFC Engine
     """
 
     class AfcConfigDispenser:
@@ -115,17 +119,20 @@ class AfcServerMessageProcessor:
                  compute: afc_server_compute.AfcServerCompute,
                  request_timeout_sec: float,
                  edebug_request_timeout_sec: float,
-                 config_refresh_sec: float) -> None:
+                 config_refresh_sec: float,
+                 afc_state_vendor_extensions: Optional[List[str]]) -> None:
         """ Constructor
 
         Arguments:
-        db                         -- DB Accessor
-        compute                    -- AFC Engine computer
-        request_timeout_sec        -- Timeout for normal request computation in
-                                      seconds
-        edebug_request_timeout_sec -- Timeout for EDEBUG request computation in
-                                      seconds
-        config_refresh_sec         -- AFC Config refresh interval in seconds
+        db                          -- DB Accessor
+        compute                     -- AFC Engine computer
+        request_timeout_sec         -- Timeout for normal request computation
+                                       in seconds
+        edebug_request_timeout_sec  -- Timeout for EDEBUG request computation
+                                       in seconds
+        config_refresh_sec          -- AFC Config refresh interval in seconds
+        afc_state_vendor_extensions -- List of vendor extensions from response
+                                       to send to AFC Engine
         """
         als.als_initialize(client_id="afc_server")
         self._db = db
@@ -135,6 +142,7 @@ class AfcServerMessageProcessor:
         self._config_dispenser = \
             AfcServerMessageProcessor.AfcConfigDispenser(
                 db=self._db, config_refresh_sec=config_refresh_sec)
+        self._afc_state_vendor_extensions = afc_state_vendor_extensions
 
     async def close(self) -> None:
         """ Gracefully close """
@@ -217,7 +225,7 @@ class AfcServerMessageProcessor:
         als_req_id    -- Request id to use in subsequent ALS writes
         start_time    -- Request processing start time in seconds since Epoch
         deadline      -- Message processing deadline in seconds since the Epoch
-        Returns AFC Response message in dictinary form
+        Returns AFC Response message in dictionary form
         """
         # Top-level format acceptable? Individual requests checked separately
         try:
@@ -363,15 +371,16 @@ class AfcServerMessageProcessor:
                     req_dict=req_dict, afc_config_dict=afc_config_dict)
 
             # Do the rcache lookup
-            resp_str: Optional[str]
+            rcache_resp: Optional[afc_server_db.AfcRcacheResp] = None
             if not (nocache or debug or edebug or gui):
-                resp_str = \
+                rcache_resp = \
                     await self._db.lookup_rcache(
                         req_cfg_digest=rcc.req_cfg_hash, deadline=deadline)
-                if resp_str is not None:
+                if rcache_resp.found:
+                    assert rcache_resp.response is not None
                     try:
                         ret = \
-                            Rest_RespMsg_1_4.parse_raw(resp_str).\
+                            Rest_RespMsg_1_4.parse_raw(rcache_resp.response).\
                             availableSpectrumInquiryResponses[0].\
                             dict(exclude_none=True)
                     except pydantic.ValidationError:
@@ -382,6 +391,23 @@ class AfcServerMessageProcessor:
                 if cert_resp.location_flags & \
                         hardcoded_relations.CERT_ID_LOCATION_INDOOR:
                     runtime_opt |= defs.RNTM_OPT_CERT_ID
+                if rcache_resp and rcache_resp.response and \
+                        self._afc_state_vendor_extensions:
+                    try:
+                        prev_response_dict = \
+                            Rest_RespMsg_1_4.parse_raw(rcache_resp.response).\
+                            dict()
+                        for ve in prev_response_dict\
+                                ["availableSpectrumInquiryResponses"][0].\
+                                get("vendorExtensions", []):
+                            if ve.get("extensionId") not in \
+                                    self._afc_state_vendor_extensions:
+                                continue
+                            if "vendorExtensions" not in req_dict:
+                                req_dict["vendorExtensions"] = []
+                            req_dict["vendorExtensions"].append(ve)
+                    except pydantic.ValidationError:
+                        pass
                 resp_str = \
                     await self._compute.process_request(
                         request_str=json.dumps(
@@ -442,6 +468,7 @@ class AfcServerMessageProcessor:
                         ex=ex, validated_dict=validated_dict, task_id=task_id))
             return ret
         finally:
+            assert ret is not None
             afc_traffic_metrics.request_processed(
                 duration_sec=time.time() - start_time,
                 response="Exception" if exception
@@ -497,7 +524,7 @@ class AfcServerMessageProcessor:
 
         Arguments:
         ex             -- Exception occurred during request processing or None
-        validated_dict -- Dictionary, containing object whose validatin caused
+        validated_dict -- Dictionary, containing object whose validation caused
                           pydantic exception
         task_id        -- Request task id or None
         responses_code -- Response code or None
