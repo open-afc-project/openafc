@@ -59,6 +59,7 @@ from typing import Any, Dict, NamedTuple, Optional
 from rcache_models import RcacheClientSettings
 from rcache_client import RcacheClient
 from rcache_req_cfg_hash import RequestConfigHash
+from rcache_db import RcacheLookupResult
 import prometheus_client
 import prometheus_utils
 import afc_traffic_metrics
@@ -715,7 +716,13 @@ class RatAfc(MethodView):
             # Creating 'responses' - dictionary of responses as JSON strings,
             # indexed by request/config hashes
             # First looking up in the cache
-            responses = self._cache_lookup(dataif=dataif, req_infos=req_infos)
+            invalidated_responses = {}
+            responses = {}
+            for req_cfg_hash, lookup_result in \
+                    self._cache_lookup(dataif=dataif, req_infos=req_infos).\
+                    items():
+                (responses if lookup_result.found else invalidated_responses)\
+                    [req_cfg_hash] = lookup_result.response
             cached_req_hashes = set(responses.keys())
             cached_duration = time.time() - flask.g.afc_start_time
 
@@ -728,7 +735,6 @@ class RatAfc(MethodView):
                         raise \
                             AP_Exception(-1,
                                          "Unsupported multipart async request")
-                    assert use_tasks
                     task = \
                         self._start_processing(
                             dataif=dataif,
@@ -747,6 +753,7 @@ class RatAfc(MethodView):
                             dataif=dataif, use_tasks=use_tasks,
                             req_infos={k: v for k, v in req_infos.items()
                                        if k not in responses},
+                            invalidated_responses=invalidated_responses,
                             is_internal_request=is_internal_request))
             computed_duration = time.time() - flask.g.afc_start_time
 
@@ -842,8 +849,8 @@ class RatAfc(MethodView):
         dataif    -- Objstore handle (used only if RCache not used)
         req_infos -- Dictionary of ReqInfo objects, indexed by request/config
                      hashes
-        Returns dictionary of found responses (as strings), indexed by
-        request/config hashes
+        Returns dictionary of RcacheLookupResult, indexed by request/config
+        hashes
         """
         cached_keys = \
             [req_cfg_hash for req_cfg_hash in req_infos.keys()
@@ -862,7 +869,10 @@ class RatAfc(MethodView):
                 except BaseException:
                     continue
                 ret[req_cfg_hash] = \
-                    zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
+                    RcacheLookupResult(
+                        found=True,
+                        response=zlib.decompress(
+                            resp_data, 16 + zlib.MAX_WBITS))
             return ret
         return rcache.lookup_responses(cached_keys)
 
@@ -904,23 +914,46 @@ class RatAfc(MethodView):
         return None
 
     def _compute_responses(self, dataif, use_tasks, req_infos,
-                           is_internal_request):
+                           invalidated_responses, is_internal_request):
         """ Prepares worker tasks and waits their completion
 
         Arguments:
-        dataif              -- Objstore handle (used only if RCache not used)
-        use_tasks           -- True to use task-based communication with
-                               worker, False to use RabbitMQ-based
-                               communication
-        req_infos           -- Dictionary of ReqInfo objects, indexed by
-                               request/config hashes
-        is_internal_request -- True for internal request massage, False for
-                               external request message
+        dataif                -- Objstore handle (used only if RCache not used)
+        use_tasks             -- True to use task-based communication with
+                                 worker, False to use RabbitMQ-based
+                                 communication
+        req_infos             -- Dictionary of ReqInfo objects, indexed by
+                                 request/config hashes
+        invalidated_responses -- Dictionary of invalidated responses for some
+                                 requests, indexed by request/config hashes
+        is_internal_request   -- True for internal request massage, False for
+                                 external request message
         Returns dictionary of found responses (as strings), indexed by
         request/config hashes
         """
         with (contextlib.nullcontext()
               if use_tasks else rcache.rmq_create_rx_connection()) as rmq_conn:
+            # Copy AFC Engine statre vendor extensions from invalidated
+            # responses to requests
+            if invalidated_responses:
+                for req_cfg_hash, req_info in req_infos.items():
+                    invalidated_response_s = \
+                        invalidated_responses.get(req_cfg_hash)
+                    if not invalidated_response_s:
+                        continue    # No such invalidated response
+                    invalidated_response = json.loads(
+                        invalidated_response_s.response)
+                    vendor_extensions = invalidated_response.get(
+                        "availableSpectrumInquiryResponses")[0].\
+                        get("vendorExtensions")
+                    if not vendor_extensions:
+                        continue    # No vendor extensions
+                    for ve in vendor_extensions:
+                        if ve.get("extensionId") in \
+                                rcache.afc_state_vendor_extensions():
+                            req_info.request\
+                                ["availableSpectrumInquiryRequests"][0].\
+                                setdefault("vendorExtensions", []).append(ve)
             tasks = {}
             for req_cfg_hash, req_info in req_infos.items():
                 tasks[req_cfg_hash] = \
