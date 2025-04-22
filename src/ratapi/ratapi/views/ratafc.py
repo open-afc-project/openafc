@@ -401,7 +401,7 @@ class ReqInfo(NamedTuple):
     # Request ID from message
     request_id: str
 
-    # AFC Request as dictionary
+    # AFC Request as dictionary - used for compitation
     request: Dict[str, Any]
 
     # AFC Config file content as string
@@ -877,11 +877,15 @@ class RatAfc(MethodView):
         return rcache.lookup_responses(cached_keys)
 
     def _start_processing(self, dataif, req_info, is_internal_request,
-                          rcache_queue=None, use_tasks=False):
+                          rcache_queue=None, use_tasks=False,
+                          original_request=None):
         """ Initiates processing on remote worker
         If 'use_tasks' - returns created Task
         """
         request_str = json.dumps(req_info.request, sort_keys=True)
+        original_request_str = \
+            json.dumps(original_request, sort_keys=True) if original_request \
+            else request_str
         if use_tasks:
             with dataif.open(req_info.config_path) as hfile:
                 if not hfile.head():
@@ -903,6 +907,8 @@ class RatAfc(MethodView):
                    runtime_opts=req_info.runtime_opts,
                    rcache_queue=rcache_queue,
                    request_str=None if use_tasks else request_str,
+                   original_request_str=None if use_tasks
+                   else original_request_str,
                    config_str=None if use_tasks else req_info.config_str,
                    timeout_sec=flask.current_app.config[
                         'AFC_MSGHND_RATAFC_TOUT'])
@@ -933,8 +939,9 @@ class RatAfc(MethodView):
         """
         with (contextlib.nullcontext()
               if use_tasks else rcache.rmq_create_rx_connection()) as rmq_conn:
-            # Copy AFC Engine statre vendor extensions from invalidated
+            # Copy AFC Engine state vendor extensions from invalidated
             # responses to requests
+            original_requests = {}
             if invalidated_responses:
                 for req_cfg_hash, req_info in req_infos.items():
                     invalidated_response_s = \
@@ -942,7 +949,7 @@ class RatAfc(MethodView):
                     if not invalidated_response_s:
                         continue    # No such invalidated response
                     invalidated_response = json.loads(
-                        invalidated_response_s.response)
+                        invalidated_response_s)
                     vendor_extensions = invalidated_response.get(
                         "availableSpectrumInquiryResponses")[0].\
                         get("vendorExtensions")
@@ -951,6 +958,9 @@ class RatAfc(MethodView):
                     for ve in vendor_extensions:
                         if ve.get("extensionId") in \
                                 rcache.afc_state_vendor_extensions():
+                            if req_cfg_hash not in original_requests:
+                                original_requests[req_cfg_hash] = \
+                                    copy.deepcopy(req_info.request)
                             req_info.request\
                                 ["availableSpectrumInquiryRequests"][0].\
                                 setdefault("vendorExtensions", []).append(ve)
@@ -961,7 +971,8 @@ class RatAfc(MethodView):
                         dataif=dataif, req_info=req_info, use_tasks=use_tasks,
                         is_internal_request=is_internal_request,
                         rcache_queue=None if use_tasks
-                        else rmq_conn.rx_queue_name())
+                        else rmq_conn.rx_queue_name(),
+                        original_request=original_requests.get(req_cfg_hash))
             if use_tasks:
                 ret = {}
                 for req_cfg_hash, task in tasks.items():
