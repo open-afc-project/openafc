@@ -721,8 +721,8 @@ class RatAfc(MethodView):
             for req_cfg_hash, lookup_result in \
                     self._cache_lookup(dataif=dataif, req_infos=req_infos).\
                     items():
-                (responses if lookup_result.found else invalidated_responses)\
-                    [req_cfg_hash] = lookup_result.response
+                (responses if lookup_result.found else invalidated_responses)[
+                    req_cfg_hash] = lookup_result.response
             cached_req_hashes = set(responses.keys())
             cached_duration = time.time() - flask.g.afc_start_time
 
@@ -961,8 +961,8 @@ class RatAfc(MethodView):
                             if req_cfg_hash not in original_requests:
                                 original_requests[req_cfg_hash] = \
                                     copy.deepcopy(req_info.request)
-                            req_info.request\
-                                ["availableSpectrumInquiryRequests"][0].\
+                            req_info.request[
+                                "availableSpectrumInquiryRequests"][0].\
                                 setdefault("vendorExtensions", []).append(ve)
             tasks = {}
             for req_cfg_hash, req_info in req_infos.items():

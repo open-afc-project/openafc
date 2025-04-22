@@ -401,8 +401,8 @@ class AfcServerMessageProcessor:
                         prev_response_dict = \
                             Rest_RespMsg_1_4.parse_raw(rcache_resp.response).\
                             dict()
-                        for ve in prev_response_dict\
-                                ["availableSpectrumInquiryResponses"][0].\
+                        for ve in prev_response_dict[
+                                "availableSpectrumInquiryResponses"][0].\
                                 get("vendorExtensions", []):
                             if ve.get("extensionId") not in \
                                     self._afc_state_vendor_extensions:
