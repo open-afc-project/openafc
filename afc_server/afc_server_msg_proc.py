@@ -13,6 +13,7 @@
 # pylint: disable=too-many-nested-blocks
 
 import asyncio
+import copy
 import datetime
 import json
 import os
@@ -391,6 +392,9 @@ class AfcServerMessageProcessor:
                 if cert_resp.location_flags & \
                         hardcoded_relations.CERT_ID_LOCATION_INDOOR:
                     runtime_opt |= defs.RNTM_OPT_CERT_ID
+                # Dictionary of original AFC Request if any vendor extensions
+                # added to it. Ultimately goes to Rcache as request
+                original_req_dict: Optional[Dict[str, Any]] = None
                 if rcache_resp and rcache_resp.response and \
                         self._afc_state_vendor_extensions:
                     try:
@@ -403,16 +407,27 @@ class AfcServerMessageProcessor:
                             if ve.get("extensionId") not in \
                                     self._afc_state_vendor_extensions:
                                 continue
+                            if original_req_dict is None:
+                                original_req_dict = copy.deepcopy(req_dict)
                             if "vendorExtensions" not in req_dict:
                                 req_dict["vendorExtensions"] = []
                             req_dict["vendorExtensions"].append(ve)
                     except pydantic.ValidationError:
                         pass
+                request_str = \
+                    json.dumps(
+                        {"version": Rest_SupportedVersions[-1],
+                         "availableSpectrumInquiryRequests": [req_dict]})
+                original_request_str = \
+                    request_str if original_req_dict is None \
+                    else json.dumps(
+                        {"version": Rest_SupportedVersions[-1],
+                         "availableSpectrumInquiryRequests":
+                         [original_req_dict]})
                 resp_str = \
                     await self._compute.process_request(
-                        request_str=json.dumps(
-                            {"version": Rest_SupportedVersions[-1],
-                             "availableSpectrumInquiryRequests": [req_dict]}),
+                        request_str=request_str,
+                        original_request_str=original_request_str,
                         config_str=rcc.cfg_str,
                         req_cfg_digest=rcc.req_cfg_hash,
                         runtime_opt=runtime_opt, task_id=task_id,
