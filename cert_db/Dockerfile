@@ -66,26 +66,20 @@ chown fbrat:fbrat /var/lib/fbrat
 ENV RCACHE_ENABLED=False
 # Space-separated list of regions to sweep
 ENV SWEEP_REGIONS="US CA"
-# Sweep periodicity in /etc/periodic units (15min,hourly,daily,weekly,monthly)
-ENV SWEEP_PERIOD=daily
+# DDelay before first sweep
+ENV SWEEP_DELAY=20s
+# Sweep periodicity in sleep units
+ENV SWEEP_PERIOD=1d
 # REST request timeout in seconds
 ENV REQUEST_TIMEOUT_SEC=500
-# Make all environment variables available to cronjobs
-RUN env >> /etc/environment
 
 LABEL revision="afc-cert_db"
 WORKDIR /wd
-COPY cert_db/entrypoint.sh /
-# Add debugging env if configured
-ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
-COPY cert_db/devel.sh cert_db/sweep.sh /wd/
-RUN chmod +x /wd/devel.sh /wd/sweep.sh
+ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
+COPY cert_db/entrypoint.sh cert_db/devel.sh cert_db/sweep.sh /wd/
+RUN chmod +x /wd/devel.sh /wd/sweep.sh /wd/entrypoint.sh
 RUN /wd/devel.sh
 #
-RUN mkdir -p /etc/periodic/$SWEEP_PERIOD
-RUN ln -s /wd/sweep.sh /etc/periodic/$SWEEP_PERIOD/sweep.sh
-RUN chmod 744 /etc/periodic/$SWEEP_PERIOD/sweep.sh
-RUN chmod +x /entrypoint.sh
-CMD ["/entrypoint.sh"]
+CMD ["/wd/entrypoint.sh"]
 
 HEALTHCHECK --start-period=30m CMD test `find /wd/touchfile -mtime -3`
