@@ -49,7 +49,9 @@ async def get_message_processor() \
                 rcache_dsn=settings.rcache_dsn,
                 rcache_password_file=settings.rcache_password_file,
                 bypass_cert=settings.bypass_cert,
-                bypass_rcache=settings.bypass_rcache)
+                bypass_rcache=settings.bypass_rcache,
+                return_invalidated=bool(
+                    settings.afc_state_vendor_extensions))
         compute = \
             afc_server_compute.AfcServerCompute(
                 rmq_dsn=settings.rmq_dsn,
@@ -59,10 +61,12 @@ async def get_message_processor() \
                 appcfg.NFS_MOUNT_PATH)
         g_message_processor = \
             afc_server_msg_proc.AfcServerMessageProcessor(
-                 db=db, compute=compute,
-                 request_timeout_sec=settings.request_timeout,
-                 edebug_request_timeout_sec=settings.request_timeout_edebug,
-                 config_refresh_sec=settings.config_refresh)
+                db=db, compute=compute,
+                request_timeout_sec=settings.request_timeout,
+                edebug_request_timeout_sec=settings.request_timeout_edebug,
+                config_refresh_sec=settings.config_refresh,
+                afc_state_vendor_extensions=settings.
+                afc_state_vendor_extensions)
     return g_message_processor
 
 

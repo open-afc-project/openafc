@@ -548,7 +548,7 @@ If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Lo
 | RCACHE_AFC_REQ_URL                     |                                  | REST API Rcache precomputer uses to send invalidated AFC requests for precomputation. No precomputation if not set       |
 | RCACHE_RULESETS_URL                    |                                  | REST API Rcache spatial invalidator uses to retrieve AFC Configs' rulesets. Default invalidation distance usd if not set |
 | RCACHE_CONFIG_RETRIEVAL_URL            |                                  | REST API Rcache spatial invalidator uses to retrieve AFC Config by ruleset. Default invalidation distance usd if not set |
-
+| AFC_STATE_VENDOR_EXTENSIONS            | openAfc.engineState              | afcserver, rat_server, msghnd                                                                                            | Comma-separated list of vendor extensions from invavlidated responses that should be added to AFC Request going to AFC Engine |
 ## RabbitMQ settings
 
 There is a way to conifugre AFC server to use a RabbitMQ broker from different docker image.

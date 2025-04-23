@@ -106,14 +106,17 @@ class CertId(db.Model):
     refreshed_at = db.Column(db.DateTime())
     ruleset_id = db.Column(db.Integer, db.ForeignKey(
         'aaa_ruleset.id', ondelete='CASCADE'), nullable=False)
+    downloaded = db.Column(db.Boolean(), nullable=False,
+                           server_default=db.text('false'))
     # Bits for this field defined by hardcoded_relations.CERT_ID_LOCATION_...
     # constants
     location = db.Column(db.Integer, nullable=False)
 
-    def __init__(self, certification_id, location):
+    def __init__(self, certification_id, location, downloaded):
         self.certification_id = certification_id
         self.location = location
         self.refreshed_at = datetime.datetime.now()
+        self.downloaded = downloaded
 
 
 class AccessPointDeny(db.Model):

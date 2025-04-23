@@ -31,6 +31,13 @@ class AfcServerSettings(pydantic.BaseSettings):
         # Prefix of environment variables
         env_prefix = "AFC_SERVER_"
 
+        @classmethod
+        def parse_env_var(cls, field_name: str, raw_val: str) -> Any:
+            """ Parses string list environment variable(s) """
+            if field_name == "afc_state_vendor_extensions":
+                return [x for x in raw_val.split(",") if x]
+            return cls.json_loads(raw_val)
+
     port: int = pydantic.Field(default=...,
                                title="Port AFC server listens on")
     rcache_dsn: pydantic.PostgresDsn = \
@@ -78,6 +85,12 @@ class AfcServerSettings(pydantic.BaseSettings):
                                               title="Log level name")
     engine_request_type: str = pydantic.Field(default="AP-AFC",
                                               title="AFC Engine Request Type")
+    afc_state_vendor_extensions: Optional[List[str]] = \
+        pydantic.Field(
+            default=None,
+            title="Comma-separated list of response vendor extensions from "
+            "rcache to attach to requests sent to AFC Engine",
+            env="AFC_STATE_VENDOR_EXTENSIONS")
     bypass_cert: bool = \
         pydantic.Field(
             default=False,
@@ -215,7 +228,7 @@ class Rest_Response(pydantic.BaseModel, extra=pydantic.Extra.forbid):
 
 class Rest_AvailableSpectrumInquiryResponseMinGen(pydantic.BaseModel,
                                                   extra=pydantic.Extra.allow):
-    """ Minimal generated AFC Request structure """
+    """ Minimal generated AFC Response structure """
     requestId: str
     rulesetId: str
     response: Rest_Response
@@ -224,7 +237,7 @@ class Rest_AvailableSpectrumInquiryResponseMinGen(pydantic.BaseModel,
 
 class Rest_AvailableSpectrumInquiryResponseMinParse(
         pydantic.BaseModel, extra=pydantic.Extra.allow):
-    """ Minimal parsed AFC Request structure """
+    """ Minimal parsed AFC Response structure """
     vendorExtensions: Optional[List[Rest_VendorExtension]] = None
 
 

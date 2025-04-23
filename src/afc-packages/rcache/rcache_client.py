@@ -10,13 +10,13 @@
 
 import pydantic
 import sys
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Set, Union
 
 from log_utils import error, error_if, get_module_logger, \
     include_stack_to_error_log, set_error_exception
 
 try:
-    from rcache_db import RcacheDb
+    from rcache_db import RcacheDb, RcacheLookupResult
 except ImportError:
     pass
 
@@ -42,18 +42,23 @@ class RcacheClient:
     """ Response Cache - related code that executes on other containers
 
     Private attributes:
-    _rcache_db      -- Optional RcacheDb object - for making DB lookups (needed
-                       on Message Handler and RatApi)
-    _rcache_rmq     -- Optional RabbitMQ server AMQP URI (Needed on Message
-                       Handler, RatApi, Worker)
-    _rmq_receiver   -- True if for RabbitMQ receiver, False for transmitter,
-                       None if irrelevant
-    _rcache_rcache  -- Request Cache service base URL. Needed on a side that
-                       makes cache update (i.e. either on Message Handler and
-                       RatApi, or on Worker) or invalidate (FS Update for
-                       spatial invalidate, some other entity for full/config
-                       invalidate)
-    _update_on_send -- True to update cache on sender
+    _rcache_db                   -- Optional RcacheDb object - for making DB
+                                    lookups (needed on Message Handler and
+                                    RatApi)
+    _rcache_rmq                  -- Optional RabbitMQ server AMQP URI (Needed
+                                    on Message Handler, RatApi, Worker)
+    _rmq_receiver                -- True if for RabbitMQ receiver, False for
+                                    transmitter, None if irrelevant
+    _rcache_rcache               -- Request Cache service base URL. Needed on a
+                                    side that makes cache update (i.e. either
+                                    on Message Handler and RatApi, or on
+                                    Worker) or invalidate (FS Update for
+                                    spatial invalidate, some other entity for
+                                    full/config invalidate)
+    _update_on_send              -- True to update cache on sender
+    _afc_state_vendor_extensions -- Set of vendor extensions from previously
+                                    computed invalidated AFC response to be
+                                    sent to AFC Engine
     """
 
     def __init__(self, client_settings: "RcacheClientSettings",
@@ -93,17 +98,23 @@ class RcacheClient:
                 (client_settings.service_url is not None):
             assert "rcache_rcache" in sys.modules
             self._rcache_rcache = RcacheRcache(client_settings.service_url)
+        self._afc_state_vendor_extensions: Set[str] = \
+            set(client_settings.afc_state_vendor_extensions or [])
 
-    def lookup_responses(self, req_cfg_digests: List[str]) -> Dict[str, str]:
+    def lookup_responses(self, req_cfg_digests: List[str]) -> \
+            Dict[str, "RcacheLookupResult"]:
         """ Lookup responses in Postgres cache database
 
         Arguments:
         req_cfg_digests -- List of lookup keys (Request/Config digests in
                            string form)
-        Returns dictionary of found responses, indexed by lookup keys
+        Returns dictionary of lookup results, indexed by lookup keys
         """
         assert self._rcache_db is not None
-        return self._rcache_db.lookup(req_cfg_digests, try_reconnect=True)
+        return \
+            self._rcache_db.lookup(
+                req_cfg_digests, try_reconnect=True,
+                return_invalidated=bool(self._afc_state_vendor_extensions))
 
     def rmq_send_response(self, queue_name: str, req_cfg_digest: str,
                           request: str, response: Optional[str]) \
@@ -197,3 +208,8 @@ class RcacheClient:
         """
         assert self._rcache_rcache is not None
         self._rcache_rcache.directional_invalidate_cache(beams=beams)
+
+    def afc_state_vendor_extensions(self) -> Set[str]:
+        """ Set of vendor extensions from previously computed invalidated AFC
+        response to be sent to AFC Engine """
+        return self._afc_state_vendor_extensions
