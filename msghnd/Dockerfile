@@ -81,6 +81,11 @@ ENV AFC_MSGHND_TIMEOUT=${AFC_MSGHND_TIMEOUT:-180}
 ENV AFC_MSGHND_WORKERS=${AFC_MSGHND_WORKERS:-20}
 ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 ENV FLASK_AFC_MSGHND_RATAFC_TOUT=${FLASK_AFC_MSGHND_RATAFC_TOUT:-600}
+
+# Comma separated list of vendor extensions from previously computed responses
+# to be appended to AFC requests
+# ENV AFC_STATE_VENDOR_EXTENSIONS
+
 RUN chmod +x /entrypoint.sh
 CMD ["/entrypoint.sh"]
 HEALTHCHECK CMD wget --no-verbose --tries=1 --spider \
