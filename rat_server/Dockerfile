@@ -94,6 +94,10 @@ ENV AFC_WEBUI_TIMEOUT=${AFC_WEBUI_TIMEOUT:-180}
 ENV AFC_WEBUI_WORKERS=${AFC_WEBUI_WORKERS:-5}
 ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 
+# Comma separated list of vendor extensions from previously computed responses
+# to be appended to AFC requests
+# ENV AFC_STATE_VENDOR_EXTENSIONS
+
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 # Add debugging env if configured
 ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
