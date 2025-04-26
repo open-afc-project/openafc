@@ -60,6 +60,7 @@ def build_task(
         runtime_opts=RNTM_OPT_DBG_GUI,
         rcache_queue=None,
         request_str=None,
+        original_request_str=None,
         config_str=None,
         timeout_sec=600):
     """
@@ -80,6 +81,7 @@ def build_task(
         "mntroot": flask.current_app.config['NFS_MOUNT_PATH'],
         "rcache_queue": rcache_queue,
         "request_str": request_str,
+        "original_request_str": original_request_str,
         "config_str": config_str,
         "deadline": time.time() + timeout_sec
     }
