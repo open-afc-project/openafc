@@ -68,12 +68,14 @@ def generateHtml(rurl, path, dirs, files):
 """
 
     for e in dirs:
-        html += "<li><a href=" + rurl + "/" + path + \
-            "/" + e + "><b>" + e + """/</b></a></li>
+        html += "<li><a href=" + \
+            "/".join(s for s in (rurl.rstrip("/"), path, e) if s) + \
+            "><b>" + e + """/</b></a></li>
 """
     for e in files:
-        html += "<li><a href=" + rurl + "/" + \
-            path + "/" + e + ">" + e + """</a></li>
+        html += "<li><a href=" + \
+            "/".join(s for s in (rurl.rstrip("/"), path, e) if s) + \
+            ">" + e + """</a></li>
 """
 
     html += """</ul>
