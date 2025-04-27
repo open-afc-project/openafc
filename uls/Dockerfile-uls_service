@@ -151,10 +151,6 @@ ENV ULS_ALEMBIC_INITIAL_VERSION=b41cf8a00430
 # Use TLS with SMTP server
 # ENV ULS_SMTP_TLS
 
-# Name of JSON secret with SMTP parameters (formatted as per
-# NOTIFIER_MAIL.json). If not specified no emails will be sent
-# ENV ULS_ALARM_SMTP_INFO
-
 # Email to send messages to. If not specified no emails will be sent
 # ENV ULS_ALARM_EMAIL_TO
 #
