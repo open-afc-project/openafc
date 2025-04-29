@@ -42,6 +42,9 @@ def upgrade() -> None:
         op.create_index(index_name=f"{table}_month_idx_idx",
                         table_name=table, columns=["month_idx"],
                         if_not_exists=True)
+    op.create_index(index_name="decode_error_time_idx",
+                    table_name="decode_error", columns=["time"],
+                    if_not_exists=True)
 
 
 def downgrade() -> None:
@@ -49,3 +52,5 @@ def downgrade() -> None:
     for table in TABLES:
         op.drop_index(index_name=f"{table}_month_idx_idx", table_name=table,
                       if_exists=True)
+    op.drop_index(index_name="decode_error_time_idx",
+                  table_name="decode_error", if_exists=True)
