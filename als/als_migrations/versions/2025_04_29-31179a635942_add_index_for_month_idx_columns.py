@@ -35,6 +35,7 @@ TABLES = [
     "afc_server",
     "decode_error"]
 
+
 def upgrade() -> None:
     """ Add index on 'month_idx' column to all tables """
     for table in TABLES:
