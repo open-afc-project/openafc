@@ -27,6 +27,7 @@ esac
 
 
 rat-manage-api db-create --if_absent
+rat-manage-api db-upgrade
 
 postfix start &
 exec gunicorn \
