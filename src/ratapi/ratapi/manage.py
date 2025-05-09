@@ -994,6 +994,8 @@ class CertIdSweep:
         headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
+            'Accept-Encoding': 'deflate, gzip, br, zstd',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15',
         }
         params = \
             {'beginDate': '01-01-2020', 'endDate': now.strftime("%m-%d-%Y")}
