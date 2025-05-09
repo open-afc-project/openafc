@@ -18,7 +18,7 @@ def upgrade():
     op.add_column(
         'cert_id',
         sa.Column('downloaded', sa.Boolean(), nullable=False,
-                  server_defafult=sa.sql.expression.false()))
+                  server_default=sa.sql.expression.false()))
 
 
 def downgrade():

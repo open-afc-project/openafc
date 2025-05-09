@@ -1768,7 +1768,7 @@ def main():
     @click.option('--log-level', help='Console logging lowest level displayed.')
     @with_appcontext
     def db_upgrade(log_level):
-        DbUpgrade()(flaskapp=flask.current_app)()
+        DbUpgrade()(flaskapp=flask.current_app)
 
     try:
         cli()
