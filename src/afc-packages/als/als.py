@@ -19,7 +19,8 @@ html/index.html#kafka-client-configuration
 """
 
 # pylint: disable=invalid-name, too-many-arguments, global-statement
-# pylint: disable=broad-exception-caught
+# pylint: disable=broad-exception-caught, too-many-positional-arguments
+# pylint: disable=global-variable-not-assigned
 
 import collections
 import datetime
@@ -39,8 +40,6 @@ try:
 except ImportError as exc:
     import_failure = repr(exc)
 
-# Topic name for AFC request/response logging
-ALS_TOPIC = "ALS"
 # AFC Config/Request/Response logging record format version
 ALS_FORMAT_VERSION = "1.0"
 # Data type value for AFC Config record
@@ -49,6 +48,16 @@ ALS_DT_CONFIG = "AFC_CONFIG"
 ALS_DT_REQUEST = "AFC_REQUEST"
 # Data type value for AFC Response record
 ALS_DT_RESPONSE = "AFC_RESPONSE"
+
+# Environment variable containing name of ALS topic in Kafka
+AFC_ALS_TOPIC_NAME_ENV = "AFC_ALS_TOPIC_NAME"
+# Default ALS topic name in Kafka
+DEFAULT_ALS_TOPIC_NAME = "ALS"
+
+# Environment variable containing prefix foe JSON log topicsin Kafka
+AFC_JSON_TOPIC_PREFIX_ENV = "AFC_JSON_TOPIC_PREFIX"
+# Default JSON log topic name prefix in Kafka
+DEFAULT_JSON_TOPIC_PREFIX = ""
 
 # Version field of AFC Config/Request/Response record
 ALS_FIELD_VERSION = "version"
@@ -94,7 +103,7 @@ POLL_PERIOD = 100
 # Delay between connection attempts
 CONNECT_ATTEMPT_INTERVAL = datetime.timedelta(seconds=10)
 
-# Regular expression for topic name check (Postgre requirement to table names)
+# Regular expression for topic name check (Postgres requirement to table names)
 TOPIC_NAME_REGEX = re.compile(r"^[_a-zA-Z][0-9a-zA-Z_]{,62}$")
 
 # Maximum um message size (default maximum of 1MB is way too small for GUI AFC
@@ -240,21 +249,23 @@ class Als:
     """ Kafka client for ALS and JSON logs
 
     Private attributes:
-    _server_id       -- Unique AFC server identity string. Computed by
-                        appending random suffix to 'client_id' constructor
-                        parameter or (if not specified) to ALS_KAFKA_CLIENT_ID
-                        environment variable value or (if not specified) to
-                        "Unknown"
-    _producer_kwargs -- Dictionary of parameters for KafkaProducer(). None if
-                        parameters are invalid
-    _producer        -- KafkaProducer. None if initialization was not
-                        successful (yet?)
-    _config_cache    -- None (if configs are not consolidated) or two-level
-                        dictionary req_id->
-                        (config, customer, geo_version, uls_id)->
-                        request_indices
-    _req_idx         -- Request message index
-    _send_count      -- Number of sent records
+    _server_id         -- Unique AFC server identity string. Computed by
+                          appending random suffix to 'client_id' constructor
+                          parameter or (if not specified) to
+                          ALS_KAFKA_CLIENT_ID environment variable value or
+                          (if not specified) to "Unknown"
+    _producer_kwargs   -- Dictionary of parameters for KafkaProducer(). None if
+                          parameters are invalid
+    _producer          -- KafkaProducer. None if initialization was not
+                          successful (yet?)
+    _config_cache      -- None (if configs are not consolidated) or two-level
+                          dictionary req_id->
+                          (config, customer, geo_version, uls_id)->
+                          request_indices
+    _req_idx           -- Request message index
+    _send_count        -- Number of sent records
+    _als_topic_name    -- ALS topic name
+    _json_topic_prefix -- JSON topic name prefix
     """
 
     def __init__(self, client_id: Optional[str] = None,
@@ -276,6 +287,10 @@ class Als:
             {} if consolidate_configs else None
         self._req_idx = 0
         self._lock = threading.Lock()
+        self._als_topic_name = os.environ.get(AFC_ALS_TOPIC_NAME_ENV,
+                                              DEFAULT_ALS_TOPIC_NAME)
+        self._json_topic_prefix = os.environ.get(AFC_JSON_TOPIC_PREFIX_ENV,
+                                                 DEFAULT_JSON_TOPIC_PREFIX)
         kwargs: Dict[str, Any] = {}
         has_parameters = True
         for argdsc in arg_dscs:
@@ -349,7 +364,7 @@ class Als:
                 (ALS_FIELD_RUNTIME_OPT, runtime_opt)]
              if v is not None}
         self._send(
-            topic=ALS_TOPIC, key=self._als_key(req_id),
+            topic=self._als_topic_name, key=self._als_key(req_id),
             value=self._als_value(data_type=ALS_DT_REQUEST, data=req,
                                   extra_fields=extra_fields))
 
@@ -365,7 +380,7 @@ class Als:
             return
         self._flush_afc_configs(req_id)
         self._send(
-            topic=ALS_TOPIC, key=self._als_key(req_id),
+            topic=self._als_topic_name, key=self._als_key(req_id),
             value=self._als_value(data_type=ALS_DT_RESPONSE, data=resp))
 
     def afc_config(self, req_id: str, config_text: str, customer: str,
@@ -409,8 +424,9 @@ class Als:
         """
         if self._producer is None:
             return
-        assert topic != ALS_TOPIC
+        topic = self._json_topic_prefix + topic
         assert TOPIC_NAME_REGEX.match(topic)
+        assert topic != self._als_topic_name
         json_dict = \
             collections.OrderedDict(
                 [(JSON_LOG_FIELD_VERSION, JSON_LOG_VERSION),
@@ -474,7 +490,7 @@ class Als:
         if req_indices:
             extra_fields[ALS_FIELD_REQ_INDICES] = req_indices
         self._send(
-            topic=ALS_TOPIC, key=self._als_key(req_id),
+            topic=self._als_topic_name, key=self._als_key(req_id),
             value=self._als_value(data_type=ALS_DT_CONFIG, data=config_text,
                                   extra_fields=extra_fields))
 
@@ -508,7 +524,7 @@ class Als:
         data         -- Data - string or JSON dictionary
         extra_fields -- None or dictionary of message-type-specific fields
         """
-        json_dict = \
+        json_dict: Dict[str, Any] = \
             collections.OrderedDict(
                 [(ALS_FIELD_VERSION, ALS_FORMAT_VERSION),
                  (ALS_FIELD_SERVER_ID, self._server_id),

@@ -6,8 +6,12 @@
 # a copy of which is included with this software program
 #
 
-/wd/sweep.sh
-if [[ -z "${K8S_CRON}" ]]; then
-  crond -b
-  sleep infinity
-fi
+echo Delaying for $SWEEP_DELAY
+sleep $SWEEP_DELAY
+
+while true
+do
+  /wd/sweep.sh
+  echo Sleping for $SWEEP_PERIOD
+  sleep $SWEEP_PERIOD
+done

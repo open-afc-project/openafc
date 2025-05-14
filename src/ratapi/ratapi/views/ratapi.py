@@ -40,6 +40,7 @@ from afcmodels.base import db
 from afcmodels.hardcoded_relations import RulesetVsRegion
 from .auth import auth
 from appcfg import ObjstConfig
+import urllib.parse
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ def build_task(
         runtime_opts=RNTM_OPT_DBG_GUI,
         rcache_queue=None,
         request_str=None,
+        original_request_str=None,
         config_str=None,
         timeout_sec=600):
     """
@@ -79,6 +81,7 @@ def build_task(
         "mntroot": flask.current_app.config['NFS_MOUNT_PATH'],
         "rcache_queue": rcache_queue,
         "request_str": request_str,
+        "original_request_str": original_request_str,
         "config_str": config_str,
         "deadline": time.time() + timeout_sec
     }
@@ -107,13 +110,7 @@ class GuiConfig(MethodView):
             LOGGER.error('Failed to fetch server version: {0}'.format(err))
             serververs = 'unknown'
 
-        # TODO: temporary support python2
-        if sys.version_info.major != 3:
-            from urlparse import urlparse
-        else:
-            from urllib.parse import urlparse
-
-        u = urlparse(flask.request.url)
+        u = urllib.parse.urlparse(flask.request.url)
 
         if 'USE_CAPTCHA' in flask.current_app.config and \
                 flask.current_app.config['USE_CAPTCHA']:
@@ -1122,30 +1119,25 @@ class AfcRulesetIds(MethodView):
 class History(MethodView):
     def get(self, path=None):
         LOGGER.debug(f"History::get({path})")
-        user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
+        auth(roles=['Analysis', 'Trial', 'Admin'])
         conf = appcfg.ObjstConfig()
-        fwd_proto = flask.request.headers.get('X-Forwarded-Proto')
-        if not fwd_proto:
-            forward_proto = flask.request.scheme
+        fwd_proto = \
+            flask.request.headers.get('X-Forwarded-Proto') or \
+            flask.request.scheme
         try:
             rurl = flask.request.base_url
             if path is not None:
                 path_len = len(path)
                 rurl = flask.request.base_url[:-path_len]
-            response = requests.get(
-                conf.AFC_OBJST_SCHEME +
-                "://" +
-                conf.AFC_OBJST_HOST +
-                ":" +
-                conf.AFC_OBJST_HIST_PORT +
-                (
-                    ("/" +
-                     path) if path is not None else ""),
-                headers={
-                    'X-Forwarded-Proto': fwd_proto},
-                params={
-                    "url": rurl},
-                stream=True)
+            response = requests.request(
+                method=flask.request.method,
+                url=urllib.parse.urlunparse(
+                    (conf.AFC_OBJST_SCHEME,
+                     f'{conf.AFC_OBJST_HOST}:{conf.AFC_OBJST_HIST_PORT}',
+                     f'/{path or ""}', '', '', '')),
+                params={'url': rurl},
+                headers={'X-Forwarded-Proto': fwd_proto}, stream=True,
+                allow_redirects=False)
             if response.headers['Content-Type'].startswith("application/octet-stream") \
                     and "Content-Encoding" not in response.headers:
                 # results.kmz case. Apache can't decompress it.

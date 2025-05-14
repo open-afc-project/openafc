@@ -90,22 +90,25 @@ class RcacheServiceSettings(pydantic.BaseSettings):
             "(default is 'head')")
     precompute_quota: int = \
         pydantic.Field(
-            10, title="Number of simultaneous precomputing requests in flight")
+            10,
+            description="Number of simultaneous precomputing requests in "
+            "flight")
     afc_req_url: Optional[pydantic.AnyHttpUrl] = \
         pydantic.Field(
             None,
-            title="RestAPI URL to send AFC Requests for precomputation")
+            description="RestAPI URL to send AFC Requests for precomputation")
     rulesets_url: Optional[pydantic.AnyHttpUrl] = \
         pydantic.Field(
             None,
-            title="RestAPI URL to retrieve list of active Ruleset IDs")
+            description="RestAPI URL to retrieve list of active Ruleset IDs")
     config_retrieval_url: Optional[pydantic.AnyHttpUrl] = \
         pydantic.Field(
             None,
-            title="RestAPI URL to retrieve AFC Config for given Ruleset ID")
+            description="RestAPI URL to retrieve AFC Config for given Ruleset "
+            "ID")
     keyhole_template: Optional[str] = \
         pydantic.Field(
-            None, title="Keyhole shape PostGIS template file")
+            None, description="Keyhole shape PostGIS template file")
 
     @classmethod
     @pydantic.root_validator(pre=True)
@@ -125,28 +128,48 @@ class RcacheClientSettings(pydantic.BaseSettings):
         # Prefix of environment variables
         env_prefix = "RCACHE_"
 
+        @classmethod
+        def parse_env_var(cls, field_name: str, raw_val: str) -> Any:
+            """ Parses string list environment variable(s) """
+            if field_name == "afc_state_vendor_extensions":
+                return [x for x in raw_val.split(",") if x]
+            return cls.json_loads(raw_val)
+
     enabled: bool = \
-        pydantic.Field(True,
-                       title="Rcache enabled (False for legacy file-based "
-                       "cache. Default is enabled")
+        pydantic.Field(
+            True,
+            description="Rcache enabled (False for legacy file-based cache. "
+            "Default is enabled")
     postgres_dsn: Optional[pydantic.PostgresDsn] = \
         pydantic.Field(
             None,
-            title="Postgres DSN: "
+            description="Postgres DSN: "
             "postgresql://[user[:password]]@host[:port]/database[?...]")
     postgres_password_file: Optional[str] = \
-        pydantic.Field(None, title="File with password for database DSN")
+        pydantic.Field(
+            None,
+            description="File with password for database DSN")
     service_url: Optional[pydantic.AnyHttpUrl] = \
-        pydantic.Field(None, title="Rcache server base RestAPI URL")
+        pydantic.Field(
+            None,
+            description="Rcache server base RestAPI URL")
     rmq_dsn: Optional[pydantic.AmqpDsn] = \
         pydantic.Field(
             None,
-            title="RabbitMQ AMQP DSN: amqp://[user[:password]]@host[:port]")
+            description="RabbitMQ AMQP DSN: "
+            "amqp://[user[:password]]@host[:port]")
     update_on_send: bool = \
         pydantic.Field(
             True,
-            title="True to update cache from worker (on sending response), "
-            "False to update cache on msghnd (on receiving response)")
+            description="True to update cache from worker (on sending "
+            "response), False to update cache on msghnd (on receiving "
+            "response)")
+    afc_state_vendor_extensions: Optional[List[str]] = \
+        pydantic.Field(
+            None,
+            description="List of Set of vendor extensions from previously "
+            "computed invalidated AFC response to be sent to AFC Engine",
+            env="AFC_STATE_VENDOR_EXTENSIONS")
 
     @classmethod
     @pydantic.root_validator(pre=True)
@@ -226,6 +249,7 @@ class RcacheSpatialInvalidateReq(pydantic.BaseModel):
 
 
 class Beam(pydantic.BaseModel):
+    """ Directed (point plus direction) spatial invalidation request """
     rx_lat: float = \
         pydantic.Field(
             ...,

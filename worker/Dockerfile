@@ -4,10 +4,9 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 
-FROM alpine:3.18.11
-# This variable should be set to default Python version for chosen Alpine
-# version. Unfortunately there is no way to get it automagically
-ENV PYTHONVERSION=3.11
+FROM python:3.12-alpine3.21
+# This variable should be set to used Python version (major.minor only)
+ENV AFC_PYTHONVERSION=3.12
 
 LABEL revision="afc-worker-al"
 ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
@@ -21,23 +20,22 @@ ARG AFC_WORKER_UID=${AFC_WORKER_UID}
 # AFC REsponse receiver (MsgHandler, RatAPI)
 ENV RCACHE_UPDATE_ON_SEND=True
 
-RUN apk add --update --no-cache python3=~${PYTHONVERSION} \
-    boost1.82-program_options boost1.82-log boost1.82-filesystem \
-    boost1.82-thread qt5-qtbase armadillo minizip libgeotiff \
+RUN apk add --update --no-cache \
+    boost1.84-program_options boost1.84-log boost1.84-filesystem \
+    boost1.84-thread qt5-qtbase armadillo minizip libgeotiff \
     qt5-qtbase-sqlite libbsd gdal tzdata imagemagick zip
 
 # Setting up venv in /venv and 'activating' it
 RUN python3 -m venv /venv
 ENV PATH=/venv/bin:$PATH
 ENV VIRTUAL_ENV=/venv
-# This explicitly set variable and its forceful injection in some places helps
-# to alleviate various venv shortcomings
-ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${PYTHONVERSION}/site-packages:${PYTHONPATH}
 
 # Installing Python libraries
-RUN apk add --update --no-cache librdkafka-dev=~2.1.1
+#   Version of librdkafka-dev depends on Alpine version. confluent-kafka
+#   version in requirements.txt may need to be updated on Alpine version change
+RUN apk add --update --no-cache librdkafka-dev
 COPY worker/requirements.txt /wd/
-RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} build-base expat expat-dev && \
+RUN apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base expat expat-dev && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base expat-dev && \
     rm -f /wd/requirements.txt

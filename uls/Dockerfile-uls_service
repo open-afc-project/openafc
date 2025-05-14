@@ -4,10 +4,9 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-FROM alpine:3.18.11
-# This variable should be set to default Python version for chosen Alpine
-# version. Unfortunately there is no way to get it automagically
-ENV PYTHONVERSION=3.11
+FROM python:3.12-alpine3.21
+# This variable should be set to used Python version (major.minor only)
+ENV AFC_PYTHONVERSION=3.12
 
 # DOWNLOADER SERVICE PARAMETERS
 
@@ -152,10 +151,6 @@ ENV ULS_ALEMBIC_INITIAL_VERSION=b41cf8a00430
 # Use TLS with SMTP server
 # ENV ULS_SMTP_TLS
 
-# Name of JSON secret with SMTP parameters (formatted as per
-# NOTIFIER_MAIL.json). If not specified no emails will be sent
-# ENV ULS_ALARM_SMTP_INFO
-
 # Email to send messages to. If not specified no emails will be sent
 # ENV ULS_ALARM_EMAIL_TO
 #
@@ -192,27 +187,28 @@ ENV ULS_ALEMBIC_INITIAL_VERSION=b41cf8a00430
 # message body
 # ENV ULS_ALARM_SENDER_LOCATION
 
-# ALS client parameters (see arg_dscs in als.py)
+# ALS client parameters (see comments in als.py)
 # ENV ALS_KAFKA_SERVER_ID
 # ENV ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
 # ENV ALS_KAFKA_MAX_REQUEST_SIZE
+# ENV AFC_ALS_TOPIC_NAME
+# ENV AFC_JSON_TOPIC_PREFIX
 
-RUN apk add --update --no-cache python3=~${PYTHONVERSION} \
-    boost1.82-program_options boost1.82-log boost1.82-filesystem \
-    boost1.82-thread armadillo minizip qt5-qtbase-sqlite libbsd
+RUN apk add --update --no-cache python3=~${AFC_PYTHONVERSION} \
+    boost1.84-program_options boost1.84-log boost1.84-filesystem \
+    boost1.84-thread armadillo minizip qt5-qtbase-sqlite libbsd
 
 # Setting up venv in /venv and 'activating' it
 RUN python3 -m venv /venv
 ENV PATH=/venv/bin:$PATH
 ENV VIRTUAL_ENV=/venv
-# This explicitly set variable and its forceful injection in some places helps
-# to alleviate various venv shortcomings
-ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${PYTHONVERSION}/site-packages:${PYTHONPATH}
 
 # Installing Python libraries
-RUN apk add --update --no-cache librdkafka-dev=~2.1.1
+#   Version of librdkafka-dev depends on Alpine version. confluent-kafka
+#   version in requirements.txt may need to be updated on Alpine version change
+RUN apk add --update --no-cache librdkafka-dev
 COPY uls/requirements.txt /wd/
-RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} build-base expat expat-dev && \
+RUN apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base expat expat-dev && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base expat-dev && \
     rm -f /wd/requirements.txt

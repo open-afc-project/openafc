@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18.11
+FROM python:3.12-alpine3.21
 
 # True if enabled (default is True)
 # ENV RCACHE_ENABLED=True
@@ -56,16 +56,14 @@ ENV RCACHE_ALEMBIC_INITIAL_VERSION=5663cf8afbd7
 # 'head'
 # ENV RCACHE_ALEMBIC_HEAD_VERSION
 
-RUN apk add --update --no-cache python3 curl
-
-# Setting up venv in /venv and 'activating' it
-RUN python3 -m venv /venv
-ENV PATH=/venv/bin:$PATH
-ENV VIRTUAL_ENV=/venv
+RUN apk add --update --no-cache curl
 
 WORKDIR /wd
 
-RUN apk add --update --no-cache librdkafka-dev=~2.1.1
+# Installing Python libraries
+#   Version of librdkafka-dev depends on Alpine version. confluent-kafka
+#   version in requirements.txt may need to be updated on Alpine version change
+RUN apk add --update --no-cache librdkafka-dev
 COPY rcache/requirements.txt /wd
 RUN apk add --update --no-cache python3-dev build-base && \
     pip3 install --root-user-action=ignore  --no-cache-dir -r /wd/requirements.txt && \
@@ -80,6 +78,7 @@ COPY rcache/rcache_app.py rcache/rcache_app.py rcache/rcache_db_async.py \
     rcache/rcache_service.py tools/rcache/rcache_tool.py \
     tools/keyhole/keyhole_gen.py tools/keyhole/keyhole_postgis.template /wd/
 RUN chmod a+x /wd/rcache_tool.py /wd/keyhole_gen.py
+COPY rcache/migrations /wd/migrations
 
 ENTRYPOINT uvicorn rcache_app:app --host 0.0.0.0 --port ${RCACHE_CLIENT_PORT} \
     ${RCACHE_UVICORN_PARAMS}

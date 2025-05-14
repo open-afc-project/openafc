@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 alembic==1.14.0
-confluent-kafka==2.1.1
+confluent-kafka==2.6.1
 distinguishedname==1.0.2
 GeoAlchemy==0.7.2
 GeoAlchemy2==0.12.5

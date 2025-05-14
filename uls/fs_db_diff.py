@@ -496,7 +496,9 @@ class Db:
                  f"FS SQLite database '{filename}' not found")
         self.filename = filename
         try:
-            self._engine = sa.create_engine("sqlite:///" + self.filename)
+            self._engine = \
+                sa.create_engine(f"sqlite:///{self.filename}?mode=ro",
+                                 connect_args={"uri": True})
             self._metadata = sa.MetaData()
             self._metadata.reflect(bind=self._engine)
             self.conn = cast(sa.engine.Connection, self._engine.connect())

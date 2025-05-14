@@ -10,10 +10,9 @@
 
 
 
-FROM osgeo/gdal:alpine-normal-3.6.3
+FROM ghcr.io/osgeo/gdal:alpine-normal-3.10.2
 
-RUN apk add py3-pip
-RUN pip install pyaml jsonschema
+RUN apk add py3-pip py3-yaml py3-jsonschema
 WORKDIR /usr/app
 COPY geoutils.py /usr/app/
 COPY dir_md5.py g8l_info_schema.json /usr/app/

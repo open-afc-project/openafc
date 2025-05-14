@@ -44,7 +44,6 @@ setuptools.setup(
     install_requires=[
         'werkzeug',
         'flask',
-        'flask-script',
         'flask_jsonrpc',
         'flask-user',
         'flask-sqlalchemy',

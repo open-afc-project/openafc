@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18.11
+FROM python:3.12-alpine3.21
 
 # Default Rcache service port
 ENV RCACHE_CLIENT_PORT=8000
@@ -21,12 +21,7 @@ ENV RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
 
 WORKDIR /wd
 
-RUN apk add --update --no-cache python3 curl
-
-# Setting up venv in /venv and 'activating' it
-RUN python3 -m venv /venv
-ENV PATH=/venv/bin:$PATH
-ENV VIRTUAL_ENV=/venv
+RUN apk add --update --no-cache curl
 
 COPY tools/rcache/requirements.txt /wd
 RUN pip3 install --root-user-action=ignore -r /wd/requirements.txt

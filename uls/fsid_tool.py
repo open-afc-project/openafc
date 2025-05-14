@@ -229,12 +229,13 @@ class Db:
     _current_transaction_length   -- Currently used maximum transaction length
     """
 
-    def __init__(self, database_file: str,
+    def __init__(self, database_file: str, read_only: bool,
                  recreate_fsid_table: bool = False) -> None:
         """ Constructor
 
         Arguments:
         database_file       -- SQLite database file
+        read_only           -- Open database for read only
         recreate_fsid_table -- True to create FSID table anew
         """
         error_if(not os.path.isfile(database_file),
@@ -243,7 +244,10 @@ class Db:
         self._conn: sa.engine.Connection = None
         try:
             self._engine = \
-                sa.create_engine("sqlite:///" + self._database_file)
+                sa.create_engine(f"sqlite:///{self._database_file}"
+                                 f"{'?mode=ro' if read_only else ''}",
+                                 **({"connect_args": {"uri": True}}
+                                    if read_only else dict()))
             self._metadata = sa.MetaData()
             self._metadata.reflect(bind=self._engine)
             self._conn = self._engine.connect()
@@ -354,12 +358,12 @@ class Db:
 
 
 def do_check(args: Any) -> None:
-    """Execute "extract" command.
+    """Execute "check" command.
 
     Arguments:
     args -- Parsed command line arguments
     """
-    with Db(args.SQLITE_FILE) as db:
+    with Db(args.SQLITE_FILE, read_only=True) as db:
         if db.fsid_fields() is None:
             print(f"No FSID table in '{args.SQLITE_FILE}'")
             sys.exit(1)
@@ -372,7 +376,7 @@ def do_extract(args: Any) -> None:
     args -- Parsed command line arguments
     """
     try:
-        with Db(args.SQLITE_FILE) as db:
+        with Db(args.SQLITE_FILE, read_only=True) as db:
             fields = db.fsid_fields()
             error_if(fields is None,
                      f"FS database '{args.SQLITE_FILE}' does not contain FSID "
@@ -412,7 +416,8 @@ def do_embed(args: Any) -> None:
     if not scr.is_ok():
         warning(scr.errmsg())
     try:
-        with Db(args.SQLITE_FILE, recreate_fsid_table=True) as db:
+        with Db(args.SQLITE_FILE, recreate_fsid_table=True, read_only=False) \
+                as db:
             with open(args.FSID_FILE, mode="r", newline="", encoding="utf-8") \
                     as f:
                 for csv_dict in csv.DictReader(f):
