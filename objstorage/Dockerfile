@@ -5,34 +5,26 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.21.3
-# This variable should be set to default Python version for chosen Alpine
-# version. Unfortunately there is no way to get it automagically
-ENV PYTHONVERSION=3.12
+FROM python:3.12-alpine3.21
+# This variable should be set to used Python version (major.minor only)
+ENV AFC_PYTHONVERSION=3.12
 
-RUN apk add --update --no-cache python3=~${PYTHONVERSION}
-
-# Setting up venv in /venv and 'activating' it
-RUN python3 -m venv /venv
-ENV PATH=/venv/bin:$PATH
-ENV VIRTUAL_ENV=/venv
-# This explicitly set variable and its forceful injection in some places helps
-# to alleviate various venv shortcomings
-ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${PYTHONVERSION}/site-packages:${PYTHONPATH}
-
-RUN apk add --update --no-cache gcc python3-dev=~${PYTHONVERSION} libc-dev
 
 COPY objstorage/requirements.txt /wd/
-RUN pip3 install --no-cache-dir -r /wd/requirements.txt && \
+RUN apk add --update --no-cache gcc python3-dev libc-dev && \
+    pip3 install --no-cache-dir -r /wd/requirements.txt && \
+    apk del --purge gcc python3-dev libc-dev && \
     rm -f /wd/requirements.txt
 
 COPY objstorage/docker-entrypoint.sh /wd/
 RUN chmod +x /wd/docker-entrypoint.sh
 
 COPY src/afc-packages /wd/afc-packages
-RUN pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
-        -r /wd/afc-packages/pkgs.objstorage \
-    && rm -rf /wd/afc-packages
+RUN apk add --update --no-cache gcc python3-dev libc-dev && \
+    pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
+        -r /wd/afc-packages/pkgs.objstorage && \
+    apk del --purge gcc python3-dev libc-dev && \
+    rm -rf /wd/afc-packages
 
 ENV AFC_OBJST_PORT=${AFC_OBJST_PORT:-"5000"}
 ENV AFC_OBJST_WORKERS=${AFC_OBJST_WORKERS:-10}

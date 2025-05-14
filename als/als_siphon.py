@@ -40,6 +40,7 @@ import sqlalchemy.dialects.postgresql as sa_pg      # type: ignore
 import string
 import subprocess
 import sys
+import time
 from typing import Any, Callable, Dict, Generic, List, NamedTuple, \
     NoReturn, Optional, Set, Tuple, Type, TypeVar, Union
 import urllib.parse
@@ -51,9 +52,6 @@ import utils
 
 # This script version
 VERSION = "0.1"
-
-# Kafka topic for ALS logs
-ALS_KAFKA_TOPIC = "ALS"
 
 # Type for JSON objects
 JSON_DATA_TYPE = Union[Dict[str, Any], List[Any]]
@@ -77,6 +75,9 @@ DEFAULT_KAFKA_SERVER = f"localhost:{KAFKA_PORT}"
 
 # Default Kafka client ID
 DEFAULT_KAFKA_CLIENT_ID = "siphon_@"
+
+# Default ALS topic name in Kafka
+DEFAULT_ALS_TOPIC = "ALS"
 
 
 def dp(*args, **kwargs):
@@ -1417,7 +1418,7 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
                 for value_month in new_value_months:
                     s = sa.select([self._table]).\
                         where(self._value_column == value_month[0])
-                    result = self._adb.conn.execute(s)
+                    result = self._adb.conn.execute(s).fetchall()
                     self._by_value[value_month] = \
                         self._key_from_row(list(result)[0])
         except (sa.exc.SQLAlchemyError, TypeError, ValueError) as ex:
@@ -1448,7 +1449,8 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
             return
         by_key: Dict[Tuple[LookupKey, int], LookupValue] = {}
         try:
-            for row in self._adb.conn.execute(sa.select(self._table)):
+            for row in \
+                    self._adb.conn.execute(sa.select(self._table)).fetchall():
                 key = (self._key_from_row(row),
                        row[AlsTableBase.MONTH_IDX_COL_NAME])
                 value = by_key.get(key)
@@ -1751,8 +1753,9 @@ class TableUpdaterBase(AlsTableBase,
                                          month_idx=month_idx)
         except (LookupError, TypeError, ValueError) as ex:
             raise JsonFormatError(
-                f"Invalid {self._json_obj_name} object format: {ex}",
-                code_line=LineNumber.exc())
+                f"Invalid {self._json_obj_name} object format when updating "
+                f"{self._table_name} table or its subordinates: {ex}",
+                code_line=LineNumber.exc(), data=data_dict)
         if not rows:
             return
         ins = sa_pg.insert(self._table).values(rows).on_conflict_do_nothing()
@@ -2510,7 +2513,7 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
         result_row_idx -- 0-based index in insert results
         Returns the latter
         """
-        ret = result_row[result_row_idx]
+        ret = result_row[0]
         if isinstance(ret, (str, bytes)):
             ret = uuid.UUID(ret)
         return ret
@@ -3046,6 +3049,8 @@ class KafkaClient:
     _subscribe_als           -- True if ALS topic should be subscribed
     _subscribe_log           -- True if log topics should be subscribed
     _metrics                 -- Metric collection
+    _als_topic               -- ALS topic name
+    _json_log_topic_prefix   -- JSON log topic name prefix
     """
     # Kafka message data
     MessageInfo = \
@@ -3098,16 +3103,19 @@ class KafkaClient:
         _ArgDsc(config="auto.offset.reset", default="earliest")]
 
     def __init__(self, args: Any, subscribe_als: bool, subscribe_log: bool,
-                 resubscribe_interval_s: int) -> None:
+                 resubscribe_interval_s: int, als_topic: str,
+                 json_log_topic_prefix: str) -> None:
         """ Constructor
 
         Arguments:
         args                   -- Parsed command line parameters
         subscribe_als          -- True if ALS topic should be subscribed
-        subscribe_log          -- True if log topics should be subscribed
+        subscribe_log          -- True if JSON log topics should be subscribed
         resubscribe_interval_s -- How often (interval in seconds)
                                   subscription_check() will actually check
-                                  subscription. 0 means - on each call.
+                                  subscription. 0 means - on each call
+        als_topic              -- ALS topic name
+        json_log_topic_prefix  -- JSON log topic name prefix
         """
         config: Dict[str, Any] = {}
         for ad in self._ARG_DSCS:
@@ -3136,6 +3144,8 @@ class KafkaClient:
                       "Messages delivered with errors", ["topic", "code"]),
                      ("Gauge", "siphon_comitted_offsets",
                       "Committed Kafka offsets", ["topic", "partition"])])
+        self._als_topic = als_topic
+        self._json_log_topic_prefix = json_log_topic_prefix
 
     def subscription_check(self) -> None:
         """ If it's time - check if new matching topics arrived and resubscribe
@@ -3146,8 +3156,9 @@ class KafkaClient:
         try:
             current_topics: Set[str] = set()
             for topic in self._consumer.list_topics().topics.keys():
-                if (self._subscribe_als and (topic == ALS_KAFKA_TOPIC)) or \
+                if (self._subscribe_als and (topic == self._als_topic)) or \
                         (self._subscribe_log and
+                         topic.startswith(self._json_log_topic_prefix) and
                          (not topic.startswith("__"))):
                     current_topics.add(topic)
             if current_topics <= self._subscribed_topics:
@@ -3168,16 +3179,13 @@ class KafkaClient:
         max_records    -- Maximum number of records to poll
         Returns by-topic dictionary of MessageInfo objects
         """
-        timeout_s = timeout_ms / 1000
         try:
             fetched_offsets: Dict[Tuple[str, int], int] = {}
             ret: Dict[str, List["KafkaClient.MessageInfo"]] = {}
-            start_time = datetime.datetime.now()
+            end_time = time.time() + timeout_ms / 1000
             for _ in range(max_records):
-                message = self._consumer.poll(timeout_s)
-                if (message is None) or \
-                        ((datetime.datetime.now() -
-                          start_time).total_seconds() > timeout_s):
+                message = self._consumer.poll(max(0, end_time - time.time()))
+                if message is None:
                     break
                 kafka_error = message.error()
                 topic = message.topic()
@@ -3200,6 +3208,8 @@ class KafkaClient:
                         fetched_offsets.setdefault((topic, partition), -1)
                     fetched_offsets[(topic, partition)] = \
                         max(previous_offset, offset)
+                if end_time <= time.time():
+                    break
         except confluent_kafka.KafkaException as ex:
             logging.error(f"Message fetch error: {ex.args[0].str}")
             raise
@@ -3233,33 +3243,35 @@ class Siphon:
     """ Siphon (Kafka reader / DB updater
 
     Private attributes:
-    _adb                        -- AlsDatabase object or None
-    _ldb                        -- LogsDatabase object or None
-    _kafka_client               -- KafkaClient consumer wrapper object
-    _decode_error_writer        -- Decode error table writer
-    _lookups                    -- Lookup collection
-    _cert_lookup                -- Certificates' lookup
-    _afc_config_lookup          -- AFC Configs lookup
-    _afc_server_lookup          -- AFC Server name lookup
-    _customer_lookup            -- Customer name lookup
-    _uls_lookup                 -- ULS ID lookup
-    _geo_data_lookup            -- Geodetic Data ID lookup
-    _dev_desc_updater           -- DeviceDescriptor table updater
-    _location_updater           -- Location table updater
-    _compressed_json_updater    -- Compressed JSON table updater
-    _max_eirp_updater           -- Maximum EIRP table updater
-    _max_psd_updater            -- Maximum PSD table updater
-    _req_resp_updater           -- Request/Response table updater
-    _rx_envelope_updater        -- AFC Request envelope table updater
-    _tx_envelope_updater        -- AFC Response envelope table updater
-    _mtls_dn_updater            -- mTLS DN table updater
-    _req_resp_assoc_updater     -- Request/Response to Message association
-                                   table updater
-    _afc_message_updater        -- Message table updater
-    _kafka_positions            -- Nonprocessed Kafka positions' collection
-    _als_bundles                -- Incomplete ALS Bundler collection
-    _metrics                    -- Collection of Prometheus metrics
-    _touch_file                 -- None or file to touch after each poll
+    _adb                     -- AlsDatabase object or None
+    _ldb                     -- LogsDatabase object or None
+    _kafka_client            -- KafkaClient consumer wrapper object
+    _decode_error_writer     -- Decode error table writer
+    _lookups                 -- Lookup collection
+    _cert_lookup             -- Certificates' lookup
+    _afc_config_lookup       -- AFC Configs lookup
+    _afc_server_lookup       -- AFC Server name lookup
+    _customer_lookup         -- Customer name lookup
+    _uls_lookup              -- ULS ID lookup
+    _geo_data_lookup         -- Geodetic Data ID lookup
+    _dev_desc_updater        -- DeviceDescriptor table updater
+    _location_updater        -- Location table updater
+    _compressed_json_updater -- Compressed JSON table updater
+    _max_eirp_updater        -- Maximum EIRP table updater
+    _max_psd_updater         -- Maximum PSD table updater
+    _req_resp_updater        -- Request/Response table updater
+    _rx_envelope_updater     -- AFC Request envelope table updater
+    _tx_envelope_updater     -- AFC Response envelope table updater
+    _mtls_dn_updater         -- mTLS DN table updater
+    _req_resp_assoc_updater  -- Request/Response to Message association table
+                                updater
+    _afc_message_updater     -- Message table updater
+    _kafka_positions         -- Nonprocessed Kafka positions' collection
+    _als_bundles             -- Incomplete ALS Bundler collection
+    _metrics                 -- Collection of Prometheus metrics
+    _touch_file              -- None or file to touch after each poll
+    _als_topic               -- ALS topic name
+    _json_log_topic_prefix   -- JSON log topic name prefix
     """
     # Number of messages fetched from Kafka in single access
     KAFKA_MAX_RECORDS = 1000
@@ -3271,13 +3283,16 @@ class Siphon:
     ALS_MAX_REQ_UPDATE = 5000
 
     def __init__(self, adb: Optional[AlsDatabase], ldb: Optional[LogsDatabase],
-                 kafka_client: KafkaClient, touch_file: Optional[str]) -> None:
+                 kafka_client: KafkaClient, touch_file: Optional[str],
+                 als_topic: str, json_log_topic_prefix: str) -> None:
         """ Constructor
 
         Arguments:
-        adb          -- AlsDatabase object or None
-        ldb          -- LogsDatabase object or None
-        kafka_client -- KafkaClient
+        adb                   -- AlsDatabase object or None
+        ldb                   -- LogsDatabase object or None
+        kafka_client          -- KafkaClient
+        als_topic             -- ALS topic name
+        json_log_topic_prefix -- JSON log topic name prefix
         """
         error_if(not (adb or ldb),
                  "Neither ALS nor Logs database specified. Nothing to do")
@@ -3307,6 +3322,8 @@ class Siphon:
         self._adb = adb
         self._ldb = ldb
         self._kafka_client = kafka_client
+        self._als_topic = als_topic
+        self._json_log_topic_prefix = json_log_topic_prefix
         if self._adb:
             self._decode_error_writer = DecodeErrorTableWriter(adb=self._adb)
             self._lookups = Lookups()
@@ -3386,7 +3403,7 @@ class Siphon:
 
             busy = bool(kafka_messages_by_topic)
             for topic, kafka_messages in kafka_messages_by_topic.items():
-                if topic == ALS_KAFKA_TOPIC:
+                if topic == self._als_topic:
                     self._read_als_kafka_messages(kafka_messages)
                 else:
                     self._process_log_kafka_messages(topic, kafka_messages)
@@ -3396,7 +3413,7 @@ class Siphon:
                 busy |= self._commit_kafka_offsets()
             self._kafka_client.subscription_check()
             if self._touch_file:
-                with open(self._touch_file, 'a'):
+                with open(self._touch_file, 'a', encoding="ascii"):
                     os.utime(self._touch_file, None)
 
     def _read_als_kafka_messages(
@@ -3404,7 +3421,6 @@ class Siphon:
         """ Put fetched ALS Kafka messages to store of incomplete bundles
 
         Arguments:
-        topic          -- ALS Topic name
         kafka_messages -- List of raw Kafka messages
         """
         for kafka_message in kafka_messages:
@@ -3432,7 +3448,7 @@ class Siphon:
         """ Process non-ALS (i.e. JSON Log) messages for one topic
 
         Arguments:
-        topic          -- ALS Topic name
+        topic          -- JSON log topic name
         kafka_messages -- List of Kafka messages
         """
         records: List[LogsDatabase.Record] = []
@@ -3457,7 +3473,9 @@ class Siphon:
             transaction: Optional[Any] = None
             try:
                 transaction = self._ldb.conn.begin()
-                self._ldb.write_log(topic=topic, records=records)
+                self._ldb.write_log(
+                    topic=topic[len(self._json_log_topic_prefix):],
+                    records=records)
                 transaction.commit()
                 transaction = None
             finally:
@@ -3495,6 +3513,9 @@ class Siphon:
             self._lookups.reread()
             self._decode_error_writer.write_decode_error(
                 ex.msg, line=ex.code_line, data=ex.data)
+        except DbFormatError as ex:
+            self._metrics.siphon_als_malformed().inc()
+            logging.error(f"Error writing ALS database: {repr(ex)}")
         finally:
             if transaction is not None:
                 transaction.rollback()
@@ -3627,9 +3648,11 @@ def do_siphon(args: Any) -> None:
         kafka_client = \
             KafkaClient(args=args, subscribe_als=adb is not None,
                         subscribe_log=ldb is not None,
-                        resubscribe_interval_s=5)
+                        resubscribe_interval_s=5, als_topic=args.als_topic,
+                        json_log_topic_prefix=args.json_topic_prefix)
         siphon = Siphon(adb=adb, ldb=ldb, kafka_client=kafka_client,
-                        touch_file=args.touch_file)
+                        touch_file=args.touch_file, als_topic=args.als_topic,
+                        json_log_topic_prefix=args.json_topic_prefix)
         siphon.main_loop()
     finally:
         if adb is not None:
@@ -3739,6 +3762,14 @@ def main(argv: List[str]) -> None:
         "--kafka_max_partition_fetch_bytes", metavar="SIZE_IN_BYTES",
         type=docker_arg_type(int),
         help="Maximum size of Kafka message (default is 1MB)")
+    switches_kafka.add_argument(
+        "--als_topic", metavar="KAFKA_ALS_TOPIC",
+        type=docker_arg_type(str, default=DEFAULT_ALS_TOPIC),
+        help=f"Kafka topic for ALS data. Default is '{DEFAULT_ALS_TOPIC}'")
+    switches_kafka.add_argument(
+        "--json_topic_prefix", metavar="JSON_LOGS_TOPIC_PREFIX",
+        type=docker_arg_type(str, default=""),
+        help="Prefix to use for JSON LOG kafka topic names. Default is ''")
 
     switches_als_db = argparse.ArgumentParser(add_help=False)
     switches_als_db.add_argument(

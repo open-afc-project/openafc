@@ -561,7 +561,9 @@ def get_uls_identity(uls_file: str) -> Optional[Dict[str, str]]:
     """
     if not os.path.isfile(uls_file):
         return None
-    engine = sa.create_engine("sqlite:///" + uls_file)
+    engine = \
+        sa.create_engine(f"sqlite:///{uls_file}?mode=ro",
+                         connect_args={"uri": True})
     conn = engine.connect()
     try:
         metadata = sa.MetaData()
@@ -851,7 +853,9 @@ class ExtParamFilesChecker:
                         # Location in the internet
                         ("base_url", str),
                         # Downloader script subdirectory
-                        ("subdir", str), ("files", List[str])])
+                        ("subdir", str),
+                        # List of files
+                        ("files", List[str])])
 
     def __init__(self, status_updater: StatusUpdater,
                  ext_files_arg: Optional[List[str]] = None,
@@ -897,17 +901,21 @@ class ExtParamFilesChecker:
                         internal_file_name = \
                             os.path.join(self._script_dir, epf.subdir,
                                          filename)
+                        url = f"{epf.base_url}/{filename}"
                         if not os.path.isfile(internal_file_name):
-                            errmsg = "Absent in container"
+                            errmsg = f"'{internal_file_name}' not foound in " \
+                                f"container. It should be downloaded from " \
+                                f"'{url}', verified and added to image"
                             continue
                         try:
-                            url = f"{epf.base_url}/{filename}"
                             external_file_name = os.path.join(temp_dir,
                                                               filename)
                             urllib.request.urlretrieve(url, external_file_name)
                         except urllib.error.URLError as ex:
                             logging.warning(f"Error downloading '{url}': {ex}")
-                            errmsg = "Download failed"
+                            errmsg = f"Error downloading '{url}': {ex}, so " \
+                                f"it was not compared with " \
+                                f"'{internal_file_name}'. Maybe next time..."
                             continue
                         contents: List[bytes] = []
                         try:
@@ -916,10 +924,13 @@ class ExtParamFilesChecker:
                                     contents.append(f.read())
                         except OSError as ex:
                             logging.warning(f"Read failed: {ex}")
-                            errmsg = "Read failed"
-                            continue
+                            errmsg = f"Can't read '{fn}', so '{url}' was " \
+                                f"not compared with '{internal_file_name}'"
                         if contents[0] != contents[1]:
-                            errmsg = "External content changed"
+                            errmsg = f"Content of '{url}' differs from " \
+                                f"'{internal_file_name}'. Former should be " \
+                                f"downloaded, verified and added to image " \
+                                f"as latter"
                     finally:
                         check_results[os.path.join(epf.subdir, filename)] = \
                             errmsg

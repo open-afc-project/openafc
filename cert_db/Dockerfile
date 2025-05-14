@@ -6,28 +6,21 @@
 #
 # Install required packages
 #
-FROM alpine:3.21.3
-# This variable should be set to default Python version for chosen Alpine
-# version. Unfortunately there is no way to get it automagically
-ENV PYTHONVERSION=3.12
+FROM python:3.12-alpine3.21
+# This variable should be set to used Python version (major.minor only)
+ENV AFC_PYTHONVERSION=3.12
 
 ENV PYTHONUNBUFFERED=1
-RUN apk add --update --no-cache python3=~${PYTHONVERSION}
 
-# Setting up venv in /venv and 'activating' it
-RUN python3 -m venv /venv
-ENV PATH=/venv/bin:$PATH
-ENV VIRTUAL_ENV=/venv
-# This explicitly set variable and its forceful injection in some places helps
-# to alleviate various venv shortcomings
-ENV PYTHONPATH=/venv/lib/python${PYTHONVERSION}/site-packages:/usr/lib/python${PYTHONVERSION}/site-packages:${PYTHONPATH}
+# CMake installs packages to /usr/lib even though this image uses /usr/local/lib
+ENV PYTHONPATH=/usr/lib/python${AFC_PYTHONVERSION}/site-packages:/usr/local/lib/python${AFC_PYTHONVERSION}/site-packages:${PYTHONPATH}
 
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka
 #   version in requirements.txt may need to be updated on Alpine version change
 RUN apk add --update --no-cache librdkafka-dev
 COPY cert_db/requirements.txt /wd/
-RUN apk add --update --no-cache python3-dev=~${PYTHONVERSION} build-base && \
+RUN apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
 
@@ -73,26 +66,20 @@ chown fbrat:fbrat /var/lib/fbrat
 ENV RCACHE_ENABLED=False
 # Space-separated list of regions to sweep
 ENV SWEEP_REGIONS="US CA"
-# Sweep periodicity in /etc/periodic units (15min,hourly,daily,weekly,monthly)
-ENV SWEEP_PERIOD=daily
+# DDelay before first sweep
+ENV SWEEP_DELAY=20s
+# Sweep periodicity in sleep units
+ENV SWEEP_PERIOD=1d
 # REST request timeout in seconds
 ENV REQUEST_TIMEOUT_SEC=500
-# Make all environment variables available to cronjobs
-RUN env >> /etc/environment
 
 LABEL revision="afc-cert_db"
 WORKDIR /wd
-COPY cert_db/entrypoint.sh /
-# Add debugging env if configured
-ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
-COPY cert_db/devel.sh cert_db/sweep.sh /wd/
-RUN chmod +x /wd/devel.sh /wd/sweep.sh
+ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
+COPY cert_db/entrypoint.sh cert_db/devel.sh cert_db/sweep.sh /wd/
+RUN chmod +x /wd/devel.sh /wd/sweep.sh /wd/entrypoint.sh
 RUN /wd/devel.sh
 #
-RUN mkdir -p /etc/periodic/$SWEEP_PERIOD
-RUN ln -s /wd/sweep.sh /etc/periodic/$SWEEP_PERIOD/sweep.sh
-RUN chmod 744 /etc/periodic/$SWEEP_PERIOD/sweep.sh
-RUN chmod +x /entrypoint.sh
-CMD ["/entrypoint.sh"]
+CMD ["/wd/entrypoint.sh"]
 
 HEALTHCHECK --start-period=30m CMD test `find /wd/touchfile -mtime -3`
