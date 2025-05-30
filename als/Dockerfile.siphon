@@ -107,7 +107,6 @@ COPY als/als_migrations $WORKDIR/als_migrations/
 COPY als/als_db_schema/ALS.sql $WORKDIR/als_db_schema/
 
 RUN chmod a+x $WORKDIR/als_*.py
-COPY als/ALS.sql $WORKDIR/
 
 ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_servers=$KAFKA_SERVERS \
