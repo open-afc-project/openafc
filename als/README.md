@@ -8,6 +8,8 @@ License, a copy of which is included with this software program.
 ## Table of Contents
 - [Databases ](#databases)
   - [`ALS` Database ](#als_database)
+    - [Partitioning](#als_partitioning)
+    - [Updating database schema](#als_schema_update)
   - [`AFC_LOGS` database ](#afc_logs_database)
 - [`als_siphon.py` - moving logs from Kafka to Postgres](#als_siphon_py)
 - [`als_query.py` - querying logs from Postgres databases](#als_query_py)
@@ -19,8 +21,12 @@ License, a copy of which is included with this software program.
   - [`als` subcommand ](#als_query_als)
     - [`als` subcommand examples ](#als_query_als_examples)
   - [`timezones` subcommand ](#als_query_timezones)
-  - [`help` subcommand ](#als_query_help)
-
+  - [`help` subcommand](#als_query_help)
+- [`als_db_tool.py` script](#als_db_tool)
+  - [`prepare_sql` subcommand](#als_db_tool_prepare_sql)
+  - [`add_partitions` subcommand](#als_db_tool_add_partitions)
+  - [`partition_info` subcommand](#als_db_tool_partition_info)
+  - [`remove_partitions` subcommand](#als_db_tool_remove_partitions)
 
 ## Databases <a name="databases">
 
@@ -28,24 +34,27 @@ ALS (AFC Log Storage) functionality revolves around two PostgreSQL databases, us
 
 ### `ALS` database <a name="als_database">
 
-Stores log of AFC Request/Response/Config data. Has rather convoluted multitable structure.
+Stores log of AFC Request/Response/Config data. Has rather convoluted multitable structure (see `als/als_db_schema/ALS.PNG`)
 
-SQL code for creation of this database contained in `ALS.sql` file. This file should be considered generated and not be manually edited.
+#### Partitioning <a name="als_partitioning">
 
-`als_db_schema` folder contains source material for `ALS.sql` generation:
+Since ALS database stores every ALS request and response, over time it may become rather large. To avoid its unlimited grouth and simplifying deletion of older data, ALS database is partitioned - each table is stored in per-month partitions.
 
-- `ALS.dbml`. Source file for [dbdiagram.io](https://dbdiagram.io) DB diagramming site. Copy/paste content of this file there, make modifications, then copy/paste back to this file.  
-  Also upon completion *ALS_raw.sql* and *ALS.png* should be exported (as *Export to PostgreSQL* and *Export to PNG* respectively) - see below.
+Partitions for future months should be preacreated ahead of time. `als_siphon` container (aka `als-siphon` pod) on each (re)start ensures that there partitions for **`AFC_ALS_MONTH_PARTITIONS_AHEAD`** (environment variable) future months are created.
 
-- `ALS_raw.sql`. Database creation SQL script that should be exported from [dbdiagram.io](https://dbdiagram.io) after changes made to `ALS.dbml`.  
-  This file is almost like final *ALS.sql*, but requires certain tweaks:
-    * Declaring used PostgreSQL extensions (PostGIS in this case)
-    * Removal of many-to-many artifacts. For many-to-many relationships [dbdiagram.io](https://dbdiagram.io) creates artificial tables that are, adding insult to injury, violate PostgreSQL syntax. They are not used and should be removed.
-    * Segmentation. Database is planned with segmentation in mind (by `month_idx` field). But segmentation itself not performed. This will need to be done eventually.
+Removal of old partitions is a manual operation - see `als_db_tool.py remove_partitions ...` described later.
 
-- `als_rectifier.awk` AWK script for converting `ALS_raw.sql` to `ALS.sql`.
+#### Updating database schema <a name="als_schema_update">
 
-- `ALS.png` Picturesque database schema. Should be exported as PNG after changes, made to `ALS.dbml`.
+ALS database schema described in `als/als_db_schema/ALS.dbml` - this is a primary source data. Its updating involves following steps:
+
+1. On [https://dbdiagram.io](https://dbdiagram.io) press ***Go To App*** button and copypaste contents of `ALS.dbml` into left pane.
+2. Make changes, arrange right-side schema picture nicely.
+3. Copyaste changed schema back to `als/als_db_schema/ALS.dbml`
+4. ***Export / To PNG*** updated schema picture to `als/als_db_schema/ALS.png`
+5. ***Export / To PostgreSQL*** updated schema to `als/als_db_schema/ALS.sql`.  
+Please note that resulting `.sql` file is not partitioned - partitions are added on the fly on database creation on `als_siphon` container start
+6. Add Alembic migration script to `als/als_migrations/versions`
 
 ### `AFC_LOGS` database <a name="afc_logs_database">
 
@@ -291,3 +300,49 @@ Print help on given subcommand:
 
 - Print help midway of entering command - just insert 'help' before subcommand name, every thing past it will be ignored:  
   `als_query.py help als --decode_errors --max_age `
+
+
+## `als_db_tool.py` script <a name="als_db_tool">
+
+This script (and its accompanying `als_db_tool.yaml` parameter file) provide functionality, related to ALS database partitioning.
+
+It is contained in `als_siphon` container (aka `als-siphon` pod) thus taking ALS database DSN and password file parameters from environment variables.
+
+### `prepare_sql` subcommand <a name="als_db_tool_prepare_sql">
+
+This subcommand used internally on container startup and migration script that added partitioning. See help message for more information.
+
+### `add_partitions` subcommand <a name="als_db_tool_add_partitions">
+
+Adds partitions for future months. Since this operation automagically performed on container (re)start and may be controlled by **`AFC_ALS_MONTH_PARTITIONS_AHEAD`** environment variable there is no point in going to deatils either. See help message for more information.
+
+### `partition_info` subcommand <a name="als_db_tool_partition_info">
+
+Prints information about partition tables and their parents
+
+```als_db_tool.py partition_info [OPTIONS]```
+
+Options are:
+
+|Option|Meaning|
+|------|-------|
+|--dsn **DSN**|DSN of ALS database (possibly without password or with default passwrd). By default taken from  `POSTGRES_ALS_CONN_STR` environment variable|
+|--password_file **FILENAME**|File with ALS database password. By default taken from `POSTGRES_ALS_PASSWORD_FILE` environment variable|
+|--by_parent|Print per-parent-table information of oldest and farthest in the future partition. By default print list of partition tables|
+
+### `remove_partitions` subcommand <a name="als_db_tool_remove_partitions">
+
+Removes all partition tables
+
+```als_db_tool.py remove_partitions [OPTIONS]```
+
+Options are:
+
+|Option|Meaning|
+|------|-------|
+|--dsn **DSN**|DSN of ALS database (possibly without password or with default passwrd). By default taken from  `POSTGRES_ALS_CONN_STR` environment variable|
+|--password_file **FILENAME**|File with ALS database password. By default taken from `POSTGRES_ALS_PASSWORD_FILE` environment variable|
+|--keep_months **NUMBER_OF_MONTHS**|Delete all partitions older than given number of months|
+|--keep_from **YEAR-MONTH**|Delete all partitions older than given month of given year|
+
+
