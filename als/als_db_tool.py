@@ -182,7 +182,6 @@ def do_prepare_sql(cfg: Dict[str, Any], args: argparse.Namespace) -> None:
             print(table)
 
 
-
 # Information about single partition table
 PartitionInfo = \
     NamedTuple("PartitionInfo", [("month_idx", int), ("table_name", str)])

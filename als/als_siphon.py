@@ -83,6 +83,7 @@ DEFAULT_ALS_TOPIC = "ALS"
 # Default number of monthly partitions ahead to ensure
 DEFAULT_ALS_MONTHS_AHEAD = 6
 
+
 def dp(*args, **kwargs):
     """Print debug message
 
