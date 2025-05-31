@@ -110,12 +110,7 @@ class AfcCertResp:
             explanation="certificate denied"),
          DenyCriterion(
             predicate=lambda cr: getattr(cr, "serial_denied"),
-            explanation="AP serial number denied"),
-         DenyCriterion(
-            predicate=lambda cr:
-                ((getattr(cr, "location_flags") or 0) &
-                 hardcoded_relations.CERT_ID_LOCATION_OUTDOOR) == 0,
-            explanation="outdoor operation not allowed")]
+            explanation="AP serial number denied")]
 
     def __init__(self, bypass_checks: Optional[AfcCertReq] = None) -> None:
         """Constructor
