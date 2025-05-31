@@ -452,9 +452,7 @@ class RatAfc(MethodView):
                          self.__class__, inspect.stack()[0][3],
                          certId.certification_id)
 
-        if not certId.location & CERT_ID_LOCATION_OUTDOOR:
-            raise DeviceUnallowedException("Outdoor operation not allowed")
-        elif certId.location & CERT_ID_LOCATION_INDOOR:
+        if certId.location & CERT_ID_LOCATION_INDOOR:
             indoor_certified = True
         else:
             indoor_certified = False
