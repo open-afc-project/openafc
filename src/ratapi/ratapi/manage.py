@@ -944,7 +944,8 @@ class CertIdSweep:
                             if code == 103:
                                 location = CERT_ID_LOCATION_OUTDOOR
                             elif code == 111:
-                                location = CERT_ID_LOCATION_INDOOR
+                                location = CERT_ID_LOCATION_INDOOR | \
+                                    CERT_ID_LOCATION_OUTDOOR
                             else:
                                 location = CERT_ID_LOCATION_UNKNOWN
                             if not location == CERT_ID_LOCATION_UNKNOWN:
@@ -1026,7 +1027,7 @@ class CertIdSweep:
                                            for note_info in
                                            spec_info.get('lNotes', {}).
                                            get('notes', [])):
-                                        location = CERT_ID_LOCATION_INDOOR
+                                        location |= CERT_ID_LOCATION_INDOOR
                                         break
                                 cert = CertId.query.filter_by(
                                     certification_id=fcc_id).first()
