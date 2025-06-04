@@ -649,6 +649,7 @@ components:
     env:
       KAFKA_SERVERS: "{{host:als-kafka}}:{{port:als-kafka:kafka}}"
       INIT_IF_EXISTS: skip
+      AFC_ALS_MONTH_PARTITIONS_AHEAD: 6
     sharedEnvKeys:
       - als-kafka-common
       - als-db
