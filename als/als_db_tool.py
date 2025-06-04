@@ -277,7 +277,7 @@ def do_add_partitions(cfg: Dict[str, Any], args: argparse.Namespace) -> None:
                                                       month_idx=month_idx)
             db.execute(
                 f"CREATE TABLE IF NOT EXISTS {partition_name} "
-                f"PARTITION ON {parent_table} FOR VALUES IN ({month_idx});")
+                f"PARTITION OF {parent_table} FOR VALUES IN ({month_idx});")
 
 
 def do_remove_partitions(cfg: Dict[str, Any], args: argparse.Namespace) \
@@ -439,7 +439,7 @@ def main(argv: List[str]) -> None:
         help="Remove older partitions from ALS database")
     parser_remove_partitions.add_argument(
         "--keep_months", metavar="MONTHS_TO_KEEP", type=int,
-        help="How many months to keep in the ALS database (1 - only the "
+        help="How many past months to keep in the ALS database (1 - only the "
         "current)")
     parser_remove_partitions.add_argument(
         "--keep_from", metavar="YEAR-MONTH",
