@@ -26,8 +26,8 @@ case "$AFC_DEVEL_ENV" in
 esac
 
 
-rat-manage-api db-create --if_absent
-rat-manage-api db-upgrade
+rat-manage-api db-create --if_absent || exit 1
+rat-manage-api db-upgrade || exit 1
 
 postfix start &
 exec gunicorn \
