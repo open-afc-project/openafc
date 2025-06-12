@@ -152,12 +152,13 @@ CREATE TABLE "afc_server" (
 );
 
 CREATE TABLE "decode_error" (
-  "id" bigserial PRIMARY KEY,
+  "id" bigserial,
   "time" timestamptz,
   "msg" text,
   "code_line" integer,
   "data" text,
-  "month_idx" smallint
+  "month_idx" smallint,
+  PRIMARY KEY ("id", "month_idx")
 );
 
 CREATE INDEX ON "afc_message" ("rx_time");
