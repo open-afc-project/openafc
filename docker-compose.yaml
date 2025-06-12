@@ -56,6 +56,7 @@ services:
 
   rat_server:
     image: ${PRIV_REPO:-ghcr.io/open-afc-project}/webui-image:${TAG:-latest}
+    restart: always
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
       - ./pipe:/pipe
