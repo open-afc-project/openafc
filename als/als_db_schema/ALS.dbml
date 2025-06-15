@@ -7,7 +7,15 @@
 // Schema of AFC Request/response/config log database
 // This file is a DBML source code for visualizing database scheme in dbdiagram.io
 
-// Read als_rectifier.awk for update instructions
+// DATABASE SCHEMA UPDATE
+
+// 1. Open dbdiagram.io, press "Go To App" button"
+// 2. Copypaste this file to schem description (left part)
+// 3. Make necessary changes, arrange picture (right part) nicely
+// 4. Copypaste upated schema description (left part) to als/als_db_schema/ALS.dbml
+// 5. Save picture (Export -> To PNG) to als/als_db_schema/ALS.png
+// 6. Save SQL (Export -> To PostgreSQL) to ala/als_db_schema/ALS.sql
+// 7. Rebuild als_siphon image
 
 // Table, containing a record for each request messgae/response message/config(s) set
 table afc_message [headercolor: #000000, note: 'AFC Request/Response message pair (contain individual requests/responses)'] {

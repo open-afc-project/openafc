@@ -40,6 +40,7 @@ import sqlalchemy.dialects.postgresql as sa_pg      # type: ignore
 import string
 import subprocess
 import sys
+import tempfile
 import time
 from typing import Any, Callable, Dict, Generic, List, NamedTuple, \
     NoReturn, Optional, Set, Tuple, Type, TypeVar, Union
@@ -78,6 +79,9 @@ DEFAULT_KAFKA_CLIENT_ID = "siphon_@"
 
 # Default ALS topic name in Kafka
 DEFAULT_ALS_TOPIC = "ALS"
+
+# Default number of monthly partitions ahead to ensure
+DEFAULT_ALS_MONTHS_AHEAD = 6
 
 
 def dp(*args, **kwargs):
@@ -301,12 +305,6 @@ def jdt(dt: Any) -> datetime.datetime:
     if not isinstance(dt, datetime.datetime):
         raise TypeError(f"Unexpected '{dt}'. Should be datetime")
     return dt
-
-
-def get_month_idx() -> int:
-    """ Computes month index """
-    d = datetime.datetime.now()
-    return (d.year - 2022) * 12 + (d.month - 1)
 
 
 class Metrics:
@@ -1759,6 +1757,7 @@ class TableUpdaterBase(AlsTableBase,
         if not rows:
             return
         ins = sa_pg.insert(self._table).values(rows).on_conflict_do_nothing()
+
         if self._data_key_columns:
             ins = ins.returning(*self._data_key_columns)
         try:
@@ -2757,15 +2756,21 @@ class DecodeErrorTableWriter(AlsTableBase):
         if isinstance(data, bytes):
             data = data.decode("latin-1")
         elif isinstance(data, (list, dict)):
-            data = json.dumps(data)
+            data = json.dumps(data, default=self._serializer)
         ins = sa.insert(self._table).values(
-            {ms(self._col_month_idx.name): get_month_idx(),
+            {ms(self._col_month_idx.name): utils.get_month_idx(),
              ms(self._col_msg.name): msg,
              ms(self._col_line.name): line,
              ms(self._col_data.name): data,
              ms(self._col_time.name):
              datetime.datetime.now(dateutil.tz.tzlocal())})
         self._conn.execute(ins)
+
+    def _serializer(self, obj: Any) -> Any:
+        """ Serializer of non-JSON-ABLE objects """
+        if isinstance(obj, AlsMessageBundle):
+            return obj.dump()
+        raise TypeError(f"Can't (yet) serialize object of type {type(obj)}")
 
 
 class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
@@ -3487,7 +3492,7 @@ class Siphon:
         """ Write complete ALS Bundles to ALS database.
         Returns True if any work was done """
         assert self._adb is not None
-        month_idx = get_month_idx()
+        month_idx = utils.get_month_idx()
         transaction: Optional[Any] = None
         try:
             data_dict = \
@@ -3567,11 +3572,6 @@ def read_sql_file(sql_file: str) -> str:
         replacer, content, flags=re.DOTALL | re.MULTILINE)
 
 
-ALS_PATCH = \
-    ["ALTER TABLE afc_server DROP CONSTRAINT IF EXISTS "
-     "afc_server_afc_server_name_key"]
-
-
 def do_init_db(args: Any) -> None:
     """Execute "init" command.
 
@@ -3580,51 +3580,79 @@ def do_init_db(args: Any) -> None:
     """
     databases: Set[DatabaseBase] = set()
     try:
-        nothing_done = True
-        patch: List[str]
-        for conn_str, password_file, sql_file, db_class, sql_required, patch, \
-                alembic_config, alembic_initial_version, alembic_head_version \
-                in [(args.als_postgres, args.als_postgres_password_file,
-                     args.als_sql, AlsDatabase, True, ALS_PATCH,
-                     args.als_alembic_config, args.als_alembic_initial_version,
-                     args.als_alembic_head_version),
-                    (args.log_postgres, args.log_postgres_password_file,
-                     args.log_sql, LogsDatabase, False, [], None, None, None)]:
-            if not (conn_str or sql_file):
-                continue
-            nothing_done = False
-            error_if(sql_file and (not os.path.isfile(sql_file)),
-                     f"SQL file '{sql_file}' not found")
-            error_if(
-                sql_required and not sql_file,
-                f"SQL file is required for {db_class.name_for_logs()} "
-                f"database")
-            created = \
-                db_class.create_db(
-                    arg_conn_str=conn_str, arg_password_file=password_file,
-                    recreate=args.recreate)
-            try:
-                db = db_class(arg_conn_str=conn_str,
-                              arg_password_file=password_file)
-                databases.add(db)
-                with db.engine.connect() as conn:
-                    if created and sql_file:
-                        conn.execute(sa.text(read_sql_file(sql_file)))
-                    if not created:
-                        for cmd in patch:
-                            conn.execute(sa.text(cmd))
-            except sa.exc.SQLAlchemyError as ex:
-                error(f"{db_class.name_for_logs()} database initialization "
-                      f"failed: {ex}")
-            if alembic_config:
-                err = \
-                    db_utils.alembic_ensure_version(
-                        alembic_config=alembic_config,
-                        existing_database=not created,
-                        initial_version=alembic_initial_version,
-                        head_version=alembic_head_version)
-                error_if(err, err)
-        error_if(nothing_done, "Nothing to do")
+        with tempfile.TemporaryDirectory(prefix="als_") as tempdir:
+            nothing_done = True
+            als_sql_file: Optional[str] = None
+            als_maintenance_cmd: List[str] = []
+            if args.als_sql and (args.als_months_ahead is not None):
+                als_sql_file = os.path.join(tempdir, "als.sql")
+                execute(
+                    ["als_db_tool.py", "prepare_sql",
+                     "--months_ahead", str(args.als_months_ahead),
+                     args.als_sql, als_sql_file])
+                als_maintenance_cmd = \
+                    ["als_db_tool.py", "add_partitions",
+                     "--months_ahead", str(args.als_months_ahead)]
+            for conn_str, password_file, sql_file, db_class, sql_required, \
+                    maintenance_cmd, alembic_config, alembic_initial_version, \
+                    alembic_head_version, sample_table \
+                    in [(args.als_postgres, args.als_postgres_password_file,
+                         als_sql_file, AlsDatabase, True, als_maintenance_cmd,
+                         args.als_alembic_config,
+                         args.als_alembic_initial_version,
+                         args.als_alembic_head_version,
+                         AfcMessageTableUpdater.TABLE_NAME),
+                        (args.log_postgres, args.log_postgres_password_file,
+                         args.log_sql, LogsDatabase, False, [], None, None,
+                         None, None)]:
+                if not conn_str:
+                    logging.warning(
+                        f"{db_class.name_for_logs()} database will not be "
+                        f"written to because database DSN not specified")
+                    continue
+                if sql_required and (not sql_file):
+                    logging.warning(
+                        f"{db_class.name_for_logs()} database will not be "
+                        f"written to because SQL file not provided")
+                    continue
+                nothing_done = False
+                error_if(sql_file and (not os.path.isfile(sql_file)),
+                         f"SQL file '{sql_file}' not found")
+                created = \
+                    db_class.create_db(
+                        arg_conn_str=conn_str, arg_password_file=password_file,
+                        recreate=args.recreate)
+                try:
+                    db = db_class(arg_conn_str=conn_str,
+                                  arg_password_file=password_file)
+                    if (not created) and sample_table:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(
+                                    sa.text(f"SELECT 1 FROM {sample_table}"))
+                        except sa.exc.SQLAlchemyError:
+                            created = True
+                    databases.add(db)
+                    with db.engine.connect() as conn:
+                        if created and sql_file:
+                            for stmt in re.split(r"(?<=;)\s*",
+                                                 read_sql_file(sql_file)):
+                                if stmt:
+                                    conn.execute(sa.text(stmt))
+                except sa.exc.SQLAlchemyError as ex:
+                    error(f"{db_class.name_for_logs()} database "
+                          f"initialization failed: {ex}")
+                if alembic_config:
+                    err = \
+                        db_utils.alembic_ensure_version(
+                            alembic_config=alembic_config,
+                            existing_database=not created,
+                            initial_version=alembic_initial_version,
+                            head_version=alembic_head_version)
+                    error_if(err, err)
+                if (not created) and maintenance_cmd:
+                    execute(maintenance_cmd)
+            error_if(nothing_done, "Nothing to do")
     finally:
         for db in databases:
             db.dispose()
@@ -3812,9 +3840,9 @@ def main(argv: List[str]) -> None:
         "database")
     switches_init.add_argument(
         "--als_sql", metavar="SQL_FILE", type=docker_arg_type(str),
-        help="SQL command file that creates tables, relations, etc. in ALS "
-        "database. If neither this parameter nor --als_postgres is specified "
-        "ALS database is not being created")
+        help="SQL file (presumably from dbdiagram.io) that creates "
+        "nonpartitioned ALS database tables, relations, etc. (partitioning is "
+        "added on the fly)")
     switches_init.add_argument(
         "--log_sql", metavar="SQL_FILE", type=docker_arg_type(str),
         help="SQL command file that creates tables, relations, etc. in JSON "
@@ -3830,6 +3858,12 @@ def main(argv: List[str]) -> None:
         type=docker_arg_type(str),
         help="Alembic version to stamp on existing ALS database if it doesn't "
         "have any")
+    switches_init.add_argument(
+        "--als_months_ahead", type=docker_arg_type(int),
+        default=DEFAULT_ALS_MONTHS_AHEAD,
+        help=f"Ensure that at this number of monthly partitions for month "
+        f"ahead is created on each container start. Default is "
+        f"{DEFAULT_ALS_MONTHS_AHEAD}")
     switches_init.add_argument(
         "--als_alembic_head_version", metavar="HEAD_ALS_ALEMBIC_VERSION",
         type=docker_arg_type(str),

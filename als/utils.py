@@ -8,11 +8,15 @@
 
 # pylint: disable=wrong-import-order, too-many-arguments
 
+import datetime
 import os
 from typing import Optional
 import urllib.parse
 
 import db_utils
+
+# Starting year for month indexes
+MONTH_IDX_BASE_YEAR = 2022
 
 # Connection string scheme that should be ultimately used
 ACTUAL_SCHEME = "postgresql+psycopg2"
@@ -73,3 +77,17 @@ def dsn(*, name_for_logs: str, arg_dsn: Optional[str] = None,
             dsn=arg_parts.geturl(),
             password_file=password_file or
             (os.environ.get(password_file_env) if password_file_env else None))
+
+
+def get_month_idx(year: Optional[int] = None, month: Optional[int] = None) \
+        -> int:
+    """ Computes month index
+
+    Arguments:
+    year  - Year, None for current
+    month - Month, None for current
+    """
+    assert (year is None) == (month is None)
+    d = datetime.datetime.now(tz=datetime.timezone.utc) if year is None \
+        else datetime.datetime(year=year, month=month, day=1)
+    return (d.year - MONTH_IDX_BASE_YEAR) * 12 + (d.month - 1)
