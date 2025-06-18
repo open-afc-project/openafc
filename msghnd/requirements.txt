@@ -60,7 +60,7 @@ requests==2.32.3
 six==1.17.0
 SQLAlchemy==1.4.54
 typeguard==2.13.3
-urllib3==1.26.19
+urllib3==2.5.0
 vine==5.1.0
 Werkzeug==3.0.6
 WsgiDAV==4.1.0
