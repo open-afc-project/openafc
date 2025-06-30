@@ -50,7 +50,6 @@ def get_rcache_client():
     global _rcache_settings, _rcache_client
     if _rcache_settings is None:
         _rcache_settings = RcacheClientSettings(postgres_dsn=None)
-        # In this validation rcache is True to handle 'update_on_send' case
         _rcache_settings.validate_for(rmq=True, rcache=True)
         _rcache_client = \
             RcacheClient(_rcache_settings, rmq_receiver=False) \

@@ -16,10 +16,6 @@ ENV AFC_WORKER_CELERY_LOG=${AFC_WORKER_CELERY_LOG:-WARNING}
 ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 ARG AFC_WORKER_UID=${AFC_WORKER_UID}
 
-# True to update Rcache by AFC Response sender (Worker), False to update by
-# AFC REsponse receiver (MsgHandler, RatAPI)
-ENV RCACHE_UPDATE_ON_SEND=True
-
 RUN apk add --update --no-cache \
     boost1.84-program_options boost1.84-log boost1.84-filesystem \
     boost1.84-thread qt5-qtbase armadillo minizip libgeotiff \

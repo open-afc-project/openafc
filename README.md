@@ -543,7 +543,6 @@ If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Lo
 |RCACHE_POSTGRES_PASWORD_FILE||rcache, rat_server, msghnd|Name of file with password for Rcache database DSN|
 |RCACHE_SERVICE_URL|Must be set|rat_server, msghnd, worker, uls_downloader|Rcache service REST API base URL|
 |RCACHE_RMQ_DSN|Must be set|rat_server, msghnd, worker|AMQP URL to RabbitMQ vhost that workers use to communicate computation result|
-|RCACHE_UPDATE_ON_SEND|TRUE|TRUE if worker sends result to Rcache server, FALSE if msghnd/rat_server|
 |RCACHE_CLIENT_PORT|8000|rcache|Rcache REST API port|
 |RCACHE_AFC_REQ_URL||REST API Rcache precomputer uses to send invalidated AFC requests for precomputation. No precomputation if not set|
 |RCACHE_RULESETS_URL||REST API Rcache spatial invalidator uses to retrieve AFC Configs' rulesets. Default invalidation distance usd if not set|
