@@ -23,7 +23,7 @@ const getFilesOfType = (url: string, ext: string): Promise<RatResponse<string[]>
         const len = td.length;
         let names = [];
         for (let i = 0; i < len; i++) {
-          const trimmed_text = (td[i].textContent ?? "").trim();
+          const trimmed_text = (td[i].textContent ?? '').trim();
           if (trimmed_text.endsWith(ext)) {
             names.push(trimmed_text);
           }
