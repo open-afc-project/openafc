@@ -1,5 +1,5 @@
-import { guiConfig } from './RatApi';
-import { RatResponse, success, error } from './RatApiTypes';
+import { guiConfig } from "./RatApi";
+import { RatResponse, success, error } from "./RatApiTypes";
 
 /**
  * FileApi.ts: Application API to access Web Dav resources on server
@@ -11,19 +11,22 @@ import { RatResponse, success, error } from './RatApiTypes';
  * @param ext file extension to filter on.
  * @returns Promise with list of file or error
  */
-const getFilesOfType = (url: string, ext: string): Promise<RatResponse<string[]>> =>
+const getFilesOfType = (
+  url: string,
+  ext: string,
+): Promise<RatResponse<string[]>> =>
   fetch(url, {
-    method: 'GET',
+    method: "GET",
   })
     .then(async (res: Response) => {
       if (res.ok) {
-        const el = document.createElement('html');
+        const el = document.createElement("html");
         el.innerHTML = await res.text();
-        const td = el.getElementsByTagName('td');
+        const td = el.getElementsByTagName("td");
         const len = td.length;
         let names = [];
         for (let i = 0; i < len; i++) {
-          const trimmed_text = (td[i].textContent ?? '').trim();
+          const trimmed_text = (td[i].textContent ?? "").trim();
           if (trimmed_text.endsWith(ext)) {
             names.push(trimmed_text);
           }
@@ -40,7 +43,7 @@ const getFilesOfType = (url: string, ext: string): Promise<RatResponse<string[]>
  * @returns ULS files of type `.sqlite3` or error
  */
 export const getUlsFiles = (): Promise<RatResponse<string[]>> => {
-  return getFilesOfType(guiConfig.uls_url, '.sqlite3');
+  return getFilesOfType(guiConfig.uls_url, ".sqlite3");
 };
 
 /**
@@ -49,7 +52,7 @@ export const getUlsFiles = (): Promise<RatResponse<string[]>> => {
  * @returns ULS files of type `.csv` or error
  */
 export const getUlsFilesCsv = (): Promise<RatResponse<string[]>> => {
-  return getFilesOfType(guiConfig.uls_url, '.csv');
+  return getFilesOfType(guiConfig.uls_url, ".csv");
 };
 
 /**
@@ -57,5 +60,5 @@ export const getUlsFilesCsv = (): Promise<RatResponse<string[]>> => {
  * @returns List of antenna pattern names or error
  */
 export const getAntennaPatterns = (): Promise<RatResponse<string[]>> => {
-  return getFilesOfType(guiConfig.antenna_url, '.csv');
+  return getFilesOfType(guiConfig.antenna_url, ".csv");
 };
