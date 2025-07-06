@@ -30,7 +30,7 @@ jobs:
       - uses: creyD/prettier_action@v4.3
         with:
           dry: true
-          prettier_options: "src/web/src"
+          prettier_options: "src/web/src --check"
 
   # Disable until code formtter question is resolved
   # check-cpp-code:
