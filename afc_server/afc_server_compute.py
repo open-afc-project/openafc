@@ -186,9 +186,6 @@ class AfcServerCompute:
                             LOGGER.error(f"Decode error on AFC Response Info "
                                          f"arrived from Worker: {ex}")
                             continue
-                        error_if(rrk.afc_req,
-                                 "RCACHE_UPDATE_ON_SEND must be unset or set "
-                                 "to TRUE")
                         future_holders = \
                             self._request_futures.get(rrk.req_cfg_digest)
                         for future_holder in (future_holders or set()):
