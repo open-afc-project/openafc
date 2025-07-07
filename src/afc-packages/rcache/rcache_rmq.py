@@ -72,14 +72,12 @@ class RcacheRmqConnection:
         assert self._for_rx
         return self._queue_name
 
-    def send_response(self, req_cfg_digest: str, request: Optional[str],
-                      response: Optional[str]) -> None:
+    def send_response(self, req_cfg_digest: str, response: Optional[str]) \
+            -> None:
         """ Send computed AFC Response
 
         Arguments:
         req_cfg_digest -- Request/config digest that identifies request
-        request        -- Request as a string. None if cache update performed
-                          by sender
         response       -- Response as a string. None on failure
         """
         assert not self._for_rx
@@ -90,8 +88,7 @@ class RcacheRmqConnection:
             self._channel.basic_publish(
                 exchange=RCACHE_RMQ_EXCHANGE_NAME, routing_key=self._queue_name,
                 body=RmqReqRespKey(
-                    afc_req=request, afc_resp=response,
-                    req_cfg_digest=req_cfg_digest).json(),
+                    afc_resp=response, req_cfg_digest=req_cfg_digest).json(),
                 properties=pika.BasicProperties(
                     content_type="application/json",
                     delivery_mode=pika.DeliveryMode.Transient),

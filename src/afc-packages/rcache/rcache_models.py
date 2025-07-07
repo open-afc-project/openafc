@@ -158,12 +158,6 @@ class RcacheClientSettings(pydantic.BaseSettings):
             None,
             description="RabbitMQ AMQP DSN: "
             "amqp://[user[:password]]@host[:port]")
-    update_on_send: bool = \
-        pydantic.Field(
-            True,
-            description="True to update cache from worker (on sending "
-            "response), False to update cache on msghnd (on receiving "
-            "response)")
     afc_state_vendor_extensions: Optional[List[str]] = \
         pydantic.Field(
             None,
@@ -310,11 +304,6 @@ class AfcReqRespKey(pydantic.BaseModel):
     req_cfg_digest: str = \
         pydantic.Field(
             ..., title="Request/Config hash (cache lookup key) as string")
-
-    class Config:
-        """ Metadata """
-        # May be constructed from RmqReqRespKey
-        orm_mode = True
 
 
 class RcacheUpdateReq(pydantic.BaseModel):
@@ -506,11 +495,6 @@ class AfcRespAvailableSpectrumInquiryResponseMessage(pydantic.BaseModel):
 
 class RmqReqRespKey(pydantic.BaseModel):
     """ Request/Response/Digest structure, used in RabbitMQ communication """
-    afc_req: Optional[str] = \
-        pydantic.Field(
-            ...,
-            title="AFC Request as string. None if cache update being made on "
-            "sender (Worker) side")
     afc_resp: Optional[str] = \
         pydantic.Field(..., title="AFC Response as string. None on failure")
     req_cfg_digest: str = \

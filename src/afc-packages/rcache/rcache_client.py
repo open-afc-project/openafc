@@ -55,7 +55,6 @@ class RcacheClient:
                                     Worker) or invalidate (FS Update for
                                     spatial invalidate, some other entity for
                                     full/config invalidate)
-    _update_on_send              -- True to update cache on sender
     _afc_state_vendor_extensions -- Set of vendor extensions from previously
                                     computed invalidated AFC response to be
                                     sent to AFC Engine
@@ -91,7 +90,6 @@ class RcacheClient:
                      "'rmq_receiver' parameter should be specified")
             self._rcache_rmq = RcacheRmq(client_settings.rmq_dsn)
             self._rmq_receiver = rmq_receiver
-        self._update_on_send = client_settings.update_on_send
 
         self._rcache_rcache: Optional["RcacheRcache"] = None
         if client_settings.enabled and \
@@ -130,11 +128,9 @@ class RcacheClient:
         assert self._rcache_rmq is not None
         with self._rcache_rmq.create_connection(tx_queue_name=queue_name) \
                 as rmq_conn:
-            rmq_conn.send_response(
-                req_cfg_digest=req_cfg_digest,
-                request=None if self._update_on_send else request,
-                response=response)
-        if self._update_on_send and response:
+            rmq_conn.send_response(req_cfg_digest=req_cfg_digest,
+                                   response=response)
+        if response:
             assert self._rcache_rcache is not None
             try:
                 self._rcache_rcache.update_cache(
@@ -169,12 +165,6 @@ class RcacheClient:
         rrks = rx_connection.receive_responses(req_cfg_digests=req_cfg_digests,
                                                timeout_sec=timeout_sec)
         assert rrks is not None
-        to_update = \
-            [AfcReqRespKey.from_orm(rrk) for rrk in rrks
-             if (rrk.afc_req is not None) and (rrk.afc_resp is not None)]
-        if to_update:
-            assert self._rcache_rcache is not None
-            self._rcache_rcache.update_cache(rrks=to_update)
         return {rrk.req_cfg_digest: rrk.afc_resp for rrk in rrks}
 
     def rcache_invalidate(
