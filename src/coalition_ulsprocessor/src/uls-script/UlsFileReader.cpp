@@ -1131,6 +1131,9 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 			case 7:
 				current.stationLocation = field;
 				break;
+			case 8:
+				current.ituClass = field;
+				break;
 			case 9:
 				current.latitudeDeg = emptyAtof(field.c_str());
 				break;
@@ -1250,7 +1253,7 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 		}
 	}
 
-	if (current.service == 9) {
+	if ((current.service == 9) && (current.ituClass == "RA")) {
 		RASClass ras;
 		ras.region = "CA";
 		ras.name = linceseeName;
