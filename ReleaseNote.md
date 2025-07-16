@@ -1,5 +1,29 @@
 # Release Note
 
+## **Version and Date**
+|Version|**373*|
+| :- | :- |
+|**Date**|**07/15/2025**|
+
+## **Issues Addressed**
+ * 373: Update ULS parser to properly parse updated ISED's Stations Data Extract
+
+
+## **Interface Changes**
+ * Updated the uls-script C++ program to filter on both "Service" (=9) and "ITU Class of Station" (=RA) to consider a link to be a radio astronomy site (RAS).
+
+## **Testing Done**
+ * Reviewed the latest generated RAS database by ULS Parser and confirmed that only the one Canadian RAS link (per the latest Stations Data Extracts) is added and the other two link (Service=9, Subservice = TC) are not added to the FS or RAS database.
+
+ * Ran four tests:
+ * Test 1: a point over the first link (service=9, ITU Class of Station=TC, authorization number=011013568-002) that shouldn't be protected in Canada, requesting all frequencies and channels. Confirmed from results.kmz file that there are no RAS at the both this link and the second link that shouldn't be protected.
+ * Test 2: a point over the same link as Test 1, requesting only the frequency channel over which the this link operates. Confirm confirmed that the channel is still used.
+ * Test 3: repeat of Test 2 but for the second link(service=9, ITU Class of Station=TC, authorization number=011013632-002) that shouldn't be protected in Canada.
+ * Test 4: a point at the center of the one RAS in Canada, requesting all frequencies and channels. Confirmed that the overlapping channels and frequencies are blocked.
+
+## **Open Issues** 
+
+
 |Version|1.0.1.0|
 | :- | :- |
 |**Date**|**10/28/2024**|
