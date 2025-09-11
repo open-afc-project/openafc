@@ -61,11 +61,15 @@ jobs:
 # test deployment of ssh keys to be used by ssh and rsync {
     - name: Write SSH keys
       run: |
+          mkdir -p ~/.ssh
+          ls -la ~/.ssh
           install -m 600 -D /dev/null ~/.ssh/id_rsa
           echo "${{ secrets.SSH_PRIVATE_KEY_GITHUB_AUTOMATION }}" > ~/.ssh/id_rsa
           host=${{ secrets.AFC_DEV_SERVER }}
           hosts="$(dig +short "$host" | grep -v '\.$' | sed -z 's|\n|,|g') $host"
-#          ssh-keyscan -H "$hosts" > ~/.ssh/known_hosts
+          echo "Hosts list: $hosts"
+          ssh-keyscan -H "$hosts" > ~/.ssh/known_hosts
+          wc ~/.ssh/known_hosts
 # } test deployment of ssh keys to be used by ssh and rsync
 
 
