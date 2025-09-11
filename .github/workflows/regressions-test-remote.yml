@@ -67,9 +67,9 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY_GITHUB_AUTOMATION }}" > ~/.ssh/id_rsa
           host=${{ secrets.AFC_DEV_SERVER }}
           hosts="$(dig +short "$host" | grep -v '\.$' | sed -z 's|\n|,|g') $host"
-          echo "Hosts list: $hosts"
+          echo T1=Hosts list: ${hosts} >> $GITHUB_ENV
           ssh-keyscan -H "$hosts" > ~/.ssh/known_hosts
-          wc ~/.ssh/known_hosts
+          echo T2=wc ~/.ssh/known_hosts >> $GITHUB_ENV
 # } test deployment of ssh keys to be used by ssh and rsync
 
 
