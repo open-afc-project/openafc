@@ -58,6 +58,35 @@ jobs:
           echo LREGRD=tests/regression >> $GITHUB_ENV
 # } generate rand
 
+#  t1 {
+    - name: t1
+      run: |
+          install -m 600 -D /dev/null ~/.ssh/id_rsa
+# } t1
+
+#  t2 {
+    - name: t2
+      run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY_GITHUB_AUTOMATION }}" > ~/.ssh/id_rsa
+# } t2
+
+#  t3 {
+    - name: t3
+      run: |
+          host=${{ secrets.AFC_DEV_SERVER }}
+# } t3
+
+# t4 {
+    - name: t4
+      run: |
+          hosts="$(dig +short "$host" | grep -v '\.$' | sed -z 's|\n|,|g') $host"
+# } t4
+
+# t5 {
+    - name: t5
+      run: |
+          ssh-keyscan -H "$hosts" > ~/.ssh/known_hosts
+# } t5
 
 # test deployment of ssh keys to be used by ssh and rsync {
     - name: Write SSH keys
