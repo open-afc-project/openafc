@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout sources
       uses: actions/checkout@v2
@@ -79,62 +79,6 @@ jobs:
       run: |
           rsync -raz --delete ${{ github.workspace }}/ ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }}:/${{ env.WD }} && ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} cp -a ${{ env.WD }}/tests/regression ${{ env.WD }}/${{ env.REGRD }}
 # }rsync sources
-
-# docker repo login {
-    - name: docker repo login
-      run: |
-          ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "sh -x ${{ env.WD }}/${{ env.REGRD }}/drepo_login.sh"
-# } docker repo login
-
-# build regr test images {
-    - name: build regr test images
-      run: |
-          ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "sh -x ${{ env.WD }}/${{ env.REGRD }}/build_imgs.sh ${{ env.WD }} ${{ env.RAND }} 1 "
-# } build regr test images
-
-# start dev srvr {
-    - name: run remote srvr
-      run: |
-          ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "EXT_IP=${{ secrets.INT_TO_EXT_IPADDR }} sh -x ${{ env.WD }}/${{ env.REGRD }}/run_srvr.sh ${{ env.WD }} ${{ env.RAND }} 1"
-# } start dev srvr
-
-# get dev srvr port num{
-    - name: get dev srvr port num
-      run: |
-          echo TEST_PORT=`ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "cd ${{ env.WD }}/${{ env.REGRD }} && TAG=${{ env.RAND }} docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE port dispatcher 443 |sed 's/.*://'"` >> $GITHUB_ENV
-# } get dev srvr port num
-
-# open srvr test port {
-    - name: Allow Security group rule to connect Github Actions to OpenAFC servers
-      run: |
-        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT }} --cidr ${{ env.IP4 }}/24
-      env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-# } open srvr test port
-
-# run tests {
-    - name: test accessibility of WebUI
-      run: |
-        curl -k https://${{ secrets.AFC_DEV_SERVER }}:${{ env.TEST_PORT }}/fbrat/www/index.html
-
-    - name: Build the regression tests docker image on client side
-      run: docker build . -t afc-regression-test -f tests/Dockerfile
-    - name: run ngnx-afcserver-rmq-worker path tests
-      run: |
-        ${{ github.workspace }}/${{ env.LREGRD }}/run_tests.sh ${{ github.workspace }} afc-regression-test ${{ secrets.AFC_DEV_SERVER }} ${{ env.TEST_PORT }}
-    - name: run ngnx-rat_server-rmq-worker path tests
-      run: |
-        ${{ github.workspace }}/${{ env.LREGRD }}/run_tests.sh ${{ github.workspace }} afc-regression-test ${{ secrets.AFC_DEV_SERVER }} ${{ env.TEST_PORT }} https 8 "AFCS.SRS.1,AFCS.URS.1,AFCS.FSP.1,AFCS.IBP.1,AFCS.SIP.1,BRCM.EXT_FSP.1" "--webui"
-  # }run tests
-
-# stop dev srvr {
-    - name: stop dev srvr
-      if: ${{ always() }}
-      run: |
-        ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "sh -x ${{ env.WD }}/${{ env.REGRD }}/stop_srvr.sh ${{ env.WD }} ${{ env.RAND }}"
-# }stop dev srvr
 
 # clean srvr {
     - name: clean remote srvr
