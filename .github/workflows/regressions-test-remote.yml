@@ -16,8 +16,8 @@ jobs:
 # { check and preinstall commands used by the test
     - name: pre-install test-commands
       run: |
-          which dig || apt-get update && apt-get install -y dnsutils
-          which ssh-keyscan || apt-get update && apt-get install -y openssh-client
+          which dig || sudo apt-get update && sudo apt-get install -y dnsutils
+          which ssh-keyscan || sudo apt-get update && sudo  apt-get install -y openssh-client
 # } check and preinstall commands used by the test
 
 # { get public IP
