@@ -68,8 +68,10 @@ jobs:
           host=${{ secrets.AFC_DEV_SERVER }}
           hosts="$(dig +short "$host" | grep -v '\.$' | sed -z 's|\n|,|g') $host"
           echo T1=Hosts list: ${hosts} >> $GITHUB_ENV
-          ssh-keyscan -H "$hosts" > ~/.ssh/known_hosts
+#          ssh-keyscan -H "$hosts" > ~/.ssh/known_hosts
           echo T2=wc ~/.ssh/known_hosts >> $GITHUB_ENV
+          echo ${{ env.T1 }}
+          echo ${{ env.T2 }}
 # } test deployment of ssh keys to be used by ssh and rsync
 
 
