@@ -65,6 +65,11 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY_GITHUB_AUTOMATION }}
         known_hosts: ${{ secrets.AFC_DEV_SERVER }}
 # } test deployment of ssh keys to be used by ssh and rsync
+# {test ssh connection
+    - name: Test SSH connection
+      run: |
+          ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "echo 'SSH connection successful'"
+# } test ssh connection
 
 # rsync sources{
     - name: rsync sources
