@@ -59,16 +59,11 @@ jobs:
 # } generate rand
 
 # test deployment of ssh keys to be used by ssh and rsync {
-    - name: Write SSH keys
-      run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          touch ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          touch ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          echo "${{ secrets.SSH_PRIVATE_KEY_GITHUB_AUTOMATION }}" > ~/.ssh/id_rsa
-          ssh-keyscan -H dev.afc.broadcom.com
+    - name: Setup SSH key and known_hosts
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.SSH_PRIVATE_KEY_GITHUB_AUTOMATION }}
+        known_hosts: ${{ secrets.AFC_DEV_SERVER }}
 # } test deployment of ssh keys to be used by ssh and rsync
 
 # rsync sources{
