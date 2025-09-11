@@ -68,7 +68,7 @@ jobs:
 # {test ssh connection
     - name: Test SSH connection
       run: |
-          ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "echo 'SSH connection successful'"
+          ssh -vvv ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "echo 'SSH connection successful'"
 # } test ssh connection
 
 # rsync sources{
