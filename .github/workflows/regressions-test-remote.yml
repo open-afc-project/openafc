@@ -13,6 +13,13 @@ jobs:
     - name: Checkout sources
       uses: actions/checkout@v2
 
+# { check and preinstall commands used by the test
+    - name: pre-install test-commands
+      run: |
+          which dig || apt-get update && apt-get install -y dnsutils
+          which ssh-keyscan || apt-get update && apt-get install -y openssh-client
+# } check and preinstall commands used by the test
+
 # { get public IP
     - name: get public IP
       run: |
@@ -51,13 +58,6 @@ jobs:
           echo LREGRD=tests/regression >> $GITHUB_ENV
 # } generate rand
 
-# { pre-install  dnsutils
-    - name: pre-install dnsutils
-      run: |
-          apt-get update
-          which dig || apt-get install -y dnsutils
-          which ssh-keyscan || apt-get install -y openssh-client
-# } pre-install  dnsutils
 
 # test deployment of ssh keys to be used by ssh and rsync {
     - name: Write SSH keys
