@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout sources
       uses: actions/checkout@v2
@@ -68,8 +68,9 @@ jobs:
           hosts="$(dig +short "$host" | grep -v '\.$' | sed -z 's|\n|,|g') $host"
           echo "$hosts"
           ssh-keyscan -H "$hosts" > ~/.ssh/known_hosts
-          ls -la ~/.ssh/known_hosts
-          wc ~/.ssh/known_hosts
+          echo `ls -la ~/.ssh/known_hosts`
+          echo `wc ~/.ssh/known_hosts`
+          echo `cat ~/.ssh/known_hosts`
 # } test deployment of ssh keys to be used by ssh and rsync
 
 # rsync sources{
