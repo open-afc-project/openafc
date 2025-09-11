@@ -54,9 +54,9 @@ jobs:
 # { pre-install  dnsutils
     - name: pre-install dnsutils
       run: |
-          sudo apt-get update
-          which (dig) || sudo apt-get install -y dnsutils
-          which (ssh-keyscan) || sudo apt-get install -y openssh-client
+          apt-get update
+          which dig || apt-get install -y dnsutils
+          which ssh-keyscan || apt-get install -y openssh-client
 # } pre-install  dnsutils
 
 # test deployment of ssh keys to be used by ssh and rsync {
