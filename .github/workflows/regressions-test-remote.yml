@@ -59,12 +59,15 @@ jobs:
 # } generate rand
 
 # test deployment of ssh keys to be used by ssh and rsync {
-    - name: Setup SSH key and known_hosts
-      uses: shimataro/ssh-key-action@v2
-      with:
-        key: ${{ secrets.SSH_PRIVATE_KEY_GITHUB_AUTOMATION }}
-        known_hosts: ${{ secrets.AFC_DEV_SERVER }}
+    - name: Write SSH keys
+      run: |
+          install -m 600 -D /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY_GITHUB_AUTOMATION }}" > ~/.ssh/id_rsa
+          host=${{ secrets.AFC_DEV_SERVER }}
+          hosts="$(dig +short "$host" | grep -v '\.$' | sed -z 's|\n|,|g') $host"
+          ssh-keyscan -H "$hosts" > ~/.ssh/known_hosts
 # } test deployment of ssh keys to be used by ssh and rsync
+
 # {test ssh connection
     - name: Test SSH connection
       run: |
