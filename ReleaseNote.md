@@ -1,6 +1,26 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**392*|
+| :- | :- |
+|**Date**|**09/17/2025**|
+
+## **Issues Addressed**
+ * 392: RPE Calculation based on ITU-R F.699-8
+
+
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Reviewed the code changes and confirmed they agree with ITU-R Rec. F.699 equations.
+ * Tested FSP1 which has alot of paths with angle-off-boresight < 5 deg (where F.699 is used). However, those all have D/lambda <= 100. Confirmed the first 3 equations in F.699-8 for this scenario (angle-off-boresight < 48).
+ * Constructed another test to test D/labmda > 100 for equation 3 (that was incorrect previously). Confirmed both equation 1 and 3 in F.699-8 for this case.
+
+
+## **Open Issues**
+
+## **Version and Date**
 |Version|**373*|
 | :- | :- |
 |**Date**|**07/15/2025**|
@@ -21,7 +41,7 @@
  * Test 3: repeat of Test 2 but for the second link(service=9, ITU Class of Station=TC, authorization number=011013632-002) that shouldn't be protected in Canada.
  * Test 4: a point at the center of the one RAS in Canada, requesting all frequencies and channels. Confirmed that the overlapping channels and frequencies are blocked.
 
-## **Open Issues** 
+## **Open Issues**
 
 
 |Version|1.0.1.0|
@@ -64,18 +84,18 @@
 |**Date**|**11/12/2024**|
 
 ## **Issues Addressed**
- * 135: Country Boundary Fix 
+ * 135: Country Boundary Fix
  * Added proc_boundary functionality to proc_gdal (https://github.com/open-afc-project/openafc/tree/135-country-boundary-fix/tools/geo_converters/proc_gdal) and included proc_boundary_examples for USA and Canada.
  * Updated database_readme.md with 'Detailed Instructions for Downloading and Converting 3DEP Files For Use In AFC'and minor editorial changes
 
 ## **Interface Changes**
- * Only the country boundary (for US and Canada) kml files need to be updated. 
+ * Only the country boundary (for US and Canada) kml files need to be updated.
  * The updated kml files are attached to the issue 135 on Github
 
 ## **Testing Done**
  * Ran FSP1 on our local dev server and confirmed getting golden response.
 
-## **Open Issues** 
+## **Open Issues**
 
 
 |Version|**226*|
@@ -83,7 +103,7 @@
 |**Date**|**11/02/2024**|
 
 ## **Issues Addressed**
- * 226: Update jquery version from 1.11.0 
+ * 226: Update jquery version from 1.11.0
 
 
 ## **Interface Changes**
@@ -92,7 +112,7 @@
 ## **Testing Done**
  * Exercised UI: Updated configuration, exercised web page controls, ran a request, all functionality seems working
 
-## **Open Issues** 
+## **Open Issues**
 
 
 |Version|1.0.1.0|
@@ -186,7 +206,7 @@
 
 ## **Issues Addressed**
  * 2: Migrated - 'ITM with building data' propagation model is broken (837)
- * 136: Update Canada default afc-config 
+ * 136: Update Canada default afc-config
 
 ## **Interface Changes**
  * There were changes to the UI code to define default afc-config for Canada (per issue 136)
@@ -195,7 +215,7 @@
  * 2: Ran a small test and confirmed that ITM with LiDAR is used as set in afc-config. The test configuration and result are attached to the issue 2.
  * 136: Confirmed that the default Canada afc-config is correct. This file is attached to issue 136 after the change.
 
-## **Open Issues** 
+## **Open Issues**
 
 ## **Version and Date**
 |Version|**105*|
@@ -212,7 +232,7 @@
 ## **Testing Done**
  * Ran a test [FSP1 but for 20 MHz channels only] (see attached afc-config, request and response json files and exc_thr files to the issue) and validated that the updated exc_thr would now show the links with distance > 1km using ITM (rather the FSPL that was tried originally to determine whether the regulatory threshold is exceeded or not) (previously, only the FSPL ones were shown). When printSkippedLinks flag in AFC Config is set, links that pass the regulatory threshold with FSPL are shown as well. Note that when the printSkippedLinks flag is set to false, links that should be using FSPL (i.e. 30m distance or inside AP uncertainty footprint) are still shown.
 
-## **Open Issues** 
+## **Open Issues**
  * Impact on speed from these changes need to be evaluated.
 
 ## **Version and Date**
@@ -238,7 +258,7 @@ Reverted the formatting of AfcManager.cpp to previous state due to overly agress
 ## **Testing Done**
  * Ran a test (see attached afc-config, request and response json files to the issue) and confirmed that the fs_anom.csv file is empty as expected. Previously, this file contained 23 links for this test that were removed due to having Rx Gain of 6 dBi).
 
-## **Open Issues** 
+## **Open Issues**
  * None
 
 ## **Version and Date**
