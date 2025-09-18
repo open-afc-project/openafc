@@ -333,6 +333,7 @@ export class AFCFormUSACanada extends React.Component<
               label="Production NLCD"
             />
             <FormSelectOption key="WFA Test NLCD " value="rat_transfer/nlcd/nlcd_wfa" label="WFA Test NLCD" />
+            <FormSelectOption key="nlcd_20250917" value="rat_transfer/nlcd/nlcd_20250917" label="nlcd_20250917" />
           </>
         );
     }
