@@ -17,6 +17,6 @@ gunicorn==23.0.0
 prometheus-client==0.17.1
 psycopg2-binary==2.9.10
 pydantic==1.10.21
-requests==2.32.3
+requests==2.32.4
 SQLAlchemy==1.4.54
 uvicorn==0.30.1
