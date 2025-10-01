@@ -6,7 +6,7 @@
 |**Date**|**10/01/2025**|
 
 ## **Issues Addressed**
- * 373: Update ULS parser to properly parse updated ISED's Stations Data Extract
+ * 391: Remove usage of bitnami kafka docker image and other bitnami images
 
 ## **Interface Changes**
 * None
