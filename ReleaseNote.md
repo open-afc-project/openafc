@@ -1,6 +1,20 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**391*|
+| :- | :- |
+|**Date**|**10/01/2025**|
+
+## **Issues Addressed**
+ * 373: Update ULS parser to properly parse updated ISED's Stations Data Extract
+
+## **Interface Changes**
+* None
+
+## **Testing Done**
+* Verified ALS logging was still being performed
+* Regession tests to validate no other changes
+
 |Version|**373*|
 | :- | :- |
 |**Date**|**07/15/2025**|
