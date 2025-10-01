@@ -15,9 +15,9 @@ def packageversion(pkg_name):
     :return: The version identifier or None.
     :rtype: str
     '''
-    import pkg_resources
+    from importlib.metadata import version
     try:
-        return pkg_resources.require(pkg_name)[0].version
+        return version(pkg_name)
     except Exception as err:
         LOGGER.error('Failed to fetch package %s version: %s', pkg_name, err)
         return None
