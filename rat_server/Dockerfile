@@ -110,5 +110,5 @@ ENV AFC_RATAPI_LOG_LEVEL=${AFC_RATAPI_LOG_LEVEL:-WARNING}
 COPY rat_server/entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
-HEALTHCHECK CMD wget --no-verbose --tries=1 --spider localhost/fbrat/ratapi/v1/healthy || exit 1
+HEALTHCHECK --start-interval=1m CMD wget --no-verbose --tries=1 --spider 127.0.0.1/fbrat/ratapi/v1/healthy || exit 1
 #

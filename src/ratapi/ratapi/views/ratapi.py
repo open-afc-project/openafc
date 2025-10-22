@@ -13,7 +13,7 @@
 import logging
 import os
 import sys
-import pkg_resources
+import importlib.metadata
 import flask
 import json
 import glob
@@ -103,9 +103,9 @@ class GuiConfig(MethodView):
         # Figure out the current server version
         try:
             if sys.version_info.major != 3:
-                serververs = pkg_resources.require('ratapi')[0].version
+                serververs = importlib.metadata.version('ratapi')
             else:
-                serververs = pkg_resources.get_distribution('ratapi').version
+                serververs = importlib.metadata.distribution('ratapi').version
         except Exception as err:
             LOGGER.error('Failed to fetch server version: {0}'.format(err))
             serververs = 'unknown'
