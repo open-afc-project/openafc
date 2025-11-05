@@ -458,6 +458,7 @@ def generateUlsScriptInputCA(directory, logFile, genFilename):
             sources_md5.update(f.read())
     return sources_md5.hexdigest()
 
+
 def generateUlsScriptInputStatic(staticDataFile, logFile, genFilename):
     logFile.write('Appending Static FS data data to ' + genFilename +
                   ' as input for uls script' + '\n')
@@ -465,11 +466,11 @@ def generateUlsScriptInputStatic(staticDataFile, logFile, genFilename):
     with open(genFilename, 'a', encoding='utf8') as combined:
         logFile.write('Adding ' + staticDataFile + ' to ' + genFilename + '\n')
         with open(staticDataFile, 'r', encoding='utf8') as csvfile:
-                    csvreader = csv.reader(csvfile)
-                    for row in csvreader:
-                        for (i, field) in enumerate(row):
-                            row[i] = field.replace('|', ':')
-                        combined.write(('|'.join(row)) + '|\n')
+            csvreader = csv.reader(csvfile)
+            for row in csvreader:
+                for (i, field) in enumerate(row):
+                    row[i] = field.replace('|', ':')
+                combined.write(('|'.join(row)) + '|\n')
     return
 
 
