@@ -39,21 +39,6 @@
 * Verified ALS logging was still being performed
 * Regession tests to validate no other changes
 
-## **Version and Date**
-|Version|**391*|
-| :- | :- |
-|**Date**|**10/01/2025**|
-
-## **Issues Addressed**
- * 391: Remove usage of bitnami kafka docker image and other bitnami images
-
-## **Interface Changes**
-* None
-
-## **Testing Done**
-* Verified ALS logging was still being performed
-* Regession tests to validate no other changes
-
 |Version|**373*|
 | :- | :- |
 |**Date**|**07/15/2025**|
@@ -303,3 +288,4 @@ Reverted the formatting of AfcManager.cpp to previous state due to overly agress
 ## **Issues Addressed**
  * Issue 7: Kubernetes-related changes
  * Initial commit
+
