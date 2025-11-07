@@ -8,7 +8,7 @@
 # Dockerfile for Kafka server, used by ALS (AFC Request/Response/Config) logging
 # This dockerfile maps outside config variables to those, used by Bitnami/Kafka
 
-FROM bitnami/kafka:3.3.1
+FROM bitnamilegacy/kafka:3.3.1
 
 # Outside configuration variables
 ENV KAFKA_ADVERTISED_HOST=localhost

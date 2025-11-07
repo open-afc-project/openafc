@@ -7,7 +7,7 @@
 
 # Dockerfile for Nginx Exporter that brings Nginx metrics to Prometheus format
 
-FROM bitnami/nginx-exporter:0.11.0-debian-11-r370
+FROM bitnamilegacy/nginx-exporter:0.11.0-debian-11-r370
 
 # URL on which Nginx' stub_status is exported
 ENV NGINXEXPORTER_STUB_URL=http://dispatcher:8080/stub_status
