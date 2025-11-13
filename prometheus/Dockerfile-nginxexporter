@@ -14,4 +14,4 @@ ENV NGINXEXPORTER_STUB_URL=http://dispatcher:8080/stub_status
 
 EXPOSE 9113/tcp
 
-ENTRYPOINT nginx-prometheus-exporter -nginx.scrape-uri=$NGINXEXPORTER_STUB_URL
+ENTRYPOINT ["nginx-prometheus-exporter", "-nginx.scrape-uri=${NGINXEXPORTER_STUB_URL}"]
