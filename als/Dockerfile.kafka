@@ -18,26 +18,28 @@ ENV KAFKA_CLIENT_SECURITY_PROTOCOL=PLAINTEXT
 
 # Bitnami Kafka configuration parameters
 ENV KAFKA_ENABLE_KRAFT=yes
-ENV KAFKA_CFG_PROCESS_ROLES=broker,controller
-ENV KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-ENV KAFKA_CFG_BROKER_ID=1
+ENV KAFKA_PROCESS_ROLES=broker,controller
+ENV KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+ENV KAFKA_BROKER_ID=1
 ENV ALLOW_PLAINTEXT_LISTENER=yes
-ENV KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
-ENV KAFKA_CFG_NUM_PARTITIONS=1
+ENV KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+ENV KAFKA_NUM_PARTITIONS=1
 ENV KAFKA_MAX_REQUEST_SIZE=1048576
+ENV KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
 
 # Setting Kafka log level to ERROR limits initialization blurt
 ENV KAFKA_LOG_LEVEL=ERROR
-RUN sed -i "s/log4j\.logger\.kafka=.*/log4j.logger.kafka=${KAFKA_LOG_LEVEL}/" /opt/bitnami/kafka/config/log4j.properties
-RUN sed -i "s/log4j\.logger\.org\.apache\.kafka=.*/log4j.logger.org.apache.kafka=${KAFKA_LOG_LEVEL}/" /opt/bitnami/kafka/config/log4j.properties
+RUN sed -i "s/log4j\.logger\.kafka=.*/log4j.logger.kafka=${KAFKA_LOG_LEVEL}/" /opt/kafka/config/log4j.properties
+RUN sed -i "s/log4j\.logger\.org\.apache\.kafka=.*/log4j.logger.org.apache.kafka=${KAFKA_LOG_LEVEL}/" /opt/kafka/config/log4j.properties
 
 # Kafka environment variables, computed from DockerCompose-supplied variables
 # can't be defined in ENV - hence they are moved to ENTRYPOINT
 ENTRYPOINT env \
-           KAFKA_CFG_MESSAGE_MAX_BYTES=${KAFKA_MAX_REQUEST_SIZE} \
-           KAFKA_CFG_MAX_REQUEST_SIZE=${KAFKA_MAX_REQUEST_SIZE} \
-           KAFKA_CFG_LISTENERS=PLAINTEXT://:${KAFKA_CLIENT_PORT},CONTROLLER://:${KAFKA_BROKER_PORT} \
-           KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:${KAFKA_CLIENT_SECURITY_PROTOCOL},PLAINTEXT:${KAFKA_CLIENT_SECURITY_PROTOCOL} \
-           KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://${KAFKA_ADVERTISED_HOST}:${KAFKA_CLIENT_PORT} \
-           KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@localhost:${KAFKA_BROKER_PORT} \
-           /opt/bitnami/scripts/kafka/entrypoint.sh /opt/bitnami/scripts/kafka/run.sh
+           KAFKA_MESSAGE_MAX_BYTES=${KAFKA_MAX_REQUEST_SIZE} \
+           KAFKA_MAX_REQUEST_SIZE=${KAFKA_MAX_REQUEST_SIZE} \
+           KAFKA_LISTENERS=PLAINTEXT://:${KAFKA_CLIENT_PORT},CONTROLLER://:${KAFKA_BROKER_PORT} \
+           KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:${KAFKA_CLIENT_SECURITY_PROTOCOL},PLAINTEXT:${KAFKA_CLIENT_SECURITY_PROTOCOL} \
+           KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://${KAFKA_ADVERTISED_HOST}:${KAFKA_CLIENT_PORT} \
+           KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:${KAFKA_BROKER_PORT} \
+           /etc/kafka/docker/run
+           
