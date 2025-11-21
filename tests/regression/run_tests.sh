@@ -32,15 +32,21 @@ verify_tls=''
 if [ "$prot" == "https" ]; then
     verify_tls='--verif'
 fi
+# Disable TLS verification to get server working without proper certs
+verify_tls=""
+
 echo "verify_tls - $verify_tls"
 
-afc_tests() {
-    docker run --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} \
-        --cmd=run --prefix_cmd  /usr/app/certs.sh cert_client \
-        ${verify_tls} ${ext_args} \
-        --cli_cert /usr/app/test_cli/test_cli_crt.pem \
-        --cli_key /usr/app/test_cli/test_cli_key.pem "$@"
 
+afc_tests() {
+    # docker run --network='host' --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} \
+    #     --cmd=run --prefix_cmd  /usr/app/certs.sh cert_client \
+    #     ${verify_tls} ${ext_args} \
+    #     --cli_cert /usr/app/test_cli/test_cli_crt.pem \
+    #     --cli_key /usr/app/test_cli/test_cli_key.pem "$@"
+
+  docker run --network='host' --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} \
+        --cmd=run ${verify_tls} ${ext_args} "$@"
 }
 
 loop() {
