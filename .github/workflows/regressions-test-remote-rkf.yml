@@ -33,15 +33,7 @@ jobs:
           echo REGRD=tests/regression_${{ env.RAND }} >> $GITHUB_ENV
           echo LREGRD=tests/regression >> $GITHUB_ENV
 
-# test deployment of ssh keys to be used by ssh and rsync {
-    - name: Write SSH keys
-      run: |
-          install -m 600 -D /dev/null ~/.ssh/id_rsa
-          echo "${{ secrets.RKF_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          host=${{ secrets.RKF_REGRESSION_SERVER_IP }}
-          hosts="$(dig +short "$host" | grep -v '\.$' | sed -z 's|\n|,|g') $host"
-          ssh-keyscan -H "$hosts" > ~/.ssh/known_hosts
-# } test deployment of ssh keys to be used by ssh and rsync
+# 
 
 # sign into AWS
     - name: Configure AWS Credentials
@@ -60,6 +52,17 @@ jobs:
           # wait for server to be active
           aws ec2 wait instance-running --instance-ids ${{ secrets.RKF_AWS_SERVER_ID }}  --region ${{ secrets.RKF_AWS_REGION }}
           echo "Server running"
+
+# test deployment of ssh keys to be used by ssh and rsync {
+    - name: Write SSH keys
+      run: |
+          install -m 600 -D /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.RKF_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          host=${{ secrets.RKF_REGRESSION_SERVER_IP }}
+          hosts="$(dig +short "$host" | grep -v '\.$' | sed -z 's|\n|,|g') $host"
+          echo $hosts
+          ssh-keyscan -H "$hosts" > ~/.ssh/known_hosts
+# } test deployment of ssh keys to be used by ssh and rsync
 
 
 # rsync sources{
@@ -120,7 +123,7 @@ jobs:
 # } clean srvr
 
 # close turn off server{
-    - name: remove Security group rule that was added for this test
+    - name: stop RKF regression server
       if: ${{ always() }}
       run: |
         aws ec2 stop-instances --instance-ids ${{secrets.RKF_AWS_SERVER_ID }} --region ${{ secrets.RKF_AWS_REGION }}     
