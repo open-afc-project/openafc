@@ -1,0 +1,133 @@
+name: Regressions test remote CI RKF Server
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Need ID token write permission to use OIDC
+permissions:
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout sources
+      uses: actions/checkout@v6
+
+
+  # Compute labels and paths
+    - name: generate rand
+      run: |
+          echo RAND=`date +"D_%d_%m_%y_T_%H_%M_%S_TZ_%Z"`_hash_`git rev-parse --short HEAD` >> $GITHUB_ENV
+
+    - name: generate  workdir
+      run: |
+          echo WD=/opt/afc/test/openafc-dev_${{ env.RAND }} >> $GITHUB_ENV
+
+    - name: generate  regression dir path
+      run: |
+          echo REGRD=tests/regression_${{ env.RAND }} >> $GITHUB_ENV
+          echo LREGRD=tests/regression >> $GITHUB_ENV
+
+# test deployment of ssh keys to be used by ssh and rsync {
+    - name: Write SSH keys
+      run: |
+          install -m 600 -D /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.RKF_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          host=${{ secrets.RKF_REGRESSION_SERVER_IP }}
+          hosts="$(dig +short "$host" | grep -v '\.$' | sed -z 's|\n|,|g') $host"
+          ssh-keyscan -H "$hosts" > ~/.ssh/known_hosts
+# } test deployment of ssh keys to be used by ssh and rsync
+
+# sign into AWS
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v5.1.0
+      with:
+        aws-region: us-east-1
+        role-to-assume: ${{ secrets.RKF_AWS_CONTROL_ROLE_ARN }}
+        role-session-name: OpenAFCGithubRegressionSession
+      
+
+#Activate server
+    - name: turn on RKF regression server
+      run: |
+          aws ec2 start-instances --instance-ids ${{ secrets.RKF_AWS_SERVER_ID }} --region ${{ secrets.RKF_AWS_REGION }}
+          echo "Starting Server..."
+          # wait for server to be active
+          aws ec2 wait instance-running --instance-ids ${{ secrets.RKF_AWS_SERVER_ID }}  --region ${{ secrets.RKF_AWS_REGION }}
+          echo "Server running"
+
+
+# rsync sources{
+    - name: rsync sources
+      run: |
+          rsync -raz --delete ${{ github.workspace }}/ ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }}:/${{ env.WD }} && ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} cp -a ${{ env.WD }}/tests/regression ${{ env.WD }}/${{ env.REGRD }}
+# }rsync sources
+
+# docker repo login {
+    - name: docker repo login
+      run: |
+          ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/drepo_login.sh"
+# } docker repo login
+
+# build regr test images {
+    - name: build regr test images
+      run: |
+          ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/build_imgs.sh ${{ env.WD }} ${{ env.RAND }} 0 "
+# } build regr test images
+
+# start dev srvr {
+    - name: run remote srvr
+      run: |
+          ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "EXT_IP=${{ secrets.INT_TO_EXT_IPADDR }} bash -x ${{ env.WD }}/${{ env.REGRD }}/run_srvr.sh ${{ env.WD }} ${{ env.RAND }} 1"
+# } start dev srvr
+
+# get dev srvr port num{
+    - name: get dev srvr port num
+      run: |
+          echo TEST_PORT=`ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "cd ${{ env.WD }}/${{ env.REGRD }} && TAG=${{ env.RAND }} docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE port dispatcher 443 |sed 's/.*://'"` >> $GITHUB_ENV
+# } get dev srvr port num
+
+# run tests {
+    - name: test accessibility of WebUI
+      run: |
+        ssh  ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "curl -k https://localhost:${{ env.TEST_PORT }}/fbrat/www/index.html"
+
+    - name: Build the regression tests docker image on client side
+      run: docker build . -t afc-regression-test -f tests/Dockerfile
+    - name: run ngnx-afcserver-rmq-worker path tests
+      run: |
+        ssh  ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/run_tests.sh  ${{ env.WD }} rtest:${{ env.RAND}} localhost ${{ env.TEST_PORT }}"
+    - name: run ngnx-rat_server-rmq-worker path tests
+      run: |
+       ssh  ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/run_tests.sh  ${{ env.WD }} rtest:${{ env.RAND}} localhost ${{ env.TEST_PORT }} "https 8 "AFCS.SRS.1,AFCS.URS.1,AFCS.FSP.1,AFCS.IBP.1,AFCS.SIP.1,BRCM.EXT_FSP.1" "--webui"
+
+# stop dev srvr {
+    - name: stop dev srvr
+      if: ${{ always() }}
+      run: |
+        ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/stop_srvr.sh ${{ env.WD }} ${{ env.RAND }}"
+# }stop dev srvr
+
+# clean srvr {
+    - name: clean remote srvr
+      run: |
+        ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/clean.sh ${{ env.WD }} ${{ env.RAND }}"
+# } clean srvr
+
+# close turn off server{
+    - name: remove Security group rule that was added for this test
+      if: ${{ always() }}
+      run: |
+        aws ec2 stop-instances --instance-ids ${{secrets.RKF_AWS_SERVER_ID }} --region ${{ secrets.RKF_AWS_REGION }}     
+        echo "Stopping regression server..."
+        aws ec2 wait instance-stopped --instance-ids ${{ secrets.RKF_AWS_SERVER_ID }}  --region ${{ secrets.RKF_AWS_REGION }}
+        echo "Server stopped."    
+     
+# } close ssh port 
+
+
