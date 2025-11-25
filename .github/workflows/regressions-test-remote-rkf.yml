@@ -71,11 +71,11 @@ jobs:
           rsync -raz --delete ${{ github.workspace }}/ ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }}:/${{ env.WD }} && ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} cp -a ${{ env.WD }}/tests/regression ${{ env.WD }}/${{ env.REGRD }}
 # }rsync sources
 
-# docker repo login {
-    - name: docker repo login
-      run: |
-          ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/drepo_login.sh"
-# } docker repo login
+# # docker repo login {
+#     - name: docker repo login
+#       run: |
+#           ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/drepo_login.sh"
+# # } docker repo login
 
 # build regr test images {
     - name: build regr test images
