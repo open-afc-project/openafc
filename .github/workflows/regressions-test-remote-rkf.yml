@@ -86,7 +86,7 @@ jobs:
 # start dev srvr {
     - name: run remote srvr
       run: |
-          ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "EXT_IP=${{ secrets.RKF_REGRESSION_SERVER_IP }} bash -x ${{ env.WD }}/${{ env.REGRD }}/run_srvr.sh ${{ env.WD }} ${{ env.RAND }} 1"
+          ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/run_srvr.sh ${{ env.WD }} ${{ env.RAND }} 1"
 # } start dev srvr
 
 # get dev srvr port num{
