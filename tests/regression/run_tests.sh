@@ -49,9 +49,8 @@ afc_tests() {
     #     --cli_cert /usr/app/test_cli/test_cli_crt.pem \
     #     --cli_key /usr/app/test_cli/test_cli_key.pem "$@"
 
-  docker run --network='host' --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} \
-        --mount type=bind,source=$results_dir,target=$results_dir \
-        --cmd=run ${verify_tls} ${ext_args} "$@"
+  docker run --network='host' --mount "type=bind,source=${results_dir},target=${results_dir}" --rm ${di_name} --addr=${addr} \
+     --port=${port} --prot=${prot} --cmd=run ${verify_tls} ${ext_args} "$@"
 }
 
 loop() {
