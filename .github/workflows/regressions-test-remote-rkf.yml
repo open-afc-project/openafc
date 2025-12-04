@@ -111,7 +111,7 @@ jobs:
 # retrieve test results {
     - name: retrieve test results
       run: |
-        rsync -raz ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }}:/${{ env.WD }}/${{ env.REGRD }}/results/ ${{ github.workspace }}/results/
+        rsync -raz ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }}:/${{ env.WD }}/results/ ${{ github.workspace }}/results/
     - name: upload test results artifact
       uses: actions/upload-artifact@v4
       with:
