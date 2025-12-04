@@ -92,7 +92,7 @@ jobs:
 # get dev srvr port num{
     - name: get dev srvr port num
       run: |
-          echo TEST_PORT=`ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "cd ${{ env.WD }}/${{ env.REGRD }} && TAG=${{ env.RAND }} docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE port dispatcher 443 |sed 's/.*://'"` >> $GITHUB_ENV
+          echo TEST_PORT=`ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "cd ${{ env.WD }}/${{ env.REGRD }} && TAG=${{ env.RAND }} docker compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE port dispatcher 443 |sed 's/.*://'"` >> $GITHUB_ENV
 # } get dev srvr port num
 
 # run tests {
