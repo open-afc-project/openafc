@@ -64,7 +64,7 @@ loop() {
         echo "from $s  to $e"
         # run processes and store pids in array
         for i in `seq $((s+1)) ${e}`; do
-            afc_tests --testcase_indexes=${i} --outfile=${results_dir}/test-output-${i}.csv &
+            afc_tests --testcase_indexes=${i} --outfile=${results_dir}/test-output.csv &
             pids+=( $! )
         done
         s=$((s + ${step}))
@@ -82,8 +82,9 @@ cd $wd
 if [ "${testcase_ids}" == "" ]; then
     loop $ap_count ${burst}
 else
-    afc_tests --testcase_ids=${testcase_ids}  --outfile=${results_dir}/test-output-1.csv
+    afc_tests --testcase_ids=${testcase_ids}  --outfile=${results_dir}/test-output.csv
     check_retval $?
+    return $retval
 fi
 
 
