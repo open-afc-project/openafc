@@ -425,10 +425,10 @@ def create_email_attachment(filename):
 
 def send_email(cfg):
     """Send an email to predefined adress using gmail smtp server"""
-    sender = cfg['email_from']
-    recipient = cfg['email_to']
+    sender = cfg.get('email_from')
+    recipient = cfg.get('email_to')
     
-    if sender == '' or recipient == '': 
+    if sender is None or recipient is None: 
         app_log.warning("Sender or recipient email is not defined.")
         return
     
