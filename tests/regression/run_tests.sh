@@ -30,6 +30,7 @@ check_retval() {
     ok "OK"
     else err "FAIL"; retval=1
   fi
+    return ${retval}
 }
 
 verify_tls=''
@@ -84,7 +85,7 @@ if [ "${testcase_ids}" == "" ]; then
 else
     afc_tests --testcase_ids=${testcase_ids}  --outfile=${results_dir}/test-output.csv
     check_retval $?
-    return $retval
+    
 fi
 
 
