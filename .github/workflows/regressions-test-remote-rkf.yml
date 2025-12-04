@@ -107,7 +107,7 @@ jobs:
         ssh  ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/run_tests.sh  ${{ env.WD }} rtest:${{ env.RAND}} localhost ${{ env.TEST_PORT }}"
     - name: run ngnx-rat_server-rmq-worker path tests
       run: |
-       ssh  ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/run_tests.sh  ${{ env.WD }} rtest:${{ env.RAND}} localhost ${{ env.TEST_PORT }} "https" 8 "AFCS.SRS.1,AFCS.URS.1,AFCS.FSP.1,AFCS.IBP.1,AFCS.SIP.1,BRCM.EXT_FSP.1" "--webui"
+       ssh  ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} bash -x "${{ env.WD }}/${{ env.REGRD }}/run_tests.sh"  "${{ env.WD }}" rtest:${{ env.RAND}} localhost ${{ env.TEST_PORT }} "https" 8 "AFCS.SRS.1,AFCS.URS.1,AFCS.FSP.1,AFCS.IBP.1,AFCS.SIP.1,BRCM.EXT_FSP.1" "--webui"
 # retrieve test results {
     - name: retrieve test results
       run: |
