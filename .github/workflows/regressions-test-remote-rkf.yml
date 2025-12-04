@@ -113,7 +113,7 @@ jobs:
       run: |
         rsync -raz ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }}:/${{ env.WD }}/${{ env.REGRD }}/results/ ${{ github.workspace }}/results/
     - name: upload test results artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: regression-test-results
         path: results/
