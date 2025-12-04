@@ -108,6 +108,17 @@ jobs:
     - name: run ngnx-rat_server-rmq-worker path tests
       run: |
        ssh  ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/run_tests.sh  ${{ env.WD }} rtest:${{ env.RAND}} localhost ${{ env.TEST_PORT }} "https 8 "AFCS.SRS.1,AFCS.URS.1,AFCS.FSP.1,AFCS.IBP.1,AFCS.SIP.1,BRCM.EXT_FSP.1" "--webui"
+# retrieve test results {
+    - name: retrieve test results
+      run: |
+        rsync -raz ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }}:/${{ env.WD }}/${{ env.REGRD }}/results/ ${{ github.workspace }}/results/
+    - name: upload test results artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: regression-test-results
+        path: results/
+# } retrieve test results
+
 
 # stop dev srvr {
     - name: stop dev srvr
