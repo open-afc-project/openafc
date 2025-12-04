@@ -427,6 +427,11 @@ def send_email(cfg):
     """Send an email to predefined adress using gmail smtp server"""
     sender = cfg['email_from']
     recipient = cfg['email_to']
+    
+    if sender == '' or recipient == '': 
+        app_log.warning("Sender or recipient email is not defined.")
+        return
+    
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
                   f" from: {sender}, to: {recipient}")
     context = ssl.create_default_context()
