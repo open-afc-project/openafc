@@ -127,22 +127,22 @@ jobs:
         ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/stop_srvr.sh ${{ env.WD }} ${{ env.RAND }}"
 # }stop dev srvr
 
-# clean srvr {
-    - name: clean remote srvr
-      if: ${{ always() }}
-      run: |
-        ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/clean.sh ${{ env.WD }} ${{ env.RAND }}"
-# } clean srvr
+# # clean srvr {
+#     - name: clean remote srvr
+#       if: ${{ always() }}
+#       run: |
+#         ssh ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/clean.sh ${{ env.WD }} ${{ env.RAND }}"
+# # } clean srvr
 
-# close turn off server{
-    - name: stop RKF regression server
-      if: ${{ always() }}
-      run: |
-        aws ec2 stop-instances --instance-ids ${{secrets.RKF_AWS_SERVER_ID }} --region ${{ secrets.RKF_AWS_REGION }}     
-        echo "Stopping regression server..."
-        aws ec2 wait instance-stopped --instance-ids ${{ secrets.RKF_AWS_SERVER_ID }}  --region ${{ secrets.RKF_AWS_REGION }}
-        echo "Server stopped."    
+# # close turn off server{
+#     - name: stop RKF regression server
+#       if: ${{ always() }}
+#       run: |
+#         aws ec2 stop-instances --instance-ids ${{secrets.RKF_AWS_SERVER_ID }} --region ${{ secrets.RKF_AWS_REGION }}     
+#         echo "Stopping regression server..."
+#         aws ec2 wait instance-stopped --instance-ids ${{ secrets.RKF_AWS_SERVER_ID }}  --region ${{ secrets.RKF_AWS_REGION }}
+#         echo "Server stopped."    
      
-# } close ssh port 
+# # } close ssh port 
 
 
