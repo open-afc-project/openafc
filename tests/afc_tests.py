@@ -427,11 +427,11 @@ def send_email(cfg):
     """Send an email to predefined adress using gmail smtp server"""
     sender = cfg.get('email_from')
     recipient = cfg.get('email_to')
-    
+
     if sender is None or recipient is None: 
         app_log.warning("Sender or recipient email is not defined.")
         return
-    
+
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
                   f" from: {sender}, to: {recipient}")
     context = ssl.create_default_context()
@@ -1727,6 +1727,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
 
         # For saving test results option
         if not isinstance(cfg['outfile'], type(None)):
+            app_log.warning(f"upd_data: {upd_data}")
             test_report(cfg['outfile'][0], float(tm_secs),
                         test_case, req_id,
                         ("PASS" if test_res == AFC_OK else "FAIL"),
