@@ -108,8 +108,7 @@ class TestCfg(dict):
             params_data = {
                 'conn_type': self['conn_type'],
                 'debug': self['debug'],
-                # Changed cfg to self DO NOT COMMIT
-                'edebug': self['elaborated_debug'],
+                'edebug': cfg['elaborated_debug'],
                 'gui': self['gui']
             }
         else:
@@ -554,12 +553,7 @@ def _send_recv(cfg, req_data, ssn=None):
         app_log.error(f"{err}")
         return
 
-    # DONT CHECK
-    if rawresp.status_code == 302:
-        app_log.error(f"{err}")
-        return
 
-    print(rawresp)
     resp = rawresp.json()
 
     tId = resp.get('taskId')
@@ -1029,9 +1023,7 @@ def add_reqs(cfg):
         app_log.error('Missing input file')
         return AFC_ERR
 
-    # Add filename declaration DO NOT COMMIT
     filename = cfg['infile'][0]
-    print(filename)
     app_log.debug('%s() %s', inspect.stack()[0][3], filename)
 
     if not os.path.isfile(filename):
@@ -1719,20 +1711,16 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
 
             diffs = []
             hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
-            if test_case not in resps:
-                print(upd_data)
-                print(hash_obj.hexdigest())
+            diffs = comparator.compare_results(ref_str=resps[test_case][0],
+                                            result_str=upd_data)
+            if (resps[test_case][1] == hash_obj.hexdigest()) \
+                    if cfg['precision'] is None else (not diffs):
+                res = res_template.substitute(status="Ok")
             else:
-                diffs = comparator.compare_results(ref_str=resps[test_case][0],
-                                                result_str=upd_data)
-                if (resps[test_case][1] == hash_obj.hexdigest()) \
-                        if cfg['precision'] is None else (not diffs):
-                    res = res_template.substitute(status="Ok")
-                else:
-                    for line in diffs:
-                        app_log.error(f"  Difference: {line}")
-                    app_log.error(hash_obj.hexdigest())
-                    test_res = AFC_ERR
+                for line in diffs:
+                    app_log.error(f"  Difference: {line}")
+                app_log.error(hash_obj.hexdigest())
+                test_res = AFC_ERR
 
         if test_res == AFC_ERR:
             res = res_template.substitute(status="Fail")
@@ -1751,7 +1739,6 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
 
     app_log.info(f"Total testcases runtime : {round(accum_secs, 1)} secs")
 
-    # DO NOT CHECK
     if not isinstance(cfg['outfile'], type(None)):
         send_email(cfg)
 
@@ -1854,8 +1841,15 @@ def _convert_reqs_n_resps_to_dict(cfg):
             for req_index, row in enumerate(found_reqs)
         }
         if not isinstance(cfg['testcase_indexes'], type(None)):
-            test_indx = list(map(str.strip,
-                                 cfg.pop("testcase_indexes").split(',')))
+            test_indx = []
+            if '-' in cfg['testcase_indexes']:
+                values = cfg['testcase_indexes'].split('-')
+                for i in range(int(values[0]),int(values[1])+1):
+                    test_indx.append(str(i))
+            else:
+                test_indx = list(map(str.strip,
+                                    cfg.pop("testcase_indexes").split(',')))
+            print(test_indx)
             cfg.pop("testcase_ids")
         else:
             test_indx = [
@@ -2193,6 +2187,7 @@ def prepare_args(parser, cfg):
         app_log.error('Please use either "--testcase_indexes"'
                       ' or "--testcase_ids" but not both')
         return AFC_ERR
+
     return execution_map[cfg['cmd']][1](cfg)
 
 
@@ -2215,7 +2210,6 @@ def main():
     console_log.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
     app_log.addHandler(console_log)
 
-    
     res = AFC_OK
     parser = make_arg_parser()
     test_cfg = TestCfg()

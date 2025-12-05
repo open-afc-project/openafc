@@ -1618,7 +1618,6 @@ class ConfigRemove:
                 if not dataline:
                     break
                 new_rcrd = json.loads(dataline)
-
                 ap_rcrd = json_lookup('apConfig', new_rcrd, None)
                 user_rcrd = json_lookup('userConfig', new_rcrd, None)
                 username = json_lookup('username', user_rcrd, None)
@@ -1628,7 +1627,6 @@ class ConfigRemove:
                             User.email == username[0]).one()
                         LOGGER.debug('Found user id %d', user.id)
                         UserRemove(flaskapp, username[0])
-
                     except RuntimeError:
                         LOGGER.debug('Delete missing user %s', username[0])
                     except Exception as e:
