@@ -1847,7 +1847,11 @@ class MTLSDump:
                         all_cfg_rcrds = json_lookup('afcConfig', cfgs_rcrd, None)
                         for i in range(len(all_cfg_rcrds)):
                             region_rcrd = json_lookup('regionStr', all_cfg_rcrds[i], None)
+<<<<<<< HEAD
 		#validate the region string
+=======
+                            # validate the region string
+>>>>>>> 3cda741a7eb47df885ce44cdb80884d180a534f5
                             RulesetVsRegion.region_to_ruleset(
                                 region_rcrd[0], exc=werkzeug.exceptions.NotFound)
 
