@@ -100,8 +100,6 @@ jobs:
       run: |
         ssh  ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "curl -k https://localhost:${{ env.TEST_PORT }}/fbrat/www/index.html"
 
-    - name: Build the regression tests docker image on client side
-      run: docker build . -t afc-regression-test -f tests/Dockerfile
     - name: run ngnx-afcserver-rmq-worker path tests
       run: |
         ssh  ${{ secrets.RKF_SSH_USERNAME }}@${{ secrets.RKF_REGRESSION_SERVER_IP }} "bash -x ${{ env.WD }}/${{ env.REGRD }}/run_tests.sh  ${{ env.WD }} rtest:${{ env.RAND}} localhost ${{ env.TEST_PORT }}"

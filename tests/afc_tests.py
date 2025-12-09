@@ -1698,9 +1698,17 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         if isinstance(resp, type(None)):
             test_res = AFC_ERR
             all_test_res = AFC_ERR
-        elif cfg['webui'] is True:
-            pass
+        elif 'error' in resp:
+            app_log.error(f"Test case {req_id} returned error: {resp['error']}")
+            test_res = AFC_ERR  
         else:
+            if cfg['webui'] is True:
+                #remove the mapping info from the response
+                # to make sure the base data matches - not checking map results
+                parent = resp['availableSpectrumInquiryResponses'][0]
+                if 'vendorExtensions' in parent:
+                    parent.pop('vendorExtensions')
+
             json_lookup('availabilityExpireTime', resp, '0')
             upd_data = json.dumps(resp, sort_keys=True)
 
