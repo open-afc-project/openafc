@@ -419,7 +419,7 @@ def send_email(cfg):
                   f" from: {sender}, to: {recipient}")
     if isinstance(cfg['email_to'], type(None)):
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
-                  f" Not sending email because no receiver specified")
+                f" Not sending email because of no reciever")
         return
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
@@ -543,12 +543,7 @@ def _send_recv(cfg, req_data, ssn=None):
 									    as err :
 						    app_log.error(f "{err}") return
 
-<<<<<<< HEAD
 						    resp = rawresp.json()
-=======
-
-    resp = rawresp.json()
->>>>>>> 3cda741a7eb47df885ce44cdb80884d180a534f5
 
 								   tId = resp.get(
 						    'taskId') if ((cfg['conn_type'] == 'async') and
