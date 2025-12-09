@@ -429,6 +429,10 @@ def send_email(cfg):
     recipient = cfg['email_to']
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
                   f" from: {sender}, to: {recipient}")
+    if isinstance(cfg['email_to'], type(None)):
+        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
+                  f" Not sending email because of no reciever")
+        return
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
         server.login(sender, cfg['email_pwd'])
@@ -548,6 +552,7 @@ def _send_recv(cfg, req_data, ssn=None):
             requests.exceptions.ConnectionError) as err:
         app_log.error(f"{err}")
         return
+
 
     resp = rawresp.json()
 
@@ -1221,13 +1226,18 @@ def export_admin_config(cfg):
         found_aps = cur.fetchall()
         con.close()
 
+        afc = ''
+        for count, val in enumerate(found_cfg):
+            afc += str(val[1]) + ','
+        app_log.debug('Found AFCs: %s\n', afc[:-1])
+
         aps = ''
         idx = 0
         for count, val in enumerate(found_aps):
             aps += str(val[1]) + ','
         app_log.debug('Found APs: %s\n', aps[:-1])
 
-        out_str = '{"afcAdminConfig":' + found_cfg[0][1] + ', '\
+        out_str = '{"afcAdminConfig":{ "afcConfigs": [' + afc[:-1] + ']}' + ', '\
                   '"userConfig":' + found_user[0][1] + ', '\
                   '"apConfig":[' + aps[:-1] + ']}'
         fp_exp.write(out_str)
@@ -1702,7 +1712,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
             diffs = []
             hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
             diffs = comparator.compare_results(ref_str=resps[test_case][0],
-                                               result_str=upd_data)
+                                            result_str=upd_data)
             if (resps[test_case][1] == hash_obj.hexdigest()) \
                     if cfg['precision'] is None else (not diffs):
                 res = res_template.substitute(status="Ok")
@@ -1832,7 +1842,7 @@ def _convert_reqs_n_resps_to_dict(cfg):
         }
         if not isinstance(cfg['testcase_indexes'], type(None)):
             test_indx = list(map(str.strip,
-                                 cfg.pop("testcase_indexes").split(',')))
+                                cfg.pop("testcase_indexes").split(',')))
             cfg.pop("testcase_ids")
         else:
             test_indx = [
