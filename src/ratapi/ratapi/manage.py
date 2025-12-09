@@ -1558,25 +1558,27 @@ class ConfigAdd:
                             User.email == username[0]).one()
                         LOGGER.debug('New user id %d', user.id)
 
-                        cfg_rcrd = json_lookup('afcConfig', new_rcrd, None)
-                        region_rcrd = json_lookup('regionStr', cfg_rcrd, None)
-                        # validate the region string
-                        RulesetVsRegion.region_to_ruleset(
-                            region_rcrd[0], exc=werkzeug.exceptions.NotFound)
+                        cfgs_rcrd = json_lookup('afcConfigs', new_rcrd, None)
+                        all_cfg_rcrds = json_lookup('afcConfig', cfgs_rcrd, None)
+                        for i in range(len(all_cfg_rcrds)):
+                            region_rcrd = json_lookup('regionStr', all_cfg_rcrds[i], None)
+                            # validate the region string
+                            RulesetVsRegion.region_to_ruleset(
+                                region_rcrd[0], exc=werkzeug.exceptions.NotFound)
 
-                        config = AFCConfig.query.filter(
-                            AFCConfig.config['regionStr'].astext == region_rcrd[0]).first()
-                        als_log_afc_config_change(
-                            old_config=config.config if config else None,
-                            new_config=cfg_rcrd[0], user=username[0],
-                            region=region_rcrd[0], source='manage.py')
-                        if not config:
-                            config = AFCConfig(cfg_rcrd[0])
-                            config.config['regionStr'] = config.config['regionStr'].upper()
-                            db.session.add(config)
-                        else:
-                            config.config = cfg_rcrd[0]
-                            config.created = datetime.datetime.now()
+                            config = AFCConfig.query.filter(
+                                AFCConfig.config['regionStr'].astext == region_rcrd[0]).first()
+                            als_log_afc_config_change(
+                                old_config=config.config if config else None,
+                                new_config=all_cfg_rcrds[i], user=username[0],
+                                region=region_rcrd[0], source='manage.py')
+                            if not config:
+                                config = AFCConfig(all_cfg_rcrds[i])
+                                config.config['regionStr'] = config.config['regionStr'].upper()
+                                db.session.add(config)
+                            else:
+                                config.config = all_cfg_rcrds[i]
+                                config.created = datetime.datetime.now()
                         db.session.commit()
 
                 except Exception as e:
@@ -1626,7 +1628,7 @@ class ConfigRemove:
                             User.email == username[0]).one()
                         LOGGER.debug('Found user id %d', user.id)
                         UserRemove(flaskapp, username[0])
-
+                        
                     except RuntimeError:
                         LOGGER.debug('Delete missing user %s', username[0])
                     except Exception as e:

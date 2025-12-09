@@ -429,6 +429,10 @@ def send_email(cfg):
     recipient = cfg['email_to']
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
                   f" from: {sender}, to: {recipient}")
+    if isinstance(cfg['email_to'], type(None)):
+        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
+                  f" Not sending email because no receiver specified")
+        return
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
         server.login(sender, cfg['email_pwd'])
@@ -1221,13 +1225,18 @@ def export_admin_config(cfg):
         found_aps = cur.fetchall()
         con.close()
 
+        afc = ''
+        for count, val in enumerate(found_cfg):
+            afc += str(val[1]) + ','
+        app_log.debug('Found AFCs: %s\n', afc[:-1])
+
         aps = ''
         idx = 0
         for count, val in enumerate(found_aps):
             aps += str(val[1]) + ','
         app_log.debug('Found APs: %s\n', aps[:-1])
 
-        out_str = '{"afcAdminConfig":' + found_cfg[0][1] + ', '\
+        out_str = '{"afcAdminConfig":{ "afcConfigs": [' + afc[:-1] + ']}' + ', '\
                   '"userConfig":' + found_user[0][1] + ', '\
                   '"apConfig":[' + aps[:-1] + ']}'
         fp_exp.write(out_str)
