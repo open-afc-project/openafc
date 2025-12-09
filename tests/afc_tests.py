@@ -543,7 +543,12 @@ def _send_recv(cfg, req_data, ssn=None):
 									    as err :
 						    app_log.error(f "{err}") return
 
+<<<<<<< HEAD
 						    resp = rawresp.json()
+=======
+
+    resp = rawresp.json()
+>>>>>>> 3cda741a7eb47df885ce44cdb80884d180a534f5
 
 								   tId = resp.get(
 						    'taskId') if ((cfg['conn_type'] == 'async') and
