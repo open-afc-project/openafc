@@ -428,7 +428,7 @@ def send_email(cfg):
     sender = cfg.get('email_from')
     recipient = cfg.get('email_to')
 
-    if sender is None or recipient is None: 
+    if sender is None or recipient is None:
         app_log.warning("Sender or recipient email is not defined.")
         return
 
@@ -1700,10 +1700,10 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
             all_test_res = AFC_ERR
         elif 'error' in resp:
             app_log.error(f"Test case {req_id} returned error: {resp['error']}")
-            test_res = AFC_ERR  
+            test_res = AFC_ERR
         else:
             if cfg['webui'] is True:
-                #remove the mapping info from the response
+                # remove the mapping info from the response
                 # to make sure the base data matches - not checking map results
                 parent = resp['availableSpectrumInquiryResponses'][0]
                 if 'vendorExtensions' in parent:
