@@ -1744,7 +1744,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
 
         # For saving test results option
         if not isinstance(cfg['outfile'], type(None)):
-            app_log.warning(f"upd_data: {upd_data}")
+            app_log.debug(f"upd_data: {upd_data}")
             test_report(cfg['outfile'][0], float(tm_secs),
                         test_case, req_id,
                         ("PASS" if test_res == AFC_OK else "FAIL"),
