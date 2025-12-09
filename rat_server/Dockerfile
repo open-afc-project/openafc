@@ -28,6 +28,7 @@ RUN apk add --update --no-cache librdkafka-dev libffi
 COPY rat_server/requirements.txt /wd/
 RUN apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base \
     expat expat-dev libffi-dev && \
+    pip3 install --upgrade pip setuptools && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base expat-dev libffi-dev && \
     rm -f /wd/requirements.txt

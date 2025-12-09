@@ -18,9 +18,10 @@ ENV PYTHONPATH=/usr/lib/python${AFC_PYTHONVERSION}/site-packages:/usr/local/lib/
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka
 #   version in requirements.txt may need to be updated on Alpine version change
-RUN apk add --update --no-cache librdkafka-dev libffi
+RUN apk add --update --no-cache librdkafka-dev libffi 
 COPY msghnd/requirements.txt /wd/
 RUN apk add --update --no-cache python3-dev build-base libffi-dev && \
+    pip3 install --upgrade pip setuptools  && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base libffi-dev && \
     rm -f /wd/requirements.txt

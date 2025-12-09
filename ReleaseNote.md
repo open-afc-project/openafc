@@ -1,4 +1,17 @@
 # Release Note
+## **Version and Date**
+|Version|**406*|
+| :- | :- |
+|**Date**|**11/11/2025**|
+
+## **Issues Addressed**
+ * 406: Add setuptools to python3.12-alpine
+
+## **Interface Changes**
+* None
+
+## **Testing Done**
+Clean docker build succeed
 
 ## **Version and Date**
 |Version|**391*|
