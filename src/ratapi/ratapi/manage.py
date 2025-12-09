@@ -1,8 +1,8 @@
 #
-# Portions copyright (C) 2021 Broadcom.
-# to the Broadcom Inc. corporate affiliate that owns the software below.
-# This work is licensed under the OpenAFC Project License, a copy of which
-# is included with this software program.
+#Portions copyright(C) 2021 Broadcom.
+#to the Broadcom Inc.corporate affiliate that owns the software below.
+#This work is licensed under the OpenAFC Project License, a copy of which
+#is included with this software program.
 #
 ''' External management of this application.
 '''
@@ -43,7 +43,7 @@ def json_lookup(key, json_obj, val):
         '''
         if isinstance(json_obj, dict):
             for k, v in json_obj.items():
-                # LOGGER.debug('%s ... %s', k, type(v))
+#LOGGER.debug('%s ... %s', k, type(v))
                 if k == key:
                     keepit.append(v)
                     if val:
@@ -71,8 +71,7 @@ def get_or_create(session, model, **kwargs):
         session.commit()
         return instance
 
-
-# 'data' group
+#'data' group
 @click.group(name='data')
 @click.option('--log-level', help='Console logging lowest level displayed.')
 def data_group(log_level):
@@ -98,7 +97,7 @@ class CleanHistory:  # pylint: disable=abstract-method
         LOGGER.debug('Removing history files from "%s"...', history_dir)
 
         now = time.time()
-        # delete file if older than 14 days
+#delete file if older than 14 days
         cutoff = now - (14 * 86400)
 
         logs = os.listdir(history_dir)
@@ -123,12 +122,12 @@ class CleanTmpFiles:
     def __call__(self, flaskapp):
 
         task_queue = flaskapp.config['TASK_QUEUE']
-        # the [7:] removes file:// prefix
+#the[7 : ] removes file: // prefix
 
         LOGGER.debug('Removing temp files from "%s"...', task_queue)
 
         now = time.time()
-        # delete file if older than 14 days
+#delete file if older than 14 days
         cutoff = now - (14 * 86400)
 
         logs = os.listdir(task_queue)
@@ -182,8 +181,7 @@ class DbCreate:
             import db_creator
 
             if if_absent:
-                try:
-                    with db.engine.connect():
+try : with db.engine.connect():
                         LOGGER.info("Database already exists")
                         return
                 except sqlalchemy.exc.SQLAlchemyError:
@@ -248,24 +246,20 @@ class DbExport:
                         'ap': []
                     }
 
-                    try:
-                        user_cfg[key]['username'] = user.username
-                    except BaseException:
-                        # if old db has no username field, use email field.
-                        user_cfg[key]['username'] = user.email
+	try : user_cfg
+		[key]['username'] = user.username except BaseException :
+#if old db has no username field, use email field.
+			user_cfg[key]['username'] = user.email
 
-                    try:
-                        user_cfg[key]['org'] = user.org
-                    except BaseException:
-                        # if old db has no org field, derive from email field.
-                        if '@' in user.email:
-                            user_cfg[key]['org'] = user.email[user.email.index(
-                                '@') + 1:]
-                        else:  # dummy user - dummy org
-                            user_cfg[key]['org'] = ""
+		try : user_cfg
+			[key]['org'] = user.org except BaseException :
+	#if old db has no org field, derive from email field.
+				if '@' in user.email :
+				user_cfg[key]['org'] = user.email
+						       [user.email.index('@') + 1:] else :
+				#dummy user - dummy org user_cfg[key]['org'] = ""
 
-            try:
-                limits = db.session.query(Limit).filter(id=0).first()
+			try : limits = db.session.query(Limit).filter(id=0).first()
                 limit = {'min_eirp': float(
                     limits.min_eirp), 'enforce': bool(limits.enforce)}
 
@@ -280,8 +274,8 @@ class DbExport:
 
 
 def setUserIdNextVal():
-    # Set nextval for the sequence so that next user record
-    # will not reuse older id.
+		#Set nextval for the sequence so that next user record
+		#will not reuse older id.
     cmd = 'select max(id) from aaa_user'
     res = db.session.execute(cmd)
     val = res.fetchone()[0]
@@ -313,52 +307,50 @@ class DbImport:
                     dataline = fp_src.readline()
                     if not dataline:
                         break
-                    # add user, APs and server configuration
+		#add user, APs and server configuration
                     new_rcrd = json.loads(dataline)
                     user_rcrd = json_lookup('userConfig', new_rcrd, None)
                     if user_rcrd:
                         username = json_lookup('username', user_rcrd, None)
-                        try:
-                            UserCreate(flaskapp, user_rcrd[0], True)
-                        except RuntimeError:
+				try : UserCreate(flaskapp, user_rcrd[0], True) except RuntimeError:
                             LOGGER.debug('User %s already exists', username[0])
 
                     else:
                         limit = json_lookup('Limit', new_rcrd, None)
-                        try:
-                            limits = db.session.query(
-                                Limit).filter_by(id=0).first()
-                            # insert case
-                            if limits is None:
-                                limits = Limit(limit[0]['min_eirp'])
-                                db.session.add(limits)
-                            elif (limit[0]['enforce'] == False):
-                                limits.enforce = False
-                            else:
-                                limits.min_eirp = limit[0]['min_eirp']
-                                limits.enforce = True
-                            db.session.commit()
-                        except BaseException:
-                            raise RuntimeError(
-                                "Can't commit DB for EIRP limits")
+					try : limits
+						= db.session.query(Limit).filter_by(id = 0).first()
+		#insert case
+							  if limits is None : limits =
+							Limit(limit[0]['min_eirp']) db.session
+								.add(limits)
+									elif (limit[0]['enforce'] ==
+									      False) :
+							limits.enforce = False else :
+							limits.min_eirp = limit[0]
+									       ['min_eirp'] limits
+										       .enforce =
+								True db.session
+									.commit() except
+										BaseException :
+							raise RuntimeError("Can't commit DB for "
+									   "EIRP limits")
 
-                setUserIdNextVal()
+								setUserIdNextVal()
 
-
-class DbUpgrade:
+									class DbUpgrade :
     ''' Upgrade User Database. '''
 
-    def __init__(self, *args, **kwargs):
-        LOGGER.debug('DbUpgrade.__init__()')
+							def
+							__init__(self, *args, **kwargs) :
+							LOGGER.debug('DbUpgrade.__init__()')
 
-    def __call__(self, flaskapp):
-        with flaskapp.app_context():
-            import flask
-            from afcmodels.aaa import Ruleset
-            from flask_migrate import (upgrade, stamp)
-            setUserIdNextVal()
-            try:
-                from afcmodels.aaa import User
+								def __call__(self, flaskapp) :
+							with flaskapp.app_context() :
+							import flask from afcmodels.aaa import
+								Ruleset from flask_migrate
+									import(upgrade, stamp)
+										setUserIdNextVal()
+						try : from afcmodels.aaa import User
                 user = db.session.query(
                     User).first()  # pylint: disable=no-member
             except Exception as exception:
@@ -379,8 +371,7 @@ class DbUpgrade:
             for rule in ruleset_list:
                 get_or_create(db.session, Ruleset, name=rule)
 
-
-# 'user' group
+		#'user' group
 @click.group(name='user')
 @click.option('--log-level', help='Console logging lowest level displayed.')
 def user_group(log_level):
@@ -413,9 +404,9 @@ class UserCreate:
 
         if 'UPGRADE_REQ' in flaskapp.config and flaskapp.config['UPGRADE_REQ']:
             return
-        try:
-            if not hashed:
-                # hash password field in non OIDC mode
+							try:
+								if not hashed:
+		#hash password field in non OIDC mode
                 if isinstance(password_in, str):
                     password = password_in.strip()
                 else:
@@ -423,9 +414,9 @@ class UserCreate:
                         password = pwfile.read().strip()
 
                 if flaskapp.config['OIDC_LOGIN']:
-                    # OIDC, password is never stored locally
-                    # Still we hash it so that if we switch back
-                    # to non OIDC, the hash still match, and can be logged in
+		#OIDC, password is never stored locally
+		#Still we hash it so that if we switch back
+		#to non OIDC, the hash still match, and can be logged in
                     from passlib.context import CryptContext
                     password_crypt_context = CryptContext(['bcrypt'])
                     passhash = password_crypt_context.encrypt(password_in)
@@ -436,14 +427,13 @@ class UserCreate:
                 passhash = password_in
 
             with flaskapp.app_context():
-                # select count(*) from aaa_user where email = ?
+		#select count(*) from aaa_user where email = ?
                 if User.query.filter(User.email == email).count() > 0:
                     raise RuntimeError(
                         'Existing user found with email "{0}"'.format(email))
 
                 if not org:
-                    try:
-                        org = email[email.index('@') + 1:]
+									try : org = email[email.index('@') + 1:]
                     except BaseException:
                         org = ""
 
@@ -511,8 +501,8 @@ class UserCreate:
 
     def __call__(self, flaskapp, username, password_in, role, hashed=False,
                  org=None, email=None):
-        # If command does not provide email.  Populate email field with
-        # username
+		#If command does not provide email.Populate email field with
+		#username
         if not email:
             email = username
         self._create_user(flaskapp, None, username, email, password_in, role,
@@ -539,8 +529,7 @@ class UserUpdate:
         if 'UPGRADE_REQ' in flaskapp.config and flaskapp.config['UPGRADE_REQ']:
             return
 
-        try:
-            with flaskapp.app_context():
+										try : with flaskapp.app_context():
                 user = User.getemail(email)
 
                 if user:
@@ -591,9 +580,9 @@ class UserRemove:
         LOGGER.debug('UserRemove._remove_user() %s', email)
 
         with flaskapp.app_context():
-            try:
-                # select * from aaa_user where email = ? limit 1
-                user = User.query.filter(User.email == email).one()
+											try :
+		#select *from aaa_user where email = ? limit 1
+												user = User.query.filter(User.email == email).one()
             except sqlalchemy.orm.exc.NoResultFound:
                 raise RuntimeError(
                     'No user found with email "{0}"'.format(email))
@@ -628,9 +617,9 @@ class UserList:
 
         with flaskapp.app_context():
             user_info = {}
-            # select email, name from aaa_user as a join aaa_user_role as aur
-            # on au.id = aur.user_id join aaa_role as ar on ar.id =
-            # aur.role_id;
+		#select email, name from aaa_user as a join aaa_user_role as aur
+		#on au.id = aur.user_id join aaa_role as ar on ar.id =
+		#aur.role_id;
             for user, _, role in db.session.query(
                     User, UserRole, Role).filter(
                     User.id == UserRole.user_id).filter(
@@ -644,7 +633,7 @@ class UserList:
                 else:
                     user_info[key] = role.name
 
-            # Find all users without roles and show them last
+		#Find all users without roles and show them last
             for user in db.session.query(User).filter(~User.roles.any()).all():
                 key = user.email + ":" + user.org + ":" + \
                     str(user.id) + ":" + user.username
@@ -656,8 +645,7 @@ class UserList:
 
             print(table)
 
-
-# 'ap-deny' group
+		#'ap-deny' group
 @click.group(name='ap-deny')
 @click.option('--log-level', help='Console logging lowest level displayed.')
 def ap_deny_group(log_level):
@@ -738,9 +726,9 @@ class AccessPointDenyRemove:
         from afcmodels.aaa import AccessPointDeny
         LOGGER.debug('AccessPointDenyRemove._remove_ap() %s', serial)
         with flaskapp.app_context():
-            try:
-                # select * from access_point as ap where ap.serial_number = ?
-                ap = AccessPointDeny.query.filter(
+												try :
+		#select *from access_point as ap where ap.serial_number = ?
+													ap = AccessPointDeny.query.filter(
                     AccessPointDeny.serial_number == serial).\
                     filter(AccessPointDeny.certification_id == cert_id).one()
 
@@ -781,8 +769,7 @@ class AccessPointDenyList:
                                ap.ruleset.name, ap.org.name])
             print(table)
 
-
-# 'cert_id' group
+		#'cert_id' group
 @click.group(name='cert_id')
 @click.option('--log-level', help='Console logging lowest level displayed.')
 def cert_id_group(log_level):
@@ -825,102 +812,234 @@ class CertIdRemove:
         from afcmodels.aaa import CertId
         LOGGER.debug('CertIdRemove._remove_cert_id() %s', cert_id)
         with flaskapp.app_context():
-            try:
-                cert = CertId.query.filter(
-                    CertId.certification_id == cert_id).one()
-            except sqlalchemy.orm.exc.NoResultFound:
-                raise RuntimeError(
-                    'No certificate found with id "{0}"'.format(cert_id))
-            db.session.delete(cert)  # pylint: disable=no-member
-            db.session.commit()  # pylint: disable=no-member
+													try : cert
+														= CertId.query
+															  .filter(CertId.certification_id ==
+																  cert_id)
+															  .one() except
+																  sqlalchemy
+															  .orm
+															  .exc
+															  .NoResultFound :
+															raise RuntimeError(
+																  'No certificate found with id "{0}"'
+																	  .format(cert_id))
+																db
+															  .session
+															  .delete (
+																  cert) #pylint :
+															disable =
+															no -
+															member db
+																.session
+																.commit() #pylint :
+															disable =
+																no -
+																member
 
-    def __init__(self, flaskapp=None, cert_id=None):
-        if flaskapp:
-            self._remove_cert_id(flaskapp, cert_id)
+																	def
+																	__init__(
+																		self,
+																		flaskapp =
+																			None,
+																		cert_id =
+																			None) :
+															if flaskapp :
+															self._remove_cert_id(
+																    flaskapp,
+																    cert_id)
 
-    def __call__(self, flaskapp, cert_id):
-        self._remove_cert_id(flaskapp, cert_id)
+																def __call__(
+																	self,
+																	flaskapp,
+																	cert_id) :
+															self
+																._remove_cert_id(
+																	flaskapp,
+																	cert_id)
 
+																	@cert_id_group
+																.command(
+																	'create')
+																	@click
+																.option('--cert_id',
+																	type = str,
+																	required =
+																		True,
+																	help = 'certification id')
+																	@click
+																.option('--ruleset_id',
+																	type = str,
+																	required =
+																		True,
+																	help = 'ruleset id')
+																	@click
+																.option('--location',
+																	type = int,
+																	required =
+																		True,
+																	help = "location. 1 indoor - 2 outdoor - 3 both")
+																	@with_appcontext def cert_id_create(
+																		cert_id,
+																		ruleset_id,
+																		location) :
+															CertIdCreate()(flaskapp =
+																	       flask.current_app,
+																       cert_id =
+																	       cert_id,
+																       ruleset_id =
+																	       ruleset_id,
+																       location =
+																	       location)
 
-@cert_id_group.command('create')
-@click.option('--cert_id', type=str, required=True, help='certification id')
-@click.option('--ruleset_id', type=str, required=True, help='ruleset id')
-@click.option('--location', type=int, required=True,
-              help="location. 1 indoor - 2 outdoor - 3 both")
-@with_appcontext
-def cert_id_create(cert_id, ruleset_id, location):
-    CertIdCreate()(flaskapp=flask.current_app, cert_id=cert_id,
-                   ruleset_id=ruleset_id, location=location)
-
-
-class CertIdCreate:
+																class
+															CertIdCreate :
     ''' Create a new certification Id. '''
 
-    def _create_cert_id(self, flaskapp, cert_id, ruleset_id, location=0):
-        from contextlib import closing
-        import datetime
-        from afcmodels.aaa import CertId, Ruleset, Organization
-        LOGGER.debug('CertIdCreate._create_cert_id() %s %s',
-                     cert_id, ruleset_id)
-        with flaskapp.app_context():
-            if not ruleset_id:
-                raise RuntimeError("Ruleset is required")
+															def _create_cert_id(
+																	self,
+																	flaskapp,
+																	cert_id,
+																	ruleset_id,
+																	location =
+																		0) :
+															from contextlib import closing
+																import datetime
+																	from afcmodels
+																.aaa import
+																	CertId,
+															Ruleset,
+															Organization LOGGER
+																.debug('CertIdCreate._create_cert_id() %s %s',
+																       cert_id,
+																       ruleset_id)
+																	with flaskapp
+																.app_context() :
+															if not ruleset_id :
+															raise RuntimeError(
+																"Ruleset is required")
 
-            # validate ruleset
-            ruleset = Ruleset.query.filter_by(name=ruleset_id).first()
-            if not ruleset:
-                raise RuntimeError("Invalid Ruleset")
+		#validate ruleset
+																ruleset =
+																Ruleset.query
+																	.filter_by(
+																		name = ruleset_id)
+																	.first() if not ruleset :
+															raise RuntimeError("Invalid Ruleset")
 
-            if CertId.query.filter(
-                    CertId.certification_id == cert_id).count() > 0:
-                raise RuntimeError(
-                    'Existing certificate found with id "{0}"'.format(cert_id))
+																if CertId
+																	.query
+																	.filter(CertId.certification_id ==
+																		cert_id)
+																	.count() >
+																0 :
+															raise RuntimeError(
+																	'Existing certificate found with id "{0}"'
+																		.format(cert_id))
 
-            cert = CertId(certification_id=cert_id, location=location,
-                          downloaded=False)
-            ruleset.cert_ids.append(cert)
+																cert = CertId(certification_id =
+																		      cert_id,
+																	      location =
+																		      location,
+																	      downloaded =
+																		      False) ruleset
+																	       .cert_ids
+																	       .append(cert)
 
-            db.session.add(cert)  # pylint: disable=no-member
-            db.session.commit()  # pylint: disable=no-member
+																		       db
+																	       .session
+																	       .add(cert) #pylint :
+															disable = no -
+																  member
+																  db.session
+																	  .commit() #pylint :
+															disable = no - member
 
-    def __init__(self, flaskapp=None, cert_id=None,
-                 ruleset_id=None, location=0):
-        if flaskapp and cert_id:
-            self._create_cert_id(flaskapp, cert_id, ruleset_id=ruleset_id,
-                                 location=location)
+																	  def
+																	  __init__(
+																		  self,
+																		  flaskapp =
+																			  None,
+																		  cert_id =
+																			  None,
+																		  ruleset_id =
+																			  None,
+																		  location =
+																			  0) :
+															if flaskapp
+																  and
+																  cert_id :
+															self._create_cert_id(
+																    flaskapp,
+																    cert_id,
+																    ruleset_id =
+																	    ruleset_id,
+																    location =
+																	    location)
 
-    def __call__(self, flaskapp, cert_id, ruleset_id=None, location=0):
-        self._create_cert_id(flaskapp, cert_id, ruleset_id, location)
+																def
+															__call__(self,
+																 flaskapp,
+																 cert_id,
+																 ruleset_id =
+																	 None,
+																 location =
+																	 0) :
+															self
+																._create_cert_id(
+																	flaskapp,
+																	cert_id,
+																	ruleset_id,
+																	location)
 
+																	@cert_id_group
+																.command(
+																	'sweep')
+																	@click
+																.option('--country',
+																	type = str,
+																	help = 'country e.g. US or CA')
+																	@with_appcontext def
+															cert_id_sweep(country) :
+															CertIdSweep()(flaskapp =
+																	      flask.current_app,
+																      country =
+																	      country)
 
-@cert_id_group.command('sweep')
-@click.option('--country', type=str, help='country e.g. US or CA')
-@with_appcontext
-def cert_id_sweep(country):
-    CertIdSweep()(flaskapp=flask.current_app, country=country)
-
-
-class CertIdSweep:
+																class
+															CertIdSweep :
     '''Lists all access points'''
 
-    def sweep_canada(self, flaskapp):
-        import csv
-        import requests
-        from afcmodels.aaa import CertId, Ruleset
-        import datetime
-        now = datetime.datetime.now()
+															def
+															sweep_canada(self,
+																     flaskapp) :
+															import csv
+															import
+															requests
+															from
+															afcmodels
+																.aaa
+															import
+															CertId
+														,
+															Ruleset import
+															datetime
+															now = datetime.datetime
+																      .now()
 
-        with flaskapp.app_context():
-            url = \
-                "https://www.ic.gc.ca/engineering/Certified_Standard_Power_Access_Points_6GHz.csv"
-            headers = {
-                'accept': 'text/html,application/xhtml+xml,application/xml',
-                'cache-control': 'max-age=0',
-                'content-type': 'application/x-www-form-urlencoded',
-                'user-agent': 'rat_server/1.0'
-            }
-            try:
-                timeout = os.environ.get("REQUEST_TIMEOUT_SEC")
+																	      with
+															      flaskapp.app_context() :
+															url = "https://www.ic.gc.ca/engineering/Certified_Standard_Power_Access_Points_6GHz.csv" headers = {
+																'accept':
+																	'text/html,application/xhtml+xml,application/xml',
+																'cache-control':
+																	'max-age=0',
+																'content-type':
+																	'application/x-www-form-urlencoded',
+																'user-agent':
+																	'rat_server/1.0'
+															}
+														try : timeout = os.environ.get("REQUEST_TIMEOUT_SEC")
                 if timeout is not None:
                     timeout = float(timeout)
                 with requests.get(url, headers, stream=True, timeout=timeout) as r:
@@ -938,8 +1057,7 @@ class CertIdSweep:
                         RulesetVsRegion.region_to_ruleset(
                             "CA", exc=werkzeug.exceptions.NotFound)
                     for row in rdr:
-                        try:
-                            cert_id = row[7]
+															try : cert_id = row[7]
                             code = int(row[6])
                             if code == 103:
                                 location = CERT_ID_LOCATION_OUTDOOR
@@ -965,7 +1083,7 @@ class CertIdSweep:
                                     db.session.add(cert)
                             cert_ids.append(cert_id)
                         except BaseException:
-                            # ignore badly formatted rows
+		#ignore badly formatted rows
                             pass
                     ruleset_id = \
                         Ruleset.query.filter_by(name=ruleset_id_str).first().id
@@ -1002,19 +1120,29 @@ class CertIdSweep:
             {'beginDate': '01-01-2020', 'endDate': now.strftime("%m-%d-%Y")}
         for _ in range(5):
             with flaskapp.app_context():
-                try:
-                    timeout = os.environ.get("REQUEST_TIMEOUT_SEC")
-                    if timeout is not None:
-                        timeout = float(timeout)
-                    resp = requests.get(url, headers=headers, params=params,
-                                        timeout=timeout)
-                    if resp.status_code == 200:
-                        cert_ids = []
-                        ruleset_id_str = \
-                            RulesetVsRegion.region_to_ruleset(
-                                "US", exc=werkzeug.exceptions.NotFound)
-                        try:
-                            for cert_info in resp.json():
+																try : timeout
+																	= os.environ
+																		  .get("REQUEST_TIMEOUT_SEC") if timeout
+																			  is not None :
+																		timeout = float(
+																		timeout) resp =
+																		requests.get(url,
+																			     headers =
+																				     headers,
+																			     params =
+																				     params,
+																			     timeout =
+																				     timeout) if resp
+																			.status_code ==
+																		200 :
+																		cert_ids = [] ruleset_id_str =
+																			RulesetVsRegion
+																				.region_to_ruleset(
+																					"US",
+																					exc = werkzeug.exceptions
+																						      .NotFound)
+																	try:
+			    for cert_info in resp.json():
                                 if cert_info.get('equipmentClass') != '6SD':
                                     continue
                                 fcc_id = cert_info.get('fccid')
@@ -1099,8 +1227,7 @@ class CertIdSweep:
         else:
             raise RuntimeError('Unknown country: {0}'.format(country))
 
-
-# 'org' group
+		#'org' group
 @click.group(name='org')
 @click.option('--log-level', help='Console logging lowest level displayed.')
 def org_group(log_level):
@@ -1157,9 +1284,9 @@ class OrganizationRemove:
         from afcmodels.aaa import Organization
         LOGGER.debug('Organization._remove_org() %s', name)
         with flaskapp.app_context():
-            try:
-                # select * from access_point as ap where ap.serial_number = ?
-                org = Organization.query.filter(
+				    try :
+		#select *from access_point as ap where ap.serial_number = ?
+					    org = Organization.query.filter(
                     Organization.name == name).one()
                 if not org:
                     raise RuntimeError('No organization found')
@@ -1199,8 +1326,7 @@ class OrganizationList:
                 table.add_row([org.name])
             print(table)
 
-
-# 'mtls' group
+		#'mtls' group
 @click.group(name='mtls')
 @click.option('--log-level', help='Console logging lowest level displayed.')
 def mtls_group(log_level):
@@ -1270,8 +1396,7 @@ class MTLSRemove:
             raise RuntimeError('mtls id required')
 
         with flaskapp.app_context():
-            try:
-                mtls = MTLS.query.filter(MTLS.id == id).one()
+					    try : mtls = MTLS.query.filter(MTLS.id == id).one()
             except sqlalchemy.orm.exc.NoResultFound:
                 raise RuntimeError(
                     'No mtls certificate found with id"{0}"'.format(id))
@@ -1333,192 +1458,343 @@ class MTLSDump:
         filename = dst
 
         with flaskapp.app_context():
-            try:
-                mtls = MTLS.query.filter(MTLS.id == id).one()
-            except sqlalchemy.orm.exc.NoResultFound:
-                raise RuntimeError(
-                    'No mtls certificate found with id"{0}"'.format(id))
+						    try : mtls
+							    = MTLS.query.filter(MTLS.id == id)
+								      .one() except sqlalchemy.orm
+								      .exc
+								      .NoResultFound :
+								    raise RuntimeError(
+									      'No mtls certificate found with id"{0}"'
+										      .format(id))
 
-            with open(filename, 'w') as fpout:
-                fpout.write("%s" % (mtls.cert))
+									    with
+									    open(filename, 'w')
+										    as fpout :
+								    fpout.write("%s" % (mtls.cert))
 
-    def __init__(self, flaskapp=None, id=None, dst=None):
-        if flaskapp and id and filename:
-            self._dump_mtls(flaskapp, id, filename)
+									    def __init__(
+										    self,
+										    flaskapp = None,
+										    id = None,
+										    dst = None) :
+								    if flaskapp and
+							      id and
+							      filename :
+								    self._dump_mtls(flaskapp,
+										    id,
+										    filename)
 
-    def __call__(self, flaskapp, id, dst):
-        self._dump_mtls(flaskapp, id, dst)
+									    def __call__(self,
+											 flaskapp,
+											 id,
+											 dst) :
+								    self
+									    ._dump_mtls(flaskapp,
+											id,
+											dst)
 
+		#'celery' group
+										    @click
+									    .group(name = 'celery')
+										    @click
+									    .option('--log-level',
+										    help = 'Console logging lowest level displayed.')
+										    def celery_group(
+											    log_level) :
+								    pass
 
-# 'celery' group
-@click.group(name='celery')
-@click.option('--log-level', help='Console logging lowest level displayed.')
-def celery_group(log_level):
-    pass
+								    @celery_group.command('status')
+									    @with_appcontext def
+										    celery_status() :
+								    CeleryStatus()(
+									    flaskapp =
+										    flask.current_app)
 
-
-@celery_group.command('status')
-@with_appcontext
-def celery_status():
-    CeleryStatus()(flaskapp=flask.current_app)
-
-
-class CeleryStatus:  # pylint: disable=abstract-method
+									    class CeleryStatus :
+								    #pylint : disable =
+								      abstract -
+								      method
     ''' Get status of celery workers '''
 
-    def __call__(self, flaskapp):  # pylint: signature-differs
-        import subprocess
-        subprocess.call(['celery', 'status'])
+								      def __call__(self, flaskapp) :
+								    #pylint :
+								    signature -
+								    differs import subprocess subprocess
+									    .call([
+										    'celery',
+										    'status'
+									    ])
 
+										    @celery_group
+									    .command('test') @click
+									    .argument(
+										    'request_type',
+										    type = click.Choice([
+											    'PointAnalysis',
+											    'ExclusionZoneAnalysis',
+											    'HeatmapAnalysis'
+										    ])) @click
+									    .argument(
+										    'request_file',
+										    type = click.Path(
+											    exists =
+												    True))
+										    @click
+									    .argument(
+										    'afc_config',
+										    type = click.Path(
+											    exists =
+												    True))
+										    @click
+									    .option('--response-file',
+										    default = None,
+										    help = 'destination for json results')
+										    @click
+									    .option('--afc-engine',
+										    default = None)
+										    @click
+									    .option('--user-id',
+										    type = int,
+										    default = 1)
+										    @click
+									    .option('--username',
+										    default =
+											    'test_user')
+										    @click
+									    .option('--response-dir',
+										    default = None)
+										    @click
+									    .option('--temp-dir',
+										    default =
+											    './test-celery-tmp')
+										    @click
+									    .option('--history-dir',
+										    default = None)
+										    @click
+									    .option('--debug',
+										    is_flag =
+											    True) @with_appcontext
+										    def celery_test(
+											    request_type,
+											    request_file,
+											    afc_config,
+											    response_file,
+											    user_id,
+											    username,
+											    response_dir,
+											    temp_dir,
+											    history_dir) :
+								    TestCelery()(
+									    flaskapp =
+										    flask.current_app,
+									    request_type =
+										    request_type,
+									    request_file =
+										    request_file,
+									    afc_config = afc_config,
+									    response_file =
+										    response_file,
+									    user_id = user_id,
+									    username = username,
+									    response_dir =
+										    response_dir,
+									    temp_dir = temp_dir,
+									    history_dir =
+										    history_dir)
 
-@celery_group.command('test')
-@click.argument('request_type', type=click.Choice(['PointAnalysis', 'ExclusionZoneAnalysis', 'HeatmapAnalysis']))
-@click.argument('request_file', type=click.Path(exists=True))
-@click.argument('afc_config', type=click.Path(exists=True))
-@click.option('--response-file', default=None, help='destination for json results')
-@click.option('--afc-engine', default=None)
-@click.option('--user-id', type=int, default=1)
-@click.option('--username', default='test_user')
-@click.option('--response-dir', default=None)
-@click.option('--temp-dir', default='./test-celery-tmp')
-@click.option('--history-dir', default=None)
-@click.option('--debug', is_flag=True)
-@with_appcontext
-def celery_test(request_type, request_file, afc_config, response_file, user_id,
-                username, response_dir, temp_dir, history_dir):
-    TestCelery()(flaskapp=flask.current_app, request_type=request_type,
-                 request_file=request_file, afc_config=afc_config,
-                 response_file=response_file, user_id=user_id,
-                 username=username, response_dir=response_dir,
-                 temp_dir=temp_dir, history_dir=history_dir)
-
-
-class TestCelery:  # pylint: disable=abstract-method
+									    class TestCelery :
+								    #pylint :
+								    disable = abstract -
+									      method
     ''' Run celery task in isolation '''
 
-    def __call__(
-            self,
-            flaskapp,
-            request_type,
-            request_file,
-            afc_config,
-            response_file,
-            user_id,
-            username,
-            response_dir,
-            temp_dir,
-            history_dir):
-        with flaskapp.app_context():
-            from afc_worker import run
-            import flask
+									      def __call__(
+										      self,
+										      flaskapp,
+										      request_type,
+										      request_file,
+										      afc_config,
+										      response_file,
+										      user_id,
+										      username,
+										      response_dir,
+										      temp_dir,
+										      history_dir) :
+								    with flaskapp
+									    .app_context() :
+								    from afc_worker import run
+									    import flask
 
-            if not os.path.exists(temp_dir):
-                os.makedirs(temp_dir)
+								    if not os.path
+									    .exists(temp_dir) :
+								    os.makedirs(temp_dir)
 
-            if response_file is None:
-                response_file = os.path.join(
-                    temp_dir, request_type + '_response.json')
-            if response_dir is None:
-                response_dir = os.path.join(
-                    flask.current_app.config['NFS_MOUNT_PATH'], 'responses')
-            if history_dir is None:
-                history_dir = flask.current_app.config['HISTORY_DIR']
+									    if response_file is
+										    None :
+								    response_file = os.path.join(
+										      temp_dir,
+										      request_type +
+											      '_response.json') if response_dir
+											    is None :
+								    response_dir = os.path.join(
+										      flask.current_app
+											      .config['NFS_MOUNT_PATH'],
+										      'responses') if history_dir
+											   is None :
+								    history_dir = flask.current_app
+											  .config['HISTORY_DIR']
 
-            LOGGER.info('Submitting task...')
-            task = run.apply_async(args=[
-                user_id,
-                username,
-                flask.current_app.config['STATE_ROOT_PATH'],
-                temp_dir,
-                request_type,
-                request_file,
-                afc_config,
-                response_file,
-                history_dir,
-                flask.current_app.config['NFS_MOUNT_PATH'],
-            ])
+										  LOGGER.info(
+											  'Submitting task...')
+											  task =
+										      run.apply_async(
+												 args =
+													 [
+														 user_id,
+														 username,
+														 flask.current_app
+															 .config['STATE_ROOT_PATH'],
+														 temp_dir,
+														 request_type,
+														 request_file,
+														 afc_config,
+														 response_file,
+														 history_dir,
+														 flask.current_app
+															 .config['NFS_MOUNT_PATH'],
+													 ])
 
-            if task.state == 'FAILURE':
-                raise Exception('Task was unable to be started')
+												      if task.state ==
+											      'FAILURE' :
+								    raise Exception('Task was unable to be started')
 
-            # wait for task to complete and get result
-            task.wait()
+		#wait for task to complete and get result
+									    task
+										    .wait()
 
-            if task.failed():
-                raise Exception('Task excecution failed')
+											    if task
+										    .failed() :
+								    raise Exception('Task excecution failed')
 
-            if task.successful() and task.result['status'] == 'DONE':
-                if not os.path.exists(task.result['result_path']):
-                    raise Exception('Resource already deleted')
-                # read temporary file generated by afc-engine
-                LOGGER.debug("Reading result file: %s",
-                             task.result['result_path'])
-                LOGGER.info('SUCCESS: result file located at "%s"',
-                            task.result['result_path'])
+									    if task.successful() and
+										      task.result['status'] ==
+											      'DONE' :
+								    if not os.path
+									    .exists(task.result
+											    ['result_path']) :
+								    raise Exception('Resource already deleted')
+		#read temporary file generated by afc - engine
+									    LOGGER
+									    .debug("Reading result "
+										   "file: %s",
+										   task.result
+											   ['result_path'])
+										    LOGGER
+									    .info('SUCCESS: result file located at "%s"',
+										  task.result
+											  ['result_path'])
 
-            elif task.successful() and task.result['status'] == 'ERROR':
-                if not os.path.exists(task.result['error_path']):
-                    raise Exception('Resource already deleted')
-                # read temporary file generated by afc-engine
-                LOGGER.debug("Reading error file: %s",
-                             task.result['error_path'])
-                LOGGER.error('AFC ENGINE ERROR: error file located at "%s"',
-                             task.result['error_path'])
-            else:
-                raise Exception('Invalid task state')
+										    elif task
+									    .successful() and
+										      task.result['status'] ==
+											      'ERROR' :
+								    if not os.path
+									    .exists(task.result
+											    ['error_path']) :
+								    raise Exception('Resource already deleted')
+		#read temporary file generated by afc - engine
+									    LOGGER
+									    .debug("Reading error "
+										   "file: %s",
+										   task.result
+											   ['error_path'])
+										    LOGGER
+									    .error('AFC ENGINE ERROR: error file located at "%s"',
+										   task.result
+											   ['error_path']) else :
+								    raise Exception('Invalid task state')
 
+		#'cfg' group
+									    @click
+									    .group(name = 'cfg')
+										    @click
+									    .option('--log-level',
+										    help = 'Console logging lowest level displayed.')
+										    def cfg_group(
+											    log_level) :
+								    pass
 
-# 'cfg' group
-@click.group(name='cfg')
-@click.option('--log-level', help='Console logging lowest level displayed.')
-def cfg_group(log_level):
-    pass
+								    @cfg_group.command('add') @click
+									    .argument(
+										    'src',
+										    metavar =
+											    'SRC=FILENAME')
+										    @with_appcontext def
+											    cfg_add(src) :
+								    ConfigAdd()(flaskapp =
+											flask.current_app,
+										src = src)
 
-
-@cfg_group.command('add')
-@click.argument('src', metavar='SRC=FILENAME')
-@with_appcontext
-def cfg_add(src):
-    ConfigAdd()(flaskapp=flask.current_app, src=src)
-
-
-class ConfigAdd:
+									    class ConfigAdd :
     ''' Create a new admin configuration. '''
 
-    def __init__(self, *args, **kwargs):
-        LOGGER.debug('ConfigAdd.__init__()')
+								    def __init__(self,
+										 *args,
+										 **kwargs) :
+								    LOGGER.debug('ConfigAdd.__init__()')
 
-    def __call__(self, flaskapp, src):
-        LOGGER.debug('ConfigAdd.__call__() %s', src)
-        from afcmodels.aaa import AFCConfig, CertId, User
-        import datetime
+									    def __call__(self,
+											 flaskapp,
+											 src) :
+								    LOGGER.debug('ConfigAdd.__call__() %s',
+										 src) from afcmodels
+									    .aaa import AFCConfig,
+									      CertId,
+									      User import datetime
 
-        split_items = src.split('=', 1)
-        filename = split_items[1].strip()
-        if not os.path.exists(filename):
-            raise RuntimeError(
-                '"{}" source file does not exist'.format(filename))
+										      split_items = src.split(
+											      '=',
+											      1) filename =
+											      split_items[1]
+												      .strip() if not os
+												      .path
+												      .exists(filename) :
+								    raise RuntimeError(
+									    '"{}" source file does not exist'
+										    .format(filename))
 
-        rollback = []
-        LOGGER.debug('Open admin cfg src file - %s', filename)
-        with open(filename, 'r') as fp_src:
-            while True:
-                dataline = fp_src.readline()
-                if not dataline:
-                    break
-                # add user, APs and server configuration
-                new_rcrd = json.loads(dataline)
-                user_rcrd = json_lookup('userConfig', new_rcrd, None)
-                username = json_lookup('username', user_rcrd, None)
-                try:
-                    UserCreate(flaskapp, user_rcrd[0], False)
-                    f_str = "UserRemove(flaskapp, '" + username[0] + "')"
-                    rollback.insert(0, f_str)
-                except RuntimeError:
-                    LOGGER.debug('User %s already exists', username[0])
+									    rollback = [] LOGGER.debug(
+												      'Open admin cfg src file - %s',
+												      filename) with
+												      open(filename,
+													   'r')
+													      as fp_src :
+								    while True :
+								    dataline = fp_src.readline() if not dataline :
+								    break
+		#add user, APs and server configuration
+								    new_rcrd = json.loads(dataline) user_rcrd = json_lookup(
+												      'userConfig',
+												      new_rcrd,
+												      None) username =
+												      json_lookup(
+													      'username',
+													      user_rcrd,
+													      None)
+							    try : UserCreate(flaskapp,
+									     user_rcrd[0],
+									     False) f_str
+								    = "UserRemove(flaskapp, '" +
+								      username[0] +
+								      "')" rollback
+									      .insert(0,
+										      f_str) except
+										      RuntimeError :
+									    LOGGER.debug(
+										    'User %s already exists',
+										    username[0])
 
-                try:
-                    ap_rcrd = json_lookup('apConfig', new_rcrd, None)
+								    try : ap_rcrd = json_lookup('apConfig', new_rcrd, None)
                     serial_id = json_lookup('serialNumber', ap_rcrd, None)
                     location = json_lookup('location', ap_rcrd, None)
                     cert_id = json_lookup('certificationId', ap_rcrd, None)
@@ -1533,20 +1809,29 @@ class ConfigAdd:
                         else:
                             org = ""
 
-                        try:
-                            OrganizationCreate(flaskapp, org)
-                            f_str = "OrganizationRemove(flaskapp, '" + \
-                                org + "')"
-                            rollback.insert(0, f_str)
-                        except BaseException:
-                            pass
+									    try : OrganizationCreate(
+										    flaskapp,
+										    org) f_str
+										    = "Organization"
+										      "Remove("
+										      "flaskapp, "
+										      "'" +
+										      org +
+										      "')" rollback.insert(
+											      0,
+											      f_str) except
+											      BaseException :
+											    pass
 
-                        try:
-                            # Since this is test, we mark these as both indoor
-                            # and indoor certified
-                            CertIdCreate(flaskapp, cert_id_str,
-                                         ruleset_id_str, loc)
-                            f_str = "CertIdRemove(flaskapp, '" + \
+										    try :
+		#Since this is test, we mark these as both indoor
+		#and indoor certified
+											    CertIdCreate(
+												    flaskapp,
+												    cert_id_str,
+												    ruleset_id_str,
+												    loc)
+												    f_str = "CertIdRemove(flaskapp, '" + \
                                 cert_id_str + "')"
                             rollback.insert(0, f_str)
                         except BaseException:
@@ -1558,25 +1843,27 @@ class ConfigAdd:
                             User.email == username[0]).one()
                         LOGGER.debug('New user id %d', user.id)
 
-                        cfg_rcrd = json_lookup('afcConfig', new_rcrd, None)
-                        region_rcrd = json_lookup('regionStr', cfg_rcrd, None)
-                        # validate the region string
-                        RulesetVsRegion.region_to_ruleset(
-                            region_rcrd[0], exc=werkzeug.exceptions.NotFound)
+                        cfgs_rcrd = json_lookup('afcConfigs', new_rcrd, None)
+                        all_cfg_rcrds = json_lookup('afcConfig', cfgs_rcrd, None)
+                        for i in range(len(all_cfg_rcrds)):
+                            region_rcrd = json_lookup('regionStr', all_cfg_rcrds[i], None)
+		#validate the region string
+                            RulesetVsRegion.region_to_ruleset(
+                                region_rcrd[0], exc=werkzeug.exceptions.NotFound)
 
-                        config = AFCConfig.query.filter(
-                            AFCConfig.config['regionStr'].astext == region_rcrd[0]).first()
-                        als_log_afc_config_change(
-                            old_config=config.config if config else None,
-                            new_config=cfg_rcrd[0], user=username[0],
-                            region=region_rcrd[0], source='manage.py')
-                        if not config:
-                            config = AFCConfig(cfg_rcrd[0])
-                            config.config['regionStr'] = config.config['regionStr'].upper()
-                            db.session.add(config)
-                        else:
-                            config.config = cfg_rcrd[0]
-                            config.created = datetime.datetime.now()
+                            config = AFCConfig.query.filter(
+                                AFCConfig.config['regionStr'].astext == region_rcrd[0]).first()
+                            als_log_afc_config_change(
+                                old_config=config.config if config else None,
+                                new_config=all_cfg_rcrds[i], user=username[0],
+                                region=region_rcrd[0], source='manage.py')
+                            if not config:
+                                config = AFCConfig(all_cfg_rcrds[i])
+                                config.config['regionStr'] = config.config['regionStr'].upper()
+                                db.session.add(config)
+                            else:
+                                config.config = all_cfg_rcrds[i]
+                                config.created = datetime.datetime.now()
                         db.session.commit()
 
                 except Exception as e:
@@ -1616,17 +1903,14 @@ class ConfigRemove:
                 if not dataline:
                     break
                 new_rcrd = json.loads(dataline)
-
                 ap_rcrd = json_lookup('apConfig', new_rcrd, None)
                 user_rcrd = json_lookup('userConfig', new_rcrd, None)
                 username = json_lookup('username', user_rcrd, None)
                 with flaskapp.app_context():
-                    try:
-                        user = User.query.filter(
+											    try : user = User.query.filter(
                             User.email == username[0]).one()
                         LOGGER.debug('Found user id %d', user.id)
                         UserRemove(flaskapp, username[0])
-
                     except RuntimeError:
                         LOGGER.debug('Delete missing user %s', username[0])
                     except Exception as e:
@@ -1687,17 +1971,17 @@ def create_cli_app():
     conf = dict(
         DEBUG=(log_level == 'DEBUG'),
         PROPAGATE_EXCEPTIONS=(log_level == 'DEBUG'),
-        # converts str log_level to int value
+		#converts str log_level to int value
         LOG_LEVEL=log_level,
         LOG_HANDLERS=[logging.StreamHandler()]
         )
 
     app = create_app(config_override=conf)
 
-    # Initialize Flask Migrate with the app
+		#Initialize Flask Migrate with the app
     migrate = Migrate(app, db)
 
-    # Register all CLI command groups
+		#Register all CLI command groups
     app.cli.add_command(data_group)
     app.cli.add_command(user_group)
     app.cli.add_command(mtls_group)
@@ -1714,12 +1998,12 @@ def main():
 
     def appfact(log_level):
         ''' Construct an application based on command parameters. '''
-        # Override some parameters for console use
+		#Override some parameters for console use
         log_level = log_level.upper()
         conf = dict(
             DEBUG=(log_level == 'DEBUG'),
             PROPAGATE_EXCEPTIONS=(log_level == 'DEBUG'),
-            # converts str log_level to int value
+		#converts str log_level to int value
             LOG_LEVEL=logging.getLevelName(log_level),
             LOG_HANDLERS=[logging.StreamHandler()]
         )
@@ -1729,7 +2013,7 @@ def main():
 
     cli = FlaskGroup(create_app=lambda: create_cli_app())
 
-    # Add version command
+		#Add version command
     version_name = cmd_utils.packageversion(__package__)
     if version_name is not None:
         @cli.command('version')
@@ -1737,7 +2021,7 @@ def main():
             """Show the application version."""
             click.echo(f"{sys.argv[0]} {version_name}")
 
-    # Add other ungrouped commands
+		#Add other ungrouped commands
     @cli.command('db-create')
     @click.option('--log-level', help='Console logging lowest level displayed.')
     @click.option('--if_absent', is_flag=True, help="Do nothing if database already exists")
@@ -1771,19 +2055,18 @@ def main():
     def db_upgrade(log_level):
         DbUpgrade()(flaskapp=flask.current_app)
 
-    try:
-        cli()
-    finally:
+												    try : cli()
+													    finally:
         als.als_flush()
 
 
 if __name__ == '__main__':
     sys.exit(main())
 
-# Local Variables:
-# mode: Python
-# indent-tabs-mode: nil
-# python-indent: 4
-# End:
-#
-# vim: sw=4:et:tw=80:cc=+1
+		#Local Variables:
+		#mode : Python
+		#indent - tabs - mode : nil
+		#python - indent : 4
+		#End:
+		#
+		#vim : sw = 4 : et : tw = 80 : cc = +1
