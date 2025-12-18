@@ -50,7 +50,7 @@ When a request is made, the python API processor looks up the Certification Id i
 
 If the location has the INDOOR bit set  (INDOOR (1) or INDOOR and OUTDOOR (3)) , the indoor_certified API flag is set to True.  
 
-The indoor_certified API flag is used to set the RNTM\_OPT\_\CERT\_ID (32) flag which gets passed to the engine via the runtime_opt parameter. Inside the engine, that sets the engine flag AfcManager::\_certifiedIndoor to true;
+The indoor_certified API flag is used to set the RNTM_OPT_CERT_ID (32) flag which gets passed to the engine via the runtime_opt parameter. Inside the engine, that sets the engine flag AfcManager::_certifiedIndoor to true;
 
 # AFC Engine
 
@@ -74,15 +74,15 @@ Below is the logic for determining if the RLAN is considered INDOOR or OUTDOOR, 
 
     RLAN_TYPE = OUTDOOR
     
-    If (indoorDeployment == 1) and (_rulesetID == "US_47_CFR_PART_15_SUBPART_E") and (\_certifiedIndoor == 'true')
+    If (indoorDeployment == 1) and (_rulesetID == "US_47_CFR_PART_15_SUBPART_E") and (_certifiedIndoor == 'true')
 
     RLAN_TYPE = INDOOR
     
-    If (indoorDeployment == 1) and (_rulesetID == "US_47_CFR_PART_15_SUBPART_E") and (\_certifiedIndoor == 'false')
+    If (indoorDeployment == 1) and (_rulesetID == "US_47_CFR_PART_15_SUBPART_E") and (_certifiedIndoor == 'false')
 
     RLAN_TYPE = OUTDOOR
     
-    If (indoorDeployment == 1) and (_rulesetID != "US\_47\_CFR\_PART\_15\_SUBPART\_E") 
+    If (indoorDeployment == 1) and (_rulesetID != "US_47_CFR_PART_15_SUBPART_E") 
 
     RLAN_TYPE = INDOOR
     
@@ -90,10 +90,10 @@ Below is the logic for determining if the RLAN is considered INDOOR or OUTDOOR, 
 
     RLAN_TYPE = OUTDOOR
     
-    If (indoorDeployment not specified) and (\_certifiedIndoor == 'true')
+    If (indoorDeployment not specified) and (_certifiedIndoor == 'true')
 
     RLAN_TYPE = INDOOR
     
-    If (indoorDeployment not specified) and (\_certifiedIndoor == 'false')
+    If (indoorDeployment not specified) and (_certifiedIndoor == 'false')
 
     RLAN_TYPE = OUTDOOR
