@@ -28,7 +28,7 @@ For the certification database, the Indoor/Outdoor value is set in the Cert ID S
 
 ## For US sweeps:
 
-The service queries for all records and ignores all items not on the 6SD requipment class:
+The service queries for all records available from the FCC Equipment Authorization Database at the URL https://apps.fcc.gov/OETLabServices/getAFCAuthorizations  since Jan 1, 2020 and ignores all items not on the 6SD requipment class:
 
 The location bit for OUTDOOR is set.
 If the Grant Note is BX, the INDOOR bit is also set.
@@ -50,20 +50,19 @@ When a request is made, the python API processor looks up the Certification Id i
 
 If the location has the INDOOR bit set  (INDOOR (1) or INDOOR and OUTDOOR (3)) , the indoor_certified API flag is set to True.  
 
-The indoor_certified API flag is used to set the RNTM_OPT_CERT_ID (32) flag which gets passed to the engine via the runtime_opt parameter. Inside the engine, that sets the engine flag AfcManager::_certifiedIndoor to true;
+The indoor_certified API flag is used to set the RNTM\_OPT\_\CERT\_ID (32) flag which gets passed to the engine via the runtime_opt parameter. Inside the engine, that sets the engine flag AfcManager::\_certifiedIndoor to true;
 
 # AFC Engine
 
 There are three parameters passed to the afc-engine:
 
-(1) _certifiedIndoor  boolean, 'true' or 'false'
+(1) \_certifiedIndoor  boolean, 'true' or 'false'
 
-This parameter is passed as a command line option when the afc-engine is executed.  This is part of the bitmask of the runtime_opt command line parameter.  This parameter is set to 'true' of "runtime_opt & 0x20" is non-zero, and 'false' if zero.  If runtime_opt is not specified at the command line, _certifiedIndoor is set to false.
+This parameter is passed as a command line option when the afc-engine is executed.  This is part of the bitmask of the runtime_opt command line parameter.  This parameter is set to 'true' if "runtime_opt & 0x20" is non-zero, and 'false' if zero.  If runtime_opt is not specified at the command line, \_certifiedIndoor is set to false.
 
 (2) indoorDeployment  integer 0, 1, or 2 This parameter is set in the analysis request json file.  If set to a value other than 0, 1, or 2, then afc-engine exits with an invalid parameter error message.  It is also possible this parameter is not specified.
 
-(3) _rulesetID string This parameter is set in the analysis request json file.
-
+(3) \_rulesetID string This parameter is set in the analysis request json file.
 
 Below is the logic for determining if the RLAN is considered INDOOR or OUTDOOR, see lines 1840 - 1881 of AfcManager.cpp:
 
@@ -75,15 +74,15 @@ Below is the logic for determining if the RLAN is considered INDOOR or OUTDOOR, 
 
     RLAN_TYPE = OUTDOOR
     
-    If (indoorDeployment == 1) and (_rulesetID == "US_47_CFR_PART_15_SUBPART_E") and (_certifiedIndoor == 'true')
+    If (indoorDeployment == 1) and (_rulesetID == "US_47_CFR_PART_15_SUBPART_E") and (\_certifiedIndoor == 'true')
 
     RLAN_TYPE = INDOOR
     
-    If (indoorDeployment == 1) and (_rulesetID == "US_47_CFR_PART_15_SUBPART_E") and (_certifiedIndoor == 'false')
+    If (indoorDeployment == 1) and (_rulesetID == "US_47_CFR_PART_15_SUBPART_E") and (\_certifiedIndoor == 'false')
 
     RLAN_TYPE = OUTDOOR
     
-    If (indoorDeployment == 1) and (_rulesetID != "US_47_CFR_PART_15_SUBPART_E") 
+    If (indoorDeployment == 1) and (_rulesetID != "US\_47\_CFR\_PART\_15\_SUBPART\_E") 
 
     RLAN_TYPE = INDOOR
     
@@ -91,21 +90,10 @@ Below is the logic for determining if the RLAN is considered INDOOR or OUTDOOR, 
 
     RLAN_TYPE = OUTDOOR
     
-    If (indoorDeployment not specified) and (_certifiedIndoor == 'true')
+    If (indoorDeployment not specified) and (\_certifiedIndoor == 'true')
 
     RLAN_TYPE = INDOOR
     
-    If (indoorDeployment not specified) and (_certifiedIndoor == 'false')
+    If (indoorDeployment not specified) and (\_certifiedIndoor == 'false')
 
     RLAN_TYPE = OUTDOOR
-
- 
- 
-
-	
- 
-	
- 
-	
-
-
