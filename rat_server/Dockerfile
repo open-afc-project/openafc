@@ -28,6 +28,7 @@ RUN apk add --update --no-cache librdkafka-dev libffi
 COPY rat_server/requirements.txt /wd/
 RUN apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base \
     expat expat-dev libffi-dev && \
+    pip3 install --upgrade pip setuptools && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base expat-dev libffi-dev && \
     rm -f /wd/requirements.txt
@@ -110,5 +111,5 @@ ENV AFC_RATAPI_LOG_LEVEL=${AFC_RATAPI_LOG_LEVEL:-WARNING}
 COPY rat_server/entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
-HEALTHCHECK CMD wget --no-verbose --tries=1 --spider localhost/fbrat/ratapi/v1/healthy || exit 1
+HEALTHCHECK --start-interval=1m CMD wget --no-verbose --tries=1 --spider 127.0.0.1/fbrat/ratapi/v1/healthy || exit 1
 #

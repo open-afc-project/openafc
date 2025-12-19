@@ -16,7 +16,6 @@ import logging
 import os
 import sys
 import shutil
-import pkg_resources
 import flask
 import json
 import glob
