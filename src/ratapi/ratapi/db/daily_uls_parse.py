@@ -459,6 +459,21 @@ def generateUlsScriptInputCA(directory, logFile, genFilename):
     return sources_md5.hexdigest()
 
 
+def generateUlsScriptInputStatic(staticDataFile, logFile, genFilename):
+    logFile.write('Appending Static FS data data to ' + genFilename +
+                  ' as input for uls script' + '\n')
+    # Names of source files (to compute MD5 of)
+    with open(genFilename, 'a', encoding='utf8') as combined:
+        logFile.write('Adding ' + staticDataFile + ' to ' + genFilename + '\n')
+        with open(staticDataFile, 'r', encoding='utf8') as csvfile:
+            csvreader = csv.reader(csvfile)
+            for row in csvreader:
+                for (i, field) in enumerate(row):
+                    row[i] = field.replace('|', ':')
+                combined.write(('|'.join(row)) + '|\n')
+    return
+
+
 def storeDataIdentities(sqlFile, identityDict):
     """ Stores region data identities in gewnerated SQLite database.
     For FCC ULS identity is upload datetime, for Canada SMS, for now, sadly,
@@ -801,6 +816,11 @@ def daily_uls_parse(state_root, interactive):
                 raise e
             assert dataIdentity is not None
             dataIdentities[region] = dataIdentity
+
+        staticDataFile = root + '/data_files/static_fs_database.csv'
+
+        if os.path.isfile(staticDataFile):
+            generateUlsScriptInputStatic(staticDataFile, logFile, fullPathCoalitionScriptInput)
 
     ###########################################################################
 
