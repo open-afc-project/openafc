@@ -14,6 +14,26 @@
 Clean docker build succeed
 
 ## **Version and Date**
+
+|Version|**398*|
+| :- | :- |
+|**Date**|**11/04/2025**|
+
+## **Issues Addressed**
+
+* 398: Add static FS database
+
+## **Interface Changes**
+
+* The changes are to read the file daily_uls_parse/data_files/static_fs_database.csv if it exists and add these FS to the FS database.  This involved modifications of the daily_uls_parse.py python code, as well as changes to the C++ source for uls-script.
+* The static_fs_database.csv has the same format as ISED's Stations_Data_Extracts.csv (with no header). This assumes that these FS use a pre-existing antenna model number and do not have passive repeaters. In the first column, "US:SD" means that these FS need to be included for US analysis and SD stands for Stations Data Extract.
+* Note that currently this support is limited to adding FS links from Stations Data Extract manually only.
+
+## **Testing Done**
+
+* With the manual file, confirmed that those FS were added correctly to the FS database.
+
+* With the manual file missing, confirmed that the FS database is generated correctly.
 |Version|**392*|
 | :- | :- |
 |**Date**|**09/17/2025**|
@@ -297,3 +317,4 @@ Reverted the formatting of AfcManager.cpp to previous state due to overly agress
 ## **Issues Addressed**
  * Issue 7: Kubernetes-related changes
  * Initial commit
+
