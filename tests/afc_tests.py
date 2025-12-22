@@ -561,7 +561,7 @@ def _send_recv(cfg, req_data, ssn=None):
     if (rawresp.status_code != 200):
         app_log.error(f"Error in request to service: Response status code {rawresp.status_code} : {rawresp.reason}")
         return
-    
+
     resp = rawresp.json()
 
     tId = resp.get('taskId')
