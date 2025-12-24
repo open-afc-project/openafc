@@ -16,6 +16,11 @@ on:
 permissions:
   id-token: write
 
+# limit to 1 job at a time, others will be queued
+concurrency:
+  group: remote-ci-rkf-server
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
