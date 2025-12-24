@@ -10,7 +10,7 @@
 # pylint: disable=too-many-nested-blocks, too-few-public-methods
 # pylint: disable=unnecessary-pass, invalid-name, consider-using-from-import
 # pylint: disable=broad-exception-caught, too-many-arguments
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes, too-many-positional-arguments
 
 import asyncio
 from collections.abc import Coroutine
@@ -28,7 +28,7 @@ from log_utils import dp, error, error_if, get_module_logger
 import rcache_models
 import db_utils
 
-__all__ = ["AfcCertReq", "AfcCertResp", "AfcServerDb"]
+__all__ = ["AfcCertReq", "AfcCertResp", "AfcRcacheResp", "AfcServerDb"]
 
 # Logger for this module
 LOGGER = get_module_logger()
@@ -110,12 +110,7 @@ class AfcCertResp:
             explanation="certificate denied"),
          DenyCriterion(
             predicate=lambda cr: getattr(cr, "serial_denied"),
-            explanation="AP serial number denied"),
-         DenyCriterion(
-            predicate=lambda cr:
-                ((getattr(cr, "location_flags") or 0) &
-                 hardcoded_relations.CERT_ID_LOCATION_OUTDOOR) == 0,
-            explanation="outdoor operation not allowed")]
+            explanation="AP serial number denied")]
 
     def __init__(self, bypass_checks: Optional[AfcCertReq] = None) -> None:
         """Constructor
@@ -172,6 +167,14 @@ class AfcCertResp:
                 if dc.predicate(cr):
                     reasons.append(f"{cr.ruleset_name}: {dc.explanation}")
         return ", ".join(reasons)
+
+
+class AfcRcacheResp(NamedTuple):
+    """ Response type for Rcache lookup """
+    # True if valid response was found in Rcache
+    found: bool
+    # Response from Rcache. Not None if found and valid or if invalidated
+    response: Optional[str] = None
 
 
 # Generic type for request queue requests
@@ -315,6 +318,8 @@ class AfcServerDb:
     _bypass_cert                -- True to bypass certificate database query
     _bypass_rcache              -- True to bypass Rcache
     _sample_rcache_reply        -- Rcache reply to use if bypassed
+    _return_invalidated         -- True to return invalidated AFC responses
+                                   from Rcache
     """
     # Name of Postgres asynchronous driver (to use in DSN)
     _ASYNC_DRIVER_NAME = "asyncpg"
@@ -337,8 +342,8 @@ class AfcServerDb:
 
     def __init__(self, ratdb_dsn: str, ratdb_password_file: Optional[str],
                  rcache_dsn: str, rcache_password_file: Optional[str],
-                 bypass_cert: bool = False, bypass_rcache: bool = False) \
-            -> None:
+                 return_invalidated: bool, bypass_cert: bool = False,
+                 bypass_rcache: bool = False) -> None:
         """ Constructor
 
         Arguments:
@@ -348,6 +353,8 @@ class AfcServerDb:
         rcache_dsn           -- Rcache DB DSN (maybe without password)
         rcache_password_file -- Optional name of file with password for Rcache
                                 DB DSN
+        return_invalidated   -- True to return invalidated AFC responses from
+                                Rcache
         bypass_cert          -- True to bypass certificate database query
         bypass_rcache        -- True to bypass Rcache
         """
@@ -360,7 +367,7 @@ class AfcServerDb:
             self._create_engine(
                 dsn=rcache_dsn, password_file=rcache_password_file,
                 dsc="rcache database")
-        self._rcache_lookup_pipeline: DbPipeline[str, Optional[str]] = \
+        self._rcache_lookup_pipeline: DbPipeline[str, AfcRcacheResp] = \
             DbPipeline(name="Rcache Lookup", db_access=self._lookup_rcache,
                        max_reqs=self._MAX_RCACHE_LOOKUP)
         self._cert_lookup_pipeline: DbPipeline[AfcCertReq, AfcCertResp] = \
@@ -374,6 +381,7 @@ class AfcServerDb:
                        max_reqs=self._MAX_AFC_CONFIG_LOOKUP)
         self._bypass_cert = bypass_cert
         self._bypass_rcache = bypass_rcache
+        self._return_invalidated = return_invalidated
         self._sample_rcache_reply: Optional[str] = None
 
     async def close(self) -> None:
@@ -390,7 +398,7 @@ class AfcServerDb:
                 error(f"{name} dispose error: {ex}")
 
     async def lookup_rcache(self, req_cfg_digest: str, deadline: float) \
-            -> Optional[str]:
+            -> AfcRcacheResp:
         """ Lookup rcache for given request/config digest """
         return await self._rcache_lookup_pipeline.process_req(req_cfg_digest,
                                                               deadline)
@@ -408,7 +416,7 @@ class AfcServerDb:
                                                                deadline)
 
     async def _lookup_rcache(self, req_cfg_digests: Set[str]) \
-            -> Dict[str, Optional[str]]:
+            -> Dict[str, AfcRcacheResp]:
         """ Fetching cached responses
 
         Arguments:
@@ -434,22 +442,28 @@ class AfcServerDb:
                                 get_patched_response()
                 except (sa.exc.SQLAlchemyError, OSError) as ex:
                     error(f"Rcache DB lookup error: {ex}")
-            return {d: self._sample_rcache_reply for d in req_cfg_digests}
+            return {d: AfcRcacheResp(found=True,
+                                     response=self._sample_rcache_reply)
+                    for d in req_cfg_digests}
 
         try:
             s = sa.select([ap_table]).\
-                where((ap_table.c.req_cfg_digest.in_(req_cfg_digests)) &
-                      (ap_table.c.state ==
-                       rcache_models.ApDbRespState.Valid.name))
+                where(ap_table.c.req_cfg_digest.in_(req_cfg_digests))
+            if not self._return_invalidated:
+                s = s.where(ap_table.c.state ==
+                            rcache_models.ApDbRespState.Valid.name)
             async with self._rcache_engine.connect() as conn:
                 rp = await conn.execute(s)
-                ret: Dict[str, Optional[str]] = \
-                    {rec.req_cfg_digest:
-                     rcache_models.ApDbRecord.parse_obj(rec).
-                     get_patched_response()
-                     for rec in rp.fetchall()}
+                ret: Dict[str, AfcRcacheResp] = {}
+                for row in rp:
+                    found = row.state == rcache_models.ApDbRespState.Valid.name
+                    response = rcache_models.ApDbRecord.parse_obj(row).\
+                        get_patched_response() \
+                        if found or self._return_invalidated else None
+                    ret[row.req_cfg_digest] = \
+                        AfcRcacheResp(found=found, response=response)
                 for req_cfg_digest in (req_cfg_digests - set(ret.keys())):
-                    ret[req_cfg_digest] = None
+                    ret[req_cfg_digest] = AfcRcacheResp(found=False)
                 return ret
         except (sa.exc.SQLAlchemyError, OSError) as ex:
             error(f"Rcache DB lookup error: {ex}")
@@ -515,7 +529,7 @@ class AfcServerDb:
             cert_infos: Dict[Certification, CertInfo] = {}
             async with self._ratdb_engine.connect() as conn:
                 rp = await conn.execute(s)
-                for row in rp.fetchall():
+                for row in rp:
                     res_certification = \
                         Certification(
                             certification_id=row["certification_id"],
@@ -586,7 +600,7 @@ class AfcServerDb:
             region_to_config: Dict[str, Dict[str, Any]] = {}
             async with self._ratdb_engine.connect() as conn:
                 rp = await conn.execute(s)
-                for row in rp.fetchall():
+                for row in rp:
                     region_to_config[row.config["regionStr"]] = row.config
             ret: Dict[str, Optional[Dict[str, Any]]] = {}
             for ruleset_id, region_or_none in ruleset_to_region.items():

@@ -35,6 +35,8 @@ cd $tests_dir
 # copy base docker-compose.yaml to test directory
 cp $wd/docker-compose.yaml $wd/.env $tests_dir/
 
+mkdir -p $tests_dir/ssl/nginx
+
 # create pipe and afc_config dir if does not exist
 [ ! -d pipe ] && mkdir pipe
 
@@ -46,19 +48,19 @@ check_ret $?
 [ -d ~/template_regrtest/ssl ] && cp -a ~/template_regrtest/ssl .
 
 # run srvr
-docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE down -v && docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE up -d && docker ps -a
+docker compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE down -v && docker compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE up -d && docker ps -a
 check_ret $?
 sleep 5
 
 # set default srvr configuration
-docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE exec -T rat_server rat-manage-api cfg add src=/pipe/export_admin_cfg.json
-docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE exec -T rat_server rat-manage-api user create --role Super --role Admin \
+docker compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE exec -T rat_server rat-manage-api cfg add src=/pipe/export_admin_cfg.json
+docker compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE exec -T rat_server rat-manage-api user create --role Super --role Admin \
 --role AP --role Analysis --org fcc "admin@afc.com" "openafc"
-docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE exec -T rat_server rat-manage-api cert_id create  --location 3 \
+docker compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE exec -T rat_server rat-manage-api cert_id create  --location 3 \
 --cert_id FsDownloaderCertIdUS --ruleset_id US_47_CFR_PART_15_SUBPART_E
-docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE exec -T rat_server rat-manage-api cert_id create  --location 3 \
+docker compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE exec -T rat_server rat-manage-api cert_id create  --location 3 \
 --cert_id FsDownloaderCertIdCA --ruleset_id CA_RES_DBS-06
-docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE exec -T rat_server rat-manage-api cert_id create  --location 3 \
+docker compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE exec -T rat_server rat-manage-api cert_id create  --location 3 \
 --cert_id FsDownloaderCertIdBR --ruleset_id BRAZIL_RULESETID
 
 # Local Variables:

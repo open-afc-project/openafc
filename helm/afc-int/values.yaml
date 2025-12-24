@@ -157,6 +157,8 @@ sharedEnv:
   # Environment variables common to als-kafka and als_siphon
   als-kafka-common:
     KAFKA_MAX_REQUEST_SIZE@I: 10485760
+    AFC_ALS_TOPIC_NAME: ALS
+    AFC_JSON_TOPIC_PREFIX: ""
   # Common Environment variables for Rcache container(s) and clients of Rcache
   # service
   rcache-common:
@@ -169,6 +171,7 @@ sharedEnv:
     RCACHE_SERVICE_URL: "http://{{host:rcache}}:{{port:rcache:rcache}}"
     RCACHE_RMQ_DSN: >-
       amqp://rcache:rcache@{{host:rmq}}:{{port:rmq:amqp}}/rcache
+    AFC_STATE_VENDOR_EXTENSIONS: openAfc.engineState
   # Setting AFC_DEVEL_ENV to 'devel' enables certain development options in
   # certain containers
   devel-env:
@@ -646,6 +649,7 @@ components:
     env:
       KAFKA_SERVERS: "{{host:als-kafka}}:{{port:als-kafka:kafka}}"
       INIT_IF_EXISTS: skip
+      AFC_ALS_MONTH_PARTITIONS_AHEAD: 6
     sharedEnvKeys:
       - als-kafka-common
       - als-db

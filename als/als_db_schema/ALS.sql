@@ -1,22 +1,3 @@
-/*
- * Copyright (C) 2022 Broadcom. All rights reserved.
- * The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
- * that owns the software below.
- * This work is licensed under the OpenAFC Project License, a copy of which is
- * included with this software program.
- *
- * This file creates ALS (AFC Request/Response/Config Logging System) database on PostgreSQL+PostGIS server
- * This file is generated, direct editing is not recommended.
- * Intended maintenance sequence is as follows:
- *   1. Load (copypaste) als_db_schema/ALS.dbml into dbdiagram.io
- *   2. Modify as needed
- *   3. Save (copypaste) modified sources back to als_db_schema/ALS.dbml
- *   4. Also export schema in PostgreSQL format as als_db_schema/ALS_raw.sql
- *   5. Rectify exported schema with als_rectifier.awk (awk -f als_db_schema/als_rectifier.awk < als_db_schema/ALS_raw.sql > ALS.sql)
- */
-
-CREATE EXTENSION postgis;
-
 CREATE TABLE "afc_message" (
   "message_id" bigserial,
   "month_idx" smallint,
@@ -26,7 +7,7 @@ CREATE TABLE "afc_message" (
   "rx_envelope_digest" uuid,
   "tx_envelope_digest" uuid,
   "dn_text_digest" uuid,
-  "ap_ip" inet,
+  "ap_ip" inet6,
   "runtime_opt" int,
   PRIMARY KEY ("message_id", "month_idx")
 );
@@ -171,12 +152,13 @@ CREATE TABLE "afc_server" (
 );
 
 CREATE TABLE "decode_error" (
-  "id" bigserial PRIMARY KEY,
+  "id" bigserial,
   "time" timestamptz,
   "msg" text,
   "code_line" integer,
   "data" text,
-  "month_idx" smallint
+  "month_idx" smallint,
+  PRIMARY KEY ("id", "month_idx")
 );
 
 CREATE INDEX ON "afc_message" ("rx_time");
@@ -193,17 +175,27 @@ CREATE INDEX ON "afc_message" ("ap_ip");
 
 CREATE INDEX ON "afc_message" ("runtime_opt");
 
+CREATE INDEX ON "afc_message" ("month_idx");
+
 CREATE INDEX ON "rx_envelope" USING HASH ("rx_envelope_digest");
+
+CREATE INDEX ON "rx_envelope" ("month_idx");
 
 CREATE INDEX ON "tx_envelope" USING HASH ("tx_envelope_digest");
 
+CREATE INDEX ON "tx_envelope" ("month_idx");
+
 CREATE INDEX ON "mtls_dn" USING HASH ("dn_text_digest");
+
+CREATE INDEX ON "mtls_dn" ("month_idx");
 
 CREATE INDEX ON "request_response_in_message" ("request_id");
 
 CREATE INDEX ON "request_response_in_message" ("request_response_digest");
 
 CREATE INDEX ON "request_response_in_message" ("expire_time");
+
+CREATE INDEX ON "request_response_in_message" ("month_idx");
 
 CREATE INDEX ON "request_response" USING HASH ("request_response_digest");
 
@@ -221,11 +213,15 @@ CREATE INDEX ON "request_response" ("response_description");
 
 CREATE INDEX ON "request_response" ("response_data");
 
+CREATE INDEX ON "request_response" ("month_idx");
+
 CREATE INDEX ON "device_descriptor" USING HASH ("device_descriptor_digest");
 
 CREATE INDEX ON "device_descriptor" ("serial_number");
 
 CREATE INDEX ON "device_descriptor" ("certifications_digest");
+
+CREATE INDEX ON "device_descriptor" ("month_idx");
 
 CREATE INDEX ON "certification" USING HASH ("certifications_digest");
 
@@ -233,9 +229,15 @@ CREATE INDEX ON "certification" ("ruleset_id");
 
 CREATE INDEX ON "certification" ("certification_id");
 
+CREATE INDEX ON "certification" ("month_idx");
+
 CREATE INDEX ON "compressed_json" USING HASH ("compressed_json_digest");
 
+CREATE INDEX ON "compressed_json" ("month_idx");
+
 CREATE INDEX ON "customer" ("customer_name");
+
+CREATE INDEX ON "customer" ("month_idx");
 
 CREATE INDEX ON "location" USING HASH ("location_digest");
 
@@ -247,15 +249,23 @@ CREATE INDEX ON "location" ("height_m");
 
 CREATE INDEX ON "location" ("height_type");
 
+CREATE INDEX ON "location" ("month_idx");
+
 CREATE INDEX ON "afc_config" USING HASH ("afc_config_text_digest");
+
+CREATE INDEX ON "afc_config" ("month_idx");
 
 CREATE UNIQUE INDEX ON "geo_data_version" ("geo_data_version", "month_idx");
 
 CREATE INDEX ON "geo_data_version" ("geo_data_version");
 
+CREATE INDEX ON "geo_data_version" ("month_idx");
+
 CREATE UNIQUE INDEX ON "uls_data_version" ("uls_data_version", "month_idx");
 
 CREATE INDEX ON "uls_data_version" ("uls_data_version");
+
+CREATE INDEX ON "uls_data_version" ("month_idx");
 
 CREATE INDEX ON "max_psd" USING HASH ("request_response_digest");
 
@@ -265,6 +275,8 @@ CREATE INDEX ON "max_psd" ("high_frequency_mhz");
 
 CREATE INDEX ON "max_psd" ("max_psd_dbm_mhz");
 
+CREATE INDEX ON "max_psd" ("month_idx");
+
 CREATE INDEX ON "max_eirp" USING HASH ("request_response_digest");
 
 CREATE INDEX ON "max_eirp" ("op_class");
@@ -273,9 +285,17 @@ CREATE INDEX ON "max_eirp" ("channel");
 
 CREATE INDEX ON "max_eirp" ("max_eirp_dbm");
 
+CREATE INDEX ON "max_eirp" ("month_idx");
+
 CREATE UNIQUE INDEX ON "afc_server" ("afc_server_name", "month_idx");
 
 CREATE INDEX ON "afc_server" ("afc_server_name");
+
+CREATE INDEX ON "afc_server" ("month_idx");
+
+CREATE INDEX ON "decode_error" ("time");
+
+CREATE INDEX ON "decode_error" ("month_idx");
 
 COMMENT ON TABLE "afc_message" IS 'AFC Request/Response message pair (contain individual requests/responses)';
 
@@ -437,8 +457,19 @@ ALTER TABLE "request_response" ADD CONSTRAINT "request_response_device_descripto
 
 ALTER TABLE "request_response" ADD CONSTRAINT "request_response_location_digest_ref" FOREIGN KEY ("location_digest", "month_idx") REFERENCES "location" ("location_digest", "month_idx");
 
+CREATE TABLE "device_descriptor_certification" (
+  "device_descriptor_certifications_digest" uuid,
+  "device_descriptor_month_idx" smallint,
+  "certification_certifications_digest" uuid,
+  "certification_month_idx" smallint,
+  PRIMARY KEY ("device_descriptor_certifications_digest", "device_descriptor_month_idx", "certification_certifications_digest", "certification_month_idx")
+);
+
+ALTER TABLE "device_descriptor_certification" ADD FOREIGN KEY ("device_descriptor_certifications_digest", "device_descriptor_month_idx") REFERENCES "device_descriptor" ("certifications_digest", "month_idx");
+
+ALTER TABLE "device_descriptor_certification" ADD FOREIGN KEY ("certification_certifications_digest", "certification_month_idx") REFERENCES "certification" ("certifications_digest", "month_idx");
+
 
 ALTER TABLE "max_psd" ADD CONSTRAINT "max_psd_request_response_digest_ref" FOREIGN KEY ("request_response_digest", "month_idx") REFERENCES "request_response" ("request_response_digest", "month_idx");
 
 ALTER TABLE "max_eirp" ADD CONSTRAINT "max_eirp_request_response_digest_ref" FOREIGN KEY ("request_response_digest", "month_idx") REFERENCES "request_response" ("request_response_digest", "month_idx");
-;

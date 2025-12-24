@@ -143,6 +143,15 @@ UlsFileReader::UlsFileReader(const char *fpath,
 					readTransmitterCA(fieldList, fwarn);
 					/******************************************************************/
 
+					/******************************************************************/
+					/* Static Data                                                    */
+					/******************************************************************/
+				} else if (front == "US:SD") {
+					readStationDataStatic(fieldList,
+							  fwarn,
+							  alignFederatedFlag,
+							  alignFederatedScale);
+
 				} else {
 					errStr << std::string("ERROR: Unable to process inputFile "
 							      "line ")
@@ -1131,6 +1140,9 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 			case 7:
 				current.stationLocation = field;
 				break;
+			case 8:
+				current.ituClass = field;
+				break;
 			case 9:
 				current.latitudeDeg = emptyAtof(field.c_str());
 				break;
@@ -1250,9 +1262,195 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 		}
 	}
 
-	if (current.service == 9) {
+	if ((current.service == 9) && (current.ituClass == "RA")) {
 		RASClass ras;
 		ras.region = "CA";
+		ras.name = linceseeName;
+		ras.location = current.stationLocation;
+		ras.startFreqMHz = current.centerFreqMHz - current.bandwidthMHz / 2;
+		ras.stopFreqMHz = current.centerFreqMHz + current.bandwidthMHz / 2;
+		ras.exclusionZone = "Horizon Distance";
+		ras.rect1lat1 = std::numeric_limits<double>::quiet_NaN();
+		ras.rect1lat2 = std::numeric_limits<double>::quiet_NaN();
+		ras.rect1lon1 = std::numeric_limits<double>::quiet_NaN();
+		ras.rect1lon2 = std::numeric_limits<double>::quiet_NaN();
+		ras.rect2lat1 = std::numeric_limits<double>::quiet_NaN();
+		ras.rect2lat2 = std::numeric_limits<double>::quiet_NaN();
+		ras.rect2lon1 = std::numeric_limits<double>::quiet_NaN();
+		ras.rect2lon2 = std::numeric_limits<double>::quiet_NaN();
+		ras.radiusKm = std::numeric_limits<double>::quiet_NaN();
+		ras.centerLat = current.latitudeDeg;
+		ras.centerLon = current.longitudeDeg;
+		ras.heightAGL = current.antennaHeightAGL;
+		RASList << ras;
+	} else {
+		allStations << current;
+		stationMap[current.authorizationNumber.c_str()] << current;
+	}
+
+	return;
+}
+/**************************************************************************/
+
+/**************************************************************************/
+/* UlsFileReader::readStationDataStatic()                                 */
+/**************************************************************************/
+void UlsFileReader::readStationDataStatic(const std::vector<std::string> &fieldList,
+				      FILE *fwarn,
+				      bool alignFederatedFlag,
+				      double alignFederatedScale)
+{
+	StationDataCAClass current;
+
+	std::string linceseeName;
+
+	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
+		std::string field = fieldList[fieldIdx];
+
+		switch (fieldIdx) {
+			case 1:
+				current.service = atoi(field.c_str());
+				break;
+			case 2:
+				current.subService = atoi(field.c_str());
+				break;
+			case 3:
+				current.authorizationNumber = field;
+				break;
+			case 4:
+				linceseeName = field;
+				break;
+			case 6:
+				current.callsign = field;
+				break;
+			case 7:
+				current.stationLocation = field;
+				break;
+			case 8:
+				current.ituClass = field;
+				break;
+			case 9:
+				current.latitudeDeg = emptyAtof(field.c_str());
+				break;
+			case 10:
+				current.longitudeDeg = emptyAtof(field.c_str());
+				break;
+			case 11:
+				current.groundElevation = emptyAtof(field.c_str());
+				break;
+			case 13:
+				current.antennaHeightAGL = emptyAtof(field.c_str());
+				break;
+			case 17:
+				current.emissionsDesignator = field;
+				break;
+			case 18:
+				current.bandwidthMHz = emptyAtof(field.c_str()) / 1000.0;
+				break;
+			case 19:
+				current.centerFreqMHz = emptyAtof(field.c_str());
+				break;
+			case 20:
+				current.antennaGain = emptyAtof(field.c_str());
+				break;
+			case 21:
+				current.lineLoss = emptyAtof(field.c_str());
+				break;
+			case 23:
+				current.antennaManufacturer = field;
+				break;
+			case 24:
+				current.antennaModel = field;
+				break;
+			case 25:
+				current.inServiceDate = field;
+				break;
+			case 26:
+				current.modulation = field;
+				break;
+			case 14:
+				current.azimuthPtg = emptyAtof(field.c_str());
+				break;
+			case 15:
+				current.elevationPtg = emptyAtof(field.c_str());
+				break;
+		}
+	}
+
+	if (alignFederatedFlag) {
+		current.longitudeDeg = std::floor(current.longitudeDeg * alignFederatedScale +
+						  0.5) /
+				       alignFederatedScale;
+		current.latitudeDeg = std::floor(current.latitudeDeg * alignFederatedScale + 0.5) /
+				      alignFederatedScale;
+	}
+
+	if (isnan(current.antennaHeightAGL)) {
+		current.antennaHeightAGL = 56.0;
+	} else if (current.antennaHeightAGL < 1.5) {
+		current.antennaHeightAGL = 1.5;
+	}
+
+	double heightAMSL_km = (current.groundElevation + current.antennaHeightAGL) / 1000.0;
+	current.position = EcefModel::geodeticToEcef(current.latitudeDeg,
+						     current.longitudeDeg,
+						     heightAMSL_km);
+
+	current.pointingVec = UlsFunctionsClass::computeHPointingVec(current.position,
+								     current.azimuthPtg,
+								     current.elevationPtg);
+
+	std::string origAntennaModel = std::string(current.antennaModel);
+	std::string antennaModel = origAntennaModel;
+
+	antennaModel.erase(std::remove_if(antennaModel.begin(), antennaModel.end(), isInvalidChar),
+			   antennaModel.end());
+
+	if (antennaModel != origAntennaModel) {
+		if (fwarn) {
+			fprintf(fwarn, "WARNING: Antenna model \"");
+			for (int i = 0; i < (int)origAntennaModel.length(); ++i) {
+				char ch = origAntennaModel[i];
+				if (isInvalidChar(ch)) {
+					fprintf(fwarn, "\\x%2X", (unsigned char)ch);
+				} else {
+					fprintf(fwarn, "%c", ch);
+				}
+			}
+			fprintf(fwarn,
+				"\" contains invalid characters, replaced with \"%s\"\n",
+				antennaModel.c_str());
+		}
+		current.antennaModel = antennaModel;
+	}
+
+	// R1-AIP-19-CAN
+	if ((isnan(current.bandwidthMHz)) || (current.bandwidthMHz == 0.0)) {
+		current.bandwidthMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(
+			QString::fromStdString(current.emissionsDesignator));
+	}
+
+	if (isnan(current.bandwidthMHz)) {
+		if (current.centerFreqMHz < 5925.0) {
+			// Do nothing
+		} else if (current.centerFreqMHz < 5955.0) {
+			current.bandwidthMHz = 2 * (current.centerFreqMHz - 5925.0);
+		} else if (current.centerFreqMHz < 6395.0) {
+			current.bandwidthMHz = 60;
+		} else if (current.centerFreqMHz < 6425.0) {
+			current.bandwidthMHz = 2 * (6425.0 - current.centerFreqMHz);
+		} else if (current.centerFreqMHz < 6440.0) {
+			current.bandwidthMHz = 2 * (current.centerFreqMHz - 6425.0);
+		} else if (current.centerFreqMHz < 6860.0) {
+			current.bandwidthMHz = 30;
+		} else if (current.centerFreqMHz < 6875.0) {
+			current.bandwidthMHz = 2 * (6875.0 - current.centerFreqMHz);
+		}
+	}
+
+	if ((current.service == 9) && (current.ituClass == "RA")) {
+		RASClass ras;
+		ras.region = "US";
 		ras.name = linceseeName;
 		ras.location = current.stationLocation;
 		ras.startFreqMHz = current.centerFreqMHz - current.bandwidthMHz / 2;

@@ -1,4 +1,14 @@
-alembic==1.8.1
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+
+alembic==1.14.0
+celery==5.4.0
+confluent-kafka==2.6.1
+cryptography==44.0.1
+email-validator==1.3.0
 Flask==2.3.2
 Flask-JSONRPC==1.0.2
 Flask-Login==0.6.3
@@ -6,19 +16,21 @@ Flask-SQLAlchemy==2.5.1
 Flask-User==1.0.2.2
 Flask-WTF==1.2.1
 Flask-Migrate==2.6.0
-Flask-Script==2.0.5
-Jinja2==3.1.5
+gevent==23.9.1
+Jinja2==3.1.6
 json5==0.9.10
+jwt==1.3.1
+numpy==2.2.2
+pika==1.3.2
 prettytable==3.5.0
 prometheus-client==0.17.1
+psycopg2-binary==2.9.10
+pydantic==1.10.21
 python_dateutil==2.8.2
 pyxdg==0.28
-email-validator==1.3.0
-jwt==1.3.1
-WsgiDAV==4.1.0
+requests==2.32.3
+setuptools==78.1.1
+SQLAlchemy==1.4.54
 typeguard==2.13.3
-celery==5.2.7
+WsgiDAV==4.1.0
 Werkzeug==3.0.6
-gevent==23.9.1
-pika==1.3.2
-

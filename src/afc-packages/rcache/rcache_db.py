@@ -7,25 +7,38 @@
 #
 
 # pylint: disable=wrong-import-order, invalid-name, too-many-statements,
-# pylint: disable=too-many-branches
+# pylint: disable=too-many-branches, too-many-positional-arguments
+# pylint: disable=too-many-arguments
 
 try:
     import db_creator
 except ImportError:
     pass
+try:
+    import geoalchemy2 as ga
+except ImportError:
+    pass
 import sqlalchemy as sa
 import sys
-from typing import Any, cast, Dict, List, Optional, Tuple
+from typing import Any, cast, Dict, List, NamedTuple, Optional, Tuple
 import urllib.parse
 
 import db_utils
 from log_utils import dp, error, error_if, FailOnError, get_module_logger
 from rcache_models import ApDbRespState, ApDbRecord
 
-__all__ = ["RcacheDb"]
+__all__ = ["RcacheDb", "RcacheLookupResult"]
 
 # Logger for this module
 LOGGER = get_module_logger()
+
+
+class RcacheLookupResult(NamedTuple):
+    """ Rcache lookup result """
+    # True if valid response for given request/config digest found
+    found: bool
+    # Response for given request/config digest - valid or invalidated
+    response: str
 
 
 class RcacheDb:
@@ -80,8 +93,9 @@ class RcacheDb:
                       index=True),
             sa.Column("config_ruleset", sa.String(), nullable=False,
                       index=True),
-            sa.Column("lat_deg", sa.Float(), nullable=False, index=True),
-            sa.Column("lon_deg", sa.Float(), nullable=False, index=True),
+            sa.Column("coordinates",
+                      ga.Geography(geometry_type="POINT", srid=4326),
+                      nullable=False, index=True),
             sa.Column("last_update", sa.DateTime(), nullable=False,
                       index=True),
             sa.Column("req_cfg_digest", sa.String(), nullable=False,
@@ -110,16 +124,22 @@ class RcacheDb:
         return self._MAX_UPDATE_FIELDS // \
             len(self.metadata.tables[self.AP_TABLE_NAME].c)
 
-    def create_db(self, db_creator_url: Optional[str], recreate_db=False,
-                  recreate_tables=False, fail_on_error=True) -> bool:
-        """ Creates database if absent, optionally adjust if present
+    def create_db(self, db_creator_url: Optional[str],
+                  alembic_config: Optional[str] = None,
+                  alembic_initial_version: Optional[str] = None,
+                  alembic_head_version: Optional[str] = None,
+                  fail_on_error=True) -> bool:
+        """ Creates database if absent, ensures correct alembic version
 
         Arguments:
-        db_creator_url   -- REST API URL for Postgres database creation or None
-        recreate_db      -- Recreate database if it exists
-        recreate_tables  -- Recreate known database tables if database exists
-        fail_on_error    -- True to fail on error, False to return success
-                            status
+        db_creator_url          -- REST API URL for Postgres database creation
+                                   or None
+        alembic_config          -- Alembic config file. None to do no Alembic
+        alembic_initial_version -- None or version to stamp alembicless
+                                   database with (before upgrade)
+        alembic_head_version    -- Current alembic version. None to use 'head'
+        fail_on_error           -- True to fail on error, False to return
+                                   success status
         Returns True on success, Fail on failure (if fail_on_error is False)
         """
         engine: Any = None
@@ -137,19 +157,28 @@ class RcacheDb:
                 engine = self._create_sync_engine(self.rcache_db_dsn)
 
                 try:
-                    db_creator.ensure_dsn(
-                        dsn=self.rcache_db_dsn, recreate=bool(recreate_db))
+                    _, existed = db_creator.ensure_dsn(dsn=self.rcache_db_dsn)
                 except RuntimeError as ex:
                     error(f"Error creating Rcache database "
                           f"'{db_utils.safe_dsn(self.rcache_db_dsn)}': {ex}")
 
+                if alembic_config:
+                    err = \
+                        db_utils.alembic_ensure_version(
+                            alembic_config=alembic_config,
+                            existing_database=existed,
+                            initial_version=alembic_initial_version,
+                            head_version=alembic_head_version)
+                    error_if(err, err)
                 try:
-                    if recreate_tables:
-                        with engine.connect() as conn:
-                            conn.execute("COMMIT")
-                            for table_name in self.ALL_TABLE_NAMES:
-                                conn.execute(
-                                    f'DROP TABLE IF EXISTS "{table_name}"')
+                    with engine.connect() as conn:
+                        conn.execute("COMMIT")
+                        conn.execute(
+                            "CREATE EXTENSION IF NOT EXISTS postgis")
+                except sa.exc.SQLAlchemyError as ex:
+                    error(f"Unable to create PostGIS extension in "
+                          f"'{self.db_name}': {ex}")
+                try:
                     self.metadata.create_all(engine)
                     self._read_metadata()
                 except sa.exc.SQLAlchemyError as ex:
@@ -199,13 +228,15 @@ class RcacheDb:
             self._engine.dispose()
             self._engine = None
 
-    def lookup(self, req_cfg_digests: List[str],
-               try_reconnect=False) -> Dict[str, str]:
+    def lookup(self, req_cfg_digests: List[str], return_invalidated: bool,
+               try_reconnect=False) -> Dict[str, RcacheLookupResult]:
         """ Request cache lookup
 
         Arguments:
-        req_cfg_digests -- List of request/config digests
-        try_reconnect   -- On failure try reconnect
+        req_cfg_digests    -- List of request/config digests
+        return_invalidated -- True to return valid and invalidated responses,
+                              False to return only valid ones
+        try_reconnect      -- On failure try reconnect
         Returns Dictionary of found requests, indexed by request/config digests
         """
         retry = False
@@ -214,13 +245,18 @@ class RcacheDb:
                 self.connect()
             assert (self._engine is not None) and (self.ap_table is not None)
             s = sa.select([self.ap_table]).\
-                where((self.ap_table.c.req_cfg_digest.in_(req_cfg_digests)) &
-                      (self.ap_table.c.state == ApDbRespState.Valid.name))
+                where(self.ap_table.c.req_cfg_digest.in_(req_cfg_digests))
+            if not return_invalidated:
+                s = s.where(self.ap_table.c.state == ApDbRespState.Valid.name)
             try:
                 with self._engine.connect() as conn:
                     rp = conn.execute(s)
-                    return {rec.req_cfg_digest:
-                            ApDbRecord.parse_obj(rec).get_patched_response()
+                    return \
+                        {rec.req_cfg_digest:
+                         RcacheLookupResult(
+                             found=rec.state == ApDbRespState.Valid.name,
+                             response=ApDbRecord.parse_obj(rec).
+                             get_patched_response())
                             for rec in rp}
             except sa.exc.SQLAlchemyError as ex:
                 if retry or (not try_reconnect):

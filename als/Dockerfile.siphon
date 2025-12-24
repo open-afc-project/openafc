@@ -9,7 +9,7 @@
 # Kafka and puts them to PostgreSQL+PostGIS database (optionally creating
 # necessary database before operation)
 
-FROM alpine:3.18
+FROM python:3.12-alpine3.21
 
 # Destination in docker image. Not a parameter (i.e. no reasons to change it)
 ARG WORKDIR=/usr/app
@@ -18,18 +18,14 @@ ENV WORKDIR=$WORKDIR
 RUN mkdir -p -m 777 $WORKDIR
 WORKDIR $WORKDIR
 
-RUN apk add --update --no-cache python3=~3.11 py3-sqlalchemy=~1.4 py3-pip \
-    py3-psycopg2 py3-pydantic=~1.10 py3-alembic py3-lz4
-
-# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
-# installed as Alpine package (thus not requiring gcc and musl-dev install)
-RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1 && \
-    pip3 install confluent-kafka==2.1.1 && \
-    apk del python3-dev gcc musl-dev
-
+# Installing Python libraries
+#   Version of librdkafka-dev depends on Alpine version. confluent-kafka
+#   version in requirements.txt may need to be updated on Alpine version change
+RUN apk add --update --no-cache librdkafka-dev
 COPY als/requirements.txt $WORKDIR/
-RUN pip3 install --no-cache-dir --root-user-action=ignore -r requirements.txt
+RUN apk add --update --no-cache python3-dev build-base && \
+    pip3 install --root-user-action=ignore -r $WORKDIR/requirements.txt && \
+    apk del --purge python3-dev build-base && rm -f $WORKDIR/requirements.txt
 
 COPY src/afc-packages /wd/afc-packages/
 RUN pip3 install --use-pep517 --root-user-action=ignore \
@@ -58,6 +54,15 @@ ENV KAFKA_SSL_CAFILE=
 
 # Maximum message size (default is 1MB)
 ENV KAFKA_MAX_REQUEST_SIZE=
+
+# Kafka topic name for ALS records. Default is "ALS"
+# ENV AFC_ALS_TOPIC_NAME
+
+# Prefix for Kafka topic names for JSON log records. Default is empty
+# ENV AFC_JSON_TOPIC_PREFIX
+
+# Number of month partitions ahead to create/ensure on each container start
+ENV AFC_ALS_MONTH_PARTITIONS_AHEAD=6
 
 # Connection string to ALS database (may be partial, leaving default parts).
 # Hostname better be specified, as default is 'localhost'
@@ -92,11 +97,16 @@ ENV ALEMBIC_CONFIG=$WORKDIR/als_migrations/alembic.ini
 # Alembic version of last pre-alembic (first alembic) ALS database
 ENV ALS_ALEMBIC_INITIAL_VERSION=4aaf4b7e53f5
 
-COPY als/als_siphon.py als/als_query.py als/utils.py $WORKDIR/
+# Name of file containing heyhole shape for als_query directional search
+ENV KEYHOLE_TEMPLATE_FILE=$WORKDIR/keyhole_postgis.template
+
+COPY als/als_siphon.py als/als_query.py als/utils.py \
+    als/als_db_tool.py als/als_db_tool.yaml \
+    tools/keyhole/keyhole_postgis.template $WORKDIR/
 COPY als/als_migrations $WORKDIR/als_migrations/
+COPY als/als_db_schema/ALS.sql $WORKDIR/als_db_schema/
 
 RUN chmod a+x $WORKDIR/als_*.py
-COPY als/ALS.sql $WORKDIR/
 
 ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_servers=$KAFKA_SERVERS \
@@ -105,13 +115,16 @@ ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_ssl_keyfile=$KAFKA_SSL_KEYFILE \
     --kafka_ssl_cafile=$KAFKA_SSL_CAFILE \
     --kafka_max_partition_fetch_bytes=$KAFKA_MAX_REQUEST_SIZE \
+    --als_topic=$AFC_ALS_TOPIC_NAME \
+    --json_topic_prefix=$AFC_JSON_TOPIC_PREFIX \
     --als_postgres=$POSTGRES_ALS_CONN_STR \
     --als_postgres_password_file=$POSTGRES_ALS_PASSWORD_FILE \
     --log_postgres=$POSTGRES_LOG_CONN_STR \
     --log_postgres_password_file=$POSTGRES_LOG_PASSWORD_FILE \
     --prometheus_port=$SIPHON_PROMETHEUS_PORT \
     --touch_file=$SIPHON_TOUCH_FILE \
-    --als_sql $WORKDIR/ALS.sql \
+    --als_sql=$WORKDIR/als_db_schema/ALS.sql \
+    --als_months_ahead=$AFC_ALS_MONTH_PARTITIONS_AHEAD \
     --als_alembic_config=$ALEMBIC_CONFIG \
     --als_alembic_initial_version=$ALS_ALEMBIC_INITIAL_VERSION
 

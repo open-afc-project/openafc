@@ -7,7 +7,15 @@
 // Schema of AFC Request/response/config log database
 // This file is a DBML source code for visualizing database scheme in dbdiagram.io
 
-// Read als_rectifier.awk for update instructions
+// DATABASE SCHEMA UPDATE
+
+// 1. Open dbdiagram.io, press "Go To App" button"
+// 2. Copypaste this file to schem description (left part)
+// 3. Make necessary changes, arrange picture (right part) nicely
+// 4. Copypaste upated schema description (left part) to als/als_db_schema/ALS.dbml
+// 5. Save picture (Export -> To PNG) to als/als_db_schema/ALS.png
+// 6. Save SQL (Export -> To PostgreSQL) to ala/als_db_schema/ALS.sql
+// 7. Rebuild als_siphon image
 
 // Table, containing a record for each request messgae/response message/config(s) set
 table afc_message [headercolor: #000000, note: 'AFC Request/Response message pair (contain individual requests/responses)'] {
@@ -32,13 +40,15 @@ table afc_message [headercolor: #000000, note: 'AFC Request/Response message pai
     dn_text_digest [type: hash]
     ap_ip
     runtime_opt
+    month_idx
   }
 }
 
 Ref afc_message_afc_server_ref: afc_message.(afc_server, month_idx) > afc_server.(afc_server_id, month_idx)
 Ref afc_message_rx_envelope_digest_ref: afc_message.(rx_envelope_digest, month_idx) > rx_envelope.(rx_envelope_digest, month_idx)
 Ref afc_message_tx_envelope_digest_ref: afc_message.(tx_envelope_digest, month_idx) > tx_envelope.(tx_envelope_digest, month_idx)
-Ref afc_message_dn_text_digest_ref: afc_message.(dn_text_digest, month_idx) > mtls_dn.(dn_text_digest, month_idx) [note: 'This relation was added to existing database, so it is OK for dn_text_digest to be NULL on legacy records']
+// This relation was added to existing database, so it is OK for dn_text_digest to be NULL on legacy records
+Ref afc_message_dn_text_digest_ref: afc_message.(dn_text_digest, month_idx) > mtls_dn.(dn_text_digest, month_idx)
 
 // Outer part of request message
 table rx_envelope [headercolor: #4B82B0, note: 'Envelope (constant part) of AFC Request Message'] {
@@ -49,6 +59,7 @@ table rx_envelope [headercolor: #4B82B0, note: 'Envelope (constant part) of AFC 
   indexes {
     (rx_envelope_digest, month_idx) [pk]
     rx_envelope_digest [type: hash]
+    month_idx
   }
 }
 
@@ -61,6 +72,7 @@ table tx_envelope [headercolor: #4B82B0, note: 'Envelope (constant part) of AFC 
   indexes {
     (tx_envelope_digest, month_idx) [pk]
     tx_envelope_digest [type: hash]
+    month_idx
   }
 }
 
@@ -74,6 +86,7 @@ table mtls_dn [headercolor: #4B82B0, note: 'mTLS certificate DN components'] {
   indexes {
     (dn_text_digest, month_idx) [pk]
     dn_text_digest [type: hash]
+    month_idx
   }
 }
 
@@ -91,6 +104,7 @@ table request_response_in_message [headercolor: #4B82B0, note: 'Associative tabl
     request_id
     request_response_digest
     expire_time
+    month_idx
   }
 }
 
@@ -123,6 +137,7 @@ table request_response [headercolor: #2D6512, note: 'Potentiially constant part 
     response_code
     response_description
     response_data
+    month_idx
   }
 }
 
@@ -147,6 +162,7 @@ table device_descriptor [headercolor: #2D6512, note: 'Information about device (
     device_descriptor_digest [type: hash]
     serial_number
     certifications_digest
+    month_idx
   }
 }
 
@@ -165,6 +181,7 @@ table certification [headercolor: #79AD51, note: 'Element of certifications list
     certifications_digest [type: hash]
     ruleset_id
     certification_id
+    month_idx
   }
 }
 
@@ -177,6 +194,7 @@ table compressed_json [headercolor: #2D6512, note: 'Compressed body of request o
   indexes {
     (compressed_json_digest, month_idx) [pk]
     compressed_json_digest [type: hash]
+    month_idx
   }
 }
 
@@ -189,6 +207,7 @@ table customer [headercolor: #79AD51, note: 'Customer aka vendor aka user'] {
   indexes {
     (customer_id, month_idx) [pk]
     customer_name
+    month_idx
   }
 }
 
@@ -211,6 +230,7 @@ table location [headercolor: #2D6512, note: 'AP location'] {
     location_type
     height_m
     height_type
+    month_idx
   }
 }
 
@@ -224,6 +244,7 @@ table afc_config [headercolor: #79AD51, note: 'AFC Config'] {
   indexes {
     (afc_config_text_digest, month_idx) [pk]
     afc_config_text_digest [type: hash]
+    month_idx
   }
 }
 
@@ -237,6 +258,7 @@ table geo_data_version [headercolor: #79AD51, note: 'Version of geospatial data'
     (geo_data_version_id, month_idx) [pk]
     (geo_data_version, month_idx) [unique]
     geo_data_version
+    month_idx
   }
 }
 
@@ -250,6 +272,7 @@ table uls_data_version [headercolor: #79AD51, note: 'Version of ULS data'] {
     (uls_data_version_id, month_idx) [pk]
     (uls_data_version, month_idx) [unique]
     uls_data_version
+    month_idx
   }
 }
 
@@ -267,6 +290,7 @@ table max_psd [headercolor: #990D0D, note: 'PSD result'] {
     low_frequency_mhz
     high_frequency_mhz
     max_psd_dbm_mhz
+    month_idx
   }
 }
 
@@ -286,6 +310,7 @@ table max_eirp [headercolor: #990D0D, note: 'EIRP result'] {
     op_class
     channel
     max_eirp_dbm
+    month_idx
   }
 }
 
@@ -301,6 +326,7 @@ table afc_server [headercolor: #4B82B0] {
     (afc_server_id, month_idx) [pk]
     (afc_server_name, month_idx) [unique]
     afc_server_name
+    month_idx
   }
 }
 
@@ -312,4 +338,9 @@ table decode_error {
   code_line integer
   data text
   month_idx smallint
+
+  indexes {
+    time
+    month_idx
+  }
 }

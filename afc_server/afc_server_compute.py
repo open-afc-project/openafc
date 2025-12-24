@@ -100,19 +100,21 @@ class AfcServerCompute:
         self._stopping = False
 
     async def process_request(
-            self, request_str: str, config_str: str, req_cfg_digest: str,
-            runtime_opt: int, task_id: str, history_dir: Optional[str],
-            deadline: float) -> Optional[str]:
+            self, request_str: str, original_request_str: str, config_str: str,
+            req_cfg_digest: str, runtime_opt: int, task_id: str,
+            history_dir: Optional[str], deadline: float) -> Optional[str]:
         """ Process AFC Engine computation request
 
         Arguments:
-        request_str    -- AFC Request as string
-        config_str     -- AFC Config as string
-        req_cfg_digest -- Hash of request and config
-        runtime_opt    -- Value for --runtime_opt AFC Engine parameter
-        task_id        -- Unique request ID
-        history_dir    -- None or ObjStore history directory
-        deadline       -- Deadline as seconds since Epoch
+        request_str          -- AFC Request as string
+        original_request_str -- Original AFC Request as string (without added
+                                vendor extensions)
+        config_str           -- AFC Config as string
+        req_cfg_digest       -- Hash of request and config
+        runtime_opt          -- Value for --runtime_opt AFC Engine parameter
+        task_id              -- Unique request ID
+        history_dir          -- None or ObjStore history directory
+        deadline             -- Deadline as seconds since Epoch
         Returns response (None in case of error) or generates TimeoutError
         """
         timeout = deadline - time.time()
@@ -128,6 +130,7 @@ class AfcServerCompute:
                     asyncio.create_task(
                         asyncio.to_thread(
                             self._send_req_to_celery, request_str=request_str,
+                            original_request_str=original_request_str,
                             config_str=config_str,
                             req_cfg_digest=req_cfg_digest,
                             runtime_opt=runtime_opt, task_id=task_id,
@@ -183,9 +186,6 @@ class AfcServerCompute:
                             LOGGER.error(f"Decode error on AFC Response Info "
                                          f"arrived from Worker: {ex}")
                             continue
-                        error_if(rrk.afc_req,
-                                 "RCACHE_UPDATE_ON_SEND must be unset or set "
-                                 "to TRUE")
                         future_holders = \
                             self._request_futures.get(rrk.req_cfg_digest)
                         for future_holder in (future_holders or set()):
@@ -197,9 +197,9 @@ class AfcServerCompute:
             error(f"Unhandled exception in RMQ reader worker task {ex}")
 
     def _send_req_to_celery(
-            self, request_str: str, config_str: str, req_cfg_digest: str,
-            runtime_opt: int, task_id: str, history_dir: Optional[str],
-            deadline: float) -> None:
+            self, request_str: str, original_request_str: str, config_str: str,
+            req_cfg_digest: str, runtime_opt: int, task_id: str,
+            history_dir: Optional[str], deadline: float) -> None:
         """ Called on separate thread to AFC Engine request via Celery """
         if self._stopping:
             return
@@ -228,6 +228,7 @@ class AfcServerCompute:
                     "mntroot": self._worker_mnt_root,
                     "rcache_queue": self._rmq_rx_queue_name,
                     "request_str": request_str,
+                    "original_request_str": original_request_str,
                     "config_str": config_str,
                     "deadline": deadline})
         except Exception as ex:

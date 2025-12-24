@@ -14,13 +14,19 @@ import datetime
 import enum
 import json
 import pydantic
+try:
+    import sqlalchemy as sa
+except ImportError:
+    pass
+import sys
 from typing import Any, Dict, List, Optional
 
 from log_utils import dp
 
-__all__ = ["AfcReqRespKey", "ApDbPk", "ApDbRecord", "ApDbRespState",
+__all__ = ["AfcReqRespKey", "ApDbPk", "ApDbRecord", "ApDbRespState", "Beam",
            "FuncSwitch", "IfDbExists", "LatLonRect", "RatapiAfcConfig",
-           "RatapiRulesetIds", "RcacheClientSettings", "RcacheInvalidateReq",
+           "RatapiRulesetIds", "RcacheClientSettings",
+           "RcacheDirectionalInvalidateReq", "RcacheInvalidateReq",
            "RCACHE_RMQ_EXCHANGE_NAME", "RcacheServiceSettings",
            "RcacheSpatialInvalidateReq", "RcacheStatus", "RcacheUpdateReq",
            "RmqReqRespKey"]
@@ -35,7 +41,7 @@ RESP_EXPIRATION_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 class IfDbExists(enum.Enum):
-    """ What to do if cache database exists on RCache service startup """
+    """ What to do if cache database exists on Rcache service startup """
     # Leave as is (default)
     leave = "leave"
     # Completely recreate (extra stuff, like alembic, will be removed)
@@ -65,31 +71,44 @@ class RcacheServiceSettings(pydantic.BaseSettings):
             "postgresql://[user[:password]]@host[:port]/database[?...]")
     postgres_password_file: Optional[str] = \
         pydantic.Field(None, title="File with password for database DSN")
-    if_db_exists: IfDbExists = \
-        pydantic.Field(
-            IfDbExists.leave,
-            title="What to do if cache database already exists: 'leave' "
-            "(leave as is - default), 'recreate' (completely recreate - e.g. "
-            "removing alembic, if any), 'clean' (only clean the cache table)")
     db_creator_url: Optional[pydantic.AnyHttpUrl] = \
         pydantic.Field(
             None, title="REST API URL for Postgres database creation",
             env="AFC_DB_CREATOR_URL")
+    alembic_config: Optional[str] = \
+        pydantic.Field(
+            None,
+            description="Optional name of Alembic config file")
+    alembic_initial_version: Optional[str] = \
+        pydantic.Field(
+            None,
+            description="Version to stamp Alembicless database with")
+    alembic_head_version: Optional[str] = \
+        pydantic.Field(
+            None,
+            description="Version to stamp newly-created database with "
+            "(default is 'head')")
     precompute_quota: int = \
         pydantic.Field(
-            10, title="Number of simultaneous precomputing requests in flight")
+            10,
+            description="Number of simultaneous precomputing requests in "
+            "flight")
     afc_req_url: Optional[pydantic.AnyHttpUrl] = \
         pydantic.Field(
             None,
-            title="RestAPI URL to send AFC Requests for precomputation")
+            description="RestAPI URL to send AFC Requests for precomputation")
     rulesets_url: Optional[pydantic.AnyHttpUrl] = \
         pydantic.Field(
             None,
-            title="RestAPI URL to retrieve list of active Ruleset IDs")
+            description="RestAPI URL to retrieve list of active Ruleset IDs")
     config_retrieval_url: Optional[pydantic.AnyHttpUrl] = \
         pydantic.Field(
             None,
-            title="RestAPI URL to retrieve AFC Config for given Ruleset ID")
+            description="RestAPI URL to retrieve AFC Config for given Ruleset "
+            "ID")
+    keyhole_template: Optional[str] = \
+        pydantic.Field(
+            None, description="Keyhole shape PostGIS template file")
 
     @classmethod
     @pydantic.root_validator(pre=True)
@@ -109,28 +128,42 @@ class RcacheClientSettings(pydantic.BaseSettings):
         # Prefix of environment variables
         env_prefix = "RCACHE_"
 
+        @classmethod
+        def parse_env_var(cls, field_name: str, raw_val: str) -> Any:
+            """ Parses string list environment variable(s) """
+            if field_name == "afc_state_vendor_extensions":
+                return [x for x in raw_val.split(",") if x]
+            return cls.json_loads(raw_val)
+
     enabled: bool = \
-        pydantic.Field(True,
-                       title="Rcache enabled (False for legacy file-based "
-                       "cache. Default is enabled")
+        pydantic.Field(
+            True,
+            description="Rcache enabled (False for legacy file-based cache. "
+            "Default is enabled")
     postgres_dsn: Optional[pydantic.PostgresDsn] = \
         pydantic.Field(
             None,
-            title="Postgres DSN: "
+            description="Postgres DSN: "
             "postgresql://[user[:password]]@host[:port]/database[?...]")
     postgres_password_file: Optional[str] = \
-        pydantic.Field(None, title="File with password for database DSN")
+        pydantic.Field(
+            None,
+            description="File with password for database DSN")
     service_url: Optional[pydantic.AnyHttpUrl] = \
-        pydantic.Field(None, title="Rcache server base RestAPI URL")
+        pydantic.Field(
+            None,
+            description="Rcache server base RestAPI URL")
     rmq_dsn: Optional[pydantic.AmqpDsn] = \
         pydantic.Field(
             None,
-            title="RabbitMQ AMQP DSN: amqp://[user[:password]]@host[:port]")
-    update_on_send: bool = \
+            description="RabbitMQ AMQP DSN: "
+            "amqp://[user[:password]]@host[:port]")
+    afc_state_vendor_extensions: Optional[List[str]] = \
         pydantic.Field(
-            True,
-            title="True to update cache from worker (on sending response), "
-            "False to update cache on msghnd (on receiving response)")
+            None,
+            description="List of Set of vendor extensions from previously "
+            "computed invalidated AFC response to be sent to AFC Engine",
+            env="AFC_STATE_VENDOR_EXTENSIONS")
 
     @classmethod
     @pydantic.root_validator(pre=True)
@@ -196,7 +229,7 @@ class LatLonRect(pydantic.BaseModel):
 
 
 class RcacheInvalidateReq(pydantic.BaseModel):
-    """ RCache REST API cache invalidation request """
+    """ Rcache REST API cache invalidation request """
     ruleset_ids: Optional[List[str]] = \
         pydantic.Field(None,
                        title="Optional list of ruleset IDs to invalidate. By "
@@ -204,9 +237,63 @@ class RcacheInvalidateReq(pydantic.BaseModel):
 
 
 class RcacheSpatialInvalidateReq(pydantic.BaseModel):
-    """ RCache REST API spatial invalidation request """
+    """ Rcache REST API spatial invalidation request """
     tiles: List[LatLonRect] = \
         pydantic.Field(..., title="List of rectangles, containing changed FSs")
+
+
+class Beam(pydantic.BaseModel):
+    """ Directed (point plus direction) spatial invalidation request """
+    rx_lat: float = \
+        pydantic.Field(
+            ...,
+            title="FS/PR RX WGS84 latitude in north-positive degrees")
+    rx_lon: float = \
+        pydantic.Field(
+            ...,
+            title="FS/PR RX WGS84 longitude in east-positive degrees")
+    tx_lat: Optional[float] = \
+        pydantic.Field(
+            None,
+            title="FS/PR TX WGS84 latitude in north-positive degrees. Absent "
+            "if azimuth to TX is specified")
+    tx_lon: Optional[float] = \
+        pydantic.Field(
+            None,
+            title="FS/PR TX WGS84 longitude in east-positive degrees. Absent "
+            "if azimuth to TX is specified")
+    azimuth_to_tx: Optional[float] = \
+        pydantic.Field(
+            None,
+            title="True WGS84 azimuth from RX to TX. Absent if TX position is "
+            "specified")
+
+    @classmethod
+    @pydantic.root_validator()
+    def one_definition(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        """ Verifies that direction to TX specified in exactly one way """
+        if (v.get("tx_lat") is None) != (v.get("tx_lon") is None):
+            raise ValueError("TX latitude/longitude should be specified both "
+                             "or not at all")
+        if (v.get("tx_lat") is None) == (v.get("azimuth_to_tx") is None):
+            raise ValueError("Either TX position or azimuth to TX (but not "
+                             "both) should be specified")
+
+    def short_str(self) -> str:
+        """ Condensed string representation """
+        return \
+            f"RX: {abs(self.rx_lat)}{'N' if self.rx_lat >= 0 else 'S'}, " \
+            f"{abs(self.rx_lon)}{'E' if self.rx_lon >= 0 else 'W'}; " + \
+            (f"azimith to TX: {self.azimuth_to_tx}"
+             if self.azimuth_to_tx is not None
+             else f"TX: {abs(self.tx_lat)}{'N' if self.tx_lat >= 0 else 'S'}, "
+             f"{abs(self.tx_lon)}{'E' if self.tx_lon >= 0 else 'W'}")
+
+
+class RcacheDirectionalInvalidateReq(pydantic.BaseModel):
+    """ Rcache REST API directional invalidation request """
+    beams: List[Beam] = \
+        pydantic.Field(..., title="List of beam definitions for changed FSs")
 
 
 class AfcReqRespKey(pydantic.BaseModel):
@@ -218,14 +305,9 @@ class AfcReqRespKey(pydantic.BaseModel):
         pydantic.Field(
             ..., title="Request/Config hash (cache lookup key) as string")
 
-    class Config:
-        """ Metadata """
-        # May be constructed from RmqReqRespKey
-        orm_mode = True
-
 
 class RcacheUpdateReq(pydantic.BaseModel):
-    """ RCache REST API cache update request """
+    """ Rcache REST API cache update request """
     req_resp_keys: List[AfcReqRespKey] = \
         pydantic.Field(..., title="Computation results to add to cache")
 
@@ -413,11 +495,6 @@ class AfcRespAvailableSpectrumInquiryResponseMessage(pydantic.BaseModel):
 
 class RmqReqRespKey(pydantic.BaseModel):
     """ Request/Response/Digest structure, used in RabbitMQ communication """
-    afc_req: Optional[str] = \
-        pydantic.Field(
-            ...,
-            title="AFC Request as string. None if cache update being made on "
-            "sender (Worker) side")
     afc_resp: Optional[str] = \
         pydantic.Field(..., title="AFC Response as string. None on failure")
     req_cfg_digest: str = \
@@ -469,10 +546,10 @@ class ApDbRecord(pydantic.BaseModel):
     state: str = pydantic.Field(..., title="Response state")
     config_ruleset: str = \
         pydantic.Field(..., title="Ruleset used for computation")
-    lat_deg: float = \
-        pydantic.Field(..., title="North positive latitude in degrees")
-    lon_deg: float = \
-        pydantic.Field(..., title="East positive longitude in degrees")
+    # Well, in fact it is # Annotated[str, geoalchemy2.types.WKBElement],
+    # but bringing geoalchemy2 into all usage places is too daunting
+    coordinates: Any = \
+        pydantic.Field(..., title="Access Point WGS84 coordinates")
     last_update: datetime.datetime = \
         pydantic.Field(..., title="Time of last update")
     req_cfg_digest: str = \
@@ -487,6 +564,8 @@ class ApDbRecord(pydantic.BaseModel):
         """ Construct from Request/Response/digest data
         Returns None if data not deserved to be in database
         """
+        if "sqlalchemy" not in sys.modules:
+            raise RuntimeError("'sqlalchemy' module not imported")
         resp = \
             AfcRespAvailableSpectrumInquiryResponseMessage.parse_raw(
                 rrk.afc_resp).availableSpectrumInquiryResponses[0]
@@ -503,8 +582,9 @@ class ApDbRecord(pydantic.BaseModel):
                 **pk.dict(),
                 state=ApDbRespState.Valid.name,
                 config_ruleset=resp.rulesetId,
-                lat_deg=center.latitude,
-                lon_deg=center.longitude,
+                coordinates=sa.text(
+                    f"ST_GeographyFromText('SRID=4326;"
+                    f"POINT({center.longitude} {center.latitude})')"),
                 last_update=datetime.datetime.now(),
                 req_cfg_digest=rrk.req_cfg_digest,
                 validity_period_sec=None
@@ -514,40 +594,6 @@ class ApDbRecord(pydantic.BaseModel):
                       datetime.datetime.utcnow()).total_seconds(),
                 request=rrk.afc_req,
                 response=rrk.afc_resp)
-
-    @classmethod
-    def check_db_table(cls, table: Any) -> Optional[str]:
-        """ Checks that structure is the same as given SqlAlchemy tab
-        Returns None if all OK, error message otherwise
-        """
-        class_name = cls.schema()['title']
-        properties: Dict[str, Dict[str, str]] = cls.schema()["properties"]
-        if len(properties) != len(table.c):
-            return f"Database table and {class_name} have different numbers " \
-                f"of fields"
-        for idx, (field_name, attrs) in enumerate(properties.items()):
-            if field_name != table.c[idx].name:
-                return f"{idx}'s field in database and in {class_name} have " \
-                    f"different names: {table.c[idx].name} and {field_name} " \
-                    f"respectively"
-            field_type = attrs.get("type")
-            column_type_name = str(table.c[idx].type)
-            if ((column_type_name == "INTEGER") and
-                (field_type != "integer")) or \
-                    ((column_type_name == "FLOAT") and
-                     (field_type != "number")) or \
-                    ((column_type_name == "VARCHAR") and
-                     (field_type not in ("string", None))) or \
-                    ((column_type_name == "DATETIME") and
-                     (attrs.get("format") != "date-time")):
-                return f"Field '{field_name}' at index {idx} in the " \
-                    f"database and in the {class_name} have different " \
-                    f"types: {str(table.c[idx].type)} and {field_type} " \
-                    f"respectively"
-        if set(c.name for c in table.c if c.primary_key) != \
-                set(ApDbPk.schema()["properties"].keys()):
-            return "Different primary key composition in database and ApDbPk"
-        return None
 
     def get_patched_response(self) -> str:
         """ Returns response patched with known nonconstant fields """

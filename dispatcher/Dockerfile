@@ -4,13 +4,16 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-FROM nginx:1.24.0-alpine
+FROM nginx:1.27.4-alpine
 ENV PYTHONUNBUFFERED=1
-RUN apk add --update --no-cache python3 py3-psutil \
-    && ln -sf python3 /usr/bin/python \
-    && python3 -m ensurepip
-RUN pip3 install --no-cache --upgrade \
-        --root-user-action=ignore pip setuptools
+
+RUN apk add --update --no-cache python3
+
+# Setting up venv in /venv and 'activating' it
+RUN python3 -m venv /venv
+ENV PATH=/venv/bin:$PATH
+ENV VIRTUAL_ENV=/venv
+
 #
 # Install reqiored python external and internal packages
 #
@@ -21,12 +24,13 @@ COPY dispatcher/requirements.txt /wd
 COPY src/afc-packages ./afc-packages
 # install
 RUN set -x \
+    &&  apk add --update --no-cache python3-dev build-base linux-headers \
     && pip3 install --no-cache --root-user-action=ignore \
      -r /wd/requirements.txt \
+    && apk del --purge python3-dev build-base linux-headers \
     && pip3 install --use-pep517 --root-user-action=ignore \
         -r /wd/afc-packages/pkgs.dispatcher \
-    && rm -rf /wd/afc-packages \
-    && pip3 uninstall -y setuptools pip \
+    && rm -rf /wd/afc-packages /wd/requirements.txt \
 # create certificate directories
     && mkdir -p \
     /certificates/servers \
