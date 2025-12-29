@@ -4,5 +4,16 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
+alembic==1.14.0
+confluent-kafka==2.6.1
+numpy==2.2.2
 prometheus-client==0.17.1
+psycopg2-binary==2.9.10
+pydantic==1.10.21
+python_dateutil==2.8.2
 python-statsd==2.1.0
+pytz==2024.2
+PyYAML==6.0.1
+requests==2.32.3
+setuptools==78.1.1
+SQLAlchemy==1.4.54

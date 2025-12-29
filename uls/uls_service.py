@@ -12,11 +12,12 @@
 # pylint: disable=logging-fstring-interpolation, invalid-name, too-many-locals
 # pylint: disable=too-few-public-methods, too-many-arguments
 # pylint: disable=too-many-nested-blocks, too-many-lines
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes, too-many-positional-arguments
 
 import argparse
 import datetime
 import glob
+import json
 import logging
 import os
 import prometheus_client
@@ -32,16 +33,19 @@ import sys
 import tempfile
 import threading
 import time
-from typing import cast, Dict, Iterable, List, NamedTuple, Optional, Tuple, \
-    Union
+from typing import Any, cast, Dict, Iterable, List, NamedTuple, Optional, \
+    Tuple, Union
 import urllib.error
 import urllib.request
 
+import als
+from db_utils import safe_dsn
 from rcache_client import RcacheClient
-from rcache_models import LatLonRect, RcacheClientSettings
+from rcache_models import Beam, LatLonRect, RcacheClientSettings
+from pydantic_utils import env_help, merge_args
 from uls_service_common import *
 from uls_service_state_db import CheckType, DownloaderMilestone, LogType, \
-    safe_dsn, StateDb
+    StateDb
 
 # Filemask for ULS databases
 ULS_FILEMASK = "*.sqlite3"
@@ -124,14 +128,23 @@ class Settings(pydantic.BaseSettings):
             None, env="ULS_SERVICE_STATE_DB_PASSWORD_FILE",
             description="Optional name of file with password for state "
             "database DSN")
-    service_state_db_create_if_absent: bool = \
+    db_creator_url: Optional[str] = \
         pydantic.Field(
-            True, env="ULS_SERVICE_STATE_DB_CREATE_IF_ABSENT",
-            description="Create service state database if it is absent")
-    service_state_db_recreate: bool = \
+            None, env="AFC_DB_CREATOR_URL",
+            description="Postgres database creator REST API URL")
+    alembic_config: Optional[str] = \
         pydantic.Field(
-            False, env="ULS_SERVICE_STATE_DB_RECREATE",
-            description="Recreate service state database if it exists")
+            None, env="ULS_ALEMBIC_CONFIG",
+            description="Optional name of Alembic config file")
+    alembic_initial_version: Optional[str] = \
+        pydantic.Field(
+            None, env="ULS_ALEMBIC_INITIAL_VERSION",
+            description="Version to stamp Alembic database with")
+    alembic_head_version: Optional[str] = \
+        pydantic.Field(
+            None, env="ULS_ALEMBIC_HEAD_VERSION",
+            description="Version to stamp newly-created database with "
+            "(default is 'head')")
     prometheus_port: Optional[int] = \
         pydantic.Field(None, env="ULS_PROMETHEUS_PORT",
                        description="Port to serve Prometheus metrics on")
@@ -173,6 +186,11 @@ class Settings(pydantic.BaseSettings):
         pydantic.Field(True, env="RCACHE_ENABLED",
                        description="Rcache spatial invalidation",
                        yes="Enabled", no="Disabled")
+    rcache_directional_invalidate: bool = \
+        pydantic.Field(
+            True, env="RCACHE_DIRECTIONAL_INVALIDATE",
+            description="True to use directional invalidation (default), "
+            "False to use tiled invalidation)")
     delay_hr: float = \
         pydantic.Field(0., env="ULS_DELAY_HR",
                        description="Hours to delay first download by")
@@ -543,7 +561,9 @@ def get_uls_identity(uls_file: str) -> Optional[Dict[str, str]]:
     """
     if not os.path.isfile(uls_file):
         return None
-    engine = sa.create_engine("sqlite:///" + uls_file)
+    engine = \
+        sa.create_engine(f"sqlite:///{uls_file}?mode=ro",
+                         connect_args={"uri": True})
     conn = engine.connect()
     try:
         metadata = sa.MetaData()
@@ -599,31 +619,52 @@ class DbDiff:
     new_len      -- Number of paths in new database
     diff_len     -- Number of different paths
     ras_diff_len -- Number of different RAS entries
-    diff_tiles   -- Tiles containing receivers of different paths
+    diff_tiles   -- Tiles to invalidate
+    diff_beams   -- Beams to invalidate
     """
 
     def __init__(self, prev_filename: str, new_filename: str,
-                 executor: LoggingExecutor) -> None:
+                 executor: LoggingExecutor,
+                 allow_directional_invalidate: bool) -> None:
         """ Constructor
 
         Arguments:
-        prev_filename -- Previous file name
-        new_filename  -- New filename
-        executor      -- LoggingExecutor object
+        prev_filename                -- Previous file name
+        new_filename                 -- New filename
+        executor                     -- LoggingExecutor object
+        allow_directional_invalidate -- True if directional invalidate is
+                                        allowed, False if only tiled one is
+                                        allowed
         """
         self.valid = False
         self.prev_len = 0
         self.new_len = 0
         self.diff_len = 0
+        self.prev_filename = prev_filename
+        self.new_filename = new_filename
         self.diff_tiles: List[LatLonRect] = []
+        self.diff_beams: List[Beam] = []
         logging.info("Getting differences with previous database")
-        output = \
-            executor.execute(
-                [FS_DB_DIFF, "--report_tiles", prev_filename, new_filename],
-                timeout_sec=10 * 60, return_output=True, fail_on_error=False)
-        if output is None:
-            logging.error("Database comparison failed")
-            return
+
+        invalidation_file: Optional[str] = None
+        try:
+            fd, invalidation_file = tempfile.mkstemp(suffix=".json",
+                                                     prefix="invalidation_")
+            os.close(fd)
+            output = \
+                executor.execute(
+                    [FS_DB_DIFF, "--invalidation", invalidation_file,
+                     prev_filename, new_filename],
+                    timeout_sec=10 * 60, return_output=True,
+                    fail_on_error=False)
+            if output is None:
+                logging.error("Database comparison failed")
+                return
+            with open(invalidation_file, encoding="utf-8") as f:
+                invalidation_dict = json.load(f)
+        finally:
+            if invalidation_file:
+                os.unlink(invalidation_file)
         m = re.search(r"Paths in DB1:\s+(?P<db1>\d+)(.|\n)+"
                       r"Paths in DB2:\s+(?P<db2>\d+)(.|\n)+"
                       r"Different paths:\s+(?P<diff>\d+)(.|\n)+"
@@ -637,28 +678,45 @@ class DbDiff:
         self.new_len = int(cast(str, m.group("db2")))
         self.diff_len = int(cast(str, m.group("diff")))
         self.ras_diff_len = int(cast(str, m.group("ras_diff")))
-        for m in re.finditer(
-                r"Difference in tile "
-                r"\[(?P<min_lat>[0-9.]+)-(?P<max_lat>[0-9.]+)\]"
-                r"(?P<lat_sign>[NS]), "
-                r"\[(?P<min_lon>[0-9.]+)-(?P<max_lon>[0-9.]+)\]"
-                r"(?P<lon_sign>[EW])", cast(str, output)):
-            lat_sign = 1 if m.group("lat_sign") == "N" else -1
-            lon_sign = 1 if m.group("lon_sign") == "E" else -1
+        for beam_dict in invalidation_dict["beams"]:
+            if not (allow_directional_invalidate and
+                    any(dir_key in beam_dict for dir_key in
+                        ("tx_lat_deg", "tx_lon_deg", "tx_azimuth_deg"))):
+                self.diff_tiles.append(
+                    LatLonRect(
+                        min_lat=beam_dict["rx_lat_deg"],
+                        max_lat=beam_dict["rx_lat_deg"],
+                        min_lon=beam_dict["rx_lon_deg"],
+                        max_lon=beam_dict["rx_lon_deg"]))
+            else:
+                self.diff_beams.append(
+                    Beam(
+                        rx_lat=beam_dict["rx_lat_deg"],
+                        rx_lon=beam_dict["rx_lon_deg"],
+                        tx_lat=beam_dict.get("tx_lat_deg"),
+                        tx_lon=beam_dict.get("tx_lon_deg"),
+                        azimuth_to_tx=beam_dict.get("tx_azimuth_deg")))
+        for rect_dict in invalidation_dict["rectangles"]:
             self.diff_tiles.append(
                 LatLonRect(
-                    min_lat=float(m.group("min_lat")) * lat_sign,
-                    max_lat=float(m.group("max_lat")) * lat_sign,
-                    min_lon=float(m.group("min_lon")) * lon_sign,
-                    max_lon=float(m.group("max_lon")) * lon_sign))
-        logging.info(
-            f"Database comparison succeeded: "
-            f"{os.path.basename(prev_filename)} has {self.prev_len} paths, "
-            f"{os.path.basename(new_filename)} has {self.new_len} paths, "
-            f"difference is in {self.diff_len} paths, "
-            f"{self.ras_diff_len} RAS entries, "
-            f"{len(self.diff_tiles)} tiles")
+                    min_lat=rect_dict["min_lat_deg"],
+                    max_lat=rect_dict["max_lat_deg"],
+                    min_lon=rect_dict["min_lon_deg"],
+                    max_lon=rect_dict["max_lon_deg"]))
         self.valid = True
+        logging.info(str(self))
+
+    def __str__(self) -> str:
+        """ String representation (for log and ALS) """
+        return \
+            f"Database comparison succeeded: " \
+            f"{os.path.basename(self.prev_filename)} has {self.prev_len} " \
+            f"paths, {os.path.basename(self.new_filename)} has " \
+            f"{self.new_len} paths, difference is in {self.diff_len} paths, " \
+            f"{self.ras_diff_len} RAS entries, " \
+            f"{len(self.diff_beams)} beams" \
+            f"{len(self.diff_tiles)} tiles" \
+            if self.valid else "Not computed"
 
 
 class UlsFileChecker:
@@ -733,12 +791,14 @@ class UlsFileChecker:
         if not db_diff.valid:
             return (True, "Database difference can't be obtained")
         if ((db_diff.diff_len == 0) and (db_diff.ras_diff_len == 0)) != \
-                (len(db_diff.diff_tiles) == 0):
+                ((len(db_diff.diff_tiles) == 0) and
+                 (len(db_diff.diff_beams) == 0)):
             return \
                 (True,
                  f"Inconsistent indication of database difference: difference "
                  f"is in {db_diff.diff_len} paths and in "
                  f"{db_diff.ras_diff_len} RAS entries, but in "
+                 f"{len(db_diff.diff_beams)} beams and "
                  f"{len(db_diff.diff_tiles)} tiles")
         if self._max_change_percent is None:
             return (False, None)
@@ -793,7 +853,9 @@ class ExtParamFilesChecker:
                         # Location in the internet
                         ("base_url", str),
                         # Downloader script subdirectory
-                        ("subdir", str), ("files", List[str])])
+                        ("subdir", str),
+                        # List of files
+                        ("files", List[str])])
 
     def __init__(self, status_updater: StatusUpdater,
                  ext_files_arg: Optional[List[str]] = None,
@@ -839,17 +901,21 @@ class ExtParamFilesChecker:
                         internal_file_name = \
                             os.path.join(self._script_dir, epf.subdir,
                                          filename)
+                        url = f"{epf.base_url}/{filename}"
                         if not os.path.isfile(internal_file_name):
-                            errmsg = "Absent in container"
+                            errmsg = f"'{internal_file_name}' not foound in " \
+                                f"container. It should be downloaded from " \
+                                f"'{url}', verified and added to image"
                             continue
                         try:
-                            url = f"{epf.base_url}/{filename}"
                             external_file_name = os.path.join(temp_dir,
                                                               filename)
                             urllib.request.urlretrieve(url, external_file_name)
                         except urllib.error.URLError as ex:
                             logging.warning(f"Error downloading '{url}': {ex}")
-                            errmsg = "Download failed"
+                            errmsg = f"Error downloading '{url}': {ex}, so " \
+                                f"it was not compared with " \
+                                f"'{internal_file_name}'. Maybe next time..."
                             continue
                         contents: List[bytes] = []
                         try:
@@ -858,10 +924,13 @@ class ExtParamFilesChecker:
                                     contents.append(f.read())
                         except OSError as ex:
                             logging.warning(f"Read failed: {ex}")
-                            errmsg = "Read failed"
-                            continue
+                            errmsg = f"Can't read '{fn}', so '{url}' was " \
+                                f"not compared with '{internal_file_name}'"
                         if contents[0] != contents[1]:
-                            errmsg = "External content changed"
+                            errmsg = f"Content of '{url}' differs from " \
+                                f"'{internal_file_name}'. Former should be " \
+                                f"downloaded, verified and added to image " \
+                                f"as latter"
                     finally:
                         check_results[os.path.join(epf.subdir, filename)] = \
                             errmsg
@@ -870,6 +939,36 @@ class ExtParamFilesChecker:
                                               results=check_results)
             if temp_dir:
                 shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+class AlsRecord(pydantic.BaseModel):
+    """ Stuff logged into ALS regarding download attempt """
+    # Downloader settings
+    settings: Dict[str, Any]
+    # None or download start time in ISO format
+    start_time: Optional[str] = None
+    # None or external dependencies ccheck completion time in ISO format
+    externals_checked_time: Optional[str] = None
+    # None or download script completion time in ISO format
+    downloaded_time: Optional[str] = None
+    # None or list of updated regions
+    updated_regions: Optional[List[str]] = None
+    # None or DB diffrence report
+    db_difference: Optional[str] = None
+    # None or validation completion time in ISO format
+    validated_time: Optional[str] = None
+    # None or list of invalidated Rcache items
+    invalidation: Optional[List[str]] = None
+    # None new FS DB file name
+    fs_db_name: Optional[str] = None
+    # None or fs database update time in ISO format
+    updated_time: Optional[str] = None
+
+    def now(self, field_name: str) -> None:
+        """ Sets given field to current datetime as ISO-formatted string """
+        assert field_name.endswith("_time")
+        setattr(self, field_name,
+                datetime.datetime.now(datetime.timezone.utc).isoformat())
 
 
 def main(argv: List[str]) -> None:
@@ -932,13 +1031,22 @@ def main(argv: List[str]) -> None:
         help=f"Name of file with password to use in state database connection "
         f"string{env_help(Settings, 'service_state_db_password_file')}")
     argument_parser.add_argument(
-        "--service_state_db_create_if_absent", action="store_true",
-        help=f"Create state database if absent"
-        f"{env_help(Settings, 'service_state_db_create_if_absent')}")
+        "--db_creator_url", metavar="URL",
+        help=f"Postgres database creation REST API URL"
+        f"{env_help(Settings, 'db_creator_url')}")
     argument_parser.add_argument(
-        "--service_state_db_recreate", action="store_true",
-        help=f"Recreate state DB if it exists"
-        f"{env_help(Settings, 'service_state_db_recreate')}")
+        "--alembic_config", metavar="ALEMBIC_CONFIG_FILE",
+        help=f"Alembic config file for state database. No Alembic "
+        "manipulations performed if unspecified"
+        f"{env_help(Settings, 'alembic_config')}")
+    argument_parser.add_argument(
+        "--alembic_initial_version", metavar="INITIAL_ALEMBIC_VERSION",
+        help=f"Alembic version to stamp existing database without Alembic"
+        f"{env_help(Settings, 'alembic_initial_version')}")
+    argument_parser.add_argument(
+        "--alembic_head_version", metavar="ALEMBIC_HEAD_VERSION",
+        help=f"Alembic version to stamp newly created database. Default is "
+        f"'head'{env_help(Settings, 'alembic_head_version')}")
     argument_parser.add_argument(
         "--prometheus_port", metavar="PORT_NUMBER",
         help=f"Port to serve Prometheus metrics on. Default is to not serve "
@@ -1006,6 +1114,7 @@ def main(argv: List[str]) -> None:
 
     try:
         setup_logging(verbose=settings.verbose)
+        als.als_initialize(client_id="fs_downloader")
 
         if settings.run_once and (settings.prometheus_port is not None):
             logging.warning(
@@ -1015,13 +1124,16 @@ def main(argv: List[str]) -> None:
 
         print_args(settings)
 
+        error_if(settings.service_state_db_dsn is None,
+                 "State database DSN not specified")
         state_db = \
-            StateDb(db_dsn=settings.service_state_db_dsn,
+            StateDb(db_dsn=cast(str, settings.service_state_db_dsn),
                     db_password_file=settings.service_state_db_password_file)
-        state_db.check_server()
-        if settings.service_state_db_create_if_absent:
-            state_db.create_db(
-                recreate_tables=settings.service_state_db_recreate)
+        state_db.create_db(
+            db_creator_url=settings.db_creator_url,
+            alembic_config=settings.alembic_config,
+            alembic_initial_version=settings.alembic_initial_version,
+            alembic_head_version=settings.alembic_head_version)
 
         status_updater = \
             StatusUpdater(state_db=state_db,
@@ -1084,6 +1196,8 @@ def main(argv: List[str]) -> None:
         temp_uls_file_name: Optional[str] = None
 
         while True:
+            als_record = AlsRecord(settings=settings.dict())
+            als_record.now(field_name="start_time")
             err_msg: Optional[str] = None
             completed = False
             logging.info("Starting ULS download")
@@ -1112,6 +1226,7 @@ def main(argv: List[str]) -> None:
 
                 logging.info("Checking if external parameter files changed")
                 ext_params_file_checker.check()
+                als_record.now(field_name="externals_checked_time")
 
                 # Issue download script
                 cmdline_args: List[str] = []
@@ -1151,6 +1266,7 @@ def main(argv: List[str]) -> None:
                         "Generated ULS file does not contain identity "
                         "information")
                 status_updater.milestone(DownloaderMilestone.DownloadSuccess)
+                als_record.now(field_name="downloaded_time")
 
                 updated_regions = set(new_uls_identity.keys())
                 if has_previous:
@@ -1163,6 +1279,7 @@ def main(argv: List[str]) -> None:
                 if updated_regions:
                     logging.info(f"Updated regions: "
                                  f"{', '.join(sorted(updated_regions))}")
+                als_record.updated_regions = list(updated_regions)
 
                 # If anything was updated - do the update routine
                 if updated_regions or settings.force:
@@ -1182,15 +1299,20 @@ def main(argv: List[str]) -> None:
 
                     db_diff = DbDiff(prev_filename=current_uls_file,
                                      new_filename=temp_uls_file_name,
-                                     executor=executor) \
+                                     executor=executor,
+                                     allow_directional_invalidate=settings.
+                                     rcache_directional_invalidate) \
                         if has_previous else None
-                    if settings.force or \
-                            uls_file_checker.valid(
-                                base_dir=settings.ext_db_dir,
-                                new_filename=os.path.join(
-                                    os.path.dirname(settings.ext_db_symlink),
-                                    os.path.basename(temp_uls_file_name)),
-                                db_diff=db_diff):
+                    if db_diff:
+                        als_record.db_difference = str(db_diff)
+                    if uls_file_checker.valid(
+                            base_dir=settings.ext_db_dir,
+                            new_filename=os.path.join(
+                                os.path.dirname(settings.ext_db_symlink),
+                                os.path.basename(temp_uls_file_name)),
+                            db_diff=db_diff) or settings.force:
+                        if not settings.force:
+                            als_record.now(field_name="validated_time")
                         if settings.force:
                             status_updater.status_check(CheckType.FsDatabase,
                                                         None)
@@ -1205,17 +1327,36 @@ def main(argv: List[str]) -> None:
                             uls_file=os.path.basename(new_uls_file),
                             symlink=os.path.basename(settings.ext_db_symlink),
                             executor=executor)
-                        if rcache and (db_diff is not None) and \
-                                db_diff.diff_tiles:
-                            tile_list = \
-                                "<" + \
-                                ">, <".join(tile.short_str() for tile in
-                                            db_diff.diff_tiles[: 1000]) + \
-                                ">"
-                            logging.info(f"Requesting invalidation of the "
-                                         f"following tiles: {tile_list}")
-                            rcache.rcache_spatial_invalidate(
-                                tiles=db_diff.diff_tiles)
+                        als_record.fs_db_name = os.path.basename(new_uls_file)
+                        als_record.now(field_name="updated_time")
+                        if rcache and (db_diff is not None):
+                            if db_diff.diff_beams:
+                                beam_list = \
+                                    "<" + \
+                                    ">, <".join(beam.short_str() for beam in
+                                                db_diff.diff_beams[: 1000]) + \
+                                    ">"
+                                logging.info(f"Requesting invalidation of the "
+                                             f"following beams: {beam_list}")
+                                als_record.invalidation = \
+                                    [beam.short_str() for beam in
+                                     db_diff.diff_beams[: 1000]]
+                                rcache.rcache_directional_invalidate(
+                                    beams=db_diff.diff_beams)
+                            if db_diff.diff_tiles:
+                                tile_list = \
+                                    "<" + \
+                                    ">, <".join(tile.short_str() for tile in
+                                                db_diff.diff_tiles[: 1000]) + \
+                                    ">"
+                                logging.info(f"Requesting invalidation of the "
+                                             f"following tiles: {tile_list}")
+                                als_record.invalidation = \
+                                    (als_record.invalidation or []) + \
+                                    [tile.short_str() for tile in
+                                     db_diff.diff_tiles[: 1000]]
+                                rcache.rcache_spatial_invalidate(
+                                    tiles=db_diff.diff_tiles)
 
                         # Update data change times (for health checker)
                         status_updater.milestone(
@@ -1233,6 +1374,11 @@ def main(argv: List[str]) -> None:
                 err_msg = str(ex)
                 logging.error(f"Download failed: {ex}")
             finally:
+                als.als_json_log(topic="fs_download", record=als_record.dict())
+                if settings.run_once:
+                    flushed = als.als_flush()
+                    if not flushed:
+                        logging.warning("ALS flush failed")
                 exec_output = executor.get_output()
                 if err_msg:
                     exec_output = f"{exec_output.rstrip()}\n{err_msg}\n"

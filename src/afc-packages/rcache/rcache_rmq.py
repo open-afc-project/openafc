@@ -16,8 +16,9 @@ import random
 import string
 from typing import cast, List, Optional, Set
 
-from log_utils import error, get_module_logger, safe_dsn
+from log_utils import error, get_module_logger
 from rcache_models import RCACHE_RMQ_EXCHANGE_NAME, RmqReqRespKey
+import db_utils
 
 __all__ = ["RcacheRmq", "RcacheRmqConnection"]
 
@@ -71,14 +72,12 @@ class RcacheRmqConnection:
         assert self._for_rx
         return self._queue_name
 
-    def send_response(self, req_cfg_digest: str, request: Optional[str],
-                      response: Optional[str]) -> None:
+    def send_response(self, req_cfg_digest: str, response: Optional[str]) \
+            -> None:
         """ Send computed AFC Response
 
         Arguments:
         req_cfg_digest -- Request/config digest that identifies request
-        request        -- Request as a string. None if cache update performed
-                          by sender
         response       -- Response as a string. None on failure
         """
         assert not self._for_rx
@@ -89,8 +88,7 @@ class RcacheRmqConnection:
             self._channel.basic_publish(
                 exchange=RCACHE_RMQ_EXCHANGE_NAME, routing_key=self._queue_name,
                 body=RmqReqRespKey(
-                    afc_req=request, afc_resp=response,
-                    req_cfg_digest=req_cfg_digest).json(),
+                    afc_resp=response, req_cfg_digest=req_cfg_digest).json(),
                 properties=pika.BasicProperties(
                     content_type="application/json",
                     delivery_mode=pika.DeliveryMode.Transient),
@@ -186,8 +184,8 @@ class RcacheRmq:
         try:
             self._url_params = pika.URLParameters(self.rmq_dsn)
         except pika.exceptions.AMQPError as ex:
-            error(f"RabbitMQ URL '{safe_dsn(self.rmq_dsn)}' has invalid "
-                  f"syntax: {ex}")
+            error(f"RabbitMQ URL '{db_utils.safe_dsn(self.rmq_dsn)}' has "
+                  f"invalid syntax: {ex}")
 
     def create_connection(self, tx_queue_name: Optional[str] = None) \
             -> RcacheRmqConnection:

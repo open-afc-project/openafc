@@ -529,6 +529,7 @@ def print_helm_values(helm_args: List[str], print_format: str) -> None:
 
 def wait_termination(what: str, cluster_context: ClusterContext,
                      namespace: Optional[str] = None,
+                     services: Optional[List[str]] = None,
                      uninstall_duration: Duration = Duration(None)) -> None:
     """ Wait until all 'Terminating' extinguished in given context
 
@@ -537,17 +538,23 @@ def wait_termination(what: str, cluster_context: ClusterContext,
                           messages)
     cluster_context    -- Cluster context
     namespace          -- Optional namespace name
+    services           -- OPtional list of services to wait
     uninstall_duration -- Maximum duration
     """
     start = datetime.datetime.now()
     time.sleep(1)
-    while "Terminating" in \
+    while True:
+        get_all = \
             cast(
                 str,
                 execute(
                     ["kubectl", "get", "all"] +
                     cluster_context.kubectl_args(namespace=namespace),
-                    return_output=True)):
+                    return_output=True))
+        if ("Terminating" not in get_all) and \
+                (not any((f"service/{s}" in get_all)
+                         for s in (services or []))):
+            break
         error_if(
             uninstall_duration and
             ((datetime.datetime.now() - start).total_seconds() >

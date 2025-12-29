@@ -32,7 +32,6 @@ setuptools.setup(
             'templates/flask_user_layout.html',
             'templates/login.html',
             'templates/about.html',
-            'templates/about_csrf.html',
             'templates/*.html',
         ]
     },
@@ -45,7 +44,6 @@ setuptools.setup(
     install_requires=[
         'werkzeug',
         'flask',
-        'flask-script',
         'flask_jsonrpc',
         'flask-user',
         'flask-sqlalchemy',

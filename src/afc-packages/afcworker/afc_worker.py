@@ -50,7 +50,6 @@ def get_rcache_client():
     global _rcache_settings, _rcache_client
     if _rcache_settings is None:
         _rcache_settings = RcacheClientSettings(postgres_dsn=None)
-        # In this validation rcache is True to handle 'update_on_send' case
         _rcache_settings.validate_for(rmq=True, rcache=True)
         _rcache_client = \
             RcacheClient(_rcache_settings, rmq_receiver=False) \
@@ -75,7 +74,7 @@ client = Celery(
 @client.task(ignore_result=True)
 def run(prot, host, port, request_type, task_id, hash_val,
         config_path, history_dir, runtime_opts, mntroot, rcache_queue,
-        request_str, config_str, deadline):
+        request_str, original_request_str, config_str, deadline):
     """ Run AFC Engine
 
         The parameters are all serializable so they can be passed through the message queue.
@@ -97,6 +96,8 @@ def run(prot, host, port, request_type, task_id, hash_val,
         :param rcache_queue: None for task-based synchronization, RabbitMQ queue name for RMQ-based synchronization
 
         :param request_str None for task-based synchronization, request text for RMQ-based synchronization
+
+        :param original_request_str None or original request string (without added vendor extensions) to put to rcache
 
         :param config_str None for task-based synchronization, config text for RMQ-based synchronization
 
@@ -206,7 +207,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
                 als.als_json_log("afc_engine_crash",
                                  {"task_id": task_id, "error_msg": error_msg,
                                   "timeout": timeout_expired,
-                                  "request": json.loads(request_str),
+                                  "request": json.loads(original_request_str),
                                   "config": json.loads(config_str)})
             except Exception as ex:
                 LOGGER.error(
@@ -230,7 +231,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
                 if success and response_gz else None
             get_rcache_client().rmq_send_response(
                 queue_name=rcache_queue, req_cfg_digest=hash_val,
-                request=request_str, response=response_str)
+                request=original_request_str, response=response_str)
 
         if runtime_opts & defs.RNTM_OPT_GUI:
             for fname in ("results.kmz", "mapData.json.gz"):

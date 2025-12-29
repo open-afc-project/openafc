@@ -1,0 +1,31 @@
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Prometheus data source
+---
+apiVersion: 1
+
+{% if GRAFANA_DS_PROMETHEUS_URL is defined -%}
+deleteDatasources:
+  - name: Prometheus
+
+datasources:
+  - access: proxy
+    basicAuth: false
+    database: ''
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+    name: Prometheus
+    orgId: 1
+    readOnly: false
+    type: prometheus
+    typeLogoUrl: public/app/plugins/datasource/prometheus/img/prometheus_logo.svg
+    typeName: Prometheus
+    url: >-
+      {{ GRAFANA_DS_PROMETHEUS_URL }}
+    user: ''
+{% endif -%}

@@ -16,7 +16,6 @@ import logging
 import os
 import sys
 import shutil
-import pkg_resources
 import flask
 import json
 import glob
@@ -25,6 +24,7 @@ import datetime
 import zlib
 import uuid
 import copy
+import time
 import platform
 from flask.views import MethodView
 import werkzeug.exceptions
@@ -58,18 +58,24 @@ from typing import Any, Dict, NamedTuple, Optional
 from rcache_models import RcacheClientSettings
 from rcache_client import RcacheClient
 from rcache_req_cfg_hash import RequestConfigHash
+from rcache_db import RcacheLookupResult
 import prometheus_client
+import prometheus_utils
+import afc_traffic_metrics
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(AFC_RATAPI_LOG_LEVEL)
 
-# Metrics for autoscaling
-prometheus_metric_flask_afc_waiting_reqs = \
-    prometheus_client.Gauge('msghnd_flask_afc_waiting_reqs',
-                            'Number of requests waiting for afc engine',
-                            ['host'], multiprocess_mode='sum')
-prometheus_metric_flask_afc_waiting_reqs = \
-    prometheus_metric_flask_afc_waiting_reqs.labels(host=platform.node())
+# Metrics for autoscaling - only works in gunicorn (not on apache)
+if prometheus_utils.multiprocess_prometheus_configured():
+    prometheus_metric_flask_afc_waiting_reqs = \
+        prometheus_client.Gauge('msghnd_flask_afc_waiting_reqs',
+                                'Number of requests waiting for afc engine',
+                                ['host'], multiprocess_mode='sum')
+    prometheus_metric_flask_afc_waiting_reqs = \
+        prometheus_metric_flask_afc_waiting_reqs.labels(host=platform.node())
+else:
+    prometheus_metric_flask_afc_waiting_reqs = None
 
 # We want to dynamically trim this this list e.g.
 # via environment variable, for the current deployment
@@ -373,12 +379,13 @@ response_map = {
     afctask.Task.STAT_PROGRESS: in_progress
 }
 
-
-rcache_settings = RcacheClientSettings()
-# In this validation rcache is True to handle 'not update_on_send' case
-rcache_settings.validate_for(db=True, rmq=True, rcache=True)
-rcache = RcacheClient(rcache_settings, rmq_receiver=True) \
-    if rcache_settings.enabled else None
+if os.environ.get('RCACHE_ENABLED', '').lower() in ('0', 'no', 'false', '-'):
+    rcache = None
+else:
+    rcache_settings = RcacheClientSettings()
+    rcache_settings.validate_for(db=True, rmq=True)
+    rcache = RcacheClient(rcache_settings, rmq_receiver=True) \
+        if rcache_settings.enabled else None
 
 
 class ReqInfo(NamedTuple):
@@ -392,7 +399,7 @@ class ReqInfo(NamedTuple):
     # Request ID from message
     request_id: str
 
-    # AFC Request as dictionary
+    # AFC Request as dictionary - used for compitation
     request: Dict[str, Any]
 
     # AFC Config file content as string
@@ -443,9 +450,7 @@ class RatAfc(MethodView):
                          self.__class__, inspect.stack()[0][3],
                          certId.certification_id)
 
-        if not certId.location & CERT_ID_LOCATION_OUTDOOR:
-            raise DeviceUnallowedException("Outdoor operation not allowed")
-        elif certId.location & CERT_ID_LOCATION_INDOOR:
+        if certId.location & CERT_ID_LOCATION_INDOOR:
             indoor_certified = True
         else:
             indoor_certified = False
@@ -520,6 +525,7 @@ class RatAfc(MethodView):
     def post(self):
         ''' POST method for RAT AFC
         '''
+        flask.g.is_afc = True
         LOGGER.debug("(%d) %s::%s()", threading.get_native_id(),
                      self.__class__, inspect.stack()[0][3])
         als_req_id = als.als_afc_req_id()
@@ -558,10 +564,19 @@ class RatAfc(MethodView):
             request_type = 'AP-AFC'
 
             use_tasks = (rcache is None) or \
-                (flask.request.args.get('conn_type') == 'async') or \
-                (flask.request.args.get('gui') == 'True')
+                (flask.request.args.get('conn_type') == 'async') or is_gui
 
-            als.als_afc_request(req_id=als_req_id, req=args)
+            message_runtime_opts = 0
+            for arg, mask in [('gui', RNTM_OPT_GUI), ('debug', RNTM_OPT_DBG),
+                              ('edebug', RNTM_OPT_SLOW_DBG),
+                              ('nocache', RNTM_OPT_NOCACHE)]:
+                if flask.request.args.get(arg):
+                    message_runtime_opts |= mask
+
+            als.als_afc_request(req_id=als_req_id, req=args,
+                                mtls_dn=flask.request.headers.get('mTLS-DN'),
+                                runtime_opt=message_runtime_opts,
+                                ap_ip=flask.request.headers.get('X-Real-IP'))
             uls_id = "Unknown"
             geo_id = "Unknown"
             indoor_certified = True
@@ -627,28 +642,16 @@ class RatAfc(MethodView):
                     elif not serial:
                         raise InvalidValueException(["serialNumber", serial])
 
+                    runtime_opts = message_runtime_opts
+
                     indoor_certified = \
                         self._auth_ap(serial, prefix, certId,
                                       device_desc.get('rulesetIds'), ver)
-
                     if indoor_certified:
-                        runtime_opts = RNTM_OPT_CERT_ID | RNTM_OPT_NODBG_NOGUI
-                    else:
-                        runtime_opts = RNTM_OPT_NODBG_NOGUI
-
-                    debug_opt = flask.request.args.get('debug')
-                    if debug_opt == 'True':
-                        runtime_opts |= RNTM_OPT_DBG
-                    edebug_opt = flask.request.args.get('edebug')
-                    if edebug_opt == 'True':
-                        runtime_opts |= RNTM_OPT_SLOW_DBG
-                    if is_gui:
-                        runtime_opts |= RNTM_OPT_GUI
-                    opt = flask.request.args.get('nocache')
-                    if opt == 'True':
-                        runtime_opts |= RNTM_OPT_NOCACHE
+                        runtime_opts |= RNTM_OPT_CERT_ID
                     if use_tasks:
                         runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
+
                     LOGGER.debug("(%d) %s::%s() runtime %d",
                                  threading.get_native_id(),
                                  self.__class__, inspect.stack()[0][3],
@@ -702,11 +705,22 @@ class RatAfc(MethodView):
                         {"requestId": individual_request["requestId"],
                          "rulesetId": prefix or "Unknown",
                          "response": response_dict})
+                    afc_traffic_metrics.request_processed(
+                        duration_sec=time.time() - flask.g.afc_start_time,
+                        response="Exception")
 
             # Creating 'responses' - dictionary of responses as JSON strings,
             # indexed by request/config hashes
             # First looking up in the cache
-            responses = self._cache_lookup(dataif=dataif, req_infos=req_infos)
+            invalidated_responses = {}
+            responses = {}
+            for req_cfg_hash, lookup_result in \
+                    self._cache_lookup(dataif=dataif, req_infos=req_infos).\
+                    items():
+                (responses if lookup_result.found else invalidated_responses)[
+                    req_cfg_hash] = lookup_result.response
+            cached_req_hashes = set(responses.keys())
+            cached_duration = time.time() - flask.g.afc_start_time
 
             # Computing the responses not found in cache
             # First handling async case
@@ -717,7 +731,6 @@ class RatAfc(MethodView):
                         raise \
                             AP_Exception(-1,
                                          "Unsupported multipart async request")
-                    assert use_tasks
                     task = \
                         self._start_processing(
                             dataif=dataif,
@@ -728,12 +741,17 @@ class RatAfc(MethodView):
                     # though). Can be fixed if anybody cares
                     return flask.jsonify(taskId=task.getId(),
                                          taskState=task.get()["status"])
-                responses.update(
-                    self._compute_responses(
-                        dataif=dataif, use_tasks=use_tasks,
-                        req_infos={k: v for k, v in req_infos.items()
-                                   if k not in responses},
-                        is_internal_request=is_internal_request))
+                with prometheus_metric_flask_afc_waiting_reqs.track_inprogress() \
+                        if prometheus_metric_flask_afc_waiting_reqs \
+                        else contextlib.nullcontext():
+                    responses.update(
+                        self._compute_responses(
+                            dataif=dataif, use_tasks=use_tasks,
+                            req_infos={k: v for k, v in req_infos.items()
+                                       if k not in responses},
+                            invalidated_responses=invalidated_responses,
+                            is_internal_request=is_internal_request))
+            computed_duration = time.time() - flask.g.afc_start_time
 
             # Preparing responses for requests
             for req_info in req_infos.values():
@@ -757,6 +775,13 @@ class RatAfc(MethodView):
                     req_id=als_req_id, config_text=req_info.config_str,
                     customer=req_info.region, geo_data_version=geo_id,
                     uls_id=uls_id, req_indices=[req_info.req_idx])
+                afc_traffic_metrics.request_processed(
+                    duration_sec=cached_duration
+                    if req_info.req_cfg_hash in cached_req_hashes
+                    else computed_duration,
+                    response=actualResult[0].get("response", {}).
+                    get("responseCode", "Error") if actualResult
+                    else "NotComputed")
         except Exception as e:
             LOGGER.error(traceback.format_exc())
             lineno = "Unknown"
@@ -787,6 +812,9 @@ class RatAfc(MethodView):
                 {"requestId": missing_id,
                  "rulesetId": "Unknown",
                  "response": response_info})
+            afc_traffic_metrics.request_processed(
+                duration_sec=time.time() - flask.g.afc_start_time,
+                response="Exception")
 
         # Removing internal vendor extensions
         drop_unwanted_extensions(
@@ -807,6 +835,7 @@ class RatAfc(MethodView):
         LOGGER.debug("Final results: %s", str(results))
         resp = flask.make_response(flask.json.dumps(results), 200)
         resp.content_type = 'application/json'
+        flask.g.afc_no_exception = True
         return resp
 
     def _cache_lookup(self, dataif, req_infos):
@@ -816,8 +845,8 @@ class RatAfc(MethodView):
         dataif    -- Objstore handle (used only if RCache not used)
         req_infos -- Dictionary of ReqInfo objects, indexed by request/config
                      hashes
-        Returns dictionary of found responses (as strings), indexed by
-        request/config hashes
+        Returns dictionary of RcacheLookupResult, indexed by request/config
+        hashes
         """
         cached_keys = \
             [req_cfg_hash for req_cfg_hash in req_infos.keys()
@@ -836,16 +865,23 @@ class RatAfc(MethodView):
                 except BaseException:
                     continue
                 ret[req_cfg_hash] = \
-                    zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
+                    RcacheLookupResult(
+                        found=True,
+                        response=zlib.decompress(
+                            resp_data, 16 + zlib.MAX_WBITS))
             return ret
         return rcache.lookup_responses(cached_keys)
 
     def _start_processing(self, dataif, req_info, is_internal_request,
-                          rcache_queue=None, use_tasks=False):
+                          rcache_queue=None, use_tasks=False,
+                          original_request=None):
         """ Initiates processing on remote worker
         If 'use_tasks' - returns created Task
         """
         request_str = json.dumps(req_info.request, sort_keys=True)
+        original_request_str = \
+            json.dumps(original_request, sort_keys=True) if original_request \
+            else request_str
         if use_tasks:
             with dataif.open(req_info.config_path) as hfile:
                 if not hfile.head():
@@ -867,6 +903,8 @@ class RatAfc(MethodView):
                    runtime_opts=req_info.runtime_opts,
                    rcache_queue=rcache_queue,
                    request_str=None if use_tasks else request_str,
+                   original_request_str=None if use_tasks
+                   else original_request_str,
                    config_str=None if use_tasks else req_info.config_str,
                    timeout_sec=flask.current_app.config[
                         'AFC_MSGHND_RATAFC_TOUT'])
@@ -877,25 +915,51 @@ class RatAfc(MethodView):
                                 is_internal_request=is_internal_request)
         return None
 
-    @prometheus_metric_flask_afc_waiting_reqs.track_inprogress()
     def _compute_responses(self, dataif, use_tasks, req_infos,
-                           is_internal_request):
+                           invalidated_responses, is_internal_request):
         """ Prepares worker tasks and waits their completion
 
         Arguments:
-        dataif              -- Objstore handle (used only if RCache not used)
-        use_tasks           -- True to use task-based communication with
-                               worker, False to use RabbitMQ-based
-                               communication
-        req_infos           -- Dictionary of ReqInfo objects, indexed by
-                               request/config hashes
-        is_internal_request -- True for internal request massage, False for
-                               external request message
+        dataif                -- Objstore handle (used only if RCache not used)
+        use_tasks             -- True to use task-based communication with
+                                 worker, False to use RabbitMQ-based
+                                 communication
+        req_infos             -- Dictionary of ReqInfo objects, indexed by
+                                 request/config hashes
+        invalidated_responses -- Dictionary of invalidated responses for some
+                                 requests, indexed by request/config hashes
+        is_internal_request   -- True for internal request massage, False for
+                                 external request message
         Returns dictionary of found responses (as strings), indexed by
         request/config hashes
         """
         with (contextlib.nullcontext()
               if use_tasks else rcache.rmq_create_rx_connection()) as rmq_conn:
+            # Copy AFC Engine state vendor extensions from invalidated
+            # responses to requests
+            original_requests = {}
+            if invalidated_responses:
+                for req_cfg_hash, req_info in req_infos.items():
+                    invalidated_response_s = \
+                        invalidated_responses.get(req_cfg_hash)
+                    if not invalidated_response_s:
+                        continue    # No such invalidated response
+                    invalidated_response = json.loads(
+                        invalidated_response_s)
+                    vendor_extensions = invalidated_response.get(
+                        "availableSpectrumInquiryResponses")[0].\
+                        get("vendorExtensions")
+                    if not vendor_extensions:
+                        continue    # No vendor extensions
+                    for ve in vendor_extensions:
+                        if ve.get("extensionId") in \
+                                rcache.afc_state_vendor_extensions():
+                            if req_cfg_hash not in original_requests:
+                                original_requests[req_cfg_hash] = \
+                                    copy.deepcopy(req_info.request)
+                            req_info.request[
+                                "availableSpectrumInquiryRequests"][0].\
+                                setdefault("vendorExtensions", []).append(ve)
             tasks = {}
             for req_cfg_hash, req_info in req_infos.items():
                 tasks[req_cfg_hash] = \
@@ -903,7 +967,8 @@ class RatAfc(MethodView):
                         dataif=dataif, req_info=req_info, use_tasks=use_tasks,
                         is_internal_request=is_internal_request,
                         rcache_queue=None if use_tasks
-                        else rmq_conn.rx_queue_name())
+                        else rmq_conn.rx_queue_name(),
+                        original_request=original_requests.get(req_cfg_hash))
             if use_tasks:
                 ret = {}
                 for req_cfg_hash, task in tasks.items():
@@ -972,6 +1037,24 @@ class ReadinessCheck(MethodView):
 
         msg += 'ready'
         return flask.make_response(msg, 200)
+
+
+# Message-level AFC metrics
+@module.before_request
+def traffic_metrics_bedore():
+    flask.g.afc_start_time = time.time()
+    flask.g.is_afc = False
+    flask.g.afc_no_exception = False
+
+
+@module.after_request
+def traffic_metrics_after(response):
+    if flask.g.is_afc:
+        afc_traffic_metrics.message_processed(
+            duration_sec=time.time() - flask.g.afc_start_time,
+            status=response.status_code if flask.g.afc_no_exception
+            else "Exception")
+    return response
 
 
 # registration of default runtime options

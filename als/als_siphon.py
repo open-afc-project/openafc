@@ -12,6 +12,7 @@
 # pylint: disable=unnecessary-pass, unnecessary-ellipsis, too-many-arguments
 # pylint: disable=too-many-instance-attributes, too-few-public-methods
 # pylint: disable=wrong-import-order, too-many-locals, too-many-branches
+# pylint: disable=too-many-statements, too-many-positional-arguments
 
 from abc import ABC, abstractmethod
 import argparse
@@ -20,6 +21,7 @@ import confluent_kafka
 import enum
 import datetime
 import dateutil.tz                                  # type: ignore
+import distinguishedname
 import geoalchemy2 as ga                            # type: ignore
 import hashlib
 import heapq
@@ -32,28 +34,33 @@ import os
 import prometheus_client                            # type: ignore
 import random
 import re
-import secret_utils
+import shlex
 import sqlalchemy as sa                             # type: ignore
 import sqlalchemy.dialects.postgresql as sa_pg      # type: ignore
 import string
+import subprocess
 import sys
-from typing import Any, Callable, Dict, Generic, List, NamedTuple, Optional, \
-    Set, Tuple, Type, TypeVar, Union
+import tempfile
+import time
+from typing import Any, Callable, Dict, Generic, List, NamedTuple, \
+    NoReturn, Optional, Set, Tuple, Type, TypeVar, Union
 import urllib.parse
 import uuid
 
+import db_creator
+import db_utils
+import utils
+
 # This script version
 VERSION = "0.1"
-
-# Kafka topic for ALS logs
-ALS_KAFKA_TOPIC = "ALS"
 
 # Type for JSON objects
 JSON_DATA_TYPE = Union[Dict[str, Any], List[Any]]
 
 # Type for database column
-COLUMN_DATA_TYPE = Optional[Union[int, float, str, bytes, bool,
-                                  datetime.datetime, uuid.UUID, Dict, List]]
+COLUMN_DATA_TYPE = \
+    Optional[Union[int, float, str, bytes, bool, datetime.datetime, uuid.UUID,
+                   Dict, List]]
 
 # Type for database row dictionary
 ROW_DATA_TYPE = Dict[str, COLUMN_DATA_TYPE]
@@ -69,6 +76,12 @@ DEFAULT_KAFKA_SERVER = f"localhost:{KAFKA_PORT}"
 
 # Default Kafka client ID
 DEFAULT_KAFKA_CLIENT_ID = "siphon_@"
+
+# Default ALS topic name in Kafka
+DEFAULT_ALS_TOPIC = "ALS"
+
+# Default number of monthly partitions ahead to ensure
+DEFAULT_ALS_MONTHS_AHEAD = 6
 
 
 def dp(*args, **kwargs):
@@ -92,7 +105,7 @@ def dp(*args, **kwargs):
         flush=True)
 
 
-def error(msg: str) -> None:
+def error(msg: str) -> NoReturn:
     """ Prints given msg as error message and exit abnormally """
     logging.error(msg)
     sys.exit(1)
@@ -191,6 +204,27 @@ class DbFormatError(ErrorBase):
         super().__init__(msg, code_line=code_line)
 
 
+def execute(args: List[str], return_stdout: bool = False) -> Optional[str]:
+    """ Execute given command
+
+    Arguments:
+    args          -- Argument list
+    retrun_stdout -- True to return stdout
+    Returns stdout if requested, None otherwise
+    """
+    logging.info(" ".join(shlex.quote(arg) for arg in args))
+    try:
+        p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True)
+        stdout, stderr = p.communicate()
+    except OSError as ex:
+        error(f"Execution failed: {ex}")
+    logging.info("\n".join(s for s in (stderr, stdout) if s))
+    error_if(p.returncode,
+             f"Execution failed with code {p.returncode}")
+    return stdout if return_stdout else None
+
+
 # MYPY APPEASEMENT STUFF
 
 @LineNumber.stack_trace_ignore
@@ -273,12 +307,6 @@ def jdt(dt: Any) -> datetime.datetime:
     return dt
 
 
-def get_month_idx() -> int:
-    """ Computes month index """
-    d = datetime.datetime.now()
-    return (d.year - 2022) * 12 + (d.month - 1)
-
-
 class Metrics:
     """ Wrapper around collection of Prometheus metrics
 
@@ -342,7 +370,7 @@ class Metrics:
                    for arg_name, arg_value in kwargs.items()})
 
         def _arg_to_str(self, arg: Any) -> str:
-            """ Somehow onvert argument value to string """
+            """ Somehow convert argument value to string """
             if isinstance(arg, bytes):
                 return arg.decode(encoding="utf-8", errors="backslashreplace")
             return str(arg)
@@ -416,9 +444,6 @@ class DatabaseBase(ABC):
     _disposed -- True if disposed
     """
 
-    # Driver part to use in Postgres database connection strings
-    DB_DRIVER = "postgresql+psycopg2"
-
     def __init__(self, arg_conn_str: Optional[str],
                  arg_password_file: Optional[str]) -> None:
         """ Constructor
@@ -451,47 +476,15 @@ class DatabaseBase(ABC):
     def get_db_name(cls, arg_conn_str: Optional[str]) -> str:
         """ Get database name from combination of argument connection string
         and default connection string """
-        return \
-            urllib.parse.urlparse(cls.create_dsn(arg_conn_str=arg_conn_str)).\
-            path.lstrip("/")
-
-    @classmethod
-    def create_dsn(cls, arg_conn_str: Optional[str],
-                   arg_password_file: Optional[str] = None) -> str:
-        """ Creates DSN by combining given parameters and default connection
-        string
-
-        Arguments:
-        arg_conn_str      -- Connection string passed from command line
-        arg_password_file -- File with password
-        Returns DSN, made by combining all that stuff
-        """
-        default_parts = urllib.parse.urlparse(cls.default_conn_str())
-        if arg_conn_str and ("://" not in arg_conn_str):
-            arg_conn_str = f"{default_parts.scheme}://{arg_conn_str}"
-        arg_parts = urllib.parse.urlparse(arg_conn_str)
-        error_if(arg_parts.scheme != default_parts.scheme,
-                 f"{cls.name_for_logs()} database connection string has "
-                 f"invalid database driver name '{arg_parts.scheme}'. "
-                 f"If specified it must be '{default_parts.scheme}'")
-
-        netloc = ""
-        for part_name, separator in [("username", ""), ("password", ":"),
-                                     ("hostname", "@"), ("port", ":")]:
-            part = getattr(arg_parts, part_name) or \
-                getattr(default_parts, part_name)
-            netloc += f"{separator}{part}"
-        replacements = {"scheme": cls.DB_DRIVER, "netloc": netloc}
-        replacements.update(
-            {field: getattr(default_parts, field)
-             for field in default_parts._fields
-             if (not getattr(arg_parts, field)) and
-             getattr(default_parts, field) and (field not in replacements)})
-        return \
-            secret_utils.substitute_password(
-                dsc=cls.name_for_logs(),
-                dsn=arg_parts._replace(**replacements).geturl(),
-                password_file=arg_password_file)
+        try:
+            return \
+                urllib.parse.urlparse(
+                    utils.dsn(
+                        arg_dsn=arg_conn_str,
+                        default_dsn=cls.default_conn_str(),
+                        name_for_logs=cls.name_for_logs())).path.lstrip("/")
+        except ValueError as ex:
+            error(str(ex))
 
     @classmethod
     def create_engine(cls, arg_conn_str: Optional[str],
@@ -504,10 +497,38 @@ class DatabaseBase(ABC):
         arg_password_file -- Name of file with password or None
         Returns SqlAlchemy engine
         """
-        return \
-            sa.create_engine(
-                cls.create_dsn(arg_conn_str=arg_conn_str,
-                               arg_password_file=arg_password_file))
+        try:
+            return \
+                sa.create_engine(
+                    utils.dsn(arg_dsn=arg_conn_str,
+                              default_dsn=cls.default_conn_str(),
+                              password_file=arg_password_file,
+                              name_for_logs=cls.name_for_logs()))
+        except ValueError as ex:
+            error(str(ex))
+
+    @classmethod
+    def create_db(cls, arg_conn_str: str, arg_password_file: Optional[str],
+                  recreate: bool) -> bool:
+        """ Create/recreate given database
+
+        Arguments:
+        arg_conn_str      -- Connection string from command line
+        arg_password_file -- Name of file with password or None
+        recreate          -- True to recreate database if exists, False to
+                             leave it as is if it exists
+        Returns True if database was created anew, False if existing was used
+        """
+        try:
+            return \
+                not db_creator.ensure_dsn(
+                    dsn=utils.dsn(arg_dsn=arg_conn_str,
+                                  default_dsn=cls.default_conn_str(),
+                                  name_for_logs=cls.name_for_logs()),
+                    password_file=arg_password_file, recreate=recreate)[1]
+        except RuntimeError as ex:
+            error(f"Error creating database "
+                  f"'{db_utils.safe_dsn(arg_conn_str)}': {ex}")
 
     @classmethod
     @abstractmethod
@@ -581,69 +602,6 @@ class LogsDatabase(DatabaseBase):
             self.conn.execute(ins)
         except sa.exc.SQLAlchemyError as ex:
             logging.error(f"Error writing {topic} log table: {ex}")
-
-
-class InitialDatabase(DatabaseBase):
-    """ Initial Postgres database (context fro creation of other databases)
-    handler """
-
-    class IfExists(enum.Enum):
-        """ What to do if database being created already exists """
-        Skip = "skip"
-        Drop = "drop"
-        Exc = "exc"
-
-    @classmethod
-    def default_conn_str(cls) -> str:
-        """ Default connection string """
-        return "postgresql://postgres:postgres@localhost:5432/postgres"
-
-    @classmethod
-    def name_for_logs(cls) -> str:
-        """ Database alias name to use for logs and error messages """
-        return "Initial"
-
-    def create_db(self, db_name: str,
-                  if_exists: "InitialDatabase.IfExists",
-                  conn_str: str, password_file: Optional[str] = None,
-                  template: Optional[str] = None) -> bool:
-        """ Create database
-
-        Arguments:
-        db_name       -- Name of database to create
-        if_exists     -- What to do if database already exists
-        conn_str      -- Connection string to database being created
-        password_file -- Optional name of file with password
-        template      -- Name of template database to use
-        Returns True if database was created, False if it already exists
-        """
-        with self.engine.connect() as conn:
-            try:
-                if if_exists == self.IfExists.Drop:
-                    conn.execute(sa.text("commit"))
-                    conn.execute(
-                        sa.text(f'drop database if exists "{db_name}"'))
-                conn.execute(sa.text("commit"))
-                template_clause = f' template "{template}"' if template else ""
-                conn.execute(
-                    sa.text(f'create database "{db_name}"{template_clause}'))
-                logging.info(f"Database '{db_name}' successfully created")
-                return True
-            except sa.exc.ProgrammingError:
-                if if_exists != self.IfExists.Skip:
-                    raise
-                engine = self.create_engine(arg_conn_str=conn_str,
-                                            arg_password_file=password_file)
-                engine.dispose()
-                logging.info(
-                    f"Already existing database '{db_name}' will be used")
-                return False
-
-    def drop_db(self, db_name: str) -> None:
-        """ Drop given database """
-        with self.engine.connect() as conn:
-            conn.execute(sa.text("commit"))
-            conn.execute(sa.text(f'drop database "{db_name}"'))
 
 
 # Fully qualified position in Kafka queue on certain Kafka cluster
@@ -771,8 +729,8 @@ class KafkaPositions:
     def get_processed_offsets(self) -> Dict[str, Dict[int, int]]:
         """ Computes commit levels for all offsets in collection
 
-        Returns by-topic/partition commit levels (offets at or below which are
-        all marked processed). Ofets at or below returned levels are removed
+        Returns by-topic/partition commit levels (offsets at or below which are
+        all marked processed). Offsets at or below returned levels are removed
         from collection """
         ret: Dict[str, Dict[int, int]] = {}
         for topic, partitions in self._topics.items():
@@ -805,6 +763,9 @@ class AlsMessage:
     uls_id          -- ULS ID (if Config) or None
     request_indexes -- Indexes of requests to which config is related (if
                        Config) or None
+    mtls_dn         -- Client mTLS DN (for Request) or None
+    ap_ip           -- AP IP Address or None
+    runtime_opt     -- Runtimeoption flags or None
     """
     # ALS message format version
     FORMAT_VERSION = "1.0"
@@ -827,7 +788,7 @@ class AlsMessage:
         try:
             msg_dict = json.loads(raw_msg)
         except json.JSONDecodeError as ex:
-            raise AlsProtocolError(f"Malforemed JSON of ALS message: {ex}",
+            raise AlsProtocolError(f"Malformed JSON of ALS message: {ex}",
                                    code_line=LineNumber.exc())
         try:
             self.version: str = msg_dict["version"]
@@ -846,6 +807,10 @@ class AlsMessage:
             self.request_indexes: Optional[Set[int]] = \
                 set(int(i) for i in msg_dict.get("requestIndexes", [])) \
                 if is_config else None
+            self.mtls_dn: Optional[str] = msg_dict.get("mtlsDn")
+            self.ap_ip: Optional[str] = msg_dict.get("apIp")
+            self.runtime_opt: Optional[int] = msg_dict.get("runtimeOpt")
+
         except (LookupError, TypeError, ValueError) as ex:
             raise AlsProtocolError(f"Invalid content of ALS message: {ex}",
                                    code_line=LineNumber.exc(), data=msg_dict)
@@ -882,6 +847,9 @@ class AlsMessageBundle:
     _configs          -- Dictionary of AfcConfigInfo objects, ordered by
                          individual request sequential indexes (or None if for
                          all requests)
+    _mtls_dn          -- None or mTLS DN string
+    _ap_ip            -- AP IP or None
+    _runtime_opt      -- Runtime options or None
     _assembled        -- True if bundle has all necessary parts
     _store_parts      -- Bundle in StoreParts representation. None if not yet
                          computed
@@ -934,7 +902,13 @@ class AlsMessageBundle:
              # List of requests with no responses
              ("orphan_requests", List[JSON_DATA_TYPE]),
              # List of responses with no requests
-             ("orphan_responses", List[JSON_DATA_TYPE])])
+             ("orphan_responses", List[JSON_DATA_TYPE]),
+             # mTLS DN string (empty if there was none)
+             ("mtls_dn", str),
+             # Optional AP IP
+             ("ap_ip", Optional[str]),
+             # Optional Runtime Option flags
+             ("runtime_opt", Optional[int])])
 
     def __init__(self, message_key: AlsMessageKeyType,
                  kafka_positions: KafkaPositions) -> None:
@@ -954,6 +928,9 @@ class AlsMessageBundle:
         self._response_timetag: Optional[datetime.datetime] = None
         self._configs: Dict[Optional[int],
                             "AlsMessageBundle.AfcConfigInfo"] = {}
+        self._mtls_dn: Optional[str] = None
+        self._ap_ip: Optional[str] = None
+        self._runtime_opt: Optional[int] = None
         self._assembled = False
         self._store_parts: Optional["AlsMessageBundle.StoreParts"] = None
         self._als_positions: Set[KafkaPosition] = set()
@@ -978,6 +955,9 @@ class AlsMessageBundle:
         return \
             {"key": self._message_key.decode("latin-1"),
              "afc_server": self._afc_server,
+             "mtls_dn": self._mtls_dn,
+             "ap_ip": self._ap_ip,
+             "runtime_opt": self._runtime_opt,
              "last_update": self._last_update.isoformat(),
              "request_msg": self._request_msg,
              "request_timetag":
@@ -1023,6 +1003,9 @@ class AlsMessageBundle:
                         "Malformed JSON in AFC Request message",
                         code_line=LineNumber.exc(), data=message.json_str)
                 self._request_timetag = message.time_tag
+                self._mtls_dn = message.mtls_dn or ""
+                self._ap_ip = message.ap_ip
+                self._runtime_opt = message.runtime_opt
             elif message.msg_type == AlsMessage.MsgType.Response:
                 if self._response_msg is not None:
                     return
@@ -1073,7 +1056,10 @@ class AlsMessageBundle:
                 tx_envelope=jd(self._response_msg),
                 rx_timetag=jdt(self._request_timetag),
                 tx_timetag=jdt(self._response_timetag),
-                request_responses={}, orphan_requests=[], orphan_responses=[])
+                request_responses={}, orphan_requests=[], orphan_responses=[],
+                mtls_dn=js(self._mtls_dn),
+                ap_ip=self._ap_ip,
+                runtime_opt=self._runtime_opt)
         requests: List[JSON_DATA_TYPE] = \
             jl(jd(self._request_msg)["availableSpectrumInquiryRequests"])
         responses: List[JSON_DATA_TYPE] = \
@@ -1191,14 +1177,14 @@ class CertificationList:
         """ Adds single certification
 
         Arguments:
-        index         -- 0-based certification indexc in certification list
+        index         -- 0-based certification index in certification list
         certification -- Certification to add
         """
         self._certifications[index] = certification
 
     def get_uuid(self) -> uuid.UUID:
         """ UUID of certification list (computed over JSON list of
-        certidications) """
+        certifications) """
         return \
             BytesUtils.json_to_uuid(
                 [{"rulesetId": self._certifications[idx].ruleset_id,
@@ -1211,7 +1197,7 @@ class CertificationList:
             [self._certifications[idx] for idx in sorted(self._certifications)]
 
     def __eq__(self, other: Any) -> bool:
-        """ Eqquality comparison """
+        """ Equality comparison """
         return isinstance(other, self.__class__) and \
             (self._certifications == other._certifications)
 
@@ -1224,7 +1210,7 @@ class CertificationList:
 class RegRuleList:
     """ List of regulatory rules
 
-    Privatew attributes:
+    Private attributes:
     _reg_rules - By-index in list dictionary of regulatory rules names """
 
     def __init__(self, json_data: Optional[List[Any]] = None) -> None:
@@ -1250,7 +1236,7 @@ class RegRuleList:
 
         Arguments:
         index    -- 0-based rule index in rule list
-        reg_rule -- Rulew name
+        reg_rule -- Rule name
         """
         self._reg_rules[index] = reg_rule
 
@@ -1289,7 +1275,7 @@ class AlsTableBase:
     def __init__(self, adb: AlsDatabase, table_name: str) -> None:
         """ Constructor
         adb        -- AlsDatabase object
-        table_name -- List of sa
+        table_name -- Table name
         """
         self._adb = adb
         self._table_name = table_name
@@ -1342,7 +1328,7 @@ class Lookups:
         self._lookups.append(lookup)
 
     def reread(self) -> None:
-        """ Signal all lookups to reread self (e.g. after transsaction failure)
+        """ Signal all lookups to reread self (e.g. after transaction failure)
         """
         for lookup in self._lookups:
             lookup.reread()
@@ -1412,6 +1398,8 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
                 self._by_value[value_month] = \
                     self._key_from_value(value_month[0])
             rows += self._rows_from_value(*value_month)
+        if not rows:
+            return
         try:
             ins = sa_pg.insert(self._table).values(rows).\
                 on_conflict_do_nothing()
@@ -1428,7 +1416,7 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
                 for value_month in new_value_months:
                     s = sa.select([self._table]).\
                         where(self._value_column == value_month[0])
-                    result = self._adb.conn.execute(s)
+                    result = self._adb.conn.execute(s).fetchall()
                     self._by_value[value_month] = \
                         self._key_from_row(list(result)[0])
         except (sa.exc.SQLAlchemyError, TypeError, ValueError) as ex:
@@ -1459,7 +1447,8 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
             return
         by_key: Dict[Tuple[LookupKey, int], LookupValue] = {}
         try:
-            for row in self._adb.conn.execute(sa.select(self._table)):
+            for row in \
+                    self._adb.conn.execute(sa.select(self._table)).fetchall():
                 key = (self._key_from_row(row),
                        row[AlsTableBase.MONTH_IDX_COL_NAME])
                 value = by_key.get(key)
@@ -1762,9 +1751,13 @@ class TableUpdaterBase(AlsTableBase,
                                          month_idx=month_idx)
         except (LookupError, TypeError, ValueError) as ex:
             raise JsonFormatError(
-                f"Invalid {self._json_obj_name} object format: {ex}",
-                code_line=LineNumber.exc())
+                f"Invalid {self._json_obj_name} object format when updating "
+                f"{self._table_name} table or its subordinates: {ex}",
+                code_line=LineNumber.exc(), data=data_dict)
+        if not rows:
+            return
         ins = sa_pg.insert(self._table).values(rows).on_conflict_do_nothing()
+
         if self._data_key_columns:
             ins = ins.returning(*self._data_key_columns)
         try:
@@ -1951,7 +1944,7 @@ class LocationTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
     object
 
     Private attributes:
-    _col_digest             -- Digest over JSON Locatopn object column
+    _col_digest             -- Digest over JSON Location object column
     _col_month_idx          -- Month index column
     _col_location           -- Geodetic location column
     _col_loc_uncertainty    -- Location uncertainty in meters column
@@ -2086,7 +2079,7 @@ class LocationTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
 
     def _dist(self, p1: "LocationTableUpdater.Point",
               p2: "LocationTableUpdater.Point") -> float:
-        """ Approximate distance in meters beteen two geodetic points """
+        """ Approximate distance in meters between two geodetic points """
         lat_dist = (p1.lat - p2.lat) * self.DEGREE_M
         lon_dist = \
             (p1.lon - self._same_hemisphere(p2.lon, p1.lon)) * \
@@ -2163,7 +2156,7 @@ class MaxEirpTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
         self._col_digest = self.get_column("request_response_digest",
                                            sa_pg.UUID)
         self._col_month_idx = self.get_month_idx_col()
-        self._col_op_class = self.get_column("channel", sa.SmallInteger)
+        self._col_op_class = self.get_column("op_class", sa.SmallInteger)
         self._col_channel = self.get_column("channel", sa.SmallInteger)
         self._col_eirp = self.get_column("max_eirp_dbm", sa.Float)
 
@@ -2200,7 +2193,7 @@ class MaxPsdTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
     """ Updater for Max PSD table.
     Data key is digest, used in request_response table (i.e. digest computed
     over AlsMessageBundle.RequestResponse.invariant_json).
-    Data value is thsi object itsef
+    Data value is this object itself
     (AlsMessageBundle.RequestResponse.invariant_json)
 
     Private attributes:
@@ -2260,7 +2253,7 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
     """ Updater for request/response table
     Data key is digest, used in request_response table (i.e. digest computed
     over AlsMessageBundle.RequestResponse.invariant_json).
-    Data value is thsi object itsef
+    Data value is this object itself
     (AlsMessageBundle.RequestResponse.invariant_json)
 
     Private attributes:
@@ -2281,7 +2274,7 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
     _col_geo_data_id          -- Geodetic data ID column
     _col_req_digest           -- Request digest column
     _col_resp_digest          -- Response digest column
-    _col_dev_desc_digest      -- Device Descriptor digets column
+    _col_dev_desc_digest      -- Device Descriptor digest column
     _col_loc_digest           -- Location digest column
     _col_response_code        -- Response code column
     _col_response_description -- Response description column
@@ -2312,7 +2305,8 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
         max_psd_updater          -- Maximum PSD table updater
         """
         super().__init__(adb=adb, table_name=self.TABLE_NAME,
-                         json_obj_name="RequestResponse")
+                         json_obj_name="RequestResponse",
+                         data_key_column_names=["request_response_digest"])
         self._afc_config_lookup = afc_config_lookup
         self._customer_lookup = customer_lookup
         self._uls_lookup = uls_lookup
@@ -2509,6 +2503,20 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
         self._max_psd_updater.update_db(data_dict=updated_psds,
                                         month_idx=month_idx)
 
+    def _data_key_from_result_row(self, result_row: Tuple[Any, ...],
+                                  result_row_idx: int) -> uuid.UUID:
+        """ Data key from rows written to database
+
+        Arguments:
+        result_row     -- Insert result tuple
+        result_row_idx -- 0-based index in insert results
+        Returns the latter
+        """
+        ret = result_row[0]
+        if isinstance(ret, (str, bytes)):
+            ret = uuid.UUID(ret)
+        return ret
+
 
 class EnvelopeTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
     """ Request/response envelope tables.
@@ -2566,6 +2574,58 @@ class EnvelopeTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
             [{ms(self._col_digest.name): data_key.urn,
              ms(self._col_month_idx.name): month_idx,
              ms(self._col_data.name): data_object}]
+
+
+class MtlsDnTableUpdater(TableUpdaterBase[uuid.UUID, str]):
+    """ mTLS DN table.
+    Keys are digests over DNs in UTF8 byte representation
+    Values are DNs in string representation
+
+    Private attributes
+    _col_digest    -- Digest column
+    _col_text      -- Column for DN in text representation
+    _col_json      -- Column for DN in JSON representation
+    _col_month_idx -- Month index column
+    """
+    TABLE_NAME = "mtls_dn"
+
+    def __init__(self, adb: AlsDatabase) -> None:
+        """ Constructor
+
+        Arguments:
+        adb    -- AlsDatabase object
+        """
+        super().__init__(adb=adb, table_name=self.TABLE_NAME,
+                         json_obj_name="MtlsDn")
+        self._col_digest = self.get_column("dn_text_digest", sa_pg.UUID)
+        self._col_text = self.get_column("dn_text", sa.Text)
+        self._col_json = self.get_column("dn_json", sa_pg.JSONB)
+        self._col_month_idx = self.get_month_idx_col()
+
+    def _make_rows(self, data_key: uuid.UUID, data_object: str,
+                   month_idx: int) -> List[ROW_DATA_TYPE]:
+        """ Makes row dictionary
+
+        Arguments:
+        data_key    -- Digest of DN text
+        data_object -- DN text
+        month_idx   -- Month index
+        """
+        dn_json: Dict[str, str] = {}
+        if data_object:
+            try:
+                for part in distinguishedname.string_to_dn(data_object):
+                    for attr, value in (av.split("=", 1) for av in part):
+                        dn_json[attr] = value
+            except Exception:  # pylint: disable=broad-exception-caught
+                # string_to_dn() raises all sorts of exceptions even on
+                # slightly off data. Catching them all
+                dn_json["undecodable"] = data_object
+        return \
+            [{ms(self._col_digest.name): data_key.urn,
+              ms(self._col_month_idx.name): month_idx,
+              ms(self._col_text.name): data_object,
+              ms(self._col_json.name): dn_json}]
 
 
 # Type for key of request/response association key data
@@ -2696,15 +2756,21 @@ class DecodeErrorTableWriter(AlsTableBase):
         if isinstance(data, bytes):
             data = data.decode("latin-1")
         elif isinstance(data, (list, dict)):
-            data = json.dumps(data)
+            data = json.dumps(data, default=self._serializer)
         ins = sa.insert(self._table).values(
-            {ms(self._col_month_idx.name): get_month_idx(),
+            {ms(self._col_month_idx.name): utils.get_month_idx(),
              ms(self._col_msg.name): msg,
              ms(self._col_line.name): line,
              ms(self._col_data.name): data,
              ms(self._col_time.name):
              datetime.datetime.now(dateutil.tz.tzlocal())})
         self._conn.execute(ins)
+
+    def _serializer(self, obj: Any) -> Any:
+        """ Serializer of non-JSON-ABLE objects """
+        if isinstance(obj, AlsMessageBundle):
+            return obj.dump()
+        raise TypeError(f"Can't (yet) serialize object of type {type(obj)}")
 
 
 class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
@@ -2714,19 +2780,23 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
     Data objects are AlsMessageBundle objects
 
     Private attributes:
-    _col_message_id       -- Message serial ID column
-    _col_month_idx        -- Month index column
-    _col_afc_server       -- AFC Server ID column
-    _col_rx_time          -- AFC Request timetag column
-    _col_tx_time          -- AFC Response timetag column
-    _rx_envelope_digest   -- AFC Request envelope digest column
-    _tx_envelope_digest   -- AFC Response envelope digest column
-    _afc_server_lookup    -- Lookup fr AFC Server names
-    _rr_assoc_updater     -- Updater of message to request/response association
-                             table
-    _rx_envelope_updater  -- Updater for AFC Request envelope table
-    _tx_envelope_updater  -- Updater for AFC Response envelope table
-    _decode_error_writer  -- Decode error table writer
+    _col_message_id         -- Message serial ID column
+    _col_month_idx          -- Month index column
+    _col_afc_server         -- AFC Server ID column
+    _col_rx_time            -- AFC Request timetag column
+    _col_tx_time            -- AFC Response timetag column
+    _col_rx_envelope_digest -- AFC Request envelope digest column
+    _col_tx_envelope_digest -- AFC Response envelope digest column
+    _col_mtls_dn_digest     -- mTLS DN  digest column
+    _col_ap_ip              -- AP IP address column
+    _col_runtime_opt        -- Runtime option address column
+    _afc_server_lookup      -- Lookup fr AFC Server names
+    _rr_assoc_updater       -- Updater of message to request/response
+                               association table
+    _rx_envelope_updater    -- Updater for AFC Request envelope table
+    _tx_envelope_updater    -- Updater for AFC Response envelope table
+    _mtls_dn_updater        -- Updater for mTLS DN table
+    _decode_error_writer    -- Decode error table writer
     """
     # Table name
     TABLE_NAME = "afc_message"
@@ -2735,6 +2805,7 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
                  rr_assoc_updater: RequestResponseAssociationTableUpdater,
                  rx_envelope_updater: EnvelopeTableUpdater,
                  tx_envelope_updater: EnvelopeTableUpdater,
+                 mtls_dn_updater: MtlsDnTableUpdater,
                  decode_error_writer: DecodeErrorTableWriter) -> None:
         """ Constructor
 
@@ -2744,6 +2815,7 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
                                 association table
         rx_envelope_updater  -- Updater for AFC Request envelope table
         tx_envelope_updater  -- Updater for AFC Response envelope table
+        mtls_dn_updater      -- Updater for mTLS DN table
         decode_error_writer  -- Decode error table writer
         """
         super().__init__(adb=adb, table_name=self.TABLE_NAME,
@@ -2754,15 +2826,20 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
         self._col_afc_server = self.get_column("afc_server", sa.Integer)
         self._col_rx_time = self.get_column("rx_time", sa.DateTime)
         self._col_tx_time = self.get_column("tx_time", sa.DateTime)
-        self._rx_envelope_digest = self.get_column("rx_envelope_digest",
+        self._col_rx_envelope_digest = self.get_column("rx_envelope_digest",
+                                                       sa_pg.UUID)
+        self._col_tx_envelope_digest = self.get_column("tx_envelope_digest",
+                                                       sa_pg.UUID)
+        self._col_mtls_dn_digest = self.get_column("dn_text_digest",
                                                    sa_pg.UUID)
-        self._tx_envelope_digest = self.get_column("tx_envelope_digest",
-                                                   sa_pg.UUID)
+        self._col_ap_ip = self.get_column("ap_ip", sa_pg.INET)
+        self._col_runtime_opt = self.get_column("runtime_opt", sa.Integer)
 
         self._afc_server_lookup = afc_server_lookup
         self._rr_assoc_updater = rr_assoc_updater
         self._rx_envelope_updater = rx_envelope_updater
         self._tx_envelope_updater = tx_envelope_updater
+        self._mtls_dn_updater = mtls_dn_updater
         self._decode_error_writer = decode_error_writer
 
     def _update_lookups(self, data_objects: Iterable[AlsMessageBundle],
@@ -2803,10 +2880,15 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
                                                        month_idx),
                  ms(self._col_rx_time.name): parts.rx_timetag,
                  ms(self._col_tx_time.name): parts.tx_timetag,
-                 ms(self._rx_envelope_digest.name):
+                 ms(self._col_rx_envelope_digest.name):
                  BytesUtils.json_to_uuid(parts.rx_envelope).urn,
-                 ms(self._tx_envelope_digest.name):
-                 BytesUtils.json_to_uuid(parts.tx_envelope).urn}]
+                 ms(self._col_tx_envelope_digest.name):
+                 BytesUtils.json_to_uuid(parts.tx_envelope).urn,
+                 ms(self._col_mtls_dn_digest.name):
+                 BytesUtils.text_to_uuid(parts.mtls_dn).urn,
+                 ms(self._col_ap_ip.name): parts.ap_ip,
+                 ms(self._col_runtime_opt.name): parts.runtime_opt,
+                 }]
 
     def _update_foreign_targets(
             self,
@@ -2821,15 +2903,21 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
         """
         self._rx_envelope_updater.update_db(
             data_dict={uuid.UUID(js(rows[0]
-                                    [ms(self._rx_envelope_digest.name)])):
+                                    [ms(self._col_rx_envelope_digest.name)])):
                        bundle.take_apart().rx_envelope
                        for bundle, rows in row_infos.values()},
             month_idx=month_idx)
         self._tx_envelope_updater.update_db(
             data_dict={uuid.UUID(js(rows[0]
-                                    [ms(self._tx_envelope_digest.name)])):
+                                    [ms(self._col_tx_envelope_digest.name)])):
                        bundle.take_apart().tx_envelope
                        for bundle, rows in row_infos.values()},
+            month_idx=month_idx)
+        self._mtls_dn_updater.update_db(
+            data_dict={
+                uuid.UUID(js(rows[0][ms(self._col_mtls_dn_digest.name)])):
+                bundle.take_apart().mtls_dn
+                for bundle, rows in row_infos.values()},
             month_idx=month_idx)
 
     def _update_foreign_sources(
@@ -2864,7 +2952,7 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
 
         Arguments:
         result_row     -- Insert result tuple
-        result_row_idx -- 0-based index i insert results
+        result_row_idx -- 0-based index in insert results
         Returns the latter
         """
         return result_row_idx
@@ -2966,6 +3054,8 @@ class KafkaClient:
     _subscribe_als           -- True if ALS topic should be subscribed
     _subscribe_log           -- True if log topics should be subscribed
     _metrics                 -- Metric collection
+    _als_topic               -- ALS topic name
+    _json_log_topic_prefix   -- JSON log topic name prefix
     """
     # Kafka message data
     MessageInfo = \
@@ -3018,16 +3108,19 @@ class KafkaClient:
         _ArgDsc(config="auto.offset.reset", default="earliest")]
 
     def __init__(self, args: Any, subscribe_als: bool, subscribe_log: bool,
-                 resubscribe_interval_s: int) -> None:
+                 resubscribe_interval_s: int, als_topic: str,
+                 json_log_topic_prefix: str) -> None:
         """ Constructor
 
         Arguments:
         args                   -- Parsed command line parameters
         subscribe_als          -- True if ALS topic should be subscribed
-        subscribe_log          -- True if log topics should be subscribed
+        subscribe_log          -- True if JSON log topics should be subscribed
         resubscribe_interval_s -- How often (interval in seconds)
                                   subscription_check() will actually check
-                                  subscription. 0 means - on each call.
+                                  subscription. 0 means - on each call
+        als_topic              -- ALS topic name
+        json_log_topic_prefix  -- JSON log topic name prefix
         """
         config: Dict[str, Any] = {}
         for ad in self._ARG_DSCS:
@@ -3055,7 +3148,9 @@ class KafkaClient:
                      ("Counter", "siphon_kafka_errors",
                       "Messages delivered with errors", ["topic", "code"]),
                      ("Gauge", "siphon_comitted_offsets",
-                      "Comitted Kafka offsets", ["topic", "partition"])])
+                      "Committed Kafka offsets", ["topic", "partition"])])
+        self._als_topic = als_topic
+        self._json_log_topic_prefix = json_log_topic_prefix
 
     def subscription_check(self) -> None:
         """ If it's time - check if new matching topics arrived and resubscribe
@@ -3066,8 +3161,9 @@ class KafkaClient:
         try:
             current_topics: Set[str] = set()
             for topic in self._consumer.list_topics().topics.keys():
-                if (self._subscribe_als and (topic == ALS_KAFKA_TOPIC)) or \
+                if (self._subscribe_als and (topic == self._als_topic)) or \
                         (self._subscribe_log and
+                         topic.startswith(self._json_log_topic_prefix) and
                          (not topic.startswith("__"))):
                     current_topics.add(topic)
             if current_topics <= self._subscribed_topics:
@@ -3088,16 +3184,13 @@ class KafkaClient:
         max_records    -- Maximum number of records to poll
         Returns by-topic dictionary of MessageInfo objects
         """
-        timeout_s = timeout_ms / 1000
         try:
             fetched_offsets: Dict[Tuple[str, int], int] = {}
             ret: Dict[str, List["KafkaClient.MessageInfo"]] = {}
-            start_time = datetime.datetime.now()
+            end_time = time.time() + timeout_ms / 1000
             for _ in range(max_records):
-                message = self._consumer.poll(timeout_s)
-                if (message is None) or \
-                        ((datetime.datetime.now() -
-                          start_time).total_seconds() > timeout_s):
+                message = self._consumer.poll(max(0, end_time - time.time()))
+                if message is None:
                     break
                 kafka_error = message.error()
                 topic = message.topic()
@@ -3120,6 +3213,8 @@ class KafkaClient:
                         fetched_offsets.setdefault((topic, partition), -1)
                     fetched_offsets[(topic, partition)] = \
                         max(previous_offset, offset)
+                if end_time <= time.time():
+                    break
         except confluent_kafka.KafkaException as ex:
             logging.error(f"Message fetch error: {ex.args[0].str}")
             raise
@@ -3153,31 +3248,35 @@ class Siphon:
     """ Siphon (Kafka reader / DB updater
 
     Private attributes:
-    _adb                        -- AlsDatabase object or None
-    _ldb                        -- LogsDatabase object or None
-    _kafka_client               -- KafkaClient consumer wrapper object
-    _decode_error_writer        -- Decode error table writer
-    _lookups                    -- Lookup collection
-    _cert_lookup                -- Certificates' lookup
-    _afc_config_lookup          -- AFC Configs lookup
-    _afc_server_lookup          -- AFC Server name lookup
-    _customer_lookup            -- Customer name lookup
-    _uls_lookup                 -- ULS ID lookup
-    _geo_data_lookup            -- Geodetic Data ID lookup
-    _dev_desc_updater           -- DeviceDescriptor table updater
-    _location_updater           -- Location table updater
-    _compressed_json_updater    -- Compressed JSON table updater
-    _max_eirp_updater           -- Maximum EIRP table updater
-    _max_psd_updater            -- Maximum PSD table updater
-    _req_resp_updater           -- Request/Response table updater
-    _rx_envelope_updater        -- AFC Request envelope table updater
-    _tx_envelope_updater        -- AFC Response envelope tabgle updater
-    _req_resp_assoc_updater     -- Request/Response to Message association
-                                   table updater
-    _afc_message_updater        -- Message table updater
-    _kafka_positions            -- Nonprocessed Kafka positions' collection
-    _als_bundles                -- Incomplete ALS Bundler collection
-    _metrics                    -- Collection of Prometheus metrics
+    _adb                     -- AlsDatabase object or None
+    _ldb                     -- LogsDatabase object or None
+    _kafka_client            -- KafkaClient consumer wrapper object
+    _decode_error_writer     -- Decode error table writer
+    _lookups                 -- Lookup collection
+    _cert_lookup             -- Certificates' lookup
+    _afc_config_lookup       -- AFC Configs lookup
+    _afc_server_lookup       -- AFC Server name lookup
+    _customer_lookup         -- Customer name lookup
+    _uls_lookup              -- ULS ID lookup
+    _geo_data_lookup         -- Geodetic Data ID lookup
+    _dev_desc_updater        -- DeviceDescriptor table updater
+    _location_updater        -- Location table updater
+    _compressed_json_updater -- Compressed JSON table updater
+    _max_eirp_updater        -- Maximum EIRP table updater
+    _max_psd_updater         -- Maximum PSD table updater
+    _req_resp_updater        -- Request/Response table updater
+    _rx_envelope_updater     -- AFC Request envelope table updater
+    _tx_envelope_updater     -- AFC Response envelope table updater
+    _mtls_dn_updater         -- mTLS DN table updater
+    _req_resp_assoc_updater  -- Request/Response to Message association table
+                                updater
+    _afc_message_updater     -- Message table updater
+    _kafka_positions         -- Nonprocessed Kafka positions' collection
+    _als_bundles             -- Incomplete ALS Bundler collection
+    _metrics                 -- Collection of Prometheus metrics
+    _touch_file              -- None or file to touch after each poll
+    _als_topic               -- ALS topic name
+    _json_log_topic_prefix   -- JSON log topic name prefix
     """
     # Number of messages fetched from Kafka in single access
     KAFKA_MAX_RECORDS = 1000
@@ -3189,13 +3288,16 @@ class Siphon:
     ALS_MAX_REQ_UPDATE = 5000
 
     def __init__(self, adb: Optional[AlsDatabase], ldb: Optional[LogsDatabase],
-                 kafka_client: KafkaClient) -> None:
+                 kafka_client: KafkaClient, touch_file: Optional[str],
+                 als_topic: str, json_log_topic_prefix: str) -> None:
         """ Constructor
 
         Arguments:
-        adb             -- AlsDatabase object or None
-        ldb             -- LogsDatabase object or None
-        kafka_client    -- KafkaClient
+        adb                   -- AlsDatabase object or None
+        ldb                   -- LogsDatabase object or None
+        kafka_client          -- KafkaClient
+        als_topic             -- ALS topic name
+        json_log_topic_prefix -- JSON log topic name prefix
         """
         error_if(not (adb or ldb),
                  "Neither ALS nor Logs database specified. Nothing to do")
@@ -3221,9 +3323,12 @@ class Siphon:
                       "Number of incomplete AFC Request messages"),
                      ("Gauge", "siphon_afc_msg_in_progress",
                       "Number of AFC Request messages awaiting completion")])
+        self._touch_file = touch_file
         self._adb = adb
         self._ldb = ldb
         self._kafka_client = kafka_client
+        self._als_topic = als_topic
+        self._json_log_topic_prefix = json_log_topic_prefix
         if self._adb:
             self._decode_error_writer = DecodeErrorTableWriter(adb=self._adb)
             self._lookups = Lookups()
@@ -3274,6 +3379,7 @@ class Siphon:
                 EnvelopeTableUpdater(
                     adb=self._adb,
                     params=EnvelopeTableUpdater.TX_ENVELOPE_PARAMS)
+            self._mtls_dn_updater = MtlsDnTableUpdater(adb=self._adb)
             self._req_resp_assoc_updater = \
                 RequestResponseAssociationTableUpdater(
                     adb=self._adb,
@@ -3284,6 +3390,7 @@ class Siphon:
                     rr_assoc_updater=self._req_resp_assoc_updater,
                     rx_envelope_updater=self._rx_envelope_updater,
                     tx_envelope_updater=self._tx_envelope_updater,
+                    mtls_dn_updater=self._mtls_dn_updater,
                     decode_error_writer=self._decode_error_writer)
         self._kafka_positions = KafkaPositions()
         self._als_bundles = \
@@ -3301,7 +3408,7 @@ class Siphon:
 
             busy = bool(kafka_messages_by_topic)
             for topic, kafka_messages in kafka_messages_by_topic.items():
-                if topic == ALS_KAFKA_TOPIC:
+                if topic == self._als_topic:
                     self._read_als_kafka_messages(kafka_messages)
                 else:
                     self._process_log_kafka_messages(topic, kafka_messages)
@@ -3310,13 +3417,15 @@ class Siphon:
                 busy |= self._timeout_als_messages()
                 busy |= self._commit_kafka_offsets()
             self._kafka_client.subscription_check()
+            if self._touch_file:
+                with open(self._touch_file, 'a', encoding="ascii"):
+                    os.utime(self._touch_file, None)
 
     def _read_als_kafka_messages(
             self, kafka_messages: List[KafkaClient.MessageInfo]) -> None:
         """ Put fetched ALS Kafka messages to store of incomplete bundles
 
         Arguments:
-        topic          -- ALS Topic name
         kafka_messages -- List of raw Kafka messages
         """
         for kafka_message in kafka_messages:
@@ -3344,7 +3453,7 @@ class Siphon:
         """ Process non-ALS (i.e. JSON Log) messages for one topic
 
         Arguments:
-        topic          -- ALS Topic name
+        topic          -- JSON log topic name
         kafka_messages -- List of Kafka messages
         """
         records: List[LogsDatabase.Record] = []
@@ -3369,7 +3478,9 @@ class Siphon:
             transaction: Optional[Any] = None
             try:
                 transaction = self._ldb.conn.begin()
-                self._ldb.write_log(topic=topic, records=records)
+                self._ldb.write_log(
+                    topic=topic[len(self._json_log_topic_prefix):],
+                    records=records)
                 transaction.commit()
                 transaction = None
             finally:
@@ -3381,7 +3492,7 @@ class Siphon:
         """ Write complete ALS Bundles to ALS database.
         Returns True if any work was done """
         assert self._adb is not None
-        month_idx = get_month_idx()
+        month_idx = utils.get_month_idx()
         transaction: Optional[Any] = None
         try:
             data_dict = \
@@ -3407,6 +3518,9 @@ class Siphon:
             self._lookups.reread()
             self._decode_error_writer.write_decode_error(
                 ex.msg, line=ex.code_line, data=ex.data)
+        except DbFormatError as ex:
+            self._metrics.siphon_als_malformed().inc()
+            logging.error(f"Error writing ALS database: {repr(ex)}")
         finally:
             if transaction is not None:
                 transaction.rollback()
@@ -3458,10 +3572,6 @@ def read_sql_file(sql_file: str) -> str:
         replacer, content, flags=re.DOTALL | re.MULTILINE)
 
 
-ALS_PATCH = ["ALTER TABLE afc_server DROP CONSTRAINT IF EXISTS "
-             "afc_server_afc_server_name_key"]
-
-
 def do_init_db(args: Any) -> None:
     """Execute "init" command.
 
@@ -3470,60 +3580,79 @@ def do_init_db(args: Any) -> None:
     """
     databases: Set[DatabaseBase] = set()
     try:
-        try:
-            init_db = \
-                InitialDatabase(
-                    arg_conn_str=args.init_postgres,
-                    arg_password_file=args.init_postgres_password_file)
-            databases.add(init_db)
-        except sa.exc.SQLAlchemyError as ex:
-            error(f"Connection to {InitialDatabase.name_for_logs()} database "
-                  f"failed: {ex}")
-        nothing_done = True
-        patch: List[str]
-        for conn_str, password_file, sql_file, template, db_class, \
-                sql_required, patch in \
-                [(args.als_postgres, args.als_postgres_password_file,
-                  args.als_sql, args.als_template, AlsDatabase, True,
-                  ALS_PATCH),
-                 (args.log_postgres, args.log_postgres_password_file,
-                  args.log_sql, args.log_template, LogsDatabase, False, [])]:
-            if not (conn_str or sql_file or template):
-                continue
-            nothing_done = False
-            error_if(sql_file and (not os.path.isfile(sql_file)),
-                     f"SQL file '{sql_file}' not found")
-            error_if(
-                sql_required and not sql_file,
-                f"SQL file is required for {db_class.name_for_logs()} "
-                f"database")
-            created = False
-            try:
-                database = db_class.get_db_name(conn_str)
+        with tempfile.TemporaryDirectory(prefix="als_") as tempdir:
+            nothing_done = True
+            als_sql_file: Optional[str] = None
+            als_maintenance_cmd: List[str] = []
+            if args.als_sql and (args.als_months_ahead is not None):
+                als_sql_file = os.path.join(tempdir, "als.sql")
+                execute(
+                    ["als_db_tool.py", "prepare_sql",
+                     "--months_ahead", str(args.als_months_ahead),
+                     args.als_sql, als_sql_file])
+                als_maintenance_cmd = \
+                    ["als_db_tool.py", "add_partitions",
+                     "--months_ahead", str(args.als_months_ahead)]
+            for conn_str, password_file, sql_file, db_class, sql_required, \
+                    maintenance_cmd, alembic_config, alembic_initial_version, \
+                    alembic_head_version, sample_table \
+                    in [(args.als_postgres, args.als_postgres_password_file,
+                         als_sql_file, AlsDatabase, True, als_maintenance_cmd,
+                         args.als_alembic_config,
+                         args.als_alembic_initial_version,
+                         args.als_alembic_head_version,
+                         AfcMessageTableUpdater.TABLE_NAME),
+                        (args.log_postgres, args.log_postgres_password_file,
+                         args.log_sql, LogsDatabase, False, [], None, None,
+                         None, None)]:
+                if not conn_str:
+                    logging.warning(
+                        f"{db_class.name_for_logs()} database will not be "
+                        f"written to because database DSN not specified")
+                    continue
+                if sql_required and (not sql_file):
+                    logging.warning(
+                        f"{db_class.name_for_logs()} database will not be "
+                        f"written to because SQL file not provided")
+                    continue
+                nothing_done = False
+                error_if(sql_file and (not os.path.isfile(sql_file)),
+                         f"SQL file '{sql_file}' not found")
                 created = \
-                    init_db.create_db(
-                        db_name=database,
-                        if_exists=InitialDatabase.IfExists(args.if_exists),
-                        template=template, conn_str=conn_str,
-                        password_file=password_file)
-                db = db_class(arg_conn_str=conn_str,
-                              arg_password_file=password_file)
-                databases.add(db)
-                with db.engine.connect() as conn:
-                    if created and sql_file:
-                        conn.execute(sa.text(read_sql_file(sql_file)))
-                    if not created:
-                        for cmd in patch:
-                            conn.execute(sa.text(cmd))
-            except sa.exc.SQLAlchemyError as ex:
-                error(f"{db_class.name_for_logs()} database initialization "
-                      f"failed: {ex}")
-                if created:
-                    try:
-                        init_db.drop_db(database)
-                    except sa.exc.SQLAlchemyError:
-                        pass
-        error_if(nothing_done, "Nothing to do")
+                    db_class.create_db(
+                        arg_conn_str=conn_str, arg_password_file=password_file,
+                        recreate=args.recreate)
+                try:
+                    db = db_class(arg_conn_str=conn_str,
+                                  arg_password_file=password_file)
+                    if (not created) and sample_table:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(
+                                    sa.text(f"SELECT 1 FROM {sample_table}"))
+                        except sa.exc.SQLAlchemyError:
+                            created = True
+                    databases.add(db)
+                    with db.engine.connect() as conn:
+                        if created and sql_file:
+                            for stmt in re.split(r"(?<=;)\s*",
+                                                 read_sql_file(sql_file)):
+                                if stmt:
+                                    conn.execute(sa.text(stmt))
+                except sa.exc.SQLAlchemyError as ex:
+                    error(f"{db_class.name_for_logs()} database "
+                          f"initialization failed: {ex}")
+                if alembic_config:
+                    err = \
+                        db_utils.alembic_ensure_version(
+                            alembic_config=alembic_config,
+                            existing_database=not created,
+                            initial_version=alembic_initial_version,
+                            head_version=alembic_head_version)
+                    error_if(err, err)
+                if (not created) and maintenance_cmd:
+                    execute(maintenance_cmd)
+            error_if(nothing_done, "Nothing to do")
     finally:
         for db in databases:
             db.dispose()
@@ -3547,8 +3676,11 @@ def do_siphon(args: Any) -> None:
         kafka_client = \
             KafkaClient(args=args, subscribe_als=adb is not None,
                         subscribe_log=ldb is not None,
-                        resubscribe_interval_s=5)
-        siphon = Siphon(adb=adb, ldb=ldb, kafka_client=kafka_client)
+                        resubscribe_interval_s=5, als_topic=args.als_topic,
+                        json_log_topic_prefix=args.json_topic_prefix)
+        siphon = Siphon(adb=adb, ldb=ldb, kafka_client=kafka_client,
+                        touch_file=args.touch_file, als_topic=args.als_topic,
+                        json_log_topic_prefix=args.json_topic_prefix)
         siphon.main_loop()
     finally:
         if adb is not None:
@@ -3658,6 +3790,14 @@ def main(argv: List[str]) -> None:
         "--kafka_max_partition_fetch_bytes", metavar="SIZE_IN_BYTES",
         type=docker_arg_type(int),
         help="Maximum size of Kafka message (default is 1MB)")
+    switches_kafka.add_argument(
+        "--als_topic", metavar="KAFKA_ALS_TOPIC",
+        type=docker_arg_type(str, default=DEFAULT_ALS_TOPIC),
+        help=f"Kafka topic for ALS data. Default is '{DEFAULT_ALS_TOPIC}'")
+    switches_kafka.add_argument(
+        "--json_topic_prefix", metavar="JSON_LOGS_TOPIC_PREFIX",
+        type=docker_arg_type(str, default=""),
+        help="Prefix to use for JSON LOG kafka topic names. Default is ''")
 
     switches_als_db = argparse.ArgumentParser(add_help=False)
     switches_als_db.add_argument(
@@ -3695,50 +3835,50 @@ def main(argv: List[str]) -> None:
 
     switches_init = argparse.ArgumentParser(add_help=False)
     switches_init.add_argument(
-        "--init_postgres",
-        metavar="[driver://][user][@host][:port][/database][?...]",
-        type=docker_arg_type(str),
-        help=f"Connection string to initial database used as a context for "
-        "other databases' creation. If some part (driver, user, host port "
-        f"database) is missing - it is taken from the default connection "
-        f"string (which is '{InitialDatabase.default_conn_str()}'. Connection "
-        f"parameters may be specified after '?' - see "
-        f"https://www.postgresql.org/docs/current/libpq-connect.html"
-        f"#LIBPQ-CONNSTRING for details")
-    switches_init.add_argument(
-        "--init_postgres_password_file", metavar="PASSWORD_FILE",
-        type=docker_arg_type(str),
-        help="File with password to substitute to initial database connection "
-        "string")
-    switches_init.add_argument(
-        "--if_exists", choices=["skip", "drop"],
-        type=docker_arg_type(str, default="exc"),
-        help="What to do if database already exist: nothing (skip) or "
-        "recreate (drop). Default is to fail")
-    switches_init.add_argument(
-        "--als_template", metavar="DB_NAME", type=docker_arg_type(str),
-        help="Template database (e.g. bearer of required extensions) to use "
-        "for ALS database creation. E.g. postgis/postgis image strangely "
-        "assigns Postgis extension on 'template_postgis' database instead of "
-        "on default 'template0/1'")
-    switches_init.add_argument(
-        "--log_template", metavar="DB_NAME", type=docker_arg_type(str),
-        help="Template database to use for JSON Logs database creation")
+        "--recreate", action="store_true",
+        help="Recreate database if it exists. Default is to use existing "
+        "database")
     switches_init.add_argument(
         "--als_sql", metavar="SQL_FILE", type=docker_arg_type(str),
-        help="SQL command file that creates tables, relations, etc. in ALS "
-        "database. If neither this parameter nor --als_postgres is specified "
-        "ALS database is not being created")
+        help="SQL file (presumably from dbdiagram.io) that creates "
+        "nonpartitioned ALS database tables, relations, etc. (partitioning is "
+        "added on the fly)")
     switches_init.add_argument(
         "--log_sql", metavar="SQL_FILE", type=docker_arg_type(str),
         help="SQL command file that creates tables, relations, etc. in JSON "
         "log database. By default database created (if --log_postgres is "
         "specified) empty")
+    switches_init.add_argument(
+        "--als_alembic_config", metavar="ALS_ALEMBIC_CONFIG",
+        type=docker_arg_type(str),
+        help="Alembic config for ALS daabase. No Alembic stamping/upgrade is "
+        "performed if this parameter is not specified")
+    switches_init.add_argument(
+        "--als_alembic_initial_version", metavar="INITIAL_ALS_ALEMBIC_VERSION",
+        type=docker_arg_type(str),
+        help="Alembic version to stamp on existing ALS database if it doesn't "
+        "have any")
+    switches_init.add_argument(
+        "--als_months_ahead", type=docker_arg_type(int),
+        default=DEFAULT_ALS_MONTHS_AHEAD,
+        help=f"Ensure that at this number of monthly partitions for month "
+        f"ahead is created on each container start. Default is "
+        f"{DEFAULT_ALS_MONTHS_AHEAD}")
+    switches_init.add_argument(
+        "--als_alembic_head_version", metavar="HEAD_ALS_ALEMBIC_VERSION",
+        type=docker_arg_type(str),
+        help="Alembic version to stamp on newly-created ALS database or "
+        "upgrade to on already existing database. Default is 'head' (provided "
+        "Alembic migration directory exists)")
 
     switches_siphon = argparse.ArgumentParser(add_help=False)
     switches_siphon.add_argument(
         "--prometheus_port", metavar="PORT", type=docker_arg_type(int),
         help="Port to serve Prometheus metrics on")
+    switches_siphon.add_argument(
+        "--touch_file", metavar="FILENAME", type=docker_arg_type(str),
+        help="File to touch after each successfull poll. May be used for "
+        "healthchecking")
 
     # Top level parser
     argument_parser = argparse.ArgumentParser(

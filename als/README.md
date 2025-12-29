@@ -7,208 +7,342 @@ License, a copy of which is included with this software program.
 
 ## Table of Contents
 - [Databases ](#databases)
-  - [*ALS* Database ](#als_database)
-  - [*AFC\_LOGS* Database ](#afc_logs_database)
-  - [Initial Database ](#initial_database)
-  - [Template Databases ](#template_databases)
-- [`als_siphon.py` - Moving Logs From Kafka To Postgres ](#als_siphon_py)
-- [`als_query.py` - Querying Logs From Postgres Database ](#als_query_py)
-  - [Installation](#als_query_install)
-  - [Addressing PostgreSQL](#als_query_server)
-  - [`log` Command ](#als_query_log)
-    - [`log` Command Examples ](#als_query_log_examples)
-
+  - [`ALS` Database ](#als_database)
+    - [Partitioning](#als_partitioning)
+    - [Updating database schema](#als_schema_update)
+  - [`AFC_LOGS` database ](#afc_logs_database)
+- [`als_siphon.py` - moving logs from Kafka to Postgres](#als_siphon_py)
+- [`als_query.py` - querying logs from Postgres databases](#als_query_py)
+  - [Installation/invocation](#als_query_install)
+  - [Connection strings](#als_query_dsn)
+  - [Time and time zones](#als_query_time)
+  - [`log` subcommand ](#als_query_log)
+    - [`log` subcommand examples ](#als_query_log_examples)
+  - [`als` subcommand ](#als_query_als)
+    - [`als` subcommand examples ](#als_query_als_examples)
+  - [`timezones` subcommand ](#als_query_timezones)
+  - [`help` subcommand](#als_query_help)
+- [`als_db_tool.py` script](#als_db_tool)
+  - [`prepare_sql` subcommand](#als_db_tool_prepare_sql)
+  - [`add_partitions` subcommand](#als_db_tool_add_partitions)
+  - [`partition_info` subcommand](#als_db_tool_partition_info)
+  - [`remove_partitions` subcommand](#als_db_tool_remove_partitions)
 
 ## Databases <a name="databases">
 
-ALS (AFC Log Storage) functionality revolves around two PostgreSQL databases, used for log storage: **ALS** and **AFC_LOGS**.
+ALS (AFC Log Storage) functionality revolves around two PostgreSQL databases, used for log storage: `ALS` and `AFC_LOGS`.
 
-### *ALS* Database <a name="als_database">
+### `ALS` database <a name="als_database">
 
-Stores log of AFC Request/Response/Config data. Has rather convoluted multitable structure.
+Stores log of AFC Request/Response/Config data. Has rather convoluted multitable structure (see `als/als_db_schema/ALS.PNG`)
 
-SQL code for creation of this database contained in *ALS.sql* file. This file should be considered generated and not be manually edited.
+#### Partitioning <a name="als_partitioning">
 
-*als_db_schema* folder contains source material for *ALS.sql* generation:
+Since ALS database stores every ALS request and response, over time it may become rather large. To avoid its unlimited grouth and simplifying deletion of older data, ALS database is partitioned - each table is stored in per-month partitions.
 
-- *ALS.dbml*. Source file for [dbdiagram.io](https://dbdiagram.io) DB diagramming site. Copy/paste content of this file there, make modifications, then copy/paste back to this file.  
-  Also upon completion *ALS_raw.sql* and *ALS.png* should be exported (as *Export to PostgreSQL* and *Export to PNG* respectively) - see below.
+Partitions for future months should be preacreated ahead of time. `als_siphon` container (aka `als-siphon` pod) on each (re)start ensures that there partitions for **`AFC_ALS_MONTH_PARTITIONS_AHEAD`** (environment variable) future months are created.
 
-- *ALS_raw.sql*. Database creation SQL script that should exported from [dbdiagram.io](https://dbdiagram.io) after changes made to *ALS.dbml*.  
-  This file is almost like final *ALS.sql*, but requires certain tweaks:
-    * Declaring used PostgreSQL extensions (PostGIS in this case)
-    * Removal of many-to-many artifacts. For many-to-many relationships [dbdiagram.io](https://dbdiagram.io) creates artificial tables that are, adding insult to injury, violate PostgreSQL syntax. They are not used and should be removed.
-    * Segmentation. Database is planned with segmentation in mind (by *month_idx* field). But segmentation itself not performed. This will need to be done eventually.
+Removal of old partitions is a manual operation - see `als_db_tool.py remove_partitions ...` described later.
 
-- *als_rectifier.awk* AWK script for converting *ALS_raw.sql* to *ALS.sql*.
+#### Updating database schema <a name="als_schema_update">
 
-- *ALS.png* Picturesque database schema. Should be exported as PNG after changes, made to *ALS.dbml*.
+ALS database schema described in `als/als_db_schema/ALS.dbml` - this is a primary source data. Its updating involves following steps:
 
-### *AFC_LOGS* Database <a name="als_logs_database">
+1. On [https://dbdiagram.io](https://dbdiagram.io) press ***Go To App*** button and copypaste contents of `ALS.dbml` into left pane.
+2. Make changes, arrange right-side schema picture nicely.
+3. Copyaste changed schema back to `als/als_db_schema/ALS.dbml`
+4. ***Export / To PNG*** updated schema picture to `als/als_db_schema/ALS.png`
+5. ***Export / To PostgreSQL*** updated schema to `als/als_db_schema/ALS.sql`.  
+Please note that resulting `.sql` file is not partitioned - partitions are added on the fly on database creation on `als_siphon` container start
+6. Add Alembic migration script to `als/als_migrations/versions`
+
+### `AFC_LOGS` database <a name="afc_logs_database">
 
 For each JSON log type (*topic* on Kafka parlance) this database has separate table with following columns:
 
-- *time* Log record timetag with timezone
+- `time` Log record timetag in UTC timezone
 
-- *source* String that uniquely identifies entity that created log record
+- `source` String that uniquely identifies entity that created log record
 
-- *log* JSON log record.
+- `log` JSON log record.
 
-### Initial Database <a name="initial_database">
+## `als_siphon.py` - moving logs from Kafka to Postgres<a name="als_siphon_py">
 
-To create database `als_siphon.py` script should connect to already database. This already existing database named *initial database*, by default it is built-in database named *postgres*.
+Various AFC Server components write ALS and JSON logs to Kafka queues using `als.py`. `als_siphon.py`, running on `als_siphon` container/pod fetches log records from Kafka and transfers them to previously described PostgreSQL databases. It also can create these databases on startup if they are not already exist.
 
-### Template Databases <a name="template_database">
+`$ als_siphon.py SUBCOMMAND PARAMETERS`
 
-Template databases, used for creation of *ALS* and *AFC_LOGS* databases. Something other than default might be used (but not yet, as of time of this writing).
+Subcommands are:
 
+- `init` Creates `ALS` and/or `AFC_LOGS` database. If already exists, databases may be recreated or left intact.
 
-## `als_siphon.py` - Moving Logs From Kafka To Postgres <a name="als_siphon_py">
+- `siphon` Transferring log records from Kafka to PostgreSQL.
 
-The main purpose of `als_siphon.py` is to fetch log records from Kafka and move them to previously described PostgreSQL databases. Also it can initialize those databases.
+- `init_siphon` First creates databases then do the siphoning - it is this subcommand that runs in `als_siphon` container/pod.
 
-`$ als_siphon.py COMMAND PARAMETERS`
+Parameters are many - see help messages. They are set in `Dockerfile.siphon` from environment variables (see comments in this file) that, in turn may be set/changed in `docker-compose.yaml` (Compose configuration) or in `helm/afc-int/values.yaml` or its overrides (see comments in `helm/afc-int/values.yaml`).
 
-Commands are:
-
-- `init` Create *ALS* and/or *AFC_LOGS* database. If already exists, databases may be recreated or left intact.
-
-- `siphon` Do the moving from Kafka to PostgreSQL.
-
-- `init_siphon` First create databases then do the siphoning. Used for Docker operation.
-
-Parameters are many - see help messages.
+Basically, once everything set up, this script is intended to work without intervention.
 
 
-## `als_query.py` - Querying Logs From Postgres Database <a name="als_query_py">
+## `als_query.py` - querying logs from Postgres databases <a name="als_query_py">
 
-This script queries logs, stored in *ALS* and *AFC_LOGS* databases.
-
-As of time of this writing this script only supports `log` command that reads JSON logs from *AFC_LOGS*
+This script queries logs, stored in `ALS` and `AFC_LOGS` databases.
 
 
-### Installation <a name="als_query_install">
+### Installation/invocation <a name="als_query_install">
 
-`als_query.py` requires Python 3 with reasonably recent *sqlalchemy*, *psycopg2*, *geoalchemy2* modules installed (latter is optional - not required for e.g. `log` command). 
+`als_query.py` requires Python 3.7+ with following modules installed: `sqlalchemy 1.4` (incompatible with `sqlalchemy 2.*` as it has some breaking changes),  `psycopg2`, `geoalchemy2`, `pytimeparse`, `pytz`, `tabulate`.
 
-Proper installation of these modules requires too much luck to be described here (as even `venv/virtualenv` does not help always - only sometimes). If you'll succeed - fine, otherwise there is one more method: running from the container where `als_siphon.py` installed. In latter case invocation looks like this:
+`als_query.py` already present in `als_siphon` container/pod, so, instead of laboriously installing all prerequisites (and passing database connection string parameters) it is recommended to run `als_query.py` right from container by means of `docker-compose ... exec als_query.py ...` or `kubectl exec als_siphon... als_query.py ...`
+ 
 
-`$ docker exec SIPHON_CONTAINER als_query.py CMD ...`
+### Connection strings <a name="als_query_dsn">
 
-Here `SIPHON_CONTAINER` is either value from first column of `docker ps` or from last column of `docker-compose ps`.
+`als_query.py` subcommands that access database (`log` and `als`) require full or partial connection strings. They can be passed in the following ways:
 
-### Addressing PostgreSQL Server <a name="als_query_server">
+- Via command line parameters (`--dsn` and, optionally, `--password_file`)
+- Via environment variables (`POSTGRES_LOG_CONN_STR` and, optionally, `POSTGRES_LOG_PASSWORD_FILE` for `log` subcommand, `POSTGRES_ALS_CONN_STR` and, optionally, `POSTGRES_ALS_PASSWORD_FILE` for `als` subcommand)
+- Not at all. Just run `als_query.py` from inside `als_siphon` container or pod that already has these environment variables set
 
-Another important aspect is how to access PostgreSQL database server where logs were placed.
+`--dsn` parameter as well as `POSTGRES_LOG_CONN_STR`, `POSTGRES_ALS_CONN_STR` environment variable have form `[<SCHEME>//:][<USERNAME>][:<PASSWORD>]<HOST>[:<PORT>][/<DATABASE>][?<OPTIONS>]` Of them only `<HOST>` is required, other may use defaults. `<PASSWORD>` may be specified explicitly or be taken from password file.
 
-#### Explicit specification
+`--password_file` parameter as well as `POSTGRES_LOG_PASSWORD_FILE` and `POSTGRES_ALS_PASSWORD_FILE` environment variables may specify the name of file, that contains password. It might be used to map Docker Compose or Kubernetes secrets.
 
-Using `--server` (aka `-s`) and `--password` parameters of `als_query.py` command line). Here are most probable cases:
+### Time and time zones <a name="als_query_time">
 
-1. `als_query.py` runs inside `als_siphon.py` container, PostgreSQL runs inside the container, named `bulk_postgres` in *docker-compose.yaml* (that's how it is named as of time of this writing):  
-  `$ docker exec SIPHON_CONTAINER als_query.py CMD \ `  
-  `--server [USER@]als_postrgres[:PORT][?OPTIONS] [--password PASSWORD] ...`  
-  Here `USER` or `PORT` might be omitted if they are `postgres` and `5432` respectively. `--password PASSWORD` and `OPTIONS` are optional.   
-  Actually, in this case `--server` and `--password` may be omitted - see below on the use of environment variables.
+Records in ALS and Log databases are time tagged. Database stores timetags using UTC time zone (that is used by default), which might be inconvenient to use by mere mortals.
 
-2. User/host/port of PostgreSQL server is known:  
-  `$ [docker exec SIPHON_CONTAINER] als_query CMD \ `  
-  `--server [USER@]HOST[:PORT][?OPTIONS] [--password PASSWORD] ...`  
+Both `als` and `log` subcommands have `--timezone` parameter that specifies what timezone to use for printing timetag and for interpreting time-related parameters (if timezone there not explicitly specified). Timezone may be specified in following forms:
 
-3. `als_query.py` runs outside container, PostgreSQL runs inside container:  
-  `$ als_query.py CMD \ `  
-  `--server [USER@]^POSTGRES_CONTAINER[:PORT][?OPTIONS] \ `  
-  `[--password PASSWORD] ...`  
-  Note the `***^***` before `POSTGRES_CONTAINER`. Here, again `POSTGRES_CONTAINER` is either value from first column of `docker ps` or from last column of `docker-compose ps` for container running PostgreSQL
+- **UTC offset**. Using `UTC` or `GMT` prefix. E.g. `--timezone UTC-7` or `--timezone GMT+5:30`
 
-I expect #1 to be the common case for development environment, #2 - for deployment environment, #3 - for illustrations (for sake of brevity) or for some lucky conditions.
+- **Timezone name**. E.g `--timezone US/Pacific`. List of known timezone names may be printed with `timezones` subcommand (`...als_query.py timezones`)
 
-#### Environment variables
+- **Abbreviated name**. E.g. `--timezone PST`. This method is ***not recommended*** as e.g. in the summer Western time is `PDT`, whereas `PST` is Philippine time. In the winter `PDT` become unavailable (because it is winter), whereas `PST` also become unavailable (because it is ambiguous).
 
-If `--server` parameter not specified `als_query.py` attempts to use environment variables:
-
-- `POSTGRES_LOG_USER`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_LOG_PASSWORD` for accessing *AFC_LOGS* database
-- `POSTGRES_ALS_USER`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_ALS_PASSWORD` for accessing *ALS* database
-
-These environment variables are passed to container with `als_siphon.py`, so they are quite natural choice when running `als_query` from there (case #1 above). 
-
-Hence for case #1 `als_query.py` command line would actually look like this:  
-`$ docker exec SIPHON_CONTAINER als_query.py CMD ...`  
-Where `...` does not contain `--server`
+Time format both on print and in command line parameters is ISO 8601. On print it is *YYYY-MM-DDTHH:MM:SS.ssssss+/-HH:MM*. In command line parameters year/month/day may be omitted (current ones assumed), hour/minute/second may also be omitted (zeros assumed), timezone may be omitted (current timezone - UTC or specified by `--timezone` is assumed).
 
 
-### `log` Command <a name="als_query_log">
+### `log` subcommand <a name="als_query_log">
 
-`log` command retrieves JSON logs from *AFC_LOGS* database. Each JSON logs is belongs to certain *topic* (handy term, originated from Kafka). Topic is a string (***lowercase highly recommended, 'ALS' name must not be used***) that supposedly corresponds to format (content) of JSON data.
+`log` subcommand retrieves JSON logs from `AFC_LOGS` database. Each JSON log is belongs to certain *topic* (handy term, originated from Kafka). Topic is just any string, passed to `als.als_json_log()` - *lowercase is recommended* to avoid wrestling with SQL. It is recommended to keep format of JSON, used for every topic consistent, but this is not mandated.
 
-Topic specifies a name of table inside *AFC_LOGS* database.
-
-Since content of JSON may be any and PostgreSQL already provides the special 'SELECT' syntax for accessing JSON data (see e.g. [here](https://www.postgresqltutorial.com/postgresql-tutorial/postgresql-json/) and [here](https://www.javatpoint.com/postgresql-json), google for further assistance), `log` command is, in fact, thin wrapper around `SELECT` command, plus a couple of additional options.
+Since content of JSON may be any and PostgreSQL already provides the special 'SELECT' syntax for accessing JSON data (see e.g. [here](https://www.postgresqltutorial.com/postgresql-tutorial/postgresql-json/) and [here](https://www.javatpoint.com/postgresql-json), google for further assistance), one queries JSON  logs with `log` subcommand by directly specifying a `SELECT` statement.
 
 Each table in *AFC_LOGS* has the following columns (this is important when composing `SELECT` statements):
 
 |Column|Content|
 |------|-------|
-|time|Time when log record was made in (includes date, time, timezone)|
-|source|Entity (e.g. WEB server) that made record|
+|time|Time tag of when log record was made in|
+|source|Name of entity that made record|
 |log|JSON log data|
 
 Command format:  
-`$ [docker exec SIPHON_CONTAINER] als_query.py log OPTIONS [SELECT_BODY]`
+`als_query.py log OPTIONS [SELECT_BODY]`
 
-|Parameter|Meaning|
-|---------|-------|
-|--server/-s **[USER@][^]HOST_OR_CONTAINER[:PORT][?OPTIONS]**|PostgreSQL server connection parameters. See discussion in [Installing and running](#als_query_deploy) chapter. This parameter is mandatory|
-|--password **PASSWORD**|PostgreSQL connection password (if required)|
-|--topics|List existing topics (database tables)|
-|--sources **[TOPIC]**|List sources - all or from specific topic|
-|--format/-f **{bare\|json\|csv}**|Output format for SELECT-based queries: **bare** - unadorned single column output, **csv** - output as CSV table (default), **json** - output as JSON list or row dictionaries|
-|**SELECT_BODY**|SQL SELECT statement body (without leading `SELECT` and trailing `;`. May be unquoted, but most likely requires quotes because of special symbols like `*`, `>`, etc.|
+|Option|Meaning|
+|------|-------|
+|--dsn **CONNECTION_STRING**|Full or partial connection string to JSON Logs database. May also be specified via `POSTGRES_LOG_CONN_STR` environment variable. See [Connection strings](#als_query_dsn) chapter|
+|--password_file **PASSWORD_FILE**|Name of file containing password for connection string. May also be specified via `POSTGRES_LOG_PASSWORD_FILE` environment variable. See [Connection strings](#als_query_dsn) chapter|
+|--verbose|Print SQL statements being emitted|
+|--max_age **DURATION**|Only return latest records since given duration ago (e.g. `--max_age 1d3h`). May not be specified together with **SELECT_BODY**|
+|--timezone **TIMEZONE**|Timezone to use for time output and as default for `--time_from` and `--time_to`. See [Time and time zones](#als_query_time) chapter|
+|--time_from **[[[yyyy-]mm-]dd][T[hh[:mm[:ss]]]][tz]**|Return records since given time. May not be specified together with **SELECT_BODY**. See [Time and time zones](#als_query_time) chapter|
+|--time_to **[[[yyyy-]mm-]dd][T[hh[:mm[:ss]]]][tz]**|Return records before given time. May not be specified together with **SELECT_BODY**. See [Time and time zones](#als_query_time) chapter|
+|--max_count **MAX_COUNT**|Maximum number of results to print (all by default). May not be specified together with **SELECT_BODY**|
+|--oldest_first|Sort in reverse time order. May not be specified together with **SELECT_BODY**|
+|--format **FORMAT**|Output format: `table`, `csv`, `json` (unindented JSON, one line per record), `indent` (indented JSON)|
+|--topics|Print current list of topics|
+|--topic TOPIC|Topic to print. May not be specified together with **SELECT_BODY**|
+|--sources|Print list of log sources - for all topics or for topic, specified with `--topic`|
+|**SELECT_BODY**|Body of select statement to execute - without leading '`SELECT`' and trailing '`;`'. Topic should be specified in the '`FROM`' clause. Default is to print entire table for topic, specified by `--topic` (within limits, imposed by `--max_age`, `--time_from`, `--time_to` and `--max_count`. May need to be quoted|
 
-#### `log` Command Examples <a name="als_query_log_examples">
+#### `log` subcommand examples <a name="als_query_log_examples">
 
-Suppose that:
-
-- There are various topics (tables), among which there is topic *few* (let me remind again, that lowercase topic names are recommended), filled with JSONs with structure similar to this:  
-```
-{
-    "a": 42,
-    "b": [1, 2, 3],
-    "c": {"d": 57}
-}
-```
-
-- `als_query.py` runs in `regression_als_siphon_1` container (YMMV - see output of `docker-compose ps`). In this case there is no need to pass `--server` parameter, as it will be taken from environment variables.
-
-Now, here are some possible actions:
+Examples below assume that DSN is specified via environment variables and proper command prefix is used (`docker-compose exec ...` or `kubectl exec ...` or none if execution performed from within the container).
 
 - List all topics:  
-  `$ docker exec regression_als_siphon_1 als_query.py log --topics`  
-  Note that there is no `--server` parameter here, as `als_query.py` would values, passed over environment variables.
+  `als_query.py log --topics`  
 
-- Print content of *foo* topic (table) in its entirety, using CSV format:  
-  `$ docker exec regression_als_siphon_1 als_query.py log "* from foo"`  
-  This invokes `SELECT * from foo;` on *AFC_LOGS* database of PostgreSQL server.
+- Print content of `user_access` topic (table) in its entirety, in table format:  
+  `als_query.py log --topic user_access`  
 
-- Print key names of JSONs of topic *foo*:  
-  `$ docker exec regression_als_siphon_1 als_query.py log \ `  
-  `json_object_keys(log) from foo`  
-  Note that quotes may be omitted here, as there are no special symbols in select statement.
+- Print key names of JSONs of topic `rcache_invalidation`:  
+  `als_query.py log "DISTINCT json_object_keys(log) FROM rcache_invalidation"`  
+  This statement will invoke `SELECT DISTINCT json_object_keys(log) FROM rcache_invalidation;` SQL query.  
+  Here 'log' is a name of column, containing JSON log records, `DISTINCT` and `FROM` are uppercase to demonstrate they are part of `SELECT` statement - they can be lowercase as well. Quotes used because otherwise `bash` tries to treat parentheses in a peculiar way.   
 
-- From topic *foo* print values of *c.d* for all records, using bare (unadorned) format:   
-  `$ docker exec regression_als_siphon_1 als_query.py log \ `  
-  `-f bare "log->'c'->'d' from foo"`  
-  Note the quotes around field names
+- Print all WebUI logins of user `foo` for last 3 days:  
+  ```
+  als_query.py log \
+    "log FROM (user_access where log->'user'='foo') AND ((now()-time)<=make_interval(0,0,0,3))"
+  ```
+  Note the quotes around field names  
+  Simpler way to achieve similar effect:  
+  `als_query.py log --topic user_access --max_age 3d | grep foo`
 
-- From topic *foo* print only values of *b[0]* for all records where *a* field equals *179*:  
-  `$ docker exec regression_als_siphon_1 als_query.py log \ `  
-  `"log->'b'->0 from foo where log->'a' = 179"`  
-  Note the way list indexing is performed (`->0`).
+- Print 10 last records from `rcache_invalidation` topic in indented JSON format, timed per US/Pacific time zone:  
+  ```
+  als_query.py log --topic rcache_invalidation --max_count 10 \
+      --latest_first --timezone US/Pacific
+  ```
 
-- Print maximum value of column *a* in topic *foo*:  
-  `$ docker exec regression_als_siphon_1 als_query.py log "MAX(log->'a') from foo"`  
+- Print WebUI logins since October 12 of this(!) year in Australia/Queensland timezone, observing generated SQL queries:  
+  ```
+  als_query.py log --topic user_access --time_from 10-12 \
+      --timezone Australia/Queensland --verbose
+  ```
 
-- Print log records in given time range:  
-  `$ docker exec regression_als_siphon_1 als_query.py log \ `  
-  `"* from foo where time > '2023-02-08 23:25:54.484174+00:00'" \ `  
-  `"and time < '2023-02-08 23:28:54.484174+00:00'"`
+
+### `als` subcommand <a name="als_query_als">
+
+This subcommand prints information about AFC request-responses, one request/response per line (unless `--distinct` specified). Some filtering and sorting options are provided.
+
+One can chose what pieces of information about request/response to print:
+
+|Out item<br>name|What is it?|Can be <br>sorted by?|
+|----|-----------|------------------|
+|time|Request RX time|Yes|
+|server|AFC Server identity|Yes|
+|request|AFC Request (e.g. for WebUI)|No|
+|response|AFC Response|No|
+|req_msg|AFC Request message|No|
+|resp_msg|AFC Response message|No|
+|duration|Message processing duration|Yes|
+|serial|AP serial number|Yes|
+|certificates|AP Certifications|Yes|
+|location|AP Location|No|
+|distance|Distance from from point, specified by `--pos` to AP|Yes|
+|azimuth|Azimuth from point, specified by `--pos` to AP|Yes|
+|psd|Max PSD results|Yes|
+|eirp|Max EIRP results|Yes|
+|config|AFC Config|Yes|
+|region|Region aka customer (AFC Config ID)|Yes|
+|error|Response code and supplemental info|Yes|
+|dn|mTLS distinguished name|Yes|
+|ip|IP address or request sender (AP or AFC Proxy)|Yes|
+|runtime_opt|Flags from AFC Request URL (gui, nocache, debug, edebug)|Yes| 
+|uls|ULS data version (not quite implemented as of time of this writing)|Yes|
+|geo|Geodetic data version (not quite implemented as of time of this writing)|Yes|
+
+This table may be printed with `--outs` command line parameter.
+
+Command format:  
+`als_query.py als OPTIONS [OUTS]`
+
+|Option|Meaning|
+|------|-------|
+|--dsn **CONNECTION_STRING**|Full or partial connection string to ALS database. May also be specified via `POSTGRES_ALS_CONN_STR` environment variable. See [Connection strings](#als_query_dsn) chapter|
+|--password_file **PASSWORD_FILE**|Name of file containing password for connection string. May also be specified via `POSTGRES_ALS_PASSWORD_FILE` environment variable. See [Connection strings](#als_query_dsn) chapter|
+|--verbose|Print SQL statements being emitted|
+|--keyhole_template **TEMPLATE_FILE**|Keyhole shape tempolate file name. File is generated by `keyhole_gen.py --type sql ...` from results of AFC Engine `KeyHoleShape` analysis. Keyhole shape covers area containing APs that may interfere eith FS RX looking in gioven direction (`--pos` and `--azimuth` parameters respectively). This file may also be specified with `KEYHOLE_TEMPLATE_FILE` environment variable|
+|--max_age **DURATION**|Only return latest records since given duration ago (e.g. `--max_age 1d3h`)|
+|--timezone **TIMEZONE**|Timezone to use for time output and as default for `--time_from` and `--time_to`. See [Time and time zones](#als_query_time) chapter|
+|--time_from **[[[yyyy-]mm-]dd][T[hh[:mm[:ss]]]][tz]**|Return records since given time. See [Time and time zones](#als_query_time) chapter|
+|--time_to **[[[yyyy-]mm-]dd][T[hh[:mm[:ss]]]][tz]**|Return records before given time. See [Time and time zones](#als_query_time) chapter|
+|--max_count **MAX_COUNT**|Maximum number of results to print (all by default)|
+|--format **FORMAT**|Output format: `table`, `csv`, `json` (unindented JSON, one line per record), `indent` (indented JSON)|
+|--decode_errors|Print table with `als_siphon.py` decoding and other errors. Only time/count filtering parameters may be used|
+|--outs|Print table of possible **OUTS** and `--order_by` values (see beginning of this chapter)|
+|--miles|Use miles instead of kilometers in `dist` column and `--dist` parameter|
+|--pos **LAT**,**LON**|Position from which distance to AP is measured (`dist` column, `--dist` parameter). Latitude and longitude (separated by comma and/or spaces) specified in degrees, hemisphere may be specified by sign (north/east is positive) or by letter: `--pos 37.5,-121.2` is the same as `--dist "37.5n 121W"`|
+|--dist **DISTANCE**|Only print records for APs within given distance (specified in kilometers or miles - see `--miles` parameter) from position specified by `--pos`|
+|--azimuth **AZIMUTH**|Only print records for APs at given direction (within keyhole shape) from posiotion, specified by `--pos`|
+|--region[=-]**REGION**|Only print records served with AFC Config of/except given region|
+|--serial[=-]**SERIAL**|Only print records for AP of/except given serial number|
+|--certificate[=-]**CERTIFICATE**|Only print records of APs of/except given certification (i.e. of given manufacturer)|
+|--ruleset[=-]**RULESET_ID**|Only print records of APs certified of/except given ruleset ID (i.e. certified by given certification authority)|
+|--cn[=-]**MTLS_COMMON_NAME**|Only print records of/except given CN of mTLS certificate|
+|-request_opt[=-]**OPT**|Only print records of messages with/without given request option flags (gui, nocache, debug, edebug)|
+|--resp_code[=-]**CODE**|Only print records of/except given AFC Response codes (except `GeneralFailure` is `--resp_code=--1`)|
+|--psd **[FROM_MHZ][-TO_MHZ]**|Only print records responded with PSD in given frequency range. Range boundaries specified in MHz|
+|--eirp **CHANNELS_OR_FREQUENCIES**|Only print records responded with EIRP for channels specified by numbers, number ranges and frequency ranges. E.g. `--eirp 1-33,13,1-50:40,6800-7000` - here we have a range of all channel numbers, individual channel number, range for 40MHz only and frequency range, YMMV|
+|--order_by **ITEM[,desc]**|Order by given output item (not all may be used - see table in the beginning of chapter). `desc` means order in descending order. This parameter may be specified several times|
+|--distinct|Only print distinct results (i.e. drop repeated ones)|
+|**OUTS**|Output items to print - see table of the beginning of this chapter (also printed by `--outs` parameter)|
+
+#### `als` subcommand examples <a name="als_query_als_examples">
+
+Examples below assume that DSN is specified via environment variables and proper command prefix is used (`docker-compose exec ...` or `kubectl exec ...` or none if execution performed from within the container).
+
+- Print `als_siphon.py` decode errors for the last month:  
+  `als_query.py als --decode_errors --max_age 30d`
+
+- Print table of output item names:  
+  `als_query.py als --outs`
+
+- Print dates, serials and positions of APs, within 100 miles from given point, allowed to transmit in 6800-7000MHz frequency range, for last year, sorted by distance (farthest first) except requests made by ULS Downloader and from WebUI. Output is in CSV format:  
+  ```
+  als_query.py als --pos 37N,121E --dist 100 --miles --max_age 365d \
+      --psd 6800-7000 --eirp 6800-7000 --serial=-FS_ACCEPTANCE_TEST \
+      --runtime_opt=-gui --order_by distance,desc --format csv \
+      time serial location
+  ```
+
+
+### `timezones` subcommand <a name="als_query_timezones">
+
+Print list of known timezones.
+
+`als_query.py timezones`
+
+
+### `help` subcommand <a name="als_query_help">
+
+Print help on given subcommand:
+
+- Print list of subcommands:  
+  `als_query.py help`
+
+- Print help on `als` subcommand:  
+  `als_query.py help als`
+
+- Print help midway of entering command - just insert 'help' before subcommand name, every thing past it will be ignored:  
+  `als_query.py help als --decode_errors --max_age `
+
+
+## `als_db_tool.py` script <a name="als_db_tool">
+
+This script (and its accompanying `als_db_tool.yaml` parameter file) provide functionality, related to ALS database partitioning.
+
+It is contained in `als_siphon` container (aka `als-siphon` pod) thus taking ALS database DSN and password file parameters from environment variables.
+
+### `prepare_sql` subcommand <a name="als_db_tool_prepare_sql">
+
+This subcommand used internally on container startup and migration script that added partitioning. See help message for more information.
+
+### `add_partitions` subcommand <a name="als_db_tool_add_partitions">
+
+Adds partitions for future months. Since this operation automagically performed on container (re)start and may be controlled by **`AFC_ALS_MONTH_PARTITIONS_AHEAD`** environment variable there is no point in going to deatils either. See help message for more information.
+
+### `partition_info` subcommand <a name="als_db_tool_partition_info">
+
+Prints information about partition tables and their parents
+
+```als_db_tool.py partition_info [OPTIONS]```
+
+Options are:
+
+|Option|Meaning|
+|------|-------|
+|--dsn **DSN**|DSN of ALS database (possibly without password or with default passwrd). By default taken from  `POSTGRES_ALS_CONN_STR` environment variable|
+|--password_file **FILENAME**|File with ALS database password. By default taken from `POSTGRES_ALS_PASSWORD_FILE` environment variable|
+|--by_parent|Print per-parent-table information of oldest and farthest in the future partition. By default print list of partition tables|
+
+### `remove_partitions` subcommand <a name="als_db_tool_remove_partitions">
+
+Removes all partition tables
+
+```als_db_tool.py remove_partitions [OPTIONS]```
+
+Options are:
+
+|Option|Meaning|
+|------|-------|
+|--dsn **DSN**|DSN of ALS database (possibly without password or with default passwrd). By default taken from  `POSTGRES_ALS_CONN_STR` environment variable|
+|--password_file **FILENAME**|File with ALS database password. By default taken from `POSTGRES_ALS_PASSWORD_FILE` environment variable|
+|--keep_months **NUMBER_OF_MONTHS**|Delete all partitions older than given number of months|
+|--keep_from **YEAR-MONTH**|Delete all partitions older than given month of given year|
+
+

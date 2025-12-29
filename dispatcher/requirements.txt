@@ -1,6 +1,13 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+
 amqp==5.1.1
 gevent==23.9.1
-greenlet==2.0.2
-kombu==5.2.4
-requests==2.31.0
-vine==5.0.0
+greenlet==3.1.1
+kombu==5.4.2
+psutil==5.9.4
+requests==2.32.3
+vine==5.1.0

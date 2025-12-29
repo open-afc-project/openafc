@@ -384,7 +384,7 @@ char *remove_quotes(char *str)
         while( (end > start) && (((*end) == ' ') || ((*end) == '\n')) ) { end--; }
         if ( (end > start) && ((*start) == '\"') && ((*end) == '\"') ) {
             ret_str = start+1;
-            (*end) = (char) NULL;
+            (*end) = (char) 0;
         }
     }
 
@@ -562,7 +562,7 @@ void set_current_dir_from_file(char *filename)
     for (i=n-1; (i>=0)&&(!found); i--) {
         if ( (path[i] == '\\') || (path[i] == '/') ) {
             found = 1;
-            path[i+1] = (char) NULL;
+            path[i+1] = (char) 0;
         }
     }
 

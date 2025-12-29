@@ -6,35 +6,31 @@
 #
 # Install required packages
 #
-FROM alpine:3.18 as msghnd.preinstall
+FROM python:3.12-alpine3.21
+# This variable should be set to used Python version (major.minor only)
+ENV AFC_PYTHONVERSION=3.12
+
 ENV PYTHONUNBUFFERED=1
-RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && \
-apk add --update --no-cache py3-six py3-numpy py3-cryptography py3-sqlalchemy \
-py3-requests py3-flask py3-psycopg2 py3-pydantic=~1.10 && \
-python3 -m ensurepip && \
-pip3 install --no-cache --upgrade pip setuptools
 
-# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
-# installed as Alpine package (thus not requiring gcc and musl-dev install)
-RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1 && \
-    pip3 install confluent-kafka==2.1.1 && \
-    apk del python3-dev gcc musl-dev
+# CMake installs packages to /usr/lib even though this image uses /usr/local/lib
+ENV PYTHONPATH=/usr/lib/python${AFC_PYTHONVERSION}/site-packages:/usr/local/lib/python${AFC_PYTHONVERSION}/site-packages:${PYTHONPATH}
 
+# Installing Python libraries
+#   Version of librdkafka-dev depends on Alpine version. confluent-kafka
+#   version in requirements.txt may need to be updated on Alpine version change
+RUN apk add --update --no-cache librdkafka-dev libffi 
 COPY msghnd/requirements.txt /wd/
-RUN pip3 install -r /wd/requirements.txt && mkdir -p /run/gunicorn /etc/xdg/fbrat
+RUN apk add --update --no-cache python3-dev build-base libffi-dev && \
+    pip3 install --upgrade pip setuptools  && \
+    pip3 install --no-cache-dir -r /wd/requirements.txt && \
+    apk del --purge python3-dev build-base libffi-dev && \
+    rm -f /wd/requirements.txt
+
+RUN mkdir -p /run/gunicorn /etc/xdg/fbrat
 COPY gunicorn/wsgi.py /wd/
 COPY config/ratapi.conf /etc/xdg/fbrat/
 RUN echo "AFC_APP_TYPE = 'msghnd'" >> /etc/xdg/fbrat/ratapi.conf
-#
-# Build Message Handler application
-#
-FROM alpine:3.18 as msghnd.build
-ENV PYTHONUNBUFFERED=1
-COPY --from=msghnd.preinstall / /
-# Development env
-RUN apk add --update --no-cache cmake ninja
-#
+
 COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /wd/
 COPY cmake /wd/cmake/
 COPY pkg /wd/pkg/
@@ -42,18 +38,14 @@ COPY src /wd/src/
 RUN mkdir -p -m 777 /wd/build
 ARG BUILDREV=localbuild
 RUN cd /wd/build && \
-cmake -DCMAKE_INSTALL_PREFIX=/wd/__install -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
-ninja -j$(nproc) install
-#
-# Install Message Handler application
-#
-FROM alpine:3.18 as msghnd.install
-ENV PYTHONUNBUFFERED=1
-COPY --from=msghnd.preinstall / /
-COPY --from=msghnd.build /wd/__install /usr/
-#
+apk add --update --no-cache cmake ninja && \
+cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
+env PYTHONPATH=${PYTHONPATH} \
+ninja -j$(nproc) install && \
+apk del --purge cmake ninja && rm -rf /wd/cmake/ /wd/pkg/ /wd/src/ /wd/build/
+
 COPY src/afc-packages /wd/afc-packages
-RUN pip3 install --use-pep517 --root-user-action=ignore \
+RUN pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
         -r /wd/afc-packages/pkgs.msghnd \
     && rm -rf /wd/afc-packages
 #
@@ -90,7 +82,12 @@ ENV AFC_MSGHND_TIMEOUT=${AFC_MSGHND_TIMEOUT:-180}
 ENV AFC_MSGHND_WORKERS=${AFC_MSGHND_WORKERS:-20}
 ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 ENV FLASK_AFC_MSGHND_RATAFC_TOUT=${FLASK_AFC_MSGHND_RATAFC_TOUT:-600}
+
+# Comma separated list of vendor extensions from previously computed responses
+# to be appended to AFC requests
+# ENV AFC_STATE_VENDOR_EXTENSIONS
+
 RUN chmod +x /entrypoint.sh
 CMD ["/entrypoint.sh"]
 HEALTHCHECK CMD wget --no-verbose --tries=1 --spider \
-    http://localhost:${AFC_MSGHND_PORT}/fbrat/ap-afc/healthy || exit 1
+    http://127.0.0.1:${AFC_MSGHND_PORT}/fbrat/ap-afc/healthy || exit 1

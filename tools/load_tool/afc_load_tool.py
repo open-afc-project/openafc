@@ -12,7 +12,9 @@
 # pylint: disable=too-few-public-methods, logging-fstring-interpolation
 # pylint: disable=too-many-instance-attributes, broad-exception-caught
 # pylint: disable=too-many-branches, too-many-nested-blocks
-# pylint: disable=too-many-statements, eval-used
+# pylint: disable=too-many-statements, eval-used, consider-using-with
+# pylint: disable=unnecessary-pass, use-yield-from
+# pylint: disable=too-many-positional-arguments
 
 import argparse
 from collections.abc import Iterable, Iterator
@@ -36,12 +38,13 @@ import re
 import shlex
 import signal
 import sqlite3
+import ssl
 import subprocess
 import sys
 import time
 import traceback
-from typing import Any, Callable, cast, List, Dict, NamedTuple, NoReturn, \
-    Optional, Tuple, Union
+from typing import Any, Callable, cast, List, Dict, TextIO, NamedTuple, \
+    NoReturn, Optional, Tuple, Union
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -203,9 +206,12 @@ class Config(Iterable):
 
     def __getattr__(self, attr: str) -> Any:
         """ Returns given attribute of node """
-        exc_if(not (isinstance(self._data, dict) and (attr in self._data)),
-               AttributeError(f"Config item '{self._path}' does not have "
-                              f"attribute '{attr}'"))
+        exc_if(not (("_data" in self.__dict__) and
+                    isinstance(self._data, dict) and (attr in self._data)),
+               AttributeError(
+                   f"Config item "
+                   f"'{self._path if '_path' in self.__dict__ else '???'}' "
+                   f"does not have attribute '{attr}'"))
         assert isinstance(self._data, dict)
         return self._subitem(value=self._data[attr], attr=attr)
 
@@ -314,7 +320,6 @@ def get_output(args: List[str]) -> str:
     except (subprocess.CalledProcessError, OSError) as ex:
         error(f"Failed to run '{' '.join(shlex.quote(arg) for arg in args)}': "
               f"{repr(ex)}")
-    return ""  # Unreachable code to make pylint happy
 
 
 class ServiceDiscovery:
@@ -335,9 +340,8 @@ class ServiceDiscovery:
     def get_exec(self, service: str) -> List[str]:
         """ Initial part of command to execute something in container of given
         service. Should be overloaded """
-        error("Cluster type/name not specified")
         unused_argument(service)
-        return []  # Unreachable code
+        error("Cluster type/name not specified")
 
     def get_url(self, base_url: str, param_host: Optional[str],
                 protocol: Optional[Protocol] = None) -> str:
@@ -384,11 +388,10 @@ class ServiceDiscovery:
         port     -- Port number
         Returns SCHEME://HOST:PORT
         """
-        error("Cluster type/name not specified")
-        unused_argument(protocol)  # Unreachable code
+        unused_argument(protocol)
         unused_argument(service)
         unused_argument(port)
-        return ""
+        error("Cluster type/name not specified")
 
     @classmethod
     def create(cls, cfg: Config, compose_project: Optional[str] = None,
@@ -417,7 +420,6 @@ class ServiceDiscovery:
         except json.JSONDecodeError as ex:
             error(f"Error parsing as JSON output of "
                   f"'{' '.join(shlex.quote(arg) for arg in args)}': {ex}")
-        return None  # Unreachable code
 
 
 class ServiceDiscoveryCompose(ServiceDiscovery):
@@ -516,11 +518,11 @@ class ServiceDiscoveryCompose(ServiceDiscovery):
                 assert name_offset is not None
                 container: Optional[str] = None
                 for names in re.split(r",\s*", line[name_offset:]):
-                    m = re.search(r"(%s_(.+)_\d+)" %
+                    m = re.search(r"(%s(_|-)(.+)(_|-)\d+)" %
                                   re.escape(self._compose_project),
                                   names)
                     if m:
-                        container = m.group(2)
+                        container = m.group(3)
                         self._containers[container] = \
                             self._ContainerInfo(name=m.group(1))
                 if container:
@@ -600,7 +602,6 @@ class ServiceDiscoveryK3d(ServiceDiscovery):
                         pod_name, "--"]
         error(
             f"Pod '{service}' not found in cluster '{self._k3d_cluster_name}'")
-        return []  # Unreachable code
 
     def get_cluster_url(self, protocol: Protocol, service: str, port: int) \
             -> str:
@@ -697,7 +698,6 @@ def ratdb(cfg: Config, command: str, service_discovery: ServiceDiscovery) \
             assert m is not None
             return int(m.group(1))
     error(f"Unknown SQL command '{command}'")
-    return 0    # Unreachable code, appeasing pylint
 
 
 def path_get(obj: Any, path: List[Union[str, int]]) -> Any:
@@ -976,17 +976,26 @@ class RestDataHandlerBase:
         unused_argument(batch)
         return b""
 
+    def generator_cleanup(self) -> None:
+        """ Virtual method to call upon generation completion """
+        pass
+
 
 class PreloadRestDataHandler(RestDataHandlerBase):
     """ REST API data handler for 'preload' operation - i.e. Rcache update
     messages (no response)
 
     Private attributes:
-    _hash_base -- MD5 hash computed over AFC Config, awaiting AFC Request tail
+    _afc_config_str -- AFC Config as string
+    _hash_base      -- MD5 hash computed over AFC Config, awaiting AFC Request
+                       tail
+    _log_file       -- None or file to write CSV to
+    _log_csv        -- None or csv object for writing to file
     """
 
     def __init__(self, cfg: Config, afc_config: Dict[str, Any],
-                 req_msg_pattern: Optional[Dict[str, Any]] = None) -> None:
+                 req_msg_pattern: Optional[Dict[str, Any]] = None,
+                 csv_log: Optional[str] = None) -> None:
         """ Constructor
 
         Arguments:
@@ -995,10 +1004,17 @@ class PreloadRestDataHandler(RestDataHandlerBase):
                            computation
         req_msg_pattern -- Optional Request message pattern to use instead of
                            default
+        csv_log         -- None or name of file to log generated stuff
         """
         self._hash_base = hashlib.md5()
-        self._hash_base.update(json.dumps(afc_config,
-                                          sort_keys=True).encode("utf-8"))
+        self._afc_config_str = json.dumps(afc_config, sort_keys=True)
+        self._hash_base.update(self._afc_config_str.encode("utf-8"))
+        self._log_file: Optional[TextIO] = \
+            None if csv_log is None \
+            else open(csv_log, "w", newline="", encoding="utf-8")
+        self._log_csv: Any = \
+            None if csv_log is None \
+            else csv.writer(cast(TextIO, self._log_file))
         super().__init__(cfg=cfg, req_msg_pattern=req_msg_pattern)
 
     def make_req_data(self, req_indices: List[int]) -> bytes:
@@ -1021,7 +1037,17 @@ class PreloadRestDataHandler(RestDataHandlerBase):
             rrks.append({"afc_req": json.dumps(req_msg),
                          "afc_resp": json.dumps(resp_msg),
                          "req_cfg_digest": h.hexdigest()})
+            if self._log_csv is not None:
+                self._log_csv.writerow(
+                    (str(req_idx), rrks[-1]["req_cfg_digest"],
+                     self._afc_config_str, rrks[-1]["afc_req"],
+                     rrks[-1]["afc_resp"]))
         return json.dumps({"req_resp_keys": rrks}).encode("utf-8")
+
+    def generator_cleanup(self) -> None:
+        """ Virtual method to call upon generation completion """
+        if self._log_file is not None:
+            self._log_file.close()
 
 
 class LoadRestDataHandler(RestDataHandlerBase):
@@ -1248,6 +1274,8 @@ class ResultsProcessor:
     _num_workers         -- Number of worker processes
     _err_dir             -- None or directory for failed requests
     _status_printer      -- StatusPrinter
+    _rate_print_sec      -- None or rate print interval in seconds
+    _last_rate_printed   -- Datetime of last rate print time
     """
 
     def __init__(
@@ -1255,7 +1283,7 @@ class ResultsProcessor:
             result_queue: "multiprocessing.Queue[ResultQueueDataType]",
             num_workers: int, status_period: int,
             rest_data_handler: Optional[RestDataHandlerBase],
-            err_dir: Optional[str]) -> None:
+            err_dir: Optional[str], rate_print_sec: Optional[float]) -> None:
         """ Constructor
 
         Arguments:
@@ -1272,6 +1300,7 @@ class ResultsProcessor:
         rest_data_handler -- Generator/interpreter of REST request/response
                              data
         err_dir           -- None or directory for failed requests
+        rate_print_sec    -- None or rate printing interval in seconds
         """
         self._netload = netload
         self._total_requests = total_requests
@@ -1281,6 +1310,8 @@ class ResultsProcessor:
         self._rest_data_handler = rest_data_handler
         self._err_dir = err_dir
         self._status_printer = StatusPrinter()
+        self._rate_print_sec = rate_print_sec
+        self._last_rate_printed = datetime.datetime.now()
 
     def process(self) -> None:
         """ Keep processing results until all worker will stop """
@@ -1291,6 +1322,7 @@ class ResultsProcessor:
         cpu_consumed_ns: int = 0
         time_spent_sec: float = 0
         req_rate_ema = RateEma()
+        max_req_rate: float = 0
         cpu_consumption_ema = RateEma()
 
         def status_message(intermediate: bool) -> str:
@@ -1326,8 +1358,9 @@ class ResultsProcessor:
                 f"({requests_failed * 100 / (requests_sent or 1):.3f}%), " \
                 f"{retries} retries made. " \
                 f"{elapsed_str} elapsed, " \
-                f"rate is {global_req_rate:.3f} req/sec " \
-                f"(avg req proc time {req_duration_str})"
+                f"avg rate {global_req_rate:.3f} req/sec " \
+                f"(avg req proc time {req_duration_str}), " \
+                f"max rate {max_req_rate:.3f} req/sec"
             if cpu_consumption >= 0:
                 ret += f", CPU consumption is {cpu_consumption:.3f}"
             if intermediate and elapsed_sec and requests_sent:
@@ -1362,6 +1395,18 @@ class ResultsProcessor:
                 if isinstance(result_info, TickInfo):
                     req_rate_ema.on_tick(requests_sent)
                     cpu_consumption_ema.on_tick(cpu_consumed_ns * 1e-9)
+                    max_req_rate = max(max_req_rate, req_rate_ema.rate_ema)
+                    if self._rate_print_sec is not None:
+                        now = datetime.datetime.now()
+                        if (now - self._last_rate_printed).total_seconds() >= \
+                                self._rate_print_sec:
+                            self._last_rate_printed = now
+                            self._status_printer.pr(
+                                f"{now.strftime('%H:%M:%S')}. "
+                                f"Current rate: {req_rate_ema.rate_ema:.3f} "
+                                f"req/sec, max rate: {max_req_rate:.3f} "
+                                f"req/sec")
+                            print("")
                     continue
                 error_msg = result_info.error_msg
                 if error_msg:
@@ -1384,8 +1429,9 @@ class ResultsProcessor:
                                 self._rest_data_handler.make_error_map(
                                     result_data=result_info.result_data)
                         except Exception as ex:
-                            error_msg = f"Error decoding message " \
-                                f"{result_info.result_data!r}: {repr(ex)}"
+                            error_map = \
+                                {idx: f"Error decoding message: {repr(ex)}"
+                                 for idx in result_info.req_indices}
                     for idx, error_msg in error_map.items():
                         self._status_printer.pr()
                         logging.error(f"Request {idx} failed: {error_msg}")
@@ -1402,17 +1448,22 @@ class ResultsProcessor:
                     requests_failed += len(error_map)
                 if self._err_dir and result_info.req_data and \
                         (result_info.error_msg or error_map):
-                    try:
-                        filename = \
-                            os.path.join(
-                                self._err_dir,
-                                datetime.datetime.now().strftime(
-                                    "err_req_%y%m%d_%H%M%S_%f.json"))
-                        with open(filename, "wb") as f:
-                            f.write(result_info.req_data)
-                    except OSError as ex:
-                        error(f"Failed to write failed request file "
-                              f"'{filename}': {repr(ex)}")
+                    timetag = \
+                        datetime.datetime.now().\
+                        strftime("%y%m%d_%H%M%S_%f")
+                    for filename, data in \
+                            [(f"req_{timetag}.json",
+                              result_info.req_data),
+                             (f"rsp_{timetag}.txt",
+                              result_info.result_data or b"")]:
+                        full_filename = os.path.join(self._err_dir, filename)
+                        try:
+                            with open(full_filename, "wb") as f:
+                                f.write(data)
+                        except OSError as ex:
+                            error(
+                                f"Failed to write failed request or response "
+                                f"file '{full_filename}': {repr(ex)}")
                 cpu_consumed_ns += result_info.worker_cpu_consumed_ns
                 time_spent_sec += result_info.req_time_spent_sec
 
@@ -1438,11 +1489,54 @@ class ResultsProcessor:
             self._status_printer.pr(s)
 
 
+def get_https_args(url: str, use_requests: bool, client_cert: Optional[str],
+                   client_key: Optional[str], ca_cert: Optional[str],
+                   verify_server: bool) -> Dict[str, Any]:
+    """ Returns https-related kwargs for requests or urllib.request
+
+    Argumens:
+    url           -- URL (used to find out if protocol is HTTPS)
+    use_requests  -- True to return parameters for requests, False - for
+                     urllib.request
+    client_cert   -- None or client mTLS certificate or PEM file
+    client_cert   -- None or client mTLS certificate or PEM file
+    client_key    -- None or client mTLS private key file\
+    ca_cert       -- None or CA certificate file
+    verify_server -- True to verify HTTPS server certificate
+    Returns dictionary of https-related arguments, empty dictionary if URL
+    is HTTP
+    """
+    ret: Dict[str, Any] = {}
+    if urllib.parse.urlparse(url).scheme != Protocol.https.name:
+        return ret
+    error_if(client_cert and (not os.path.isfile(client_cert)),
+             f"Client certificate file '{client_cert}' not found")
+    error_if(client_key and (not os.path.isfile(client_key)),
+             f"Client key file '{client_key}' not found")
+    error_if(client_key and (not client_cert),
+             "Client key file may not be used without client certificate file")
+    if use_requests:
+        ret["verify"] = ca_cert if ca_cert and verify_server else verify_server
+        if client_cert:
+            ret["cert"] = client_cert if not client_key \
+                else (client_cert, client_key)
+    else:
+        ssl_context = \
+            ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_cert)
+        ssl_context.check_hostname = verify_server
+        if client_cert:
+            ssl_context.load_cert_chain(client_cert, client_key)
+        ret["context"] = ssl_context
+    return ret
+
+
 def post_req_worker(
         url: str, retries: int, backoff: float, timeout: float, dry: bool,
         post_req_queue: multiprocessing.Queue,
         result_queue: "multiprocessing.Queue[ResultQueueDataType]",
         dry_result_data: Optional[bytes], use_requests: bool,
+        client_cert: Optional[str], client_key: Optional[str],
+        ca_cert: Optional[str], verify_server: bool,
         return_requests: bool = False, delay_sec: float = 0) -> None:
     """ REST API POST worker
 
@@ -1458,6 +1552,10 @@ def post_req_worker(
     result_queue    -- Result queue. Elements added are WorkerResultInfo for
                        operation results, None to signal that worker finished
     use_requests    -- True to use requests, False to use urllib.request
+    client_cert     -- None or client mTLS certificate or PEM file
+    client_key      -- None or client mTLS private key file
+    ca_cert          -- None or CA certificate file
+    verify_server   -- True to verify HTTPS server certificate
     return_requests -- True to return requests in WorkerResultInfo
     delay_sec       -- Delay start by this number of seconds
     """
@@ -1465,6 +1563,11 @@ def post_req_worker(
         time.sleep(delay_sec)
         session: Optional[requests.Session] = \
             requests.Session() if use_requests and (not dry) else None
+        https_args = \
+            get_https_args(
+                url=url, use_requests=use_requests, client_cert=client_cert,
+                client_key=client_key, ca_cert=ca_cert,
+                verify_server=verify_server)
         has_proc_time = hasattr(time, "process_time_ns")
         prev_proc_time_ns = time.process_time_ns() if has_proc_time else 0
         while True:
@@ -1493,7 +1596,7 @@ def post_req_worker(
                                         "application/json; charset=utf-8",
                                         "Content-Length":
                                         str(len(req_info.req_data))},
-                                    timeout=timeout)
+                                    timeout=timeout, **https_args)
                             if not resp.ok:
                                 last_error = \
                                     f"{resp.status_code}: {resp.reason}"
@@ -1510,8 +1613,8 @@ def post_req_worker(
                                        str(len(req_info.req_data)))
                         try:
                             with urllib.request.urlopen(
-                                    req, req_info.req_data, timeout=timeout) \
-                                    as f:
+                                    req, req_info.req_data, timeout=timeout,
+                                    **https_args) as f:
                                 result_data = f.read()
                             break
                         except (urllib.error.HTTPError, urllib.error.URLError,
@@ -1546,7 +1649,9 @@ def get_req_worker(
         url: str, expected_code: Optional[int], retries: int, backoff: float,
         timeout: float, dry: bool, get_req_queue: multiprocessing.Queue,
         result_queue: "multiprocessing.Queue[ResultQueueDataType]",
-        use_requests: bool) -> None:
+        use_requests: bool, client_cert: Optional[str],
+        client_key: Optional[str], ca_cert: Optional[str],
+        verify_server: bool) -> None:
     """ REST API GET worker
 
     Arguments:
@@ -1562,11 +1667,20 @@ def get_req_worker(
     result_queue  -- Result queue. Elements added are WorkerResultInfo for
                      operation results, None to signal that worker finished
     use_requests  -- True to use requests, False to use urllib.request
+    client_cert   -- None or client mTLS certificate or PEM file
+    client_key    -- None or client mTLS private key file
+    ca_cert       -- None or CA certificate file
+    verify_server -- True to verify HTTPS server certificate
     """
     try:
         if expected_code is None:
             expected_code = http.HTTPStatus.OK.value
         has_proc_time = hasattr(time, "process_time_ns")
+        https_args = \
+            get_https_args(
+                url=url, use_requests=use_requests, client_cert=client_cert,
+                client_key=client_key, ca_cert=ca_cert,
+                verify_server=verify_server)
         prev_proc_time_ns = time.process_time_ns() if has_proc_time else 0
         session: Optional[requests.Session] = \
             requests.Session() if use_requests and (not dry) else None
@@ -1575,8 +1689,8 @@ def get_req_worker(
             if req_info is None:
                 result_queue.put(None)
                 return
-            start_time = datetime.datetime.now()
             for _ in range(req_info.num_gets):
+                start_time = datetime.datetime.now()
                 error_msg = None
                 if dry:
                     attempts = 1
@@ -1586,7 +1700,8 @@ def get_req_worker(
                         if use_requests:
                             assert session is not None
                             try:
-                                resp = session.get(url=url, timeout=timeout)
+                                resp = session.get(url=url, timeout=timeout,
+                                                   **https_args)
                                 if resp.status_code != expected_code:
                                     last_error = \
                                         f"{resp.status_code}: {resp.reason}"
@@ -1599,8 +1714,8 @@ def get_req_worker(
                             status_code: Optional[int] = None
                             status_reason: str = ""
                             try:
-                                with urllib.request.urlopen(req,
-                                                            timeout=timeout):
+                                with urllib.request.urlopen(
+                                        req, timeout=timeout, **https_args):
                                     pass
                                 status_code = http.HTTPStatus.OK.value
                                 status_reason = http.HTTPStatus.OK.name
@@ -1668,6 +1783,7 @@ def producer_worker(
     dry               -- Dry run
     rest_data_handler -- Generator/interpreter of REST request/response data
     req_queue         -- Requests queue to fill
+    netload           -- True to do netload, false for load/preload
     """
     try:
         if netload:
@@ -1699,6 +1815,8 @@ def producer_worker(
     except Exception as ex:
         error(f"Producer terminated: {repr(ex)}")
     finally:
+        if rest_data_handler is not None:
+            rest_data_handler.generator_cleanup()
         for _ in range(parallel):
             req_queue.put(None)
 
@@ -1711,7 +1829,10 @@ def run(url: str, parallel: int, backoff: float, timeout: float, retries: int,
         max_idx: Optional[int] = None, count: Optional[int] = None,
         use_requests: bool = False, err_dir: Optional[str] = None,
         ramp_up: Optional[float] = None, randomize: Optional[bool] = None,
-        population_db: Optional[str] = None) -> None:
+        population_db: Optional[str] = None,
+        rate_print_sec: Optional[float] = None,
+        client_cert: Optional[str] = None, client_key: Optional[str] = None,
+        ca_cert: Optional[str] = None, verify_server: bool = False) -> None:
     """ Run the POST operation
 
     Arguments:
@@ -1743,6 +1864,11 @@ def run(url: str, parallel: int, backoff: float, timeout: float, retries: int,
                          None if irrelevant. Only used in banner printing
     population_db     -- Population database file name or None. Only used for
                          banner printing
+    rate_print_sec    -- None or rate printing interval
+    client_cert       -- None or client mTLS certificate or PEM file
+    client_key        -- None or client mTLS private key file
+    ca_cert           -- None or CA certificate file
+    verify_server     -- True to verify HTTPS server certificate
     """
     error_if(use_requests and ("requests" not in sys.modules),
              "'requests' Python3 module have to be installed to use "
@@ -1793,7 +1919,9 @@ def run(url: str, parallel: int, backoff: float, timeout: float, retries: int,
         req_worker_kwargs: Dict[str, Any] = {
             "url": url, "backoff": backoff, "timeout": timeout,
             "retries": retries, "dry": dry, "result_queue": result_queue,
-            "use_requests": use_requests}
+            "use_requests": use_requests, "client_cert": client_cert,
+            "client_key": client_key, "ca_cert": ca_cert,
+            "verify_server": verify_server}
         req_worker: Callable
         if netload_target:
             req_worker = get_req_worker
@@ -1832,7 +1960,8 @@ def run(url: str, parallel: int, backoff: float, timeout: float, retries: int,
                 netload=netload_target is not None,
                 total_requests=total_requests, result_queue=result_queue,
                 num_workers=parallel, status_period=status_period,
-                rest_data_handler=rest_data_handler, err_dir=err_dir)
+                rest_data_handler=rest_data_handler, err_dir=err_dir,
+                rate_print_sec=rate_print_sec)
         results_processor.process()
         for worker in workers:
             worker.join()
@@ -1925,7 +2054,6 @@ def get_afc_config(cfg: Config, args: Any,
         return json.loads(afc_config_str)
     except json.JSONDecodeError as ex:
         error(f"Error decoding AFC Config JSON: {repr(ex)}")
-        return {}  # Unreachable code to appease pylint
 
 
 def patch_json(patch_arg: Optional[List[str]], json_dict: Dict[str, Any],
@@ -2070,11 +2198,13 @@ def do_preload(cfg: Config, args: Any) -> None:
 
     run(rest_data_handler=PreloadRestDataHandler(
             cfg=cfg, afc_config=afc_config,
-            req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
+            req_msg_pattern=patch_req(cfg=cfg, args_req=args.req),
+            csv_log=args.log),
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
         timeout=args.timeout, retries=args.retries, dry=args.dry,
         batch=args.batch, min_idx=min_idx, max_idx=max_idx,
-        status_period=args.status_period, use_requests=args.no_reconnect)
+        status_period=args.status_period, use_requests=args.no_reconnect,
+        rate_print_sec=args.rate_print_sec)
 
     if not args.dry:
         wait_rcache_flush(cfg=cfg, args=args,
@@ -2115,10 +2245,12 @@ def do_load(cfg: Config, args: Any) -> None:
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
         timeout=args.timeout, retries=args.retries, dry=args.dry,
         batch=args.batch, min_idx=min_idx, max_idx=max_idx,
-        status_period=args.status_period, count=args.count,
-        use_requests=args.no_reconnect, err_dir=args.err_dir,
-        ramp_up=args.ramp_up, randomize=args.random,
-        population_db=args.population)
+        status_period=args.status_period,
+        count=None if args.all else args.count, use_requests=args.no_reconnect,
+        err_dir=args.err_dir, ramp_up=args.ramp_up, randomize=args.random,
+        population_db=args.population, rate_print_sec=args.rate_print_sec,
+        client_cert=args.client_cert, client_key=args.client_key,
+        ca_cert=args.ca_cert, verify_server=args.verify_server)
 
 
 def do_netload(cfg: Config, args: Any) -> None:
@@ -2150,9 +2282,10 @@ def do_netload(cfg: Config, args: Any) -> None:
             expected_code = cfg.rest_api.rcache_get.get("code")
         elif args.target == "msghnd":
             worker_url = \
-                service_discovery.get_url(base_url=cfg.rest_api.msghnd_get.url,
-                                          param_host=args.afc)
-            expected_code = cfg.rest_api.msghnd_get.get("code")
+                service_discovery.get_url(
+                    base_url=cfg.rest_api.afcserver_get.url,
+                    param_host=args.afc)
+            expected_code = cfg.rest_api.afcserver_get.get("code")
         else:
             assert args.target == "dispatcher"
             worker_url = \
@@ -2166,8 +2299,11 @@ def do_netload(cfg: Config, args: Any) -> None:
     run(netload_target=args.target, url=worker_url,
         parallel=args.parallel, backoff=args.backoff, timeout=args.timeout,
         retries=args.retries, dry=args.dry, batch=1000,
-        expected_code=expected_code, status_period=args.status_period,
-        count=args.count, use_requests=args.no_reconnect)
+        expected_code=args.code if args.code is not None else expected_code,
+        status_period=args.status_period, count=args.count,
+        use_requests=args.no_reconnect, rate_print_sec=args.rate_print_sec,
+        client_cert=args.client_cert, client_key=args.client_key,
+        ca_cert=args.ca_cert, verify_server=args.verify_server)
 
 
 def do_cache(cfg: Config, args: Any) -> None:
@@ -2299,6 +2435,9 @@ def main(argv: List[str]) -> None:
         help=f"How often to print status information. Default is once in "
         f"{cfg.defaults.status_period} requests. 0 means no status print")
     switches_common.add_argument(
+        "--rate_print_sec", metavar="SECONDS", type=float,
+        help="Print cacurrent rate every this number pf seconds")
+    switches_common.add_argument(
         "--no_reconnect", action="store_true",
         help="Do not reconnect on each request (requires 'requests' Python3 "
         "library to be installed: 'pip install requests'")
@@ -2339,6 +2478,23 @@ def main(argv: List[str]) -> None:
         "or https port of the dispatcher. If neither --afc nor --dispatcher "
         "specified, AFC Requests are sent directly to msghnd (to avoid https "
         "issues on dispatcher")
+    switches_afc.add_argument(
+        "--verify_server", action="store_true",
+        help="Verify HTTPS server identity")
+    switches_afc.add_argument(
+        "--client_cert", metavar="CLIENT_CERT_OR_PEM_FILE",
+        help="Client certificate for mTLS authentication. May be .cert file "
+        "(containing certificate only) or .pem file (containing certificate "
+        "and private key). In former case --client_key parameter should also "
+        "be provided")
+    switches_afc.add_argument(
+        "--client_key", metavar="CLIENT_PRIVATE_KEY_FILE",
+        help="Client private key file thatr accompanies mTLS certificcate "
+        "file. Not needed if .pem certificate is used")
+    switches_afc.add_argument(
+        "--ca_cert", metavar="CA_CERT_PEM_FILE",
+        help="CA (certidication authority) certificate file to use if server "
+        "uses self-signed certificate")
 
     switches_k3d = argparse.ArgumentParser(add_help=False)
     switches_k3d.add_argument(
@@ -2394,6 +2550,10 @@ def main(argv: List[str]) -> None:
         help="Protect Rcache from invalidation (e.g. by ULS downloader). "
         "Protection persists in rcache database, see 'rcache' subcommand on "
         "how to unprotect")
+    parser_preload.add_argument(
+        "--log", metavar="CSV_FILE",
+        help="Print hash, config request and response to CSV file (internal "
+        "debugging)")
     parser_preload.set_defaults(func=do_preload)
 
     parser_load = subparsers.add_parser(
@@ -2404,6 +2564,10 @@ def main(argv: List[str]) -> None:
     parser_load.add_argument(
         "--no_cache", action="store_true",
         help="Don't use rcache, force each request to be computed")
+    parser_load.add_argument(
+        "--all", action="store_true",
+        help="Compute for each index value one time (sequentially). May be "
+        "used for cache preloading when internal containers unavailable")
     parser_load.add_argument(
         "--debug", action="store_true",
         help="Run AFC engine in debug mode")
@@ -2426,17 +2590,20 @@ def main(argv: List[str]) -> None:
         "all at once")
     parser_load.set_defaults(func=do_load)
 
-    parser_network = subparsers.add_parser(
+    parser_netload = subparsers.add_parser(
         "netload",
         parents=[switches_common, switches_count, switches_compose,
                  switches_afc, switches_rcache, switches_k3d],
         help="Network load test by repeatedly querying health endpoints")
-    parser_network.add_argument(
+    parser_netload.add_argument(
         "--target", choices=["dispatcher", "msghnd", "rcache"],
         help="What to test. If omitted then guess is attempted: 'dispatcher' "
         "if --dispatcher specified, 'msghnd' if --afc without --dispatcher is "
         "specified, 'rcache' if --rcache is specified")
-    parser_network.set_defaults(func=do_netload)
+    parser_netload.add_argument(
+        "--code", metavar="HTTP_CODE", type=int,
+        help="Expected HTTP result code. Default is take it from config file")
+    parser_netload.set_defaults(func=do_netload)
 
     parser_cache = subparsers.add_parser(
         "cache", parents=[switches_compose, switches_rcache, switches_k3d],

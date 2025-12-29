@@ -169,7 +169,7 @@ class InstallHandler(abc.ABC):
                 if install_wait else None
             if not self._preinstall_impl():
                 continue
-            for cmd in getattr(self._component, "preinstall", []):
+            for cmd in (getattr(self._component, "preinstall", None) or []):
                 result = execute(cmd.lstrip("-"), fail_on_error=False)
                 if (not result) and (not cmd.startswith("-")):
                     continue
@@ -179,7 +179,7 @@ class InstallHandler(abc.ABC):
                         self._cluster_context.kubectl_args())
             if not self._install_impl():
                 continue
-            for cmd in getattr(self._component, "postinstall", []):
+            for cmd in (getattr(self._component, "postinstall", None) or []):
                 result = execute(cmd.lstrip("-"), fail_on_error=False)
                 if (not result) and (not cmd.startswith("-")):
                     continue
@@ -199,7 +199,7 @@ class InstallHandler(abc.ABC):
                     self._cluster_context.kubectl_args() +
                     self._kubectl_uninstall_wait_args(),
                     fail_on_error=False)
-        for cmd in getattr(self._component, "postuninstall", []):
+        for cmd in (getattr(self._component, "postuninstall", None) or []):
             execute(cmd.lstrip("-"), fail_on_error=False)
 
     def _namespace_exists(self) -> bool:
@@ -244,6 +244,7 @@ class InstallHandler(abc.ABC):
                     all(cs.get("ready") for cs in
                         pod_infos[0].get("status", {}).
                         get("containerStatuses", [])):
+                time.sleep(10)
                 break
             time.sleep(10)
         return True
@@ -375,12 +376,14 @@ class HelmInstallHandler(InstallHandler):
             filter_args("--version",
                         getattr(self._component, "helm_version", None)) + \
             self._cluster_context.helm_args(namespace=self._namespace)
-        for helm_values in getattr(self._component, "helm_values", []):
+        for helm_values in \
+                (getattr(self._component, "helm_values", None) or []):
             helm_args += \
                 ["--values", expand_filename(helm_values, root=SCRIPTS_DIR)]
-        for helm_setting in getattr(self._component, "helm_settings", []):
+        for helm_setting in \
+                (getattr(self._component, "helm_settings", None) or []):
             helm_args += ["--set", helm_setting]
-        helm_args += getattr(self._component, "args", []) + \
+        helm_args += (getattr(self._component, "args", None) or []) + \
             Duration(getattr(self._component, "helm_wait", None)).\
             helm_timeout()
         return cast(bool, execute(helm_args, fail_on_error=False))

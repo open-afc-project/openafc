@@ -1,0 +1,33 @@
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# FS (ULS) downloader state data source
+---
+apiVersion: 1
+
+{% if GRAFANA_COMPOSE_PROJECT_NAME is defined -%}
+deleteDatasources:
+  - name: Docker
+
+datasources:
+  - access: proxy
+    apiVersion: ''
+    basicAuth: false
+    basicAuthUser: ''
+    database: ''
+    isDefault: false
+    jsonData:
+      global_queries: []
+    name: Docker
+    orgId: 1
+    readOnly: false
+    secureJsonFields: {}
+    type: yesoreyeram-infinity-datasource
+    typeLogoUrl: public/plugins/yesoreyeram-infinity-datasource/img/icon.svg
+    url: http://localhost:{{ GRAFANA_DOCKER_SOCKET_PORT }}
+    user: ''
+    version: 4
+    withCredentials: false
+{% endif %}

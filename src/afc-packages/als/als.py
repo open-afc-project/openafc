@@ -19,7 +19,8 @@ html/index.html#kafka-client-configuration
 """
 
 # pylint: disable=invalid-name, too-many-arguments, global-statement
-# pylint: disable=broad-exception-caught
+# pylint: disable=broad-exception-caught, too-many-positional-arguments
+# pylint: disable=global-variable-not-assigned
 
 import collections
 import datetime
@@ -39,8 +40,6 @@ try:
 except ImportError as exc:
     import_failure = repr(exc)
 
-# Topic name for AFC request/response logging
-ALS_TOPIC = "ALS"
 # AFC Config/Request/Response logging record format version
 ALS_FORMAT_VERSION = "1.0"
 # Data type value for AFC Config record
@@ -49,6 +48,16 @@ ALS_DT_CONFIG = "AFC_CONFIG"
 ALS_DT_REQUEST = "AFC_REQUEST"
 # Data type value for AFC Response record
 ALS_DT_RESPONSE = "AFC_RESPONSE"
+
+# Environment variable containing name of ALS topic in Kafka
+AFC_ALS_TOPIC_NAME_ENV = "AFC_ALS_TOPIC_NAME"
+# Default ALS topic name in Kafka
+DEFAULT_ALS_TOPIC_NAME = "ALS"
+
+# Environment variable containing prefix foe JSON log topicsin Kafka
+AFC_JSON_TOPIC_PREFIX_ENV = "AFC_JSON_TOPIC_PREFIX"
+# Default JSON log topic name prefix in Kafka
+DEFAULT_JSON_TOPIC_PREFIX = ""
 
 # Version field of AFC Config/Request/Response record
 ALS_FIELD_VERSION = "version"
@@ -68,6 +77,12 @@ ALS_FIELD_GEO_DATA = "geoDataVersion"
 ALS_FIELD_ULS_ID = "ulsId"
 # Request indices field of AFC Config/Request/Response record
 ALS_FIELD_REQ_INDICES = "requestIndexes"
+# mTLS DN field of AFC Request record
+ALS_FIELD_MTLS_DN = "mtlsDn"
+# AP IP field of AFC Request record
+ALS_FIELD_AP_IP = "apIp"
+# Runtime Options field of AFC Request record
+ALS_FIELD_RUNTIME_OPT = "runtimeOpt"
 
 # JSON log record format version
 JSON_LOG_VERSION = "1.0"
@@ -88,7 +103,7 @@ POLL_PERIOD = 100
 # Delay between connection attempts
 CONNECT_ATTEMPT_INTERVAL = datetime.timedelta(seconds=10)
 
-# Regular expression for topic name check (Postgre requirement to table names)
+# Regular expression for topic name check (Postgres requirement to table names)
 TOPIC_NAME_REGEX = re.compile(r"^[_a-zA-Z][0-9a-zA-Z_]{,62}$")
 
 # Maximum um message size (default maximum of 1MB is way too small for GUI AFC
@@ -234,21 +249,23 @@ class Als:
     """ Kafka client for ALS and JSON logs
 
     Private attributes:
-    _server_id       -- Unique AFC server identity string. Computed by
-                        appending random suffix to 'client_id' constructor
-                        parameter or (if not specified) to ALS_KAFKA_CLIENT_ID
-                        environment variable value or (if not specified) to
-                        "Unknown"
-    _producer_kwargs -- Dictionary of parameters for KafkaProducer(). None if
-                        parameters are invalid
-    _producer        -- KafkaProducer. None if initialization was not
-                        successful (yet?)
-    _config_cache    -- None (if configs are not consolidated) or two-level
-                        dictionary req_id->
-                        (config, customer, geo_version, uls_id)->
-                        request_indices
-    _req_idx         -- Request message index
-    _send_count      -- Number of sent records
+    _server_id         -- Unique AFC server identity string. Computed by
+                          appending random suffix to 'client_id' constructor
+                          parameter or (if not specified) to
+                          ALS_KAFKA_CLIENT_ID environment variable value or
+                          (if not specified) to "Unknown"
+    _producer_kwargs   -- Dictionary of parameters for KafkaProducer(). None if
+                          parameters are invalid
+    _producer          -- KafkaProducer. None if initialization was not
+                          successful (yet?)
+    _config_cache      -- None (if configs are not consolidated) or two-level
+                          dictionary req_id->
+                          (config, customer, geo_version, uls_id)->
+                          request_indices
+    _req_idx           -- Request message index
+    _send_count        -- Number of sent records
+    _als_topic_name    -- ALS topic name
+    _json_topic_prefix -- JSON topic name prefix
     """
 
     def __init__(self, client_id: Optional[str] = None,
@@ -270,6 +287,10 @@ class Als:
             {} if consolidate_configs else None
         self._req_idx = 0
         self._lock = threading.Lock()
+        self._als_topic_name = os.environ.get(AFC_ALS_TOPIC_NAME_ENV,
+                                              DEFAULT_ALS_TOPIC_NAME)
+        self._json_topic_prefix = os.environ.get(AFC_JSON_TOPIC_PREFIX_ENV,
+                                                 DEFAULT_JSON_TOPIC_PREFIX)
         kwargs: Dict[str, Any] = {}
         has_parameters = True
         for argdsc in arg_dscs:
@@ -320,19 +341,32 @@ class Als:
             self._req_idx += 1
             return str(self._req_idx)
 
-    def afc_request(self, req_id: str, req: Dict[str, Any]) -> None:
+    def afc_request(self, req_id: str, req: Dict[str, Any],
+                    mtls_dn: Optional[str] = None, ap_ip: Optional[str] = None,
+                    runtime_opt: Optional[int] = None) -> None:
         """ Send AFC Request
 
         Arguments:
-        req_id -- Unique for this Als object instance request ID string (e.g.
-                  returned by req_id())
-        req    -- Request message JSON dictionary
+        req_id      -- Unique for this Als object instance request ID string
+                       (e.g. returned by req_id())
+        req         -- Request message JSON dictionary
+        mtls_dn     -- DN of client mTLS certificate or None
+        ap_ip       -- AP (Request sender) IP as string or None
+        runtime_opt -- Runtime options (Numerical representation of request
+                       flags) or None
         """
         if self._producer is None:
             return
+        extra_fields = \
+            {k: v for k, v in [
+                (ALS_FIELD_MTLS_DN, mtls_dn),
+                (ALS_FIELD_AP_IP, ap_ip),
+                (ALS_FIELD_RUNTIME_OPT, runtime_opt)]
+             if v is not None}
         self._send(
-            topic=ALS_TOPIC, key=self._als_key(req_id),
-            value=self._als_value(data_type=ALS_DT_REQUEST, data=req))
+            topic=self._als_topic_name, key=self._als_key(req_id),
+            value=self._als_value(data_type=ALS_DT_REQUEST, data=req,
+                                  extra_fields=extra_fields))
 
     def afc_response(self, req_id: str, resp: Dict[str, Any]) -> None:
         """ Send AFC Response
@@ -346,7 +380,7 @@ class Als:
             return
         self._flush_afc_configs(req_id)
         self._send(
-            topic=ALS_TOPIC, key=self._als_key(req_id),
+            topic=self._als_topic_name, key=self._als_key(req_id),
             value=self._als_value(data_type=ALS_DT_RESPONSE, data=resp))
 
     def afc_config(self, req_id: str, config_text: str, customer: str,
@@ -390,8 +424,9 @@ class Als:
         """
         if self._producer is None:
             return
-        assert topic != ALS_TOPIC
+        topic = self._json_topic_prefix + topic
         assert TOPIC_NAME_REGEX.match(topic)
+        assert topic != self._als_topic_name
         json_dict = \
             collections.OrderedDict(
                 [(JSON_LOG_FIELD_VERSION, JSON_LOG_VERSION),
@@ -455,7 +490,7 @@ class Als:
         if req_indices:
             extra_fields[ALS_FIELD_REQ_INDICES] = req_indices
         self._send(
-            topic=ALS_TOPIC, key=self._als_key(req_id),
+            topic=self._als_topic_name, key=self._als_key(req_id),
             value=self._als_value(data_type=ALS_DT_CONFIG, data=config_text,
                                   extra_fields=extra_fields))
 
@@ -489,7 +524,7 @@ class Als:
         data         -- Data - string or JSON dictionary
         extra_fields -- None or dictionary of message-type-specific fields
         """
-        json_dict = \
+        json_dict: Dict[str, Any] = \
             collections.OrderedDict(
                 [(ALS_FIELD_VERSION, ALS_FORMAT_VERSION),
                  (ALS_FIELD_SERVER_ID, self._server_id),
@@ -545,15 +580,22 @@ def als_afc_req_id() -> Optional[str]:
     return _als_instance.afc_req_id() if _als_instance is not None else None
 
 
-def als_afc_request(req_id: str, req: Dict[str, Any]) -> None:
+def als_afc_request(req_id: str, req: Dict[str, Any],
+                    mtls_dn: Optional[str] = None, ap_ip: Optional[str] = None,
+                    runtime_opt: Optional[int] = None) -> None:
     """ Send AFC Request
 
     Arguments:
-    req_id -- Unique (on at least server level) request ID string
-    req    -- Request message JSON dictionary
+    req_id      -- Unique (on at least server level) request ID string
+    req         -- Request message JSON dictionary
+    mtls_dn     -- DN of client mTLS certificate or None
+    ap_ip       -- AP (Request sender) IP as string or None
+    runtime_opt -- Runtime options (Numerical representation of request flags)
+                   or None
     """
     if (_als_instance is not None) and (req_id is not None):
-        _als_instance.afc_request(req_id, req)
+        _als_instance.afc_request(req_id=req_id, req=req, mtls_dn=mtls_dn,
+                                  ap_ip=ap_ip, runtime_opt=runtime_opt)
 
 
 def als_afc_response(req_id: str, resp: Dict[str, Any]) -> None:
@@ -599,7 +641,7 @@ def als_json_log(topic: str, record: Any):
         _als_instance.json_log(topic, record)
 
 
-def als_flush(timeout_sec: float = 2) -> bool:
+def als_flush(timeout_sec: float = 10) -> bool:
     """ Flush pending messages (if any)
 
     Usually it is not needed, but if last log ALS/JSON write was made

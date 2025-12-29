@@ -12,12 +12,12 @@
 import fastapi
 import logging
 import uvicorn
-import sys
 from typing import Annotated, Optional
 
 from log_utils import dp, get_module_logger, set_dp_printer, set_parent_logger
-from rcache_models import IfDbExists, RcacheServiceSettings, RcacheUpdateReq, \
-    RcacheInvalidateReq, RcacheSpatialInvalidateReq, RcacheStatus
+from rcache_models import IfDbExists, RcacheDirectionalInvalidateReq, \
+    RcacheServiceSettings, RcacheUpdateReq, RcacheInvalidateReq, \
+    RcacheSpatialInvalidateReq, RcacheStatus
 from rcache_service import RcacheService
 
 __all__ = ["app"]
@@ -50,7 +50,8 @@ def get_service() -> RcacheService:
                 precompute_quota=settings.precompute_quota,
                 afc_req_url=settings.afc_req_url,
                 rulesets_url=settings.rulesets_url,
-                config_retrieval_url=settings.config_retrieval_url)
+                config_retrieval_url=settings.config_retrieval_url,
+                keyhole_template_file=settings.keyhole_template)
     return rcache_service
 
 
@@ -66,13 +67,11 @@ async def startup() -> None:
     if not settings.enabled:
         return
     service = get_service()
-    if not service.check_db_server():
-        LOGGER.error("Can't connect to postgres database server")
-        sys.exit()
     await service.connect_db(
-        create_if_absent=True,
-        recreate_db=settings.if_db_exists == IfDbExists.recreate,
-        recreate_tables=settings.if_db_exists == IfDbExists.clean)
+        db_creator_url=settings.db_creator_url,
+        alembic_config=settings.alembic_config,
+        alembic_initial_version=settings.alembic_initial_version,
+        alembic_head_version=settings.alembic_head_version)
 
 
 @app.on_event("shutdown")
@@ -106,6 +105,19 @@ async def spatial_invalidate(
         service: RcacheService = fastapi.Depends(get_service)) -> None:
     """ Spatial invalidate request handler """
     service.invalidate(spatial_invalidate_req)
+
+
+@app.post("/directional_invalidate")
+async def spatial_invalidate(
+        directional_invalidate_req: RcacheDirectionalInvalidateReq,
+        service: RcacheService = fastapi.Depends(get_service)) -> None:
+    """ Spatial invalidate request handler """
+    if not service.directional_invalidation_supported():
+        raise fastapi.HTTPException(
+            status_code=fastapi.status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Directional invalidation not configured on rcache server "
+            "(keyhole shape file not set)")
+    service.invalidate(directional_invalidate_req)
 
 
 @app.post("/update")

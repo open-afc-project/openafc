@@ -4,5 +4,5 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 /wd/afc-packages/rcache
-/wd/afc-packages/secret_utils
+/wd/afc-packages/db_utils
 /wd/afc-packages/als

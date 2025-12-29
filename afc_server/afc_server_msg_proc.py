@@ -9,9 +9,11 @@
 # pylint: disable=wrong-import-order, too-many-arguments
 # pylint: disable=too-few-public-methods, too-many-branches, too-many-locals
 # pylint: disable=broad-exception-caught, too-many-statements
-# pylint: disable=consider-using-from-import
+# pylint: disable=consider-using-from-import, too-many-positional-arguments
+# pylint: disable=too-many-nested-blocks
 
 import asyncio
+import copy
 import datetime
 import json
 import os
@@ -27,9 +29,11 @@ import afc_server_compute
 import afc_server_db
 from afc_server_models import OpenAfcUsedDataVendorExtParams, \
     Rest_AvailableSpectrumInquiryRequest_1_4, \
-    Rest_AvailableSpectrumInquiryResponseMinGen, Rest_ReqMsg, \
+    Rest_AvailableSpectrumInquiryResponseMinGen, \
+    Rest_AvailableSpectrumInquiryResponseMinParse, Rest_ReqMsg, \
     Rest_ReqMsg_1_4, Rest_RespMsg_1_4, Rest_Response, Rest_ResponseCode, \
-    Rest_SupplementalInfo, Rest_SupportedVersions
+    Rest_SupplementalInfo, Rest_SupportedVersions, Rest_VendorExtension
+import afc_traffic_metrics
 import als
 import defs
 from log_utils import dp, get_module_logger
@@ -45,13 +49,15 @@ class AfcServerMessageProcessor:
     """ Processor of AFC Request messages
 
     Private attributes:
-    _db                         -- DB Accessor
-    _compute                    -- AFC Engine computer
-    _request_timeout_sec        -- Timeout for normal request computation in
-                                   seconds
-    _edebug_request_timeout_sec -- Timeout for EDEBUG request computation in
-                                   seconds
-    _config_dispenser           -- AfcConfigDispenser object
+    _db                          -- DB Accessor
+    _compute                     -- AFC Engine computer
+    _request_timeout_sec         -- Timeout for normal request computation in
+                                    seconds
+    _edebug_request_timeout_sec  -- Timeout for EDEBUG request computation in
+                                    seconds
+    _config_dispenser            -- AfcConfigDispenser object
+    _afc_state_vendor_extensions -- List of vendor extensions from response
+                                    to send to AFC Engine
     """
 
     class AfcConfigDispenser:
@@ -114,18 +120,22 @@ class AfcServerMessageProcessor:
                  compute: afc_server_compute.AfcServerCompute,
                  request_timeout_sec: float,
                  edebug_request_timeout_sec: float,
-                 config_refresh_sec: float) -> None:
+                 config_refresh_sec: float,
+                 afc_state_vendor_extensions: Optional[List[str]]) -> None:
         """ Constructor
 
         Arguments:
-        db                         -- DB Accessor
-        compute                    -- AFC Engine computer
-        request_timeout_sec        -- Timeout for normal request computation in
-                                      seconds
-        edebug_request_timeout_sec -- Timeout for EDEBUG request computation in
-                                      seconds
-        config_refresh_sec         -- AFC Config refresh interval in seconds
+        db                          -- DB Accessor
+        compute                     -- AFC Engine computer
+        request_timeout_sec         -- Timeout for normal request computation
+                                       in seconds
+        edebug_request_timeout_sec  -- Timeout for EDEBUG request computation
+                                       in seconds
+        config_refresh_sec          -- AFC Config refresh interval in seconds
+        afc_state_vendor_extensions -- List of vendor extensions from response
+                                       to send to AFC Engine
         """
+        als.als_initialize(client_id="afc_server")
         self._db = db
         self._compute = compute
         self._request_timeout_sec = request_timeout_sec
@@ -133,6 +143,7 @@ class AfcServerMessageProcessor:
         self._config_dispenser = \
             AfcServerMessageProcessor.AfcConfigDispenser(
                 db=self._db, config_refresh_sec=config_refresh_sec)
+        self._afc_state_vendor_extensions = afc_state_vendor_extensions
 
     async def close(self) -> None:
         """ Gracefully close """
@@ -141,6 +152,7 @@ class AfcServerMessageProcessor:
 
     async def process_msg(self, req_msg: Rest_ReqMsg, debug: bool,
                           edebug: bool, nocache: bool, gui: bool,
+                          mtls_dn: Optional[str], ap_ip: Optional[str],
                           internal: bool) \
             -> Dict[str, Any]:
         """ Process AFC Request message
@@ -151,36 +163,56 @@ class AfcServerMessageProcessor:
         edebug   -- True if 'edebug' flag was set in URL
         nocache  -- True if 'nocache' flag was set in URL
         gui      -- True if 'gui' flag was set in URL
+        mtls_dn  -- DN of client's MTLS certificate or None
+        ap_ip    -- AFC Request source IP or None
         internal -- True if request message came from within the cluster
         Returns AFC Response message in dictionary form
         """
+        start_time = time.time()
+        runtime_opt = 0
+        for predicate, flag in \
+                [(debug, defs.RNTM_OPT_DBG),
+                 (edebug, defs.RNTM_OPT_SLOW_DBG),
+                 (nocache, defs.RNTM_OPT_NOCACHE),
+                 (gui, defs.RNTM_OPT_GUI)]:
+            if predicate:
+                runtime_opt |= flag
+
         req_msg_dict = req_msg.dict(exclude_none=True)
         als_req_id = als.als_afc_req_id()
-        als.als_afc_request(req_id=als_req_id, req=req_msg_dict)
-        deadline = time.time() + \
+        als.als_afc_request(
+            req_id=als_req_id, mtls_dn=mtls_dn, req=req_msg_dict,
+            ap_ip=ap_ip, runtime_opt=runtime_opt)
+        deadline = start_time + \
             (self._edebug_request_timeout_sec if edebug
              else self._request_timeout_sec)
+        ret: Dict[str, Any]
         # Message format version acceptable?
         if req_msg.version not in Rest_SupportedVersions:
-            return \
+            ret = \
                 self._make_response_msg(
                     response_info=self._make_response_info(
-                        response_code=Rest_ResponseCode.VERSION_NOT_SUPPORTED),
+                        response_code=Rest_ResponseCode.
+                        VERSION_NOT_SUPPORTED),
                     req_msg_dict=req_msg_dict)
-        ret = \
-            (await self._process_msg_internal(
-                req_msg_dict=req_msg_dict, debug=debug, edebug=edebug,
-                nocache=nocache, gui=gui, internal=internal,
-                als_req_id=als_req_id, deadline=deadline))
-        self._drop_unwanted_extensions(
-            msg_dict=ret, is_input=False, is_gui=gui, is_internal=internal)
+        else:
+            ret = \
+                (await self._process_msg_internal(
+                    req_msg_dict=req_msg_dict, debug=debug, edebug=edebug,
+                    nocache=nocache, gui=gui, runtime_opt=runtime_opt,
+                    internal=internal, als_req_id=als_req_id,
+                    start_time=start_time, deadline=deadline))
+            self._drop_unwanted_extensions(
+                msg_dict=ret, is_input=False, is_gui=gui,
+                is_internal=internal)
         als.als_afc_response(req_id=als_req_id, resp=ret)
         return ret
 
     async def _process_msg_internal(
             self, req_msg_dict: Dict[str, Any], debug: bool, edebug: bool,
-            nocache: bool, gui: bool, internal: bool, als_req_id: int,
-            deadline: float) -> Dict[str, Any]:
+            nocache: bool, gui: bool, runtime_opt: int, internal: bool,
+            als_req_id: int, start_time: float,  deadline: float) \
+            -> Dict[str, Any]:
         """ Internal implementation of Request message processing
 
         Arguments:
@@ -189,17 +221,13 @@ class AfcServerMessageProcessor:
         edebug        -- True if 'edebug' flag was set in URL
         nocache       -- True if 'nocache' flag was set in URL
         gui           -- True if 'gui' flag was set in URL
+        runtime_opt   -- Runtime options, derived from AFC message parameters
         internal      -- True if request message came from within the cluster
         als_req_id    -- Request id to use in subsequent ALS writes
+        start_time    -- Request processing start time in seconds since Epoch
         deadline      -- Message processing deadline in seconds since the Epoch
         Returns AFC Response message in dictionary form
         """
-        # Too late?
-        if time.time() >= deadline:
-            return \
-                self._make_response_msg(
-                    response_info=self._make_response_info(ex=TimeoutError()),
-                    req_msg_dict=req_msg_dict)
         # Top-level format acceptable? Individual requests checked separately
         try:
             Rest_ReqMsg_1_4.validate(req_msg_dict)
@@ -208,6 +236,16 @@ class AfcServerMessageProcessor:
                 response_info=self._make_response_info(
                     ex=ex, validated_dict=req_msg_dict),
                 req_msg_dict=req_msg_dict)
+        # Too late?
+        if time.time() >= deadline:
+            afc_traffic_metrics.request_processed(
+                duration_sec=time.time() - start_time,
+                response="NotComputed",
+                n=len(req_msg_dict["availableSpectrumInquiryRequests"]))
+            return \
+                self._make_response_msg(
+                    response_info=self._make_response_info(ex=TimeoutError()),
+                    req_msg_dict=req_msg_dict)
         # Remove unacceptable Vendor Extensions
         self._drop_unwanted_extensions(
             msg_dict=req_msg_dict, is_input=True, is_gui=gui,
@@ -222,18 +260,21 @@ class AfcServerMessageProcessor:
                     req_tg.create_task(
                         self._process_req(
                             req_dict=req_dict, debug=debug, edebug=edebug,
-                            nocache=nocache, gui=gui, als_req_id=als_req_id,
-                            req_idx=req_idx, deadline=deadline)))
-        # Make result form individual responses
+                            nocache=nocache, gui=gui, runtime_opt=runtime_opt,
+                            internal=internal, als_req_id=als_req_id,
+                            req_idx=req_idx, start_time=start_time,
+                            deadline=deadline)))
+        # Make result from individual responses
         return \
             self._make_response_msg(
                 responses=[task.result() for task in req_tasks],
                 req_msg_dict=req_msg_dict)
 
-    async def _process_req(self, req_dict: Dict[str, Any], debug: bool,
-                           edebug: bool, nocache: bool, gui: bool,
-                           als_req_id: int, req_idx: int, deadline: float) \
-            -> Dict[str, Any]:
+    async def _process_req(
+            self, req_dict: Dict[str, Any], debug: bool, edebug: bool,
+            nocache: bool, gui: bool, runtime_opt: int, internal: bool,
+            als_req_id: int, req_idx: int, start_time: float,
+            deadline: float) -> Dict[str, Any]:
         """ Process individual AFC request
 
         Arguments:
@@ -242,8 +283,11 @@ class AfcServerMessageProcessor:
         edebug        -- True if 'edebug' flag was set in URL
         nocache       -- True if 'nocache' flag was set in URL
         gui           -- True if 'gui' flag was set in URL
+        runtime_opt   -- Runtime options, derived from AFC message parameters
+        internal      -- True if request message came from within the cluster
         als_req_id    -- Request id to use in subsequent ALS writes
         req_idx       -- Request index inside AFC Request message
+        start_time    -- Request processing start time in seconds since Epoch
         deadline      -- Message processing deadline in seconds since the Epoch
         Returns AFC Response in dictionary form
         """
@@ -252,6 +296,12 @@ class AfcServerMessageProcessor:
         err_ruleset_name = "Unknown"
         # Dictionary that, possibly, caused Pydantic validation error
         validated_dict: Optional[Dict[str, Any]] = None
+        ret: Optional[Dict[str, Any]] = None
+        # True if computation was not performed due to deadline or AFC Engine
+        # misbehavior
+        not_computed = False
+        # True if unexpected exception happened
+        exception = False
         try:
             try:
                 err_ruleset_name = \
@@ -265,19 +315,20 @@ class AfcServerMessageProcessor:
             validated_dict = None
 
             # Find allowed certifications
+            cert_req = afc_server_db.AfcCertReq(req.deviceDescriptor)
             cert_info = \
-                await self._db.get_cert_info(
-                    afc_server_db.AfcCertReq(req.deviceDescriptor),
-                    deadline=deadline)
+                afc_server_db.AfcCertResp(bypass_checks=cert_req) if internal \
+                else await self._db.get_cert_info(cert_req, deadline=deadline)
             allowed_certifications = cert_info.allowed_cert_resps()
             if not allowed_certifications:
                 # Bail if none allowed
-                return \
+                ret = \
                     self._make_failed_response(
                         request_id=req.requestId, ruleset_id=err_ruleset_name,
                         response_info=self._make_response_info(
                             response_code=Rest_ResponseCode.DEVICE_DISALLOWED,
                             description=cert_info.deny_reason()))
+                return ret
             err_ruleset_name = allowed_certifications[0].ruleset_name
 
             # Find AFC Config for some allowed certification
@@ -293,13 +344,14 @@ class AfcServerMessageProcessor:
                     break
             else:
                 # Bail if no AFC Configs found
-                return \
+                ret = \
                     self._make_failed_response(
                         request_id=req.requestId, ruleset_id=err_ruleset_name,
                         response_info=self._make_response_info(
                             response_code=Rest_ResponseCode.DEVICE_DISALLOWED,
                             description="No AFC Config found for presented "
                             "Ruleset IDs"))
+                return ret
             assert afc_config_dict is not None
             assert cert_resp is not None
 
@@ -320,16 +372,16 @@ class AfcServerMessageProcessor:
                     req_dict=req_dict, afc_config_dict=afc_config_dict)
 
             # Do the rcache lookup
-            ret: Optional[Dict[str, Any]] = None
-            resp_str: Optional[str]
+            rcache_resp: Optional[afc_server_db.AfcRcacheResp] = None
             if not (nocache or debug or edebug or gui):
-                resp_str = \
+                rcache_resp = \
                     await self._db.lookup_rcache(
                         req_cfg_digest=rcc.req_cfg_hash, deadline=deadline)
-                if resp_str is not None:
+                if rcache_resp.found:
+                    assert rcache_resp.response is not None
                     try:
                         ret = \
-                            Rest_RespMsg_1_4.parse_raw(resp_str).\
+                            Rest_RespMsg_1_4.parse_raw(rcache_resp.response).\
                             availableSpectrumInquiryResponses[0].\
                             dict(exclude_none=True)
                     except pydantic.ValidationError:
@@ -337,31 +389,56 @@ class AfcServerMessageProcessor:
 
             # If no results from cache - invoke AFC Engine
             if ret is None:
-                runtime_opts = 0
-                for predicate, flag in \
-                        [(cert_resp.location_flags &
-                          hardcoded_relations.CERT_ID_LOCATION_INDOOR,
-                          defs.RNTM_OPT_CERT_ID),
-                         (debug, defs.RNTM_OPT_DBG),
-                         (edebug, defs.RNTM_OPT_SLOW_DBG),
-                         (gui, defs.RNTM_OPT_GUI)]:
-                    if predicate:
-                        runtime_opts |= flag
+                if cert_resp.location_flags & \
+                        hardcoded_relations.CERT_ID_LOCATION_INDOOR:
+                    runtime_opt |= defs.RNTM_OPT_CERT_ID
+                # Dictionary of original AFC Request if any vendor extensions
+                # added to it. Ultimately goes to Rcache as request
+                original_req_dict: Optional[Dict[str, Any]] = None
+                if rcache_resp and rcache_resp.response and \
+                        self._afc_state_vendor_extensions:
+                    try:
+                        prev_response_dict = \
+                            Rest_RespMsg_1_4.parse_raw(rcache_resp.response).\
+                            dict()
+                        for ve in prev_response_dict[
+                                "availableSpectrumInquiryResponses"][0].\
+                                get("vendorExtensions", []):
+                            if ve.get("extensionId") not in \
+                                    self._afc_state_vendor_extensions:
+                                continue
+                            if original_req_dict is None:
+                                original_req_dict = copy.deepcopy(req_dict)
+                            if "vendorExtensions" not in req_dict:
+                                req_dict["vendorExtensions"] = []
+                            req_dict["vendorExtensions"].append(ve)
+                    except pydantic.ValidationError:
+                        pass
+                request_str = \
+                    json.dumps(
+                        {"version": Rest_SupportedVersions[-1],
+                         "availableSpectrumInquiryRequests": [req_dict]})
+                original_request_str = \
+                    request_str if original_req_dict is None \
+                    else json.dumps(
+                        {"version": Rest_SupportedVersions[-1],
+                         "availableSpectrumInquiryRequests":
+                         [original_req_dict]})
                 resp_str = \
                     await self._compute.process_request(
-                        request_str=json.dumps(
-                            {"version": Rest_SupportedVersions[-1],
-                             "availableSpectrumInquiryRequests": [req_dict]}),
+                        request_str=request_str,
+                        original_request_str=original_request_str,
                         config_str=rcc.cfg_str,
                         req_cfg_digest=rcc.req_cfg_hash,
-                        runtime_opts=runtime_opts, task_id=task_id,
+                        runtime_opt=runtime_opt, task_id=task_id,
                         history_dir=os.path.join(
                             "/history", req.deviceDescriptor.serialNumber,
                             datetime.datetime.now().isoformat()),
                         deadline=deadline)
                 if not resp_str:
                     # Bail on failure
-                    return \
+                    not_computed = True
+                    ret = \
                         self._make_failed_response(
                             request_id=req.requestId,
                             ruleset_id=err_ruleset_name,
@@ -370,6 +447,7 @@ class AfcServerMessageProcessor:
                                 GENERAL_FAILURE,
                                 description=f"AFC General failure. "
                                 f"Task ID {task_id}"))
+                    return ret
                 ret = \
                     Rest_RespMsg_1_4.parse_raw(resp_str).\
                     availableSpectrumInquiryResponses[0].\
@@ -396,12 +474,22 @@ class AfcServerMessageProcessor:
             ret["requestId"] = req.requestId
             return ret
         except Exception as ex:
-            return \
+            exception = True
+            ret = \
                 self._make_failed_response(
                     request_id=req_dict["requestId"],
                     ruleset_id=err_ruleset_name,
                     response_info=self._make_response_info(
                         ex=ex, validated_dict=validated_dict, task_id=task_id))
+            return ret
+        finally:
+            assert ret is not None
+            afc_traffic_metrics.request_processed(
+                duration_sec=time.time() - start_time,
+                response="Exception" if exception
+                else (
+                    "NotComputed" if not_computed
+                    else ret.get("response", {}).get("responseCode", "Error")))
 
     def _make_response_msg(
             self, req_msg_dict: Dict[str, Any],
@@ -451,7 +539,7 @@ class AfcServerMessageProcessor:
 
         Arguments:
         ex             -- Exception occurred during request processing or None
-        validated_dict -- Dictionary, containing object whose validatin caused
+        validated_dict -- Dictionary, containing object whose validation caused
                           pydantic exception
         task_id        -- Request task id or None
         responses_code -- Response code or None

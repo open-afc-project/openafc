@@ -81,6 +81,10 @@ securityContexts:
 #    in another shared environment block. <IFABSENT> describes what to do if
 #    referred value is absent (see above for values)
 sharedEnv:
+  # Setting AFC_DEVEL_ENV to 'devel' enables certain development options in
+  # certain containers
+  devel-env:
+    AFC_DEVEL_ENV: production
 
 # Dictionary of components. Component roughly corresponds to Docker Compose
 # service. Keys in dictionary are Docker Compose service names, plus there is
@@ -127,8 +131,9 @@ sharedEnv:
 #   staticVolumeMounts Dictionary of mount points of used static
 #           (non-templated, non-secret) volumes, indexed by staticVolumes
 #           dictionary keys
-#   mountedSecrets List of external secret names (keys in externalSecrets
-#           dictionary) to mount
+#   mountedSecrets Dictionary whose keys are external secret names (keys in
+#           externalSecrets dictionary) to mount, values are ignored. Not a
+#           list to allow adding secrets in platform-specific override files
 #   metrics Where to look for Prometheus metrics. Contains single entry in
 #           podmonitor's podMetricsEndpoints key (port, path, params, etc.)
 #     port Port name
@@ -164,6 +169,8 @@ components:
     service:
       type: LoadBalancer
       loadBalancerIpKey: ext-dispatcher
+    sharedEnvKeys:
+      - devel-env
     env:
       AFC_SERVER_NAME: _
       AFC_ENFORCE_HTTPS: "True"
@@ -189,7 +196,7 @@ components:
       status:
         servicePort: 8080
     mountedSecrets:
-      - server-cert
+      server-cert:
     readinessProbe:
       exec:
         command: [/wd/acceptor.py, --cmd, check]

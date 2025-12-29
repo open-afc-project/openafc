@@ -13,15 +13,19 @@ components:
   dispatcher:
     service:
       type: NodePort
-  grafana:
+  rat-server:
     env:
-      # Somehow Grafana behaves differently when exposed from behind dispatcher
-      # only (k3d) as compared to dispatcher and ingress-nginx (GCE) - hence
-      # this setting. The root cause is probably some dispatcher nginx
-      # configuration issue.
-      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-
-ingress: null
+      AFC_DB_CREATOR_DSN_RATDB: >-
+        postgresql://postgres:postgres@{{host:ratdb}}:{{port:ratdb:ratdb}}/postgres
+      AFC_DB_CREATOR_PASSWORD_FILE_RATDB: >-
+        {{secretFile:db-creator-password-ratdb:optional}}
+      AFC_DB_CREATOR_DSN_BULK_POSTGRES: >-
+        postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/postgres
+      AFC_DB_CREATOR_PASSWORD_FILE_BULK_POSTGRES: >-
+        {{secretFile:db-creator-password-bulk-postgres:optional}}
+    mountedSecrets:
+      db-creator-password-ratdb:
+      db-creator-password-bulk-postgres:
 
 staticVolumes:
   rat_transfer:
@@ -33,7 +37,15 @@ staticVolumes:
       # Path better be overridden, type set to bypass creation if overridden
       path: /tmp
       type: DirectoryOrCreate
+  objst-storage:
+    hostPath:
+      # Path better be overridden, type set to bypass creation if overridden
+      path: /opt/afc/databases/storage
+      type: DirectoryOrCreate
 
 externalSecrets:
   image-pull: null
-  server-cert: null
+  db-creator-password-ratdb:
+    property: DB_CREATOR_PASSWORD_RATDB
+  db-creator-password-bulk-postgres:
+    property: DB_CREATOR_PASSWORD_BULK_POSTGRES

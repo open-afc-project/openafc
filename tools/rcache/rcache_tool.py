@@ -21,7 +21,6 @@ import json
 import os
 import random
 import re
-import secret_utils
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sa_async
 import sys
@@ -29,10 +28,11 @@ import tabulate
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import urllib.parse
 
+import db_utils
 from log_utils import dp, error, error_if
 from rcache_models import AfcReqRespKey, ApDbRecord, ApDbRespState, \
-    LatLonRect, RcacheInvalidateReq, RcacheSpatialInvalidateReq, \
-    RcacheStatus, RcacheUpdateReq
+    Beam, LatLonRect, RcacheDirectionalInvalidateReq, RcacheInvalidateReq, \
+    RcacheSpatialInvalidateReq, RcacheStatus, RcacheUpdateReq
 
 # Environment variable with connection string to Postgres DB
 POSTGRES_DSN_ENV = "RCACHE_POSTGRES_DSN"
@@ -523,9 +523,9 @@ async def do_mass_lookup(args: Any) -> None:
     reporter = Reporter(total_count=per_worker_count * args.threads)
     metadata: Optional[sa.MetaData] = None
     postgres_dsn = \
-        secret_utils.substitute_password(
-            dsc="rcache database", dsn=args.postgres,
-            password_file=args.postgres_password_file, optional=args.dry)
+        db_utils.substitute_password(
+            dsn=args.postgres, password_file=args.postgres_password_file,
+            optional=args.dry)
     if not args.dry:
         engine = sa.create_engine(postgres_dsn)
         metadata = sa.MetaData()
@@ -587,6 +587,30 @@ async def do_invalidate(args: Any) -> None:
                            max_lon=max_lon))
         invalidate_req = RcacheSpatialInvalidateReq(tiles=tiles).dict()
         path = "spatial_invalidate"
+    elif args.beam:
+        beams: List[Beam] = []
+        for s in args.beam:
+            m = \
+                re.search(
+                    r"^(?P<rx_lat>[0-9.+-]+),(?P<rx_lon>[0-9.+-]+),"
+                    r"(?P<tx1>[0-9.+-]+)(,(?P<tx2>[0-9.+-]+))?$",
+                    s)
+            error_if(not m, f"Beam specification '{s}' has invalid format")
+            assert m is not None
+            try:
+                rx_lat = float(m.group("rx_lat"))
+                rx_lon = float(m.group("rx_lon"))
+                tx1 = float(m.group("tx1"))
+                tx2: Optional[float] = \
+                    float(m.group("tx2")) if m.group("tx2") else None
+            except ValueError:
+                error(not m, f"Beam specification '{s}' has invalid format")
+            beams.append(Beam(rx_lat=rx_lat, rx_lon=rx_lon,
+                              tx_lat=tx1 if tx2 is not None else None,
+                              tx_lon=tx2,
+                              azimuth_to_tx=tx1 if tx2 is None else None))
+            invalidate_req = RcacheDirectionalInvalidateReq(beams=beams).dict()
+            path = "directional_invalidate"
     else:
         error("No invalidation type parameters specified")
     async with aiohttp.ClientSession() as session:
@@ -772,6 +796,12 @@ def main(argv: List[str]) -> None:
         help="Tile to invalidate. Latitude/longitude are north/east positive "
         "degrees. Maximums, if not specified, are 'plus one degree' of "
         "minimums. This parameter may be specified several times")
+    parser_invalidate.add_argument(
+        "--beam", metavar="RX_LAT,RX_LON,{TX_LAT,TX_LON|TX_AZIMUTH}",
+        action="append",
+        help="Beam to invalidate. RX_LAT,RX_LON specify receiver position, "
+        "TX_LAT,TX_LON or TX_AZIMUTH specify RX antenna direction. This "
+        "parameter may be specified several times")
     parser_invalidate.add_argument(
         "--ruleset", metavar="RULESET_ID", action="append",
         help="Config ruleset ID for entries to invalidate. This parameter may "

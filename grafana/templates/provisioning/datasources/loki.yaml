@@ -1,0 +1,34 @@
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Loki datasource
+
+{% if GRAFANA_DS_LOKI_URL is defined -%}
+
+deleteDatasources:
+  - name: Loki
+
+apiVersion: 1
+datasources:
+  - access: proxy
+    apiVersion: ''
+    basicAuth: false
+    basicAuthUser: ''
+    database: ''
+    isDefault: false
+    jsonData: {}
+    name: Loki
+    orgId: 1
+    readOnly: false
+    secureJsonFields: {}
+    type: loki
+    typeLogoUrl: public/app/plugins/datasource/loki/img/loki_icon.svg
+    url: >-
+      {{ GRAFANA_DS_LOKI_URL }}
+    user: ''
+    version: 3
+    withCredentials: false
+{% endif %}

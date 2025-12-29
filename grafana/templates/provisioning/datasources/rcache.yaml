@@ -1,0 +1,41 @@
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Rcache rest API
+apiVersion: 1
+
+{% if GRAFANA_DS_RCACHE_URL is defined -%}
+deleteDatasources:
+  - name: Rcache
+
+datasources:
+  - access: proxy
+    apiVersion: ''
+    basicAuth: false
+    basicAuthUser: ''
+    database: ''
+    isDefault: false
+    jsonData:
+      auth_method: none
+      customHealthCheckEnabled: true
+      customHealthCheckUrl: >-
+        {{ GRAFANA_DS_RCACHE_URL }}/status
+      global_queries: []
+      oauthPassThru: false
+      proxy_type: none
+      tlsSkipVerify: true
+    name: Rcache
+    orgId: 1
+    readOnly: false
+    secureJsonFields: {}
+    type: yesoreyeram-infinity-datasource
+    typeLogoUrl: public/plugins/yesoreyeram-infinity-datasource/img/icon.svg
+    url: >-
+      {{ GRAFANA_DS_RCACHE_URL }}
+    user: ''
+    version: 6
+    withCredentials: false
+{% endif -%}

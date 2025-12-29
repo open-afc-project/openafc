@@ -94,7 +94,7 @@ Code above will create following time series:
   - foo_count - same labels as above
 
 
-Defining Flask metrics endpoint. Thsi example is, in fact, not good, as
+Defining Flask metrics endpoint. This example is, in fact, not good, as
 /metrics endpoint better be defined at top level (not in blueprint), but as of
 time of this writing I do not know how to achieve this and anyway achieving
 this has nothing to do with Prometheus. So use '__metrics_path__' in Prometheus
@@ -110,6 +110,12 @@ if prometheus_utils.multiprocess prometheus_configured():
     module.add_url_rule(
         '/metrics', view_func=PrometheusMetrics.as_view('PrometheusMetrics'))
 
+
+Defining multiprocess FastAPI metrics endpoint
+
+app = fastapi.FastAPI()
+...
+app.mount("/metrics", prometheus_utils.multiprocess_fastapi_metrics())
 
 SETUP
 
@@ -141,7 +147,7 @@ import prometheus_client.multiprocess
 import prometheus_client.core
 import sys
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 
 class PrometheusTimeBase:
@@ -282,3 +288,10 @@ def multiprocess_flask_metrics() -> "flask.Response":
     ret = flask.make_response(prometheus_client.generate_latest(registry))
     ret.mimetype = prometheus_client.CONTENT_TYPE_LATEST
     return ret
+
+
+def multiprocess_fastapi_metrics() -> Callable:
+    """ Creating ASGI metrics app """
+    registry = prometheus_client.CollectorRegistry()
+    prometheus_client.multiprocess.MultiProcessCollector(registry)
+    return prometheus_client.make_asgi_app(registry=registry)

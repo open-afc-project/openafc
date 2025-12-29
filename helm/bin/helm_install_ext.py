@@ -51,8 +51,8 @@ def main(argv: List[str]) -> None:
         "--mtls", action="store_true",
         help="Enforce mTLS operation (client certificat checking)")
     argument_parser.add_argument(
-        "--access_log", action="store_true",
-        help="Enables dispatcher access log")
+        "--devel", action="store_true",
+        help="Enables development features of various containers")
     argument_parser.add_argument(
         "--wait", metavar="TIMEunit",
         help="Wait for completion for up to given timeout, specified in "
@@ -72,9 +72,6 @@ def main(argv: List[str]) -> None:
         "--set", metavar="VA.RI.AB.LE=VALUE", action="append", default=[],
         help="Additional value setting (overrides some vaslues.yaml variable)")
     argument_parser.add_argument(
-        "--print_values", choices=["yaml", "json"],
-        help="Print consolidated values in given format and exit")
-    argument_parser.add_argument(
         "RELEASE",
         help="Helm release name. 'AUTO' means construct from username and "
         "checkout directory")
@@ -84,8 +81,6 @@ def main(argv: List[str]) -> None:
         sys.exit(1)
 
     args = argument_parser.parse_args(argv)
-
-    set_silent_execute(args.print_values is not None)
 
     tag: Optional[str] = \
         auto_name(kabob=False) if args.tag == AUTO_NAME else args.tag
@@ -110,7 +105,8 @@ def main(argv: List[str]) -> None:
         execute(["helm", "uninstall", release] + cluster_context.helm_args())
         print(">> Waiting for uninstallation completion")
         wait_termination(what=release, cluster_context=cluster_context,
-                         uninstall_duration=Duration(args.wait))
+                         uninstall_duration=Duration(args.wait),
+                         services=["dispatcher"])
 
     if args.uninstall:
         return
@@ -124,7 +120,7 @@ def main(argv: List[str]) -> None:
     for cond, filename in \
             [(args.http, "values-http.yaml"),
              (args.mtls, "values-mtls.yaml"),
-             (args.access_log, "values-access_log.yaml")]:
+             (args.devel, "values-devel.yaml")]:
         if not cond:
             continue
         assert isinstance(filename, str)
@@ -148,11 +144,6 @@ def main(argv: List[str]) -> None:
     # ... timeout
     if args.wait:
         install_args += ["--wait", "--timeout", args.wait]
-
-    if args.print_values:
-        print_helm_values(helm_args=install_args,
-                          print_format=args.print_values)
-        return
 
     # Executing helm install
     execute(install_args)

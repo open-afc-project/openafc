@@ -31,7 +31,7 @@ if [ "$AFC_DEVEL_ENV" == "devel" ]; then
         addgroup $AFC_WORKER_USER wheel
     fi
 else
-    apk del apk-tools libc-utils py3-pip
+    apk del --purge apk-tools libc-utils
 fi
 
 # Local Variables:

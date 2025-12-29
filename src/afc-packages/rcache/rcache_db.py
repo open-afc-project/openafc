@@ -7,21 +7,38 @@
 #
 
 # pylint: disable=wrong-import-order, invalid-name, too-many-statements,
-# pylint: disable=too-many-branches
+# pylint: disable=too-many-branches, too-many-positional-arguments
+# pylint: disable=too-many-arguments
 
+try:
+    import db_creator
+except ImportError:
+    pass
+try:
+    import geoalchemy2 as ga
+except ImportError:
+    pass
 import sqlalchemy as sa
-import secret_utils
-from typing import Any, cast, Dict, List, Optional, Tuple
+import sys
+from typing import Any, cast, Dict, List, NamedTuple, Optional, Tuple
 import urllib.parse
 
-from log_utils import dp, error, error_if, FailOnError, get_module_logger, \
-    safe_dsn
+import db_utils
+from log_utils import dp, error, error_if, FailOnError, get_module_logger
 from rcache_models import ApDbRespState, ApDbRecord
 
-__all__ = ["RcacheDb"]
+__all__ = ["RcacheDb", "RcacheLookupResult"]
 
 # Logger for this module
 LOGGER = get_module_logger()
+
+
+class RcacheLookupResult(NamedTuple):
+    """ Rcache lookup result """
+    # True if valid response for given request/config digest found
+    found: bool
+    # Response for given request/config digest - valid or invalidated
+    response: str
 
 
 class RcacheDb:
@@ -39,55 +56,6 @@ class RcacheDb:
     Private attributes:
     _engine        -- SqlAlchemy Engine object. None before connect()
     """
-
-    class _RootDb:
-        """ Context manager that encapsulates everexisting Postgres root
-        database
-
-        Public attributes:
-        dsn  -- Root database connection string
-        conn -- Root database connection
-
-        Private attributes:
-        _engine -- Root database engine
-        """
-        # Name of root database (used for database creation
-        ROOT_DB_NAME = "postgres"
-
-        def __init__(self, dsn: str) -> None:
-            """ Constructor
-
-            Arguments:
-            dsn -- Connection string to some (nonroot) database on same server
-            """
-            self.dsn = \
-                urllib.parse.urlunsplit(
-                    urllib.parse.urlsplit(dsn).
-                    _replace(path=f"/{self.ROOT_DB_NAME}"))
-            self._engine: Any = None
-            self.conn: Any = None
-            try:
-                self._engine = sa.create_engine(self.dsn)
-                self.conn = self._engine.connect()
-            except sa.exc.SQLAlchemyError as ex:
-                error(
-                    f"Can't connect to root database '{safe_dsn(self.dsn)}': "
-                    f"{ex}")
-            finally:
-                if (self.conn is None) and (self._engine is not None):
-                    # Connection failed
-                    self._engine.dispose()
-
-        def __enter__(self) -> "RcacheDb._RootDb":
-            """ Context entry """
-            return self
-
-        def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-            """ Context exit """
-            if self.conn is not None:
-                self.conn.close()
-            if self._engine is not None:
-                self._engine.dispose()
 
     # Maximum number of fields in one UPDATE
     _MAX_UPDATE_FIELDS = 32767
@@ -125,8 +93,9 @@ class RcacheDb:
                       index=True),
             sa.Column("config_ruleset", sa.String(), nullable=False,
                       index=True),
-            sa.Column("lat_deg", sa.Float(), nullable=False, index=True),
-            sa.Column("lon_deg", sa.Float(), nullable=False, index=True),
+            sa.Column("coordinates",
+                      ga.Geography(geometry_type="POINT", srid=4326),
+                      nullable=False, index=True),
             sa.Column("last_update", sa.DateTime(), nullable=False,
                       index=True),
             sa.Column("req_cfg_digest", sa.String(), nullable=False,
@@ -140,9 +109,9 @@ class RcacheDb:
             sa.Column("name", sa.String(), nullable=False, primary_key=True),
             sa.Column("state", sa.Boolean(), nullable=False))
         self.rcache_db_dsn = \
-            secret_utils.substitute_password(
-                dsc="rcache database", dsn=rcache_db_dsn,
-                password_file=rcache_db_password_file, optional=True)
+            db_utils.substitute_password(
+                dsn=rcache_db_dsn, password_file=rcache_db_password_file,
+                optional=True)
         self.db_name: Optional[str] = \
             urllib.parse.urlsplit(self.rcache_db_dsn).path.strip("/") \
             if self.rcache_db_dsn else None
@@ -155,25 +124,22 @@ class RcacheDb:
         return self._MAX_UPDATE_FIELDS // \
             len(self.metadata.tables[self.AP_TABLE_NAME].c)
 
-    def check_server(self) -> bool:
-        """ True if database server can be connected """
-        error_if(not self.rcache_db_dsn,
-                 "AFC Response Cache URL was not specified")
-        assert self.rcache_db_dsn is not None
-        with FailOnError(False), self._RootDb(self.rcache_db_dsn) as rdb:
-            rdb.conn.execute("SELECT 1")
-            return True
-        return False
-
-    def create_db(self, recreate_db=False, recreate_tables=False,
+    def create_db(self, db_creator_url: Optional[str],
+                  alembic_config: Optional[str] = None,
+                  alembic_initial_version: Optional[str] = None,
+                  alembic_head_version: Optional[str] = None,
                   fail_on_error=True) -> bool:
-        """ Creates database if absent, optionally adjust if present
+        """ Creates database if absent, ensures correct alembic version
 
         Arguments:
-        recreate_db      -- Recreate database if it exists
-        recreate_tables  -- Recreate known database tables if database exists
-        fail_on_error    -- True to fail on error, False to return success
-                            status
+        db_creator_url          -- REST API URL for Postgres database creation
+                                   or None
+        alembic_config          -- Alembic config file. None to do no Alembic
+        alembic_initial_version -- None or version to stamp alembicless
+                                   database with (before upgrade)
+        alembic_head_version    -- Current alembic version. None to use 'head'
+        fail_on_error           -- True to fail on error, False to return
+                                   success status
         Returns True on success, Fail on failure (if fail_on_error is False)
         """
         engine: Any = None
@@ -185,36 +151,34 @@ class RcacheDb:
                 error_if(not self.rcache_db_dsn,
                          "AFC Response Cache URL was not specified")
                 assert self.rcache_db_dsn is not None
+                error_if("requests" not in sys.modules,
+                         "'requests' modules, used for Postgres database "
+                         "creation, not installed")
                 engine = self._create_sync_engine(self.rcache_db_dsn)
-                if recreate_db:
-                    with self._RootDb(self.rcache_db_dsn) as rdb:
-                        try:
-                            rdb.conn.execute("COMMIT")
-                            rdb.conn.execute(
-                                f'DROP DATABASE IF EXISTS "{self.db_name}"')
-                        except sa.exc.SQLAlchemyError as ex:
-                            error(f"Unable to drop database '{self.db_name}': "
-                                  f"{ex}")
+
                 try:
-                    with engine.connect():
-                        pass
-                except sa.exc.SQLAlchemyError:
-                    with self._RootDb(self.rcache_db_dsn) as rdb:
-                        try:
-                            rdb.conn.execute("COMMIT")
-                            rdb.conn.execute(
-                                f'CREATE DATABASE "{self.db_name}"')
-                            with engine.connect():
-                                pass
-                        except sa.exc.SQLAlchemyError as ex1:
-                            error(f"Unable to create target database: {ex1}")
+                    _, existed = db_creator.ensure_dsn(dsn=self.rcache_db_dsn)
+                except RuntimeError as ex:
+                    error(f"Error creating Rcache database "
+                          f"'{db_utils.safe_dsn(self.rcache_db_dsn)}': {ex}")
+
+                if alembic_config:
+                    err = \
+                        db_utils.alembic_ensure_version(
+                            alembic_config=alembic_config,
+                            existing_database=existed,
+                            initial_version=alembic_initial_version,
+                            head_version=alembic_head_version)
+                    error_if(err, err)
                 try:
-                    if recreate_tables:
-                        with engine.connect() as conn:
-                            conn.execute("COMMIT")
-                            for table_name in self.ALL_TABLE_NAMES:
-                                conn.execute(
-                                    f'DROP TABLE IF EXISTS "{table_name}"')
+                    with engine.connect() as conn:
+                        conn.execute("COMMIT")
+                        conn.execute(
+                            "CREATE EXTENSION IF NOT EXISTS postgis")
+                except sa.exc.SQLAlchemyError as ex:
+                    error(f"Unable to create PostGIS extension in "
+                          f"'{self.db_name}': {ex}")
+                try:
                     self.metadata.create_all(engine)
                     self._read_metadata()
                 except sa.exc.SQLAlchemyError as ex:
@@ -264,13 +228,15 @@ class RcacheDb:
             self._engine.dispose()
             self._engine = None
 
-    def lookup(self, req_cfg_digests: List[str],
-               try_reconnect=False) -> Dict[str, str]:
+    def lookup(self, req_cfg_digests: List[str], return_invalidated: bool,
+               try_reconnect=False) -> Dict[str, RcacheLookupResult]:
         """ Request cache lookup
 
         Arguments:
-        req_cfg_digests -- List of request/config digests
-        try_reconnect   -- On failure try reconnect
+        req_cfg_digests    -- List of request/config digests
+        return_invalidated -- True to return valid and invalidated responses,
+                              False to return only valid ones
+        try_reconnect      -- On failure try reconnect
         Returns Dictionary of found requests, indexed by request/config digests
         """
         retry = False
@@ -279,13 +245,18 @@ class RcacheDb:
                 self.connect()
             assert (self._engine is not None) and (self.ap_table is not None)
             s = sa.select([self.ap_table]).\
-                where((self.ap_table.c.req_cfg_digest.in_(req_cfg_digests)) &
-                      (self.ap_table.c.state == ApDbRespState.Valid.name))
+                where(self.ap_table.c.req_cfg_digest.in_(req_cfg_digests))
+            if not return_invalidated:
+                s = s.where(self.ap_table.c.state == ApDbRespState.Valid.name)
             try:
                 with self._engine.connect() as conn:
                     rp = conn.execute(s)
-                    return {rec.req_cfg_digest:
-                            ApDbRecord.parse_obj(rec).get_patched_response()
+                    return \
+                        {rec.req_cfg_digest:
+                         RcacheLookupResult(
+                             found=rec.state == ApDbRespState.Valid.name,
+                             response=ApDbRecord.parse_obj(rec).
+                             get_patched_response())
                             for rec in rp}
             except sa.exc.SQLAlchemyError as ex:
                 if retry or (not try_reconnect):
@@ -312,12 +283,12 @@ class RcacheDb:
                 error_if(
                     table_name not in metadata.tables,
                     f"Table '{table_name}' not present in the database "
-                    f"'{safe_dsn(self.rcache_db_dsn)}'")
+                    f"'{db_utils.safe_dsn(self.rcache_db_dsn)}'")
             self.metadata = metadata
             self._update_ap_table()
         except sa.exc.SQLAlchemyError as ex:
             error(f"Can't connect to database "
-                  f"'{safe_dsn(self.rcache_db_dsn)}': {ex}")
+                  f"'{db_utils.safe_dsn(self.rcache_db_dsn)}': {ex}")
         finally:
             if engine is not None:
                 engine.dispose()
@@ -352,5 +323,6 @@ class RcacheDb:
         try:
             return sa.create_engine(dsn, pool_pre_ping=True)
         except sa.exc.SQLAlchemyError as ex:
-            error(f"Invalid database DSN: '{safe_dsn(dsn)}': {ex}")
+            error(f"Invalid database DSN: '{db_utils.safe_dsn(dsn)}': "
+                  f"{ex}")
         return None  # Will never happen, appeasing pylint
