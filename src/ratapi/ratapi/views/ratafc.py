@@ -16,7 +16,6 @@ import logging
 import os
 import sys
 import shutil
-import pkg_resources
 import flask
 import json
 import glob
@@ -384,8 +383,7 @@ if os.environ.get('RCACHE_ENABLED', '').lower() in ('0', 'no', 'false', '-'):
     rcache = None
 else:
     rcache_settings = RcacheClientSettings()
-    # In this validation rcache is True to handle 'not update_on_send' case
-    rcache_settings.validate_for(db=True, rmq=True, rcache=True)
+    rcache_settings.validate_for(db=True, rmq=True)
     rcache = RcacheClient(rcache_settings, rmq_receiver=True) \
         if rcache_settings.enabled else None
 
