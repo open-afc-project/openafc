@@ -5,18 +5,26 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18
+FROM python:3.12-alpine3.21
+# This variable should be set to used Python version (major.minor only)
+ENV AFC_PYTHONVERSION=3.12
 
-RUN apk add py3-pip py3-gunicorn py3-gevent \
-    gcc python3-dev libc-dev
+
+COPY objstorage/requirements.txt /wd/
+RUN apk add --update --no-cache gcc python3-dev libc-dev && \
+    pip3 install --no-cache-dir -r /wd/requirements.txt && \
+    apk del --purge gcc python3-dev libc-dev && \
+    rm -f /wd/requirements.txt
 
 COPY objstorage/docker-entrypoint.sh /wd/
 RUN chmod +x /wd/docker-entrypoint.sh
 
 COPY src/afc-packages /wd/afc-packages
-RUN pip3 install --use-pep517 --root-user-action=ignore \
-        -r /wd/afc-packages/pkgs.objstorage \
-    && rm -rf /wd/afc-packages
+RUN apk add --update --no-cache gcc python3-dev libc-dev && \
+    pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
+        -r /wd/afc-packages/pkgs.objstorage && \
+    apk del --purge gcc python3-dev libc-dev && \
+    rm -rf /wd/afc-packages
 
 ENV AFC_OBJST_PORT=${AFC_OBJST_PORT:-"5000"}
 ENV AFC_OBJST_WORKERS=${AFC_OBJST_WORKERS:-10}
@@ -24,4 +32,4 @@ ENV AFC_OBJST_HIST_PORT=${AFC_OBJST_HIST_PORT:-"4999"}
 ENV AFC_OBJST_HIST_WORKERS=${AFC_OBJST_HIST_WORKERS:-2}
 CMD ["/wd/docker-entrypoint.sh"]
 HEALTHCHECK CMD wget --no-verbose --tries=1 --spider \
-    http://localhost:${AFC_OBJST_PORT}/objst_healthy || exit 1
+    http://127.0.0.1:${AFC_OBJST_PORT}/objst_healthy || exit 1

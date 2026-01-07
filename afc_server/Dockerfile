@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM alpine:3.18
+FROM python:3.12-alpine3.21
 
 # Port REST API service listen on. Mandatory
 # ENV AFC_SERVER_PORT
@@ -52,13 +52,20 @@ ENV AFC_SERVER_GUNICORN_PID=/run/gunicorn/afc_server_app.pid
 # Error log file
 ENV AFC_SERVER_ERROR_LOG=/proc/self/fd/2
 
+# Comma separated list of vendor extensions from previously computed responses
+# to be appended to AFC requests
+# ENV AFC_STATE_VENDOR_EXTENSIONS
+
 # Root of static data files in Worker's file system
 # ENV NFS_MOUNT_PATH
 
-# ALS client parameters (see arg_dscs in als.py)
+# ALS client parameters (see comments in als.py)
 # ENV ALS_KAFKA_SERVER_ID
 # ENV ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
 # ENV ALS_KAFKA_MAX_REQUEST_SIZE
+# ENV AFC_ALS_TOPIC_NAME
+# ENV AFC_JSON_TOPIC_PREFIX
+
 
 # Parts of RMQ Celery URL (see BrokerConfigurator constructor)
 # ENV BROKER_PROT
@@ -75,24 +82,27 @@ ENV AFC_SERVER_ERROR_LOG=/proc/self/fd/2
 
 WORKDIR /wd
 
-RUN apk add --update --no-cache python3=~3.11 py3-sqlalchemy=~1.4 py3-pip \
-    py3-pydantic=~1.10 py3-psycopg2 py3-greenlet curl
+# Prometheus stuff
+COPY gunicorn/config.py /wd/gunicorn_config.py
+# Directory for Prometheus's multiprocess housekeeping
+ENV PROMETHEUS_MULTIPROC_DIR=/wd/prometheus_multiproc_dir
+RUN mkdir -p $PROMETHEUS_MULTIPROC_DIR
+
+RUN apk add --update --no-cache curl
 
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
-        -r /wd/afc-packages/pkgs.afc_server \
+    --no-cache-dir -r /wd/afc-packages/pkgs.afc_server \
     && rm -rf /wd/afc-packages
 
-# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
-# installed as Alpine package (thus not requiring gcc and musl-dev install)
-RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1 && \
-    pip3 install confluent-kafka==2.1.1 && \
-    apk del python3-dev gcc musl-dev
-
+# Installing Pthon libraries
+#   Version of librdkafka-dev depends on Alpine version. confluent-kafka
+#   version in requirements.txt may need to be updated on Alpine version change
+RUN apk add --update --no-cache librdkafka-dev
 COPY afc_server/requirements.txt /wd
-RUN pip3 install --root-user-action=ignore -r /wd/requirements.txt && \
-    rm -f /wd/requirements.txt
+RUN apk add --update --no-cache python3-dev build-base && \
+    pip3 install --no-cache-dir --root-user-action=ignore -r /wd/requirements.txt && \
+    apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
 
 COPY afc_server/afc_server_app.py afc_server/afc_server_compute.py \
     afc_server/afc_server_db.py afc_server/afc_server_models.py \

@@ -47,13 +47,16 @@ Corine Land Cover is land categorization over the EU used to determine RLAN/FS m
 #### **population:** 
 contains the Gridded Population of the World (GPW), v4.11, population density database. Use of GPW for determination of RLAN morphology is only used in the absence of a land cover database.
 
-#### **US.kml:** 
+#### **Country Boundary Files:**
+The AFC database contains a country boundary file for each administrative region supported by AFC.  The boundary file is a kml file defining a single polygon, or multiple polygons that define the corresponding region.  Typically, government agencies require the use of an official website defining the region, and further processing is required to convert these files into the kml format that is used by AFC.  The procedure for converting country boundary files to the format that AFC uses is described in [readme](tools/geo_converters/proc_gdal/proc_boundary_examples/readme.md).
+
+* **US.kml:** 
 specifies United States' country boundary where AP access is allowed for that region. 
-#### **CA.kml:** 
+* **CA.kml:** 
 specifies Canada's country boundary where AP access is allowed for that region. 
-#### **GB.kml:** 
+* **GB.kml:** 
 specifies the Great Britain country boundary where AP access is allowed for that region. 
-#### **BRA.kml:** 
+* **BRA.kml:** 
 specifies Brazil's country boundary where AP access is allowed for that region.  
 
 #### **itudata:** 
@@ -68,10 +71,12 @@ these are WinnForum databases used by the FS Parser (antenna_model_diameter_gain
 * **proc_lidar_2019:** raw data obtained from https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/Non_Standard_Contributed/NGA_US_Cities/
 * **Multiband-BDesign3D:** this was purchased https://www.b-design3d.com/
 
-* **globe:** https://ngdc.noaa.gov/mgg/topo/globe.html
+* **globe:** 
+Global data is downloaded from: https://www.ncei.noaa.gov/products/etopo-global-relief-model.  The actual zip file downloaded is: https://www.ngdc.noaa.gov/mgg/topo/DATATILES/elev/all10g.zip. The raw files are extracted from the zip file and placed in the directory rat_transfer/globe.
+
 * **srtm3arcsecondv003:** https://search.earthdata.nasa.gov/search/granules?p=C2763266377-LPCLOUD&pg[0][v]=f&pg[0][gsk]=-start_date&q=srtm&gdf=HGT&tl=1702926101!3!!
 * **srtm1arcsecond:** https://search.earthdata.nasa.gov/search/granules?p=C2763266360-LPCLOUD&pg[0][v]=f&pg[0][gsk]=-start_date&q=srtm&gdf=HGT&tl=1702926101!3!!
-* **3dep:** https://data.globalchange.gov/dataset/usgs-national-elevation-dataset-ned-1-arc-second
+* **3dep:** https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/1/TIFF/current/
 * **cdsm:"** https://open.canada.ca/data/en/dataset/768570f8-5761-498a-bd6a-315eb6cc023d
 
 * **nlcd:** original file nlcd_2019_land_cover_I48_20210604 was downloaded from [link](https://www.mrlc.gov/data?f%5B0%5D=category%3Aland%20cover) (download NLCD 2019 Land Cover (CONUS)). Using gdal utilties this file was translated to nlcd_2019_land_cover_I48_20210604_resample.zip so that the 1-arcsec tiles matchup with 1-arcsec 3DEP tiles. The federated_nlcd.zip file was obtained by using other gdal utilities to convert federated's many files to one file covering CONUS.
@@ -79,10 +84,12 @@ these are WinnForum databases used by the FS Parser (antenna_model_diameter_gain
 * **clc:** original file was downloaded from the [Copernicus](https://land.copernicus.eu/pan-european/corine-land-cover/clc2018) website (download the GeoTIFF data). Login is required. Using gdal utilies this file was translated to landcover-2020-classification_resampled.tif so that the 1-arcsec tiles matchup with 1-arcsec 3DEP tiles and the canada landcover classifications are mapped to the equivalent NLCD codes.
 * **population:** https://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-rev11
 
-* **US.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
-* **CA.kml:** https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/index2021-eng.cfm?year=21 (Catrographic Boundary files, selecting 'Provinces/territories' of Administrative boundaries)
-* **GB.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
-* **BRA.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
+* **Country Boundary Files:**
+The following country boundary files were created from data obtained from the following websites.  The procedure for converting data into the format used by AFC is described in [readme](tools/geo_converters/proc_gdal/proc_boundary_examples/readme.md).
+    * **US.kml:** https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_us_nation_5m.zip
+    * **CA.kml:** https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lpr_000b21a_e.zip
+    * **GB.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
+    * **BRA.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
  
 * **itudata:** The Radio Climate map, TropoClim.txt, is in the zip file from ITU-R Rec, P.617-3 (https://www.itu.int/dms_pubrec/itu-r/rec/p/R-REC-P.617-3-201309-S!!ZIP-E.zip).  The Surface Refractivity map, N050.txt, is in the zip file from ITU-R Rec, P.617-5 (https://www.itu.int/dms_pubrec/itu-r/rec/p/R-REC-P.617-5-201908-I!!ZIP-E.zip)
 
@@ -210,7 +217,7 @@ THIS DOCUMENT (OR WORK PRODUCT) IS BEING OFFERED WITHOUT ANY WARRANTY WHATSOEVER
    * (5) Under target directory create directory for each city, under each city create dir structure containing combined tif files.
    * (6) For each city create info file listing tif files and min/max lon/lat for each file.
 * **srtm3arcsecondv003:** the two SRTM tiles over Manhattan are removed since they erroneously contain building height
-* **country.KML:** there is some post-processing done that is not documented here as we are moving to using a different processing.
+* **country.kml:** the program proc_gdal is used to post-process downloaded shapefile into a format for use with AFC.  This is described in more detail in [readme](tools/geo_converters/proc_gdal/proc_boundary_examples/readme.md).
 
 * **Near Field Adjustment Factor File:** "nfa_table_data.csv" is created as follows.
 
@@ -398,3 +405,119 @@ chown -R 1003:1003 /var/databases /var/afc_config
 ```
 
 
+## Detailed Instructions for Downloading and Converting 3DEP Files For Use In AFC
+The process for downloading and converting 3DEP terrain height files involves downloading the raw data from USGS, then, in the provided docker container, converting the data from NAD83 to WGS84.  The conversion is a 2 step process where the data is first longitude and latitude values are converted, then the height values are adjusted for the WGS84 geiod.  The commands below assume a linux system running a bash shell.  The utilities wget2, gdal_translate must be installed as well as a web browser for downloading the Canada geoid.
+
+
+1) **Identify location with adequate disk space.**  It is recommended that the directory containing 3DEP data be on a disk with at least 600 GB of free space.  The disk needs to accomodate the original NAD83 files downloaded, intermediate files, and the final converted files.  Only the final converted files are used by AFC, and the original NAD83 files downloaded and intermediate files can be removed, if desired, to clear up disk space.  The commands below must be adjusted to the corresponding directory locations on your system.
+
+```
+DEPDIR=/mnt/nfs/rat_transfer/3dep
+
+GEOID_DIR=/mnt/nfs/rat_transfer/geoid
+mkdir $GEOID_DIR
+mkdir $GEOID_DIR/usa_ge
+
+TMPDIR=/tmp
+
+AFCDIR=/path/to/openafc
+```
+
+2) **Download the NAD83 files from USGS**
+
+```
+mkdir $DEPDIR/1_arcsec_nad83
+cd $DEPDIR/1_arcsec_nad83
+wget2 -c -r -np -l 2 -nd -A "*.tif" https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/1/TIFF/current
+```
+
+3) **Download geoid files for USA**
+
+```
+cd $TMPDIR
+wget2 https://www.myfloridagps.com/Geoid/NGS.zip
+mkdir NGS
+cd NGS
+unzip -x ../NGS.zip
+gdal_translate -of GTX g2018u0.bin $GEOID_DIR/usa_ge/usa_ge_prd_g2018u0.gtx
+gdal_translate -of GTX g2018p0.bin $GEOID_DIR/usa_ge/usa_ge_prd_g2018p0.gtx
+
+cd $TMPDIR
+wget2 https://vdatum.noaa.gov/download/data/vdatum_GEOID12B.zip
+unzip -x vdatum_GEOID12B.zip
+cp vdatum/core/geoid12b/g2012ba0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012ba0.gtx
+cp vdatum/core/geoid12b/g2012bg0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012bg0.gtx
+cp vdatum/core/geoid12b/g2012bh0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012bh0.gtx
+cp vdatum/core/geoid12b/g2012bp0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012bp0.gtx 
+cp vdatum/core/geoid12b/g2012bs0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012bs0.gtx
+cp vdatum/core/geoid12b/g2012bu0.gtx $GEOID_DIR/usa_ge/usa_ge_prd_g2012bu0.gtx
+```
+
+4) **Download geoid files for Canada**
+* Open a browser and navigate to https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/data-donnees/geoid.php?locale=en
+* If not registered, register on this site to get a username and password
+* Sign in
+* Download the file https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/process/download-helper.php?file_id=HT2_2010_tif and save to TMPDIR.
+
+```
+cd $TMPDIR
+
+gdal_translate -of GTX HT2_2010v70.tif can_ge_prd_HT2_2010v70.gtx
+
+mkdir $GEOID_DIR/can_ge
+mv can_ge_prd_HT2_2010v70.gtx $GEOID_DIR/can_ge
+```
+
+5) **Build gdal container distributed with openafc, then run the gdal container.**
+
+```
+cd $AFCDIR/tools/geo_converters
+docker rmi gdalcontainer
+docker build . -t gdalcontainer
+
+gdalCmd="docker run --rm -it  --privileged"
+gdalCmd="$gdalCmd -v $AFCDIR:/wd/afc/open-afc"
+gdalCmd="$gdalCmd -v $DEPDIR:/mnt/nfs/rat_transfer/3dep"
+gdalCmd="$gdalCmd -v $GEOID_DIR:/mnt/nfs/rat_transfer/geoid"
+gdalCmd="$gdalCmd -h gdalcontainer"
+gdalCmd="$gdalCmd gdalcontainer"
+alias gdalcontainer="$gdalCmd"
+
+gdalcontainer
+```
+
+6) **Perform first conversion to WGS84 longitude/latitute coordinates.**  In the gdal contain run the commands
+
+```
+mkdir /mnt/nfs/rat_transfer/3dep/1_arcsec_wgs84_datum_aligned
+to_wgs84.py --pixels_per_degree 3600 --enforce_one_deg_tiles --resampling cubic --threads 16 \
+    --out_dir /mnt/nfs/rat_transfer/3dep/1_arcsec_wgs84_datum_aligned/ \
+    '/mnt/nfs/rat_transfer/3dep/1_arcsec_nad83/*.tif'
+```
+
+7) **Perform second conversion to WGS84 adjusting height values to the WGS84 ellipsoid.**  In the gdal contain run the commands
+
+```
+mkdir /mnt/nfs/rat_transfer/3dep/1_arcsec_wgs84
+to_wgs84.py --pixels_per_degree 3600 --enforce_one_deg_tiles --resampling cubic --threads 16 \
+    --src_geoid '/mnt/nfs/rat_transfer/geoid/usa_ge/usa_ge_prd_g2018?0.gtx' \
+    --src_geoid '/mnt/nfs/rat_transfer/geoid/usa_ge/usa_ge_prd_g2012b?0.gtx' \
+    --src_geoid /mnt/nfs/rat_transfer/geoid/can_ge/can_ge_prd_HT2_2010v70.gtx \
+    --format_param COMPRESS=PACKBITS \
+    --out_dir /mnt/nfs/rat_transfer/3dep/1_arcsec_wgs84 \
+    '/mnt/nfs/rat_transfer/3dep/1_arcsec_wgs84_datum_aligned/*.tif`
+```
+
+8) **Exit the gdalcontainer.**
+
+```
+exit
+```
+
+9) **Create a symbolic link pointing to the WGS84 dataset.**
+
+```
+ln -s $DEPDIR/1_arcsec_wgs84 $DEPDIR/1_arcsec
+```
+
+At this point the conversion is complete.  The directories ```$DEPDIR/1_arcsec_wgs84_datum_aligned``` and ```$DEPDIR/1_arcsec_wgs84``` can be deleted, if desired, to free up disk space.

@@ -23,7 +23,10 @@ scrape_configs:
   - job_name: msghnd
     static_configs:
       - targets: [msghnd:8000]
-    metrics_path: fbrat/metrics
+  - job_name: afcserver
+    static_configs:
+      - targets: [afcserver:8000]
+    metrics_path: /metrics
   - job_name: als_siphon
     static_configs:
       - targets: [als_siphon:8080]
@@ -38,14 +41,14 @@ scrape_configs:
       - targets: [cadvisor:8080]
     metric_relabel_configs:
       - source_labels: [name]
-        regex: "(.*?)_(rat_server|als_siphon|uls_downloader|bulk_postgres|\
-          als_kafka|cert_db|rcache_tool|[^_]+)_[0-9]+"
+        regex: "(.*?)(_|-)(rat_server|als_siphon|uls_downloader|bulk_postgres|\
+          als_kafka|cert_db|rcache_tool|[^_-]+)(_|-)[0-9]+"
         replacement: "$1"
         target_label: project
       - source_labels: [name]
-        regex: "(.*?)_(rat_server|als_siphon|uls_downloader|bulk_postgres|\
-          als_kafka|cert_db|rcache_tool|[^_]+)_[0-9]+"
-        replacement: "$2"
+        regex: "(.*?)(_|-)(rat_server|als_siphon|uls_downloader|bulk_postgres|\
+          als_kafka|cert_db|rcache_tool|[^_-]+)(_|-)[0-9]+"
+        replacement: "$3"
         target_label: service
       - regex: image
         action: labeldrop

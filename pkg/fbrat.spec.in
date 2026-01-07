@@ -35,20 +35,19 @@ BuildRequires: selinux-policy-devel
 BuildRequires: selinux-policy-targeted, checkpolicy
 
 # Runtime requirements
-Requires: httpd
-Requires: mod_wsgi
+#Requires: httpd
+#Requires: mod_wsgi
 Requires: python-flask
-Requires: python-flask-script
 Requires: python-flask_jsonrpc
-Requires: python2-flask-sqlalchemy
-Requires: python2-flask-migrate
-Requires: python2-flask-user
+#Requires: python2-flask-sqlalchemy
+#Requires: python2-flask-migrate
+#Requires: python2-flask-user
 Requires: python-pyxdg
 Requires: python-cryptography
-Requires: python2-bcrypt
-Requires: python-blinker
+#Requires: python2-bcrypt
+#Requires: python-blinker
 Requires: python-wsgidav
-Requires: python2-numpy
+#Requires: python2-numpy
 Requires: python-sqlalchemy
 Requires: python-jwt
 Requires: python-prettytable

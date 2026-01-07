@@ -603,6 +603,65 @@ public:
 	{}
 };
 
+class ResponseInfo {
+// Contains responseCode and shortDescription for AFC Response
+private:
+    /** responseCode value for AFC Response */
+	CConst::ResponseCodeEnum _responseCode;
+    /** shortDescription value for AFC Response */
+	std::string _shortDescription;
+
+public:
+	/** Construct with responseCode and default shortDescription */
+	ResponseInfo(CConst::ResponseCodeEnum responseCode)
+	: _responseCode(responseCode)
+	{
+		switch (responseCode) {
+			case      CConst::generalFailureResponseCode: _shortDescription = "General Failure";       break;
+			case             CConst::successResponseCode: _shortDescription = "Success";               break;
+			case CConst::versionNotSupportedResponseCode: _shortDescription = "Version Not Supported"; break;
+			case    CConst::deviceDisallowedResponseCode: _shortDescription = "Device Disallowed";     break;
+			case        CConst::missingParamResponseCode: _shortDescription = "Missing Param";         break;
+			case        CConst::invalidValueResponseCode: _shortDescription = "Invalid Value";         break;
+			case     CConst::unexpectedParamResponseCode: _shortDescription = "Unexpected Param";      break;
+			case CConst::unsupportedSpectrumResponseCode: _shortDescription = "Unsupported Spectrum";  break;
+			default: CORE_DUMP; break;
+		}
+	}
+
+	/** Construct with responseCode and string shortDescription */
+	ResponseInfo(CConst::ResponseCodeEnum responseCode, const std::string &shortDescription)
+	: _responseCode(responseCode), _shortDescription(shortDescription)
+	{
+		LOGGER_WARN(logger) << _shortDescription;
+	}
+
+	/** Construct with responseCode and strstream (formatted) shortDescription */
+	ResponseInfo(CConst::ResponseCodeEnum responseCode, const std::ostringstream &shortDescription)
+	: _responseCode(responseCode), _shortDescription(shortDescription.str())
+	{
+		LOGGER_WARN(logger) << _shortDescription;
+	}
+
+	/** responseCode value */
+	CConst::ResponseCodeEnum responseCode() const { return _responseCode; }
+
+	/** shortDescription value as std::string */
+	const std::string &shortDescription() const { return _shortDescription; }
+
+	/** True for success */
+	bool success() const { return _responseCode == CConst::successResponseCode; }
+
+	/** True id supplementalInfo object should be created */
+	bool hasSupplementalInfoFlag() const
+	{
+		return std::set<CConst::ResponseCodeEnum> ({CConst::missingParamResponseCode,
+													CConst::invalidValueResponseCode,
+													CConst::unexpectedParamResponseCode}
+			).count(_responseCode) > 0;
+	}
+};
+
 AfcManager::AfcManager()
 {
 	_createKmz = false;
@@ -789,7 +848,7 @@ AfcManager::AfcManager()
 	_heatmapMaxIToNDB = quietNaN;
 	_heatmapIToNThresholdDB = quietNaN;
 
-	_responseCode = CConst::successResponseCode;
+	_responseInfo.reset(new ResponseInfo(CConst::successResponseCode));
 }
 
 /******************************************************************************************/
@@ -828,7 +887,7 @@ bool sortFunction(std::pair<double, double> p0,std::pair<double, double> p1) { r
 /******************************************************************************************/
 void AfcManager::initializeDatabases()
 {
-	if (_responseCode != CConst::successResponseCode) {
+	if (!_responseInfo->success()) {
 		return;
 	}
 
@@ -874,7 +933,7 @@ void AfcManager::initializeDatabases()
 		}
 	}
 	if (!found) {
-		_responseCode = CConst::invalidValueResponseCode;
+		_responseInfo.reset(new ResponseInfo(CConst::invalidValueResponseCode));
 		_invalidParams << "latitude";
 		_invalidParams << "longitude";
 		return;
@@ -891,7 +950,7 @@ void AfcManager::initializeDatabases()
 
 	createChannelList();
 
-	if (_responseCode != CConst::successResponseCode) {
+	if (!_responseInfo->success()) {
 		return;
 	}
 
@@ -1337,9 +1396,10 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	if (_guiJsonVersion == "1.4") {
 		importGUIjsonVersion1_4(jsonObj);
 	} else {
-		LOGGER_WARN(logger) <<
-			"VERSION NOT SUPPORTED: GUI JSON FILE \"" << inputJSONpath << "\": version: " << _guiJsonVersion;
-		_responseCode = CConst::versionNotSupportedResponseCode;
+		_responseInfo.reset(new ResponseInfo(
+			CConst::versionNotSupportedResponseCode,
+			std::ostringstream() <<
+			"VERSION NOT SUPPORTED: GUI JSON FILE \"" << inputJSONpath << "\": version: " << _guiJsonVersion));
 		return;
 	}
 
@@ -1378,9 +1438,11 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		if (!requiredParams.contains("availableSpectrumInquiryRequests")) {
 			QJsonArray requestArray = jsonObj["availableSpectrumInquiryRequests"].toArray();
 			if (requestArray.size() != 1) {
-				LOGGER_WARN(logger) << "GENERAL FAILURE: afc-engine only processes a single request, "
-					<< requestArray.size() << " requests specified";
-				_responseCode = CConst::generalFailureResponseCode;
+				_responseInfo.reset(new ResponseInfo(
+					CConst::generalFailureResponseCode,
+					std::ostringstream() <<
+					"GENERAL FAILURE: afc-engine only processes a single request, "
+					<< requestArray.size() << " requests specified"));
 				return;
 			}
 			requestObj = requestArray.at(0).toObject();
@@ -1533,9 +1595,10 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		int n = hasEllipseFlag + hasLinearPolygonFlag + hasRadialPolygonFlag;
 
 		if (n != 1) {
-			LOGGER_WARN(logger) << "GENERAL FAILURE: location object must contain exactly one instance of ellipse, linearPolygon, or radialPolygon, total of "
-				<< n << " instances found";
-			_responseCode = CConst::generalFailureResponseCode;
+			_responseInfo.reset(new ResponseInfo(
+				CConst::generalFailureResponseCode,
+				std::ostringstream() << "GENERAL FAILURE: location object must contain exactly one instance of ellipse, linearPolygon, or radialPolygon, total of "
+				<< n << " instances found"));
 			return;
 		}
 
@@ -1821,10 +1884,10 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 
 
 		if (_missingParams.size()) {
-			_responseCode = CConst::missingParamResponseCode;
+			_responseInfo.reset(new ResponseInfo(CConst::missingParamResponseCode));
 			return;
 		} else if (_unexpectedParams.size()) {
-			_responseCode = CConst::unexpectedParamResponseCode;
+			_responseInfo.reset(new ResponseInfo(CConst::unexpectedParamResponseCode));
 			return;
 		}
 
@@ -1832,7 +1895,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		/* Extract values                                                     */
 		/**********************************************************************/
 		if (certificationIdArray.size() == 0) {
-			_responseCode = CConst::invalidValueResponseCode;
+			_responseInfo.reset(new ResponseInfo(CConst::invalidValueResponseCode));
 			_invalidParams << "certificationId";
 			return;
 		}
@@ -2103,8 +2166,9 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 				std::string type = parametersObj["type"].toString().toStdString();
 				if (type == "rlanAntenna") {
 					if (hasRLANAntenna) {
-						LOGGER_WARN(logger) << "GENERAL FAILURE: multiple RLAN antennas specified";
-						_responseCode = CConst::generalFailureResponseCode;
+						_responseInfo.reset(new ResponseInfo(
+							CConst::generalFailureResponseCode,
+							"GENERAL FAILURE: multiple RLAN antennas specified"));
 						return;
 					}
 					std::string antennaName =  parametersObj["antennaModel"].toString().toStdString();
@@ -2115,8 +2179,10 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 					gainArray = parametersObj["discriminationGainDB"].toArray();
 
 					if (gainArray.size() != numAntennaAOB) {
-						LOGGER_WARN(logger) << "GENERAL FAILURE: numAntennaAOB = " << numAntennaAOB << " discriminationGainDB has " << gainArray.size() << " elements";
-						_responseCode = CConst::generalFailureResponseCode;
+						_responseInfo.reset(new ResponseInfo(
+							CConst::generalFailureResponseCode,
+							std::ostringstream() <<
+							"GENERAL FAILURE: numAntennaAOB = " << numAntennaAOB << " discriminationGainDB has " << gainArray.size() << " elements"));
 						return;
 					}
 
@@ -2154,10 +2220,10 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 					_missingParams << requiredParams;
 
 					if (_missingParams.size()) {
-						_responseCode = CConst::missingParamResponseCode;
+						_responseInfo.reset(new ResponseInfo(CConst::missingParamResponseCode));
 						return;
 					} else if (_unexpectedParams.size()) {
-						_responseCode = CConst::unexpectedParamResponseCode;
+						_responseInfo.reset(new ResponseInfo(CConst::unexpectedParamResponseCode));
 						return;
 					}
 
@@ -2178,8 +2244,10 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 						outdoorFlag = true;
 						indoorFlag = true;
 					} else {
-						LOGGER_WARN(logger) << "GENERAL FAILURE: heatmap IndoorOutdoorStr = " << _heatmapIndoorOutdoorStr << " illegal value";
-						_responseCode = CConst::generalFailureResponseCode;
+						_responseInfo.reset(new ResponseInfo(
+							CConst::generalFailureResponseCode,
+							std::ostringstream() <<
+							"GENERAL FAILURE: heatmap IndoorOutdoorStr = " << _heatmapIndoorOutdoorStr << " illegal value"));
 						return;
 					}
 
@@ -2191,8 +2259,10 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 					} else if (_heatmapAnalysisStr == "availability") {
 						itonFlag = false;
 					} else {
-						LOGGER_WARN(logger) << "GENERAL FAILURE: heatmap analysis = " << _heatmapAnalysisStr << " illegal value";
-						_responseCode = CConst::generalFailureResponseCode;
+						_responseInfo.reset(new ResponseInfo(
+							CConst::generalFailureResponseCode,
+							std::ostringstream() <<
+							"GENERAL FAILURE: heatmap analysis = " << _heatmapAnalysisStr << " illegal value"));
 						return;
 					}
 
@@ -2205,15 +2275,17 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 						if (!optionalParams.contains("RLANIndoorHeight")) {
 							_heatmapRLANIndoorHeight =  parametersObj["RLANIndoorHeight"].toDouble();
 						} else {
-							LOGGER_WARN(logger) << "GENERAL FAILURE: heatmap RLANIndoorHeight not specified";
-							_responseCode = CConst::generalFailureResponseCode;
+							_responseInfo.reset(new ResponseInfo(
+								CConst::generalFailureResponseCode,
+								"GENERAL FAILURE: heatmap RLANIndoorHeight not specified"));
 							return;
 						}
 						if (!optionalParams.contains("RLANIndoorHeightUncertainty")) {
 							_heatmapRLANIndoorHeightUncertainty =  parametersObj["RLANIndoorHeightUncertainty"].toDouble();
 						} else {
-							LOGGER_WARN(logger) << "GENERAL FAILURE: heatmap RLANIndoorHeightUncertainty not specified";
-							_responseCode = CConst::generalFailureResponseCode;
+							_responseInfo.reset(new ResponseInfo(
+								CConst::generalFailureResponseCode,
+								"GENERAL FAILURE: heatmap RLANIndoorHeightUncertainty not specified"));
 							return;
 						}
 
@@ -2221,8 +2293,9 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 							if (!optionalParams.contains("RLANIndoorEIRPDBm")) {
 								_heatmapRLANIndoorEIRPDBm =  parametersObj["RLANIndoorEIRPDBm"].toDouble();
 							} else {
-								LOGGER_WARN(logger) << "GENERAL FAILURE: heatmap RLANIndoorEIRPDBm not specified";
-								_responseCode = CConst::generalFailureResponseCode;
+								_responseInfo.reset(new ResponseInfo(
+									CConst::generalFailureResponseCode,
+									"GENERAL FAILURE: heatmap RLANIndoorEIRPDBm not specified"));
 								return;
 							}
 						}
@@ -2232,22 +2305,25 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 						if (!optionalParams.contains("RLANOutdoorHeightType")) {
 							_heatmapRLANOutdoorHeightType =  parametersObj["RLANOutdoorHeightType"].toString().toStdString();
 						} else {
-							LOGGER_WARN(logger) << "GENERAL FAILURE: heatmap RLANOutdoorHeightType not specified";
-							_responseCode = CConst::generalFailureResponseCode;
+							_responseInfo.reset(new ResponseInfo(
+								CConst::generalFailureResponseCode,
+								"GENERAL FAILURE: heatmap RLANOutdoorHeightType not specified"));
 							return;
 						}
 						if (!optionalParams.contains("RLANOutdoorHeight")) {
 							_heatmapRLANOutdoorHeight =  parametersObj["RLANOutdoorHeight"].toDouble();
 						} else {
-							LOGGER_WARN(logger) << "GENERAL FAILURE: heatmap RLANOutdoorHeight not specified";
-							_responseCode = CConst::generalFailureResponseCode;
+							_responseInfo.reset(new ResponseInfo(
+								CConst::generalFailureResponseCode,
+								"GENERAL FAILURE: heatmap RLANOutdoorHeight not specified"));
 							return;
 						}
 						if (!optionalParams.contains("RLANOutdoorHeightUncertainty")) {
 							_heatmapRLANOutdoorHeightUncertainty =  parametersObj["RLANOutdoorHeightUncertainty"].toDouble();
 						} else {
-							LOGGER_WARN(logger) << "GENERAL FAILURE: heatmap RLANOutdoorHeightUncertainty not specified";
-							_responseCode = CConst::generalFailureResponseCode;
+							_responseInfo.reset(new ResponseInfo(
+								CConst::generalFailureResponseCode,
+								"GENERAL FAILURE: heatmap RLANOutdoorHeightUncertainty not specified"));
 							return;
 						}
 
@@ -2255,8 +2331,9 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 							if (!optionalParams.contains("RLANOutdoorEIRPDBm")) {
 								_heatmapRLANOutdoorEIRPDBm =  parametersObj["RLANOutdoorEIRPDBm"].toDouble();
 							} else {
-								LOGGER_WARN(logger) << "GENERAL FAILURE: heatmap RLANOutdoorEIRPDBm not specified";
-								_responseCode = CConst::generalFailureResponseCode;
+								_responseInfo.reset(new ResponseInfo(
+									CConst::generalFailureResponseCode,
+									"GENERAL FAILURE: heatmap RLANOutdoorEIRPDBm not specified"));
 								return;
 							}
 						}
@@ -2270,13 +2347,16 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 						if (!optionalParams.contains("fsId")) {
 							_heatmapFSID =  parametersObj["fsId"].toInt();
 						} else {
-							LOGGER_WARN(logger) << "GENERAL FAILURE: heatmap fsId not specified";
-							_responseCode = CConst::generalFailureResponseCode;
+							_responseInfo.reset(new ResponseInfo(
+								CConst::generalFailureResponseCode,
+								"GENERAL FAILURE: heatmap fsId not specified"));
 							return;
 						}
 					} else {
-						LOGGER_WARN(logger) << "GENERAL FAILURE: heatmap fsIdType = " << fsidTypeStr << " illegal value";
-						_responseCode = CConst::generalFailureResponseCode;
+						_responseInfo.reset(new ResponseInfo(
+							CConst::generalFailureResponseCode,
+							std::ostringstream() <<
+							"GENERAL FAILURE: heatmap fsIdType = " << fsidTypeStr << " illegal value"));
 						return;
 					}
 
@@ -2301,10 +2381,10 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 					_missingParams << requiredParams;
 
 					if (_missingParams.size()) {
-						_responseCode = CConst::missingParamResponseCode;
+						_responseInfo.reset(new ResponseInfo(CConst::missingParamResponseCode));
 						return;
 					} else if (_unexpectedParams.size()) {
-						_responseCode = CConst::unexpectedParamResponseCode;
+						_responseInfo.reset(new ResponseInfo(CConst::unexpectedParamResponseCode));
 						return;
 					}
 
@@ -2340,13 +2420,14 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		LOGGER_INFO(logger) << _inquiredFrequencyRangesMHz.size() << " frequency range(s) requested";
 
 		if (_inquiredChannels.size() + _inquiredFrequencyRangesMHz.size() == 0) {
-			LOGGER_WARN(logger) << "GENERAL FAILURE: must specify either inquiredChannels or inquiredFrequencies";
-			_responseCode = CConst::generalFailureResponseCode;
+			_responseInfo.reset(new ResponseInfo(
+				CConst::generalFailureResponseCode,
+				"GENERAL FAILURE: must specify either inquiredChannels or inquiredFrequencies"));
 			return;
 		}
 
 		if (_invalidParams.size()) {
-			_responseCode = CConst::invalidValueResponseCode;
+			_responseInfo.reset(new ResponseInfo(CConst::invalidValueResponseCode));
 		}
 #if DEBUG_AFC
 	} else if (_analysisType == "test_winner2") {
@@ -2483,7 +2564,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 {
 	QString errMsg;
 
-	if (_responseCode != CConst::successResponseCode) {
+	if (!_responseInfo->success()) {
 		return;
 	}
 
@@ -3466,7 +3547,7 @@ QJsonDocument AfcManager::generateRatAfcJson()
 	QJsonArray channelInfos = QJsonArray();
 	QJsonArray blackChannelInfos = QJsonArray();
 	QJsonArray redChannelInfos = QJsonArray();
-	if (_responseCode == CConst::successResponseCode) {
+	if (_responseInfo->success()) {
 		for (const auto &group : _inquiredChannels) {
 			auto operatingClass = group.first;
 			auto indexArray = QJsonArray();
@@ -3517,35 +3598,11 @@ QJsonDocument AfcManager::generateRatAfcJson()
 		}
 	}
 
-	std::string shortDescription;
-
-	switch(_responseCode) {
-		case      CConst::generalFailureResponseCode: shortDescription = "General Failure";       break;
-		case             CConst::successResponseCode: shortDescription = "Success";               break;
-		case CConst::versionNotSupportedResponseCode: shortDescription = "Version Not Supported"; break;
-		case    CConst::deviceDisallowedResponseCode: shortDescription = "Device Disallowed";     break;
-		case        CConst::missingParamResponseCode: shortDescription = "Missing Param";         break;
-		case        CConst::invalidValueResponseCode: shortDescription = "Invalid Value";         break;
-		case     CConst::unexpectedParamResponseCode: shortDescription = "Unexpected Param";      break;
-		case CConst::unsupportedSpectrumResponseCode: shortDescription = "Unsupported Spectrum";  break;
-
-		default: CORE_DUMP; break;
-	}
-
-	bool hasSupplementalInfoFlag = false;
-	if (_responseCode == CConst::missingParamResponseCode) {
-		hasSupplementalInfoFlag = true;
-	} else if (_responseCode == CConst::invalidValueResponseCode) {
-		hasSupplementalInfoFlag = true;
-	} else if (_responseCode == CConst::unexpectedParamResponseCode) {
-		hasSupplementalInfoFlag = true;
-	}
-
 	QJsonObject responseObj;
-	responseObj.insert("responseCode", _responseCode);
-	responseObj.insert("shortDescription", shortDescription.c_str());
+	responseObj.insert("responseCode", _responseInfo->responseCode());
+	responseObj.insert("shortDescription", _responseInfo->shortDescription().c_str());
 
-	if (hasSupplementalInfoFlag) {
+	if (_responseInfo->hasSupplementalInfoFlag()) {
 		QJsonObject paramObj;
 		QJsonArray paramsArray;
 
@@ -3585,7 +3642,7 @@ QJsonDocument AfcManager::generateRatAfcJson()
 	if (spectrumInfos.size()) {
 		availableSpectrumInquiryResponse.insert("availableFrequencyInfo", spectrumInfos);
 	}
-	if (_responseCode == CConst::successResponseCode) {
+	if (_responseInfo->success()) {
 		availableSpectrumInquiryResponse.insert("availabilityExpireTime", ISO8601TimeUTC(1));
 	}
 
@@ -3909,7 +3966,7 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath, const std::string&
 		//outputDocument = QJsonDocument(jsonSpectrumData(_rlanBWList, _numChan, _channelData, _deviceDesc, _wlanMinFreq));
 		outputDocument = generateRatAfcJson();
 
-		if ( (_responseCode == CConst::successResponseCode) && (!_mapDataGeoJsonFile.empty()) ) {
+		if ( _responseInfo->success() && (!_mapDataGeoJsonFile.empty()) ) {
 			generateMapDataGeoJson(tempDir);
 		}
 	}
@@ -4807,10 +4864,11 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		} else if ((_analysisType == "HeatmapAnalysis") && (_heatmapFSID != -1)) {
 			ulsDatabase->loadFSById(QString::fromStdString(filename), _deniedRegionList, _antennaList, rows, _heatmapFSID);
 			if (rows.size() == 0) {
-				LOGGER_WARN(logger) << "GENERAL FAILURE: invalid FSID specified for heatmap analysis: "
-					<< _heatmapFSID;
-				_responseCode = CConst::generalFailureResponseCode;
-				return;
+				_responseInfo.reset(new ResponseInfo(
+					CConst::generalFailureResponseCode,
+					std::ostringstream() << "GENERAL FAILURE: invalid FSID specified for heatmap analysis: "
+					<< _heatmapFSID));
+
 			}
 		} else {
 			ulsDatabase->loadUlsData(QString::fromStdString(filename), _deniedRegionList, _antennaList, rows, minLat, maxLat, minLon, maxLon);
@@ -7564,7 +7622,7 @@ double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, doub
 /******************************************************************************************/
 void AfcManager::compute()
 {
-	if (_responseCode != CConst::successResponseCode) {
+	if (!_responseInfo->success()) {
 		return;
 	}
 
@@ -7626,7 +7684,7 @@ void AfcManager::runPointAnalysis()
 #if DEBUG_AFC
 	// std::vector<int> fsidTraceList{2128, 3198, 82443};
 	// std::vector<int> fsidTraceList{64324};
-	std::vector<int> fsidTraceList{24175};
+	std::vector<int> fsidTraceList{148348};
 	std::string pathTraceFile = "path_trace.csv.gz";
 #endif
 
@@ -8245,10 +8303,11 @@ void AfcManager::runPointAnalysis()
 	const double maxRadiusKmSquared = (_maxRadius / 1000.0) * (_maxRadius / 1000.0);
 
 	if ( (_rlanRegion->getMaxHeightAGL() < _minRlanHeightAboveTerrain) && (_reportErrorRlanHeightLowFlag) ) {
-		LOGGER_WARN(logger) << std::string("ERROR: Point Analysis: Invalid RLAN parameter settings.") << std::endl
-			<< std::string("RLAN uncertainty region has a max AGL height of ") << _rlanRegion->getMaxHeightAGL()
-			<< std::string(", which is < ") << _minRlanHeightAboveTerrain << std::endl;
-		_responseCode = CConst::invalidValueResponseCode;
+		_responseInfo.reset(new ResponseInfo(
+			CConst::invalidValueResponseCode,
+			std::ostringstream() << "ERROR: Point Analysis: Invalid RLAN parameter settings.\n"
+			<< "RLAN uncertainty region has a max AGL height of " << _rlanRegion->getMaxHeightAGL()
+			<< ", which is < " << _minRlanHeightAboveTerrain ));
 		_invalidParams << "heightType" << "height" << "verticalUncertainty";
 		return;
 	}
@@ -9204,6 +9263,44 @@ void AfcManager::runPointAnalysis()
 #if DEBUG_AFC
 								if (traceFlag&&(!contains2D)) {
 									if (uls->ITMHeightProfile) {
+#if 1
+										double tdist;
+										int N = ((int) uls->ITMHeightProfile[0]) + 1;
+										QVector<QPointF> latlons = UlsMeasurementAnalysis::computeGreatCircleLineMM(
+											QPointF(rlanCoord.latitudeDeg, rlanCoord.longitudeDeg),
+											QPointF(ulsRxLatitude, ulsRxLongitude), N, &tdist);
+
+										double lon1Rad = rlanCoord.longitudeDeg*M_PI/180.0;
+										double lat1Rad = rlanCoord.latitudeDeg*M_PI/180.0;
+										for(int ptIdx=0; ptIdx<N; ptIdx++) {
+											Vector3 losPathPosn = (((double) (N-1-ptIdx))/(N-1))*rlanPosn + (((double) ptIdx)/(N-1))*ulsRxPos;
+											GeodeticCoord losPathPosnGeodetic = EcefModel::ecefToGeodetic(losPathPosn);
+											double losPathHeight = losPathPosnGeodetic.heightKm*1000.0;
+
+											double ptLon = latlons[ptIdx].y();
+											double ptLat = latlons[ptIdx].x();
+
+											double lon2Rad = ptLon*M_PI/180.0;
+											double lat2Rad = ptLat*M_PI/180.0;
+											double slat = sin((lat2Rad-lat1Rad)/2);
+											double slon = sin((lon2Rad-lon1Rad)/2);
+											double ptDistKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+
+											pathTraceGc.ptId = (boost::format("PT_%d") % ptIdx).str();
+											pathTraceGc.lon = ptLon;
+											pathTraceGc.lat = ptLat;
+											pathTraceGc.dist = ptDistKm;
+											pathTraceGc.amsl = uls->ITMHeightProfile[2+ptIdx];
+											pathTraceGc.losAmsl = losPathHeight;
+											pathTraceGc.fsid = uls->getID();
+											pathTraceGc.divIdx = divIdx;
+											pathTraceGc.segIdx = segIdx;
+											pathTraceGc.scanPtIdx = scanPtIdx;
+											pathTraceGc.rlanHtIdx = rlanHtIdx;
+											pathTraceGc.completeRow();
+										}
+
+#else
 										double lon1Rad = rlanCoord.longitudeDeg*M_PI/180.0;
 										double lat1Rad = rlanCoord.latitudeDeg*M_PI/180.0;
 										int N = ((int) uls->ITMHeightProfile[0]) + 1;
@@ -9234,6 +9331,7 @@ void AfcManager::runPointAnalysis()
 											pathTraceGc.rlanHtIdx = rlanHtIdx;
 											pathTraceGc.completeRow();
 										}
+#endif
 									}
 								}
 #endif
@@ -12200,7 +12298,7 @@ void AfcManager::printUserInputs()
 	if (!AfcManager::_createDebugFiles) {
 		return;
 	}
-	if (_responseCode != CConst::successResponseCode) {
+	if (!_responseInfo->success()) {
 		return;
 	}
 	QStringList msg;
@@ -12633,8 +12731,10 @@ void AfcManager::createChannelList()
 		auto inquiredStopFreqMHz = freqRange.second;
 
 		if (inquiredStopFreqMHz <= inquiredStartFreqMHz) {
-			LOGGER_DEBUG(logger) << "Inquired Freq Range INVALID: [" << inquiredStartFreqMHz << ", " << inquiredStopFreqMHz << "] stop freq must be > start freq" << std::endl;
-			_responseCode = CConst::unsupportedSpectrumResponseCode;
+			_responseInfo.reset(new ResponseInfo(
+				CConst::unsupportedSpectrumResponseCode,
+				std::ostringstream() <<
+				"Inquired Freq Range INVALID: [" << inquiredStartFreqMHz << ", " << inquiredStopFreqMHz << "] stop freq must be > start freq"));
 			return;
 		}
 
@@ -12672,8 +12772,10 @@ void AfcManager::createChannelList()
 			}
 		} else {
 			// the start/stop frequencies are not valid
-			LOGGER_DEBUG(logger) << "Inquired Freq Range INVALID: [" << inquiredStartFreqMHz << ", " << inquiredStopFreqMHz << "]" << std::endl;
-			_responseCode = CConst::unsupportedSpectrumResponseCode;
+			_responseInfo.reset(new ResponseInfo(
+				CConst::unsupportedSpectrumResponseCode,
+				std::ostringstream() <<
+				"Inquired Freq Range INVALID: [" << inquiredStartFreqMHz << ", " << inquiredStopFreqMHz << "]"));
 			return;
 		}
 	}
@@ -12760,15 +12862,18 @@ std::cout << '\n';
 				}
 			}
 			if (numChan == 0) {
-				LOGGER_DEBUG(logger) << "Inquired Channel INVALID Operating Class: " << channelPair.first << std::endl;
-				_responseCode = CConst::unsupportedSpectrumResponseCode;
+				_responseInfo.reset(new ResponseInfo(
+					CConst::unsupportedSpectrumResponseCode,
+					std::ostringstream() <<
+					"Inquired Channel INVALID Operating Class: " << channelPair.first));
 				return;
 			}
 		}
 
 		if (totalNumChan == 0) {
-			LOGGER_DEBUG(logger) << "Missing valid Inquired channel and frequency " << std::endl;
-			_responseCode = CConst::missingParamResponseCode;
+			_responseInfo.reset(new ResponseInfo(
+				CConst::missingParamResponseCode,
+				"Missing valid Inquired channel and frequency "));
 			return;
 		}
 	}

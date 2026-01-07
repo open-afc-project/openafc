@@ -1,4 +1,4 @@
-""" Prometheus cluient utility stuff for Flask """
+""" Prometheus client utility stuff for Flask """
 #
 # Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
@@ -20,7 +20,7 @@ setup(
     # Label compatible with PEP 440
     version='0.1.0',
     description='AFC packages',
-    py_modules=["prometheus_utils"],
+    py_modules=["prometheus_utils", "afc_traffic_metrics"],
     cmdclass={
         'install': InstallCmdWrapper,
     }

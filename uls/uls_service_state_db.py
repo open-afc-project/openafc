@@ -8,14 +8,21 @@
 
 # pylint: disable=invalid-name, broad-exception-caught, wildcard-import
 # pylint: disable=wrong-import-order, unused-wildcard-import
+# pylint: disable=too-many-statements, too-many-branches
+# pylint: disable=too-many-positional-arguments, too-many-arguments
 
 import datetime
 import enum
-import secret_utils
+import requests
+import shlex
 import sqlalchemy as sa
 import sqlalchemy.dialects.postgresql as sa_pg
-from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Set
+import subprocess
+from typing import Any, cast, Dict, Iterable, List, NamedTuple, Optional, Set
 import urllib.parse
+
+import db_creator
+import db_utils
 from uls_service_common import *
 
 # FS database downloader milestone. Names used in database and Prometheus
@@ -97,35 +104,19 @@ AlarmInfo = \
          ("timestamp", datetime.datetime)])
 
 
-def safe_dsn(dsn: Optional[str]) -> Optional[str]:
-    """ Returns DSN without password (if there was any) """
-    if not dsn:
-        return dsn
-    try:
-        parsed = urllib.parse.urlparse(dsn)
-        if not parsed.password:
-            return dsn
-        return \
-            urllib.parse.urlunparse(
-                parsed._replace(
-                    netloc=parsed.netloc.replace(":" + parsed.password,
-                                                 ":<PASSWORD>")))
-    except Exception:
-        return dsn
-
-
 class StateDb:
     """ Status database access wrapper
 
-    Public attributes:
-    db_dsn   -- Connection string (might be None in Alembic environment)
-    db_name  -- Database name from connection string (might be None in Alembic
-                environment)
-    metadata -- Metadata. Originally as predefined, after connection - actual
-
     Private attributes::
-    _engine -- SqlAlchemy engine (set on connection, reset to None on
-                disconnection or error)
+    _arg_db_dsn    -- Connection string as passed from command line or
+                      environment
+    _password_file -- Password file name or None
+    _full_db_dsn   -- Connection string with password substituted
+    _db_name       -- Database name from connection string
+    _metadata      -- Metadata. Originally as predefined, after connection -
+                      actual
+    _engine        -- SqlAlchemy engine (set on connection, reset to None on
+                      disconnection or error)
     """
     # Name of table with milestones
     MILESTONE_TABLE_NAME = "milestones"
@@ -143,71 +134,20 @@ class StateDb:
     ALL_TABLE_NAMES = [MILESTONE_TABLE_NAME, ALARM_TABLE_NAME, LOG_TABLE_NAME,
                        CHECKS_TABLE]
 
-    class _RootDb:
-        """ Context wrapper to work with everpresent root database
-
-        Public attributes:
-        dsn  -- Connection string to root database
-        conn -- Sqlalchemy connection object to root database
-
-        Private attributes:
-        _engine -- SqlAlchemy connection object
-        """
-        # Name of Postgres root database
-        ROOT_DB_NAME = "postgres"
-
-        def __init__(self, dsn: str) -> None:
-            """ Constructor
-
-            Arguments:
-            dsn -- Connection string to (nonroot) database of interest
-            """
-            self.dsn = \
-                urllib.parse.urlunsplit(
-                    urllib.parse.urlsplit(dsn).
-                    _replace(path=f"/{self.ROOT_DB_NAME}"))
-            self._engine: Any = None
-            self.conn: Any = None
-            try:
-                self._engine = sa.create_engine(self.dsn)
-                self.conn = self._engine.connect()
-            except sa.exc.SQLAlchemyError as ex:
-                error(
-                    f"Can't connect to root database '{safe_dsn(self.dsn)}': "
-                    f"{ex}")
-            finally:
-                if (self.conn is None) and (self._engine is not None):
-                    # Connection failed
-                    self._engine.dispose()
-
-        def __enter__(self) -> "StateDb._RootDb":
-            """ Context entry """
-            return self
-
-        def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-            """ Context exit """
-            if self.conn is not None:
-                self.conn.close()
-            if self._engine is not None:
-                self._engine.dispose()
-
-    def __init__(self, db_dsn: Optional[str],
-                 db_password_file: Optional[str]) -> None:
+    def __init__(self, db_dsn: str, db_password_file: Optional[str]) -> None:
         """ Constructor
 
         Arguments:
-        db_dsn           -- Connection string to state database. None in
-                            Alembic environment
+        db_dsn           -- Connection string to state database
         db_password_file -- File with password to use in DSN
         """
-        self.db_dsn = \
-            secret_utils.substitute_password(
-                dsc="ULS Service State Database", dsn=db_dsn,
-                password_file=db_password_file, optional=True)
-        db_dsn
-        self.db_name: Optional[str] = \
-            urllib.parse.urlsplit(self.db_dsn).path.strip("/") \
-            if self.db_dsn else None
+        self._arg_db_dsn = db_dsn
+        self._password_file = db_password_file
+        self._full_db_dsn = \
+            db_utils.substitute_password(
+                dsn=db_dsn, password_file=db_password_file)
+        self.db_name: str = \
+            urllib.parse.urlsplit(self._full_db_dsn).path.strip("/")
         self.metadata = sa.MetaData()
         sa.Table(
             self.MILESTONE_TABLE_NAME,
@@ -215,7 +155,7 @@ class StateDb:
             sa.Column("milestone", sa.Enum(DownloaderMilestone), index=True,
                       primary_key=True),
             sa.Column("region", sa.String(), index=True, primary_key=True),
-            sa.Column("timestamp", sa.DateTime(), nullable=False))
+            sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False))
         sa.Table(
             self.ALARM_TABLE_NAME,
             self.metadata,
@@ -223,14 +163,15 @@ class StateDb:
                       index=True),
             sa.Column("alarm_reason", sa.String(), primary_key=True,
                       index=True),
-            sa.Column("timestamp", sa.DateTime(), nullable=False))
+            sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False))
         sa.Table(
             self.LOG_TABLE_NAME,
             self.metadata,
             sa.Column("log_type", sa.Enum(LogType), index=True, nullable=False,
                       primary_key=True),
             sa.Column("text", sa.String(), nullable=False),
-            sa.Column("timestamp", sa.DateTime(), nullable=False, index=True))
+            sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False,
+                      index=True))
         sa.Table(
             self.CHECKS_TABLE,
             self.metadata,
@@ -238,25 +179,23 @@ class StateDb:
                       index=True),
             sa.Column("check_item", sa.String(), primary_key=True, index=True),
             sa.Column("errmsg", sa.String(), nullable=True),
-            sa.Column("timestamp", sa.DateTime(), nullable=False))
+            sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False))
         self._engine: Any = None
 
-    def check_server(self) -> bool:
-        """ True if database server can be connected """
-        error_if(not self.db_dsn,
-                 "FS downloader status database DSN was not specified")
-        assert self.db_dsn is not None
-        with self._RootDb(self.db_dsn) as rdb:
-            rdb.conn.execute("SELECT 1")
-            return True
-        return False
-
-    def create_db(self, recreate_db=False, recreate_tables=False) -> bool:
+    def create_db(self, db_creator_url: Optional[str],
+                  alembic_config: Optional[str] = None,
+                  alembic_initial_version: Optional[str] = None,
+                  alembic_head_version: Optional[str] = None) -> bool:
         """ Creates database if absent, optionally adjust if present
 
         Arguments:
-        recreate_db     -- Recreate database if it exists
-        recreate_tables -- Recreate known database tables if database exists
+        db_creator_url          -- REST API URL for database creation
+        alembic_config          -- Alembic config file name. None to do no
+                                   Alembic manipulations
+        alembic_initial_version -- Alembic version to stamp alembicless
+                                   database with
+        alembic_head_version    -- Alembic version to stamp newly created
+                                   database with
         Returns True on success, Fail on failure (if fail_on_error is False)
         """
         engine: Any = None
@@ -264,44 +203,30 @@ class StateDb:
             if self._engine:
                 self._engine.dispose()
                 self._engine = None
-            error_if(not self.db_dsn,
-                     "FS downloader status database DSN was not specified")
-            assert self.db_dsn is not None
-            engine = self._create_engine(self.db_dsn)
-            if recreate_db:
-                with self._RootDb(self.db_dsn) as rdb:
-                    try:
-                        rdb.conn.execute("COMMIT")
-                        rdb.conn.execute(
-                            f'DROP DATABASE IF EXISTS "{self.db_name}"')
-                    except sa.exc.SQLAlchemyError as ex:
-                        error(f"Unable to drop database '{self.db_name}': "
-                              f"{repr(ex)}")
             try:
-                with engine.connect():
-                    pass
-            except sa.exc.SQLAlchemyError:
-                with self._RootDb(self.db_dsn) as rdb:
-                    try:
-                        rdb.conn.execute("COMMIT")
-                        rdb.conn.execute(
-                            f'CREATE DATABASE "{self.db_name}"')
-                        with engine.connect():
-                            pass
-                    except sa.exc.SQLAlchemyError as ex1:
-                        error(f"Unable to create target database: {ex1}")
-            try:
-                if recreate_tables:
-                    with engine.connect() as conn:
-                        conn.execute("COMMIT")
-                        for table_name in self.ALL_TABLE_NAMES:
-                            conn.execute(
-                                f'DROP TABLE IF EXISTS "{table_name}"')
-                self.metadata.create_all(engine, checkfirst=True)
-                self._read_metadata()
-            except sa.exc.SQLAlchemyError as ex:
-                error(f"Unable to (re)create tables in the database "
-                      f"'{self.db_name}': {repr(ex)}")
+                db_existed = \
+                    db_creator.ensure_dsn(
+                        dsn=self._arg_db_dsn,
+                        password_file=self._password_file)[1]
+            except RuntimeError as ex:
+                error(f"Error creating state database "
+                      f"'{db_utils.safe_dsn(self._arg_db_dsn)}': {ex}")
+            engine = self._create_engine(self._full_db_dsn)
+            if not db_existed:
+                self.metadata.create_all(engine)
+            if alembic_config:
+                err = \
+                    db_utils.alembic_ensure_version(
+                        alembic_config=alembic_config,
+                        existing_database=db_existed,
+                        initial_version=alembic_initial_version,
+                        head_version=alembic_head_version,
+                        env={"ULS_SERVICE_STATE_DB_DSN": self._arg_db_dsn,
+                             "ULS_SERVICE_STATE_DB_PASSWORD_FILE":
+                             self._password_file or ""})
+                error_if(err, err)
+            self._read_metadata()
+
             self._engine = engine
             engine = None
             return True
@@ -315,9 +240,7 @@ class StateDb:
             return
         engine: Any = None
         try:
-            error_if(not self.db_dsn,
-                     "FS downloader status database DSN was not specified")
-            engine = self._create_engine(self.db_dsn)
+            engine = self._create_engine(self._full_db_dsn)
             self._read_metadata()
             with engine.connect():
                 pass
@@ -337,7 +260,7 @@ class StateDb:
         """ Reads-in metadata from an existing database """
         engine: Any = None
         try:
-            engine = self._create_engine(self.db_dsn)
+            engine = self._create_engine(self._full_db_dsn)
             with engine.connect():
                 pass
             metadata = sa.MetaData()
@@ -346,11 +269,11 @@ class StateDb:
                 error_if(
                     table_name not in metadata.tables,
                     f"Table '{table_name}' not present in the database "
-                    f"'{safe_dsn(self.db_dsn)}'")
+                    f"'{db_utils.safe_dsn(self._full_db_dsn)}'")
             self.metadata = metadata
         except sa.exc.SQLAlchemyError as ex:
             error(f"Can't connect to database "
-                  f"'{safe_dsn(self.db_dsn)}': {repr(ex)}")
+                  f"'{db_utils.safe_dsn(self._full_db_dsn)}': {repr(ex)}")
         finally:
             if engine is not None:
                 engine.dispose()
@@ -394,8 +317,34 @@ class StateDb:
         try:
             return sa.create_engine(dsn)
         except sa.exc.SQLAlchemyError as ex:
-            error(f"Invalid database DSN: '{safe_dsn(dsn)}': {ex}")
-        return None  # Will never happen, appeasing pylint
+            error(
+                f"Invalid database DSN: '{db_utils.safe_dsn(dsn)}': {ex}")
+
+    def _alembic(self, alembic_config: str, args: List[str],
+                 return_stdout: bool = False) -> Optional[str]:
+        """ Do an alembic operation
+
+        Arguments:
+        alembic_config -- Alembic config file name
+        args           -- Command lin etail - operatopm amd argumends
+        return_stdout  -- True to return stdout
+        Returns stdout if requested, None otherwise
+        """
+        args = ["alembic", "-c", alembic_config] + args
+        logging.info(" ".join(shlex.quote(arg) for arg in args))
+        env = dict(os.environ)
+        env["ULS_SERVICE_STATE_DB_DSN"] = self._arg_db_dsn
+        env["ULS_SERVICE_STATE_DB_PASSWORD_FILE"] = self._password_file or ""
+        try:
+            p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, text=True, env=env)
+            stdout, stderr = p.communicate()
+        except OSError as ex:
+            error(f"Alembic execution failed: {ex}")
+        logging.info("\n".join(s for s in (stderr, stdout) if s))
+        error_if(p.returncode,
+                 f"Alembic execution failed with code {p.returncode}")
+        return stdout if return_stdout else None
 
     def write_milestone(self, milestone: DownloaderMilestone,
                         updated_regions: Optional[Iterable[str]] = None,
@@ -415,7 +364,7 @@ class StateDb:
             ops.append(
                 sa.delete(table).where(table.c.region.notin_(all_regions)).
                 where(table.c.milestone == milestone.name))
-        timestamp = datetime.datetime.now()
+        timestamp = datetime.datetime.now(datetime.timezone.utc)
         ins = sa_pg.insert(table).\
             values(
                 [{"milestone": milestone.name, "region": region or "",
@@ -453,7 +402,7 @@ class StateDb:
         table = self.metadata.tables[self.ALARM_TABLE_NAME]
         ops: List[Any] = [sa.delete(table)]
         if reasons:
-            timestamp = datetime.datetime.now()
+            timestamp = datetime.datetime.now(datetime.timezone.utc)
             values: List[Dict[str, Any]] = []
             for alarm_type, alarm_reasons in reasons.items():
                 values += [{"alarm_type": alarm_type.name,
@@ -488,7 +437,7 @@ class StateDb:
         table = self.metadata.tables[self.LOG_TABLE_NAME]
         ins = sa_pg.insert(table).\
             values(log_type=log_type.name, text=log,
-                   timestamp=datetime.datetime.now())
+                   timestamp=datetime.datetime.now(datetime.timezone.utc))
         ins = \
             ins.on_conflict_do_update(
                 index_elements=["log_type"],
@@ -526,7 +475,7 @@ class StateDb:
         ops: List[Any] = \
             [sa.delete(table).where(table.c.check_type == check_type.name)]
         if results:
-            timestamp = datetime.datetime.now()
+            timestamp = datetime.datetime.now(datetime.timezone.utc)
             ops.append(
                 sa.insert(table).values(
                     [{"check_type": check_type.name, "check_item": key,

@@ -1,0 +1,45 @@
+#
+# Copyright 2022 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Loki config
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: ${GRAFANA_LOKI_DATA_FILESYSTEM_DIRECTORY}
+  storage:
+    filesystem:
+      chunks_directory: ${GRAFANA_LOKI_DATA_FILESYSTEM_DIRECTORY}/chunks
+      rules_directory: ${GRAFANA_LOKI_DATA_FILESYSTEM_DIRECTORY}/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-12-31
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+analytics:
+  reporting_enabled: false
+
+compactor:
+  retention_enabled: true
+  delete_request_store: filesystem
+
+limits_config:
+  retention_period: ${GRAFANA_LOKI_RETENTION_PERIOD}

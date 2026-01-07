@@ -77,8 +77,8 @@ soTable below summarizes these parameters and environment variables:
 |--ext_ras_database **FILENAME**|ULS_EXT_RAS_DATABASE|rat_transfer/RAS_Database/<br>RASdatabase.dat<br>*Defined in dockerfile*|Name of externally maintained 'RAS database' (.csv file with restricted areas)|
 |--ras_database **FILENAME**|ULS_RAS_DATABASE|/mnt/nfs/rat_transfer<br>/daily_uls_parse/data_files<br>/RASdatabase.dat|Where from *daily_uls_parse.py* reads RAS database|
 |--service_state_db_dsn<br>**CONNECTION_STRING**|ULS_SERVICE_STATE_DB_DSN||Connection string to state database. It contains FS service state that is used by healthcheck script. This parameter is mandatory|
-|--service_state_db_create_if_absent|ULS_SERVICE_STATE_DB_CREATE_IF_ABSENT|True|Create state database if absent|
-|--service_state_db_recreate|ULS_SERVICE_STATE_DB_RECREATE|False|Recreate state database if it exists|
+|--service_state_db_password_file<br>**PASSWORD_FILE**|ULS_SERVICE_STATE_DB_PASSWORD_FILE||File with password for FS service state DB|
+|--db_creator_url **URL**|AFC_DB_CREATOR_URL|http://rat_server<br>/fbrat/admin/CreateDb|REST API URL for creating Postgres databases|
 |--prometheus_port **PORT**|ULS_PROMETHEUS_PORT||Port to serve Prometheus metrics on (default is to not serve)|
 |--statsd_server **HOST[:PORT]**|ULS_STATSD_SERVER||StatsD server to send metrics to. Default is to not send|
 |--check_ext_files **BASE_URL:SUBDIR:FILENAME[,FILENAME...][;...**|ULS_CHECK_EXT_FILES|"https://raw.githubusercontent.com<br>/Wireless-Innovation-Forum/<br>6-GHz-AFC/main/data/common_data:<br>raw_wireless_innovation_forum_files:<br>antenna_model_diameter_gain.csv,<br>billboard_reflector.csv,<br>category_b1_antennas.csv,<br>high_performance_antennas.csv,<br>fcc_fixed_service_channelization.csv,<br>transmit_radio_unit_architecture.csv|Certain files used by *daily_uls_parse.py* should be identical to certain files on the Internet. Comparison performed by *uls_service.py*, this parameter specifies what to compare. Several such group may be specified semicolon-separated. This parameter may be specified several times and currently hardcoded in *uls/Dockerfile-uls_service*|

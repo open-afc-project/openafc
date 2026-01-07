@@ -1,3 +1,0 @@
-nonMasqueradeCIDRs:
-- 240.0.0.0/4
-resyncInterval: 60s

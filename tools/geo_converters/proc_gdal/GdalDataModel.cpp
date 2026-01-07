@@ -110,7 +110,7 @@ std::map<int64_t,double> GdalDataModel::getBuildingsAtPoint(double lat, double l
 
     int transformSuccess;
     // Perform transform into WGS-84 lat/lon coordinate system
-    int allTransformSuccess = tmpCoordTransform->TransformEx(1, &lon, &lat, nullptr, &transformSuccess);
+    int allTransformSuccess = tmpCoordTransform->Transform(1, &lon, &lat, nullptr, &transformSuccess);
 
     // Store input point projected into data source's spatial reference
     GdalHelpers::GeomUniquePtr<OGRPoint> testPoint(GdalHelpers::createGeometry<OGRPoint>()); // Create OGRPoint on heap
@@ -203,7 +203,7 @@ void GdalDataModel::printDebugInfo() const
 
                 int transformSuccess;
                 // Perform transform into WGS-84 lat/lon coordinate system
-                int allTransformSuccess = invCoordTransform->TransformEx(1, &lon, &lat, nullptr, &transformSuccess);
+                int allTransformSuccess = invCoordTransform->Transform(1, &lon, &lat, nullptr, &transformSuccess);
 
 #if 1
                 std::cout << "    POINT " << ptIdx << " : " << pRing->getX(ptIdx) << " " << pRing->getY(ptIdx) << " " << lon << " " << lat << std::endl;
@@ -265,8 +265,8 @@ void GdalDataModel::printDebugInfo() const
     double fsY   = fsLat;
 
     int transformSuccess;
-    testCoordTransform->TransformEx(1, &rlanX, &rlanY, nullptr, &transformSuccess);
-    testCoordTransform->TransformEx(1, &fsX,   &fsY,   nullptr, &transformSuccess);
+    testCoordTransform->Transform(1, &rlanX, &rlanY, nullptr, &transformSuccess);
+    testCoordTransform->Transform(1, &fsX,   &fsY,   nullptr, &transformSuccess);
 
     std::cout << "RLAN " << " : " << rlanX << " " << rlanY << " " << rlanLon << " " << rlanLat << std::endl;
     std::cout << "FS   " << " : " <<   fsX << " " <<   fsY << " " <<   fsLon << " " <<   fsLat << std::endl;
@@ -308,7 +308,7 @@ void GdalDataModel::printDebugInfo() const
                 double lat = pRing->getY(ptIdx);
 
                 // Perform transform into WGS-84 lat/lon coordinate system
-                int allTransformSuccess = invCoordTransform->TransformEx(1, &lon, &lat, nullptr, &transformSuccess);
+                int allTransformSuccess = invCoordTransform->Transform(1, &lon, &lat, nullptr, &transformSuccess);
 
                 std::cout << "    POINT " << ptIdx << " : " << pRing->getX(ptIdx) << " " << pRing->getY(ptIdx) << " " << lon << " " << lat << std::endl;
             }
@@ -340,4 +340,108 @@ void GdalDataModel::printDebugInfo() const
     std::cout << "NUM_POLYGON_NOT_CONTAIN_ENDPTS = " << idList.size() << std::endl;
 
 }
+/******************************************************************************************/
 
+/******************************************************************************************/
+/* FUNCTION: GdalDataModel::getExtents()                                              */
+/******************************************************************************************/
+void GdalDataModel::getExtents(double& minLon, double& maxLon,
+                               double& minLat, double& maxLat, double minLonWrap) const
+{
+    bool initFlag = true;
+    int numPolygon = 0;
+    std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter> ptrOFeature;
+    // Iterate over features defined in current layer
+    std::map<int64_t,double> returnMap;
+    _ptrLayer->ResetReading();
+
+    while ((ptrOFeature = std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter>(_ptrLayer->GetNextFeature())) != NULL) {
+        // GDAL maintains ownership of returned pointer, so we should not manage its memory
+        OGRGeometry *ptrOGeometry = ptrOFeature->GetGeometryRef();
+
+        if (ptrOGeometry != NULL) {
+            bool useGeometryFlag;
+            bool isMultiPolygonFlag;
+            bool cont;
+            OGRMultiPolygon *multipoly;
+            OGRPolygon *poly;
+            OGRPolygon **iter;
+            OGRwkbGeometryType geometryType = ptrOGeometry->getGeometryType();
+            if (geometryType == OGRwkbGeometryType::wkbPolygon) {
+                poly = (OGRPolygon *) ptrOGeometry;
+                useGeometryFlag = true;
+                isMultiPolygonFlag = false;
+            } else if (geometryType == OGRwkbGeometryType::wkbMultiPolygon ) {
+                multipoly = (OGRMultiPolygon *) ptrOGeometry;
+                iter = multipoly->begin();
+                if (iter != multipoly->end()) {
+                    useGeometryFlag = true;
+                } else {
+                    useGeometryFlag = false;
+                }
+                isMultiPolygonFlag = true;
+            } else {
+                useGeometryFlag = false;
+                isMultiPolygonFlag = false;
+                std::cout << "Ignore features of type: " << OGRGeometryTypeToName(geometryType) << std::endl;
+            }
+
+            if (useGeometryFlag) {
+                do {
+                    if (isMultiPolygonFlag) {
+                        poly = *iter;
+                    }
+
+                    OGRLinearRing *pRing = poly->getExteriorRing();
+                    int numPoints = pRing->getNumPoints();
+                    // std::cout << "NUM_POINTS = " << pRing->getNumPoints() << std::endl;
+                    if (numPoints > 2) {
+                        for(int ptIdx=0; ptIdx<pRing->getNumPoints(); ptIdx++) {
+                            double lon = pRing->getX(ptIdx);
+                            double lat = pRing->getY(ptIdx);
+
+                            while(lon < minLonWrap) {
+                                lon += 360.0;
+                            }
+                            while(lon >= minLonWrap+360.0) {
+                                lon -= 360.0;
+                            }
+                            if (initFlag) {
+                                minLon = lon;
+                                maxLon = lon;
+                                minLat = lat;
+                                maxLat = lat;
+                                initFlag = false;
+                            } else {
+                                if (lon < minLon) {
+                                    minLon = lon;
+                                } else if (lon > maxLon) {
+                                    maxLon = lon;
+                                }
+                                if (lat < minLat) {
+                                    minLat = lat;
+                                } else if (lat > maxLat) {
+                                    maxLat = lat;
+                                }
+                            }
+                        }
+                    } else {
+                        std::cout << "WARNING: Polygon has " << numPoints << " virtices" << std::endl;
+                    }
+
+                    if (isMultiPolygonFlag) {
+                        iter++;
+                        if (iter != multipoly->end()) {
+                            cont = true;
+                        } else {
+                            cont = false;
+                        }
+                    } else {
+                        cont = false;
+                    }
+                } while(cont);
+            }
+        }
+    }
+}
+/******************************************************************************************/

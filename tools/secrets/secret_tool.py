@@ -358,7 +358,8 @@ def do_export(args: Any) -> None:
                     continue
                 try:
                     filename = os.path.join(args.secrets_dir, secret_name)
-                    with open(filename, mode=mode, encoding=encoding) as f:
+                    with open(filename, mode=mode, encoding=encoding,
+                              newline="\n") as f:
                         if not args.empty:
                             f.write(secret_value)
                 except OSError as ex:

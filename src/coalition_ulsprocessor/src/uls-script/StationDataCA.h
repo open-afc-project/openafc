@@ -32,6 +32,7 @@ class StationDataCAClass
 		double lineLoss;
 		std::string inServiceDate;
 		std::string stationLocation;
+		std::string ituClass;
 		std::string antennaManufacturer;
 
 		Vector3 position;

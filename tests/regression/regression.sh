@@ -9,7 +9,7 @@
 PRIV_REPO="${PRIV_REPO:=ghcr.io/open-afc-project}"
 PUB_REPO="${PUB_REPO:=ghcr.io/open-afc-project}"
 
-SRV="${PRIV_REPO}/afc-server"                                         # server image
+WEBUI="${PRIV_REPO}/webui-image"                             # Web server image
 MSGHND="${PRIV_REPO}/afc-msghnd"                             # msghnd image
 OBJST="${PUB_REPO}/objstorage-image"                         # object storage
 RATDB=${PUB_REPO}"/ratdb-image"                                  # ratdb image
@@ -21,13 +21,14 @@ BULK_POSTGRES="${PUB_REPO}/bulk-postgres-image" # PostgreSQL for bulk stuff (ALS
 RCACHE="${PUB_REPO}/rcache-image"                             # Request cache
 AFC_SERVER="${PUB_REPO}/afcserver-image"                      # AFC Server image
 GRAFANA="${PUB_REPO}/grafana-image"                           # Grafana
+LOKI="${PUB_REPO}/loki-image"                                 # Loki
+PROMTAIL="${PUB_REPO}/promtail-image"                         # Promtail
 PROMETHEUS="${PUB_REPO}/prometheus-image"                     # Prometheus
 CADVISOR="${PUB_REPO}/cadvisor-image"                         # Cadvisor
 NGINXEXPORTER="${PUB_REPO}/nginxexporter-image"               # Nginx-exporter
+GEO_CONVERTERS="${PUB_REPO}/geo-converters-image"             # Geodeti cconverters
 
 WORKER=${PRIV_REPO}"/afc-worker"                                    # msghnd image
-WORKER_AL_D4B="${PUB_REPO}/worker-al-build-image" # Alpine worker build img
-WORKER_AL_PRINST="${PUB_REPO}/worker-al-preinstall" # Alpine worker preinst
 
 ULS_UPDATER=${PRIV_REPO}"/uls-updater"                # ULS Updater image
 ULS_DOWNLOADER="${PUB_REPO}/uls-downloader" # ULS Downloader image
@@ -122,66 +123,111 @@ build_dev_server() {
   docker_build tests/Dockerfile ${RTEST_DI}:${tag}
   check_ret $?
 
-  # build in parallel server docker prereq images (preinstall and docker_for_build)
-    docker_build_and_push ${wd}/worker/Dockerfile.build ${WORKER_AL_D4B}:${tag} ${push} &
-    docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${WORKER_AL_PRINST}:${tag} ${push} &
+  build_pids=(); build_names=(); failed_images=()
 
   msg "wait for prereqs to be built"
   # wait for background jobs to be done
-  wait
+  for i in ${!build_pids[@]}; do
+    if ! wait ${build_pids[$i]}; then
+      failed_images+=( ${build_names[$i]} )
+    fi
+  done
+  build_pids=(); build_names=()
   msg "prereqs are built"
 
   # build of ULS dockers
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=${BUILDREV}"
   docker_build_and_push ${wd}/uls/Dockerfile-uls_service ${ULS_DOWNLOADER}:${tag} ${push} "${EXT_ARGS}" &
+  build_pids+=( $! ) ; build_names+=( ${ULS_DOWNLOADER} )
 
   # build msghnd  (flask + gunicorn)
   docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${MSGHND} )
 
   # build worker image
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=worker"
   docker_build_and_push ${wd}/worker/Dockerfile   ${WORKER}:${tag} ${push} "${EXT_ARGS}" &
+  build_pids+=( $! ) ; build_names+=( ${WORKER} )
 
   # build afc ratdb docker image
   docker_build_and_push ${wd}/ratdb/Dockerfile ${RATDB}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${RATDB} )
 
   # build afc dynamic data storage image
-  docker_build_and_push ${wd}/objstorage/Dockerfile ${OBJST}:${tag} ${push}&
+  docker_build_and_push ${wd}/objstorage/Dockerfile ${OBJST}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${OBJST} )
   cd ${wd}
 
   # build afc rabbit MQ docker image
   docker_build_and_push ${wd}/rabbitmq/Dockerfile ${RMQ}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${RMQ} )
 
   # build afc dispatcher docker image
   docker_build_and_push ${wd}/dispatcher/Dockerfile ${DISPATCHER}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${DISPATCHER} )
 
   # build afc server docker image
   EXT_ARGS="--build-arg BUILDREV=${BUILDREV}"
-  docker_build_and_push ${wd}/rat_server/Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}"
+  docker_build_and_push ${wd}/rat_server/Dockerfile ${WEBUI}:${tag}  ${push} "${EXT_ARGS}" &
+  build_pids+=( $! ) ; build_names+=( ${WEBUI} )
 
   # build ALS-related images
   docker_build_and_push ${wd}/als/Dockerfile.siphon ${ALS_SIPHON}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${ALS_SIPHON} )
+
   cd ${wd}/als && docker_build_and_push Dockerfile.kafka ${ALS_KAFKA}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${ALS_KAFKA} )
+
   cd ${wd}/bulk_postgres && docker_build_and_push Dockerfile ${BULK_POSTGRES}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${BULK_POSTGRES} )
   cd ${wd}
 
    # build cert db image
   docker_build_and_push ${wd}/cert_db/Dockerfile ${CERT_DB}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${CERT_DB} )
 
   # Build Request Cache
   docker_build_and_push ${wd}/rcache/Dockerfile ${RCACHE}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${RCACHE} )
 
   # Build AFC Server
   docker_build_and_push ${wd}/afc_server/Dockerfile ${AFC_SERVER}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${AFC_SERVER} )
 
   # Build Prometheus-related images
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-prometheus ${PROMETHEUS}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${PROMETHEUS} )
+
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-cadvisor ${CADVISOR}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${CADVISOR} )
+
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-nginxexporter ${NGINXEXPORTER}:${tag} ${push} &
-  cd ${wd}/prometheus && docker_build_and_push Dockerfile-grafana ${GRAFANA}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${NGINXEXPORTER} )
+
+  docker_build_and_push ${wd}/grafana/Dockerfile-grafana ${GRAFANA}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${GRAFANA} )
+
+  cd ${wd}/grafana && docker_build_and_push Dockerfile-loki ${LOKI}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${LOKI} )
+
+  cd ${wd}/grafana && docker_build_and_push Dockerfile-promtail ${PROMTAIL}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${PROMTAIL} )
+
+  cd ${wd}/tools/geo_converters && docker_build_and_push Dockerfile ${GEO_CONVERTERS}:${tag} ${push} &
+  build_pids+=( $! ) ; build_names+=( ${GEO_CONVERTERS} )
 
   msg "wait for all images to be built"
-  wait
+
+  for i in ${!build_pids[@]}; do
+    if ! wait ${build_pids[$i]}; then
+      failed_images+=( ${build_names[$i]} )
+    fi
+  done
+
+  if [ ${#failed_images[@]} -ne 0 ]; then
+    msg "Failed images:  ${failed_images[@]}"
+    exit 1
+  fi
   msg "-done-"
 }
 # Local Variables:

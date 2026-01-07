@@ -6,31 +6,32 @@
 #
 # Install required packages
 #
-FROM alpine:3.18 as cert_db.preinstall
+FROM python:3.12-alpine3.21
+# This variable should be set to used Python version (major.minor only)
+ENV AFC_PYTHONVERSION=3.12
+
 ENV PYTHONUNBUFFERED=1
-RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && \
-apk add --update --no-cache py3-sqlalchemy py3-cryptography py3-numpy \
-py3-requests py3-flask py3-psycopg2 py3-pydantic=~1.10 && python3 -m ensurepip && \
-pip3 install --no-cache --upgrade pip setuptools
 
-# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
-# installed as Alpine package (thus not requiring gcc and musl-dev install)
-RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1 && \
-    pip3 install confluent-kafka==2.1.1 && \
-    apk del python3-dev gcc musl-dev
+# CMake installs packages to /usr/lib even though this image uses /usr/local/lib
+ENV PYTHONPATH=/usr/lib/python${AFC_PYTHONVERSION}/site-packages:/usr/local/lib/python${AFC_PYTHONVERSION}/site-packages:${PYTHONPATH}
 
+# Installing Python libraries
+#   Version of librdkafka-dev depends on Alpine version. confluent-kafka
+#   version in requirements.txt may need to be updated on Alpine version change
+RUN apk add --update --no-cache librdkafka-dev
 COPY cert_db/requirements.txt /wd/
-RUN pip3 install -r /wd/requirements.txt && mkdir -p /etc/xdg/fbrat
+RUN apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base && \
+    pip3 install --no-cache-dir -r /wd/requirements.txt && \
+    apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
+
+RUN mkdir -p /etc/xdg/fbrat
 COPY config/ratapi.conf /etc/xdg/fbrat/
 RUN echo "AFC_APP_TYPE = 'cert_db'" >> /etc/xdg/fbrat/ratapi.conf
 #
 # Build Message Handler application
 #
-FROM alpine:3.18 as cert_db.build
-COPY --from=cert_db.preinstall / /
+
 # Development env
-RUN apk add --update --no-cache cmake ninja
 #
 COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /wd/
 COPY cmake /wd/cmake/
@@ -38,17 +39,19 @@ COPY pkg /wd/pkg/
 COPY src /wd/src/
 RUN mkdir -p -m 777 /wd/build
 ARG BUILDREV=localbuild
-RUN cd /wd/build && \
-cmake -DCMAKE_INSTALL_PREFIX=/wd/__install -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
-ninja -j$(nproc) install
+
+RUN apk add --update --no-cache cmake ninja && \
+cd /wd/build && \
+cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
+env PYTHONPATH=${PYTHONPATH} \
+ninja -j$(nproc) install && \
+apk del --purge cmake ninja && rm -rf /wd/cmake/ /wd/pkg/ /wd/src/ /wd/build
+
 #
 # Install FCCID_DB application
 #
-FROM alpine:3.18 as cert_db.install
-COPY --from=cert_db.preinstall / /
-COPY --from=cert_db.build /wd/__install /usr/
 COPY src/afc-packages /wd/afc-packages
-RUN pip3 install --use-pep517 --root-user-action=ignore \
+RUN pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
         -r /wd/afc-packages/pkgs.cert_db \
     && rm -rf /wd/afc-packages
 RUN mkdir -m 755 -p /var/lib/fbrat
@@ -59,16 +62,24 @@ RUN addgroup -g 1003 fbrat && \
 adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat && \
 chown fbrat:fbrat /var/lib/fbrat
 #
+# Prevent Rcache client initialization (fails on parameter checking)
+ENV RCACHE_ENABLED=False
+# Space-separated list of regions to sweep
+ENV SWEEP_REGIONS="US CA"
+# DDelay before first sweep
+ENV SWEEP_DELAY=20s
+# Sweep periodicity in sleep units
+ENV SWEEP_PERIOD=1d
+# REST request timeout in seconds
+ENV REQUEST_TIMEOUT_SEC=500
+
 LABEL revision="afc-cert_db"
 WORKDIR /wd
-COPY cert_db/entrypoint.sh /
-# Add debugging env if configured
-ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
-COPY cert_db/devel.sh /wd/
-RUN chmod +x /wd/devel.sh
+ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
+COPY cert_db/entrypoint.sh cert_db/devel.sh cert_db/sweep.sh /wd/
+RUN chmod +x /wd/devel.sh /wd/sweep.sh /wd/entrypoint.sh
 RUN /wd/devel.sh
 #
-ADD cert_db/sweep.sh /etc/periodic/daily/
-RUN chmod 744 /etc/periodic/daily/sweep.sh
-RUN chmod +x /entrypoint.sh
-CMD ["/entrypoint.sh"]
+CMD ["/wd/entrypoint.sh"]
+
+HEALTHCHECK --start-period=30m CMD test `find /wd/touchfile -mtime -3`

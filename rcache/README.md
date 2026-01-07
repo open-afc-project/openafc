@@ -69,19 +69,25 @@ Following services interoperate with Rcache service or library:
 
 All Rcache service, Rcache client library and, to certain extent, Rcache tool are configured by means of environment variables, passed to containers. All these variables have `RCACHE_` prefix. Here are these environment variables
 
-|Name|Current value|Defined in|Images <br>using it|Meaning|
-|----|-------------|----------|---------------|-------|
-|<small>RCACHE_ENABLED</small>|True|`.env`|rcache,<br>msghnd,<br>rat_server,<br>worker,<br>uls_downloader|TRUE to use Rcache for synchronous non-GUI requests. FALSE to use legacy ObjStore-based cache|
-|<small>RCACHE_CLIENT_PORT</small>|8000|.env, <br>docker-compose.yaml,<br>tools/rcache/<br>Dockerfile|rcache,<br>rcache_tool|Port on which Rcache REST API service is listening. Also this port is a part of **RCACHE_SERVICE_URL** environment variable, passed to other containers (see below)|
-|<small>RCACHE_<br>POSTGRES_<br>DSN</small>|<small>postgresql://<br>postgres:postgres@<br>bulk_postgres/rcache</small>|docker-compose.yaml,<br>tools/rcache/<br>Dockerfile|rcache,<br>rat_server,<br>msghnd,<br>rcache_tool|Connection string to Postgres database that stores cache|
-|<small>RCACHE_<br>SERVICE_<br>URL</small>|<small>http://rcache:<br>$\{RCACHE_CLIENT_PORT\}</small>|docker-compose.yaml,<br>tools/rcache/<br>Dockerfile|msghnd,<br>rat_server,<br>worker,<br>uls_downloader,<br>rcache_tool|Rcache service REST API URL|
-|<small>RCACHE_RMQ_<br>DSN</small>|<small>amqp://rcache:rcache@<br>rmq:5672/rcache</small>|docker-compose.yaml|msghnd,<br>rat_server,<br>worker|RabbitMQ AMQP URL Worker uses to send and msghnd/rat_server to receive AFC Response. Note that user and vhost (rcache and rcache in this URL) should be properly configured in RabbitMQ service|
-|<small>RCACHE_AFC_<br>REQ_URL</small>|<small>http://msghnd:8000/<br>fbrat/ap-afc/<br>availableSpectrumInquiry?<br>nocache=True</small>|docker-compose.yaml|rcache|REST API Rcache service uses to launch precomputation requests. No precomputation if this environment variable empty or not defined|
-|<small>RCACHE_<br>RULESETS_<br>URL</small>|<small>http://rat_server/fbrat/<br>ratapi/v1/GetRulesetIDs</small>|docker-compose.yaml|rcache|REST API URL to request list of Ruleset IDs in use. If empty or not defined default AFC distance (130km as of time of this writing) is used for spatial invalidation|
-|<small>RCACHE_CONFIG_<br>RETRIEVAL_URL</small>|<small>http://rat_server/fbrat/<br>ratapi/v1/<br>GetAfcConfigByRulesetID</small>|docker-compose.yaml|rcache|REST API URL to request AFC Config by for Ruleset ID. If empty or not defined default AFC distance (130km as of time of this writing) is used for spatial invalidation|
-|<small>RCACHE_UPDATE_<br>ON_SEND</small>|True|worker/Dockerfile|worker|TRUE if worker sends update request to Rcache service (this speeds up AFC request processing, but prolongs worker existence). FALSE if msghnd/rat_server send update request to Rcache service. This setting consumed by worker, but indirectly affects msghnd and rat_server services operation|
-|<small>RCACHE_IF_<br>DB_EXISTS</small>|leave|rcache/Dockerfile|rcache|What to do with Rcache database if it exists when service started: **leave** - to leave as is, **recreate** - to create from scratch (losing unknown tables, like from Alembic, etc.), **clean** - to clean but leave other tables intact|
-|<small>RCACHE_<br>PRECOMPUTE_<br>QUOTA</small>|10|rcache/Dockerfile|rcache|Maximum number of parallel precompute requests. Also can be changed on the fly with Rcache service REST API|
+|Name|Trivia|Meaning|
+|----|------|-------|
+|<small>**RCACHE_ENABLED**</small>|<small>*Current value*: True<br>*Defined in*: .env<br>*Used in images*: rcache, msghnd, rat_server, worker, uls_downloader</small>|TRUE to use Rcache for synchronous non-GUI requests. FALSE to use legacy ObjStore-based cache|
+|<small>**RCACHE_CLIENT_PORT**</small>|<small>*Current value*: 8000<br>*Defined in*: .env, docker-compose.yaml, tools/rcache/Dockerfile<br>*Used in images*: rcache, rcache_tool</small>|Port on which Rcache REST API service is listening. Also this port is a part of **RCACHE_SERVICE_URL** environment variable, passed to other containers (see below)|
+|<small>**RCACHE_POSTGRES_DSN**</small>|<small>*Current value*: postgresql://postgres:postgres@bulk_postgres/rcache<br>*Defined in*: docker-compose.yaml, tools/rcache/Dockerfile<br>*Used in images*: rcache, rat_server, msghnd, rcache_tool</small>|Connection string to Postgres database that stores cache|
+|<small>**RCACHE_POSTGRES_PASSWORD_FILE**</small>|<small>*Current value*: <SECRETS_DIRECTORY>/RCACHE_DB_PASSWORD<br>*Defined in*: docker-compose.yaml, tools/rcache/Dockerfile<br>*Used in images*: rcache, rat_server, msghnd, rcache_tool</small>|File containing password for Rcache DB DSN|
+|<small>**AFC_DB_CREATOR_URL**</small>|<small>*Current value*: http://rat_server/fbrat/admin/CreateDb<br>*Defined in*: docker-compose.yaml<br>*Used in images*: rcache</small>|REST API URL for Postgres database creation|
+|<small>**RCACHE_SERVICE_URL**</small>|<small>*Current value*: http://rcache:$\{RCACHE_CLIENT_PORT\}<br>*Defined in*: docker-compose.yaml, tools/rcache/Dockerfile<br>*Used in images*: msghnd, rat_server, worker, uls_downloader, rcache_tool</small>|Rcache service REST API URL|
+|<small>**RCACHE_RMQ_DSN**</small>|<small>*Current value*: amqp://rcache:rcache@<br>rmq:5672/rcache<br>*Defined in*: docker-compose.yaml<br>*Used in images*: msghnd, rat_server, worker</small>|RabbitMQ AMQP URL Worker uses to send and msghnd/rat_server to receive AFC Response. Note that user and vhost (rcache and rcache in this URL) should be properly configured in RabbitMQ service|
+|<small>**RCACHE_AFC_REQ_URL**</small>|<small>*Current value*: http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry?nocache=True<br>*Defined in*: docker-compose.yaml<br>*Used in images*: rcache</small>|REST API Rcache service uses to launch precomputation requests. No precomputation if this environment variable empty or not defined|
+|<small>**RCACHE_RULESETS_URL**</small>|<small>*Current value*: http://rat_server/fbrat/ratapi/v1/GetRulesetIDs<br>*Defined in*: docker-compose.yaml<br>*Used in images*: rcache</small>|REST API URL to request list of Ruleset IDs in use. If empty or not defined default AFC distance (130km as of time of this writing) is used for spatial invalidation|
+|<small>**RCACHE_CONFIG_RETRIEVAL_URL**</small>|<small>*Current value*: http://rat_server/fbrat/ratapi/v1/GetAfcConfigByRulesetID<br>*Defined in*: docker-compose.yaml<br>*Used in images*: rcache</small>|REST API URL to request AFC Config by for Ruleset ID. If empty or not defined default AFC distance (130km as of time of this writing) is used for spatial invalidation|
+|<small>**RCACHE_PRECOMPUTE_QUOTA**</small>|<small>*Current value*: 10<br>*Defined in*: rcache/Dockerfile<br>*Used in images*: rcache</small>|Maximum number of parallel precompute requests. Also can be changed on the fly with Rcache service REST API|
+|<small>**RCACHE_UVICORN_PARAMS**</small>|<small>*Current value*: "--no-access-log --log-level info"<br>*Defined in*: rcache/Dockerfile<br>*Used in images*: rcache</small>||
+|<small>**RCACHE_ALEMBIC_CONFIG**</small>|<small>*Current value*: /wd/migrations/alembic.ini<br>*Defined in*: rcache/Dockerfile<br>*Used in images*: rcache</small>|Alembic config file in image filesystem. If undefined - no Alembic upgrades is performed|
+|<small>**RCACHE_ALEMBIC_INITIAL_VERSION**</small>|<small>*Current value*: 5663cf8afbd7<br>*Defined in*: rcache/Dockerfile<br>*Used in images*: rcache</small>|Assumed alembic version of alembicless database|
+|<small>**RCACHE_ALEMBIC_HEAD_VERSION**</small>|<small>*Current value*: head<br>*Defined in*: nowhere<br>*Used in images*: rcache</small>|Latest/current Alembic version|
+
+
 
 ## Client API <a name="client_api"/>
 
@@ -173,8 +179,7 @@ Table name is `aps`, each of its rows represent data on a single AP. It has foll
 |cert_ids|Yes|Yes|String|Request Certification IDs, concatenated with `|`. Kinda AP manufacturer|
 |state|No|Yes|Enum<br>(Valid,<br>Invalid,<br>Precomp)|Row state. **Valid** - may be used, **Invalid** - invalidated, to be precomputed, **Precomp** - precomputation is in progress|
 |config_ruleset|No|Yes|String|Ruleset ID used for computation. Used for invalidation by Ruleset ID (i.e. by AFC Config change)|
-|lat_deg|No|Yes|Float|AP Latitude as north-positive degree. Used for spatial invalidation (on FS data change)|
-|lon_deg|No|Yes|Float|AP Longitude as east-positive degree. Ditto.
+|coordinates|No|Yes|geography(POINT,4326)|AP coordinate. Used for spatial invalidation (on FS data change)|
 |last_update|No|Yes|DateTime|Timetag of last update - eventually may be used for removal of old rows|
 |req_cfg_digest|No|Yes|String|Hash, computed over AFC Request and AFC Config. Used as key for cache lookup|
 |validity_period_sec|No|No|Float|Validity period of original response. Used to compute expiration time of response retrieved from cache|

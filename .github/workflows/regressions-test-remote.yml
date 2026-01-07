@@ -78,13 +78,13 @@ jobs:
 # start dev srvr {
     - name: run remote srvr
       run: |
-          ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "sh -x ${{ env.WD }}/${{ env.REGRD }}/run_srvr.sh ${{ env.WD }} ${{ env.RAND }} 1"
+          ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "EXT_IP=${{ secrets.INT_TO_EXT_IPADDR }} sh -x ${{ env.WD }}/${{ env.REGRD }}/run_srvr.sh ${{ env.WD }} ${{ env.RAND }} 1"
 # } start dev srvr
 
 # get dev srvr port num{
     - name: get dev srvr port num
       run: |
-          echo TEST_PORT=`ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "cd ${{ env.WD }}/${{ env.REGRD }} && TAG=${{ env.RAND }} docker-compose port dispatcher 443 |sed 's/.*://'"` >> $GITHUB_ENV
+          echo TEST_PORT=`ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "cd ${{ env.WD }}/${{ env.REGRD }} && TAG=${{ env.RAND }} docker-compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE port dispatcher 443 |sed 's/.*://'"` >> $GITHUB_ENV
 # } get dev srvr port num
 
 # open srvr test port {

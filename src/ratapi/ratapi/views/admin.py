@@ -15,16 +15,20 @@ import contextlib
 import shutil
 import flask
 import datetime
+import urllib.parse
 from flask.views import MethodView
 from fst import DataIf
 from ncli import MsgPublisher
 from werkzeug import exceptions
 from sqlalchemy.exc import IntegrityError
+import sqlalchemy as sa
 import werkzeug
 import afcmodels.aaa as aaa
 from afcmodels.hardcoded_relations import RulesetVsRegion
 from .auth import auth
 from afcmodels.base import db
+import db_creator
+import db_utils
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -587,6 +591,8 @@ class AllowedFreqRanges(MethodView):
 
     def get(self):
         """GET method for allowed frequency bands"""
+        user_id = auth(roles=["Admin", "AP", "Analysis"])
+        LOGGER.debug("current user: %s", user_id)
         LOGGER.debug("getting admin supplied frequncy bands")
         filename = "allowed_frequencies.json"
         if filename not in self.ACCEPTABLE_FILES:
@@ -755,6 +761,32 @@ class MTLS(MethodView):
         return flask.make_response()
 
 
+class CreateDb(MethodView):
+    """ (Re)creator of absent Postgres databases """
+
+    # Default PostgreSQL port
+    DEFAULT_PORT = 5432
+    # Prefix for db creator user/database (usually `postgres/postgres`) DSNs
+    # on various servers
+    DSN_ENV_PREFIX = "AFC_DB_CREATOR_DSN_"
+    # Prefix for correspondent password filename environment variables
+    PASSWORD_FILE_ENV_PREFIX = "AFC_DB_CREATOR_PASSWORD_FILE_"
+
+    def post(self):
+        """ Postgres database creation REST API
+
+        POST CreateDb?dsn=<DSN>[&recreate=<True/False>][&owner=<True/False>]
+        """
+        dsn = db_utils.safe_dsn(flask.request.args.get('dsn', 'Unknown'))
+        try:
+            db_creator.ensure_dsn(**flask.request.args, local=True)
+            LOGGER.info(f"Database '{dsn}' created")
+            return flask.make_response()
+        except RuntimeError as ex:
+            LOGGER.error(f"Error creating databse '{dsn}': {ex}")
+            raise werkzeug.exceptions.BadRequest(str(ex))
+
+
 module.add_url_rule("/user/<int:user_id>", view_func=User.as_view("User"))
 module.add_url_rule("/user/ap_deny/<int:id>",
                     view_func=AccessPointDeny.as_view("AccessPointDeny"))
@@ -768,3 +800,4 @@ module.add_url_rule(
     "/user/denied_regions/<string:regionStr>",
     view_func=DeniedRegion.as_view("DeniedRegion"),
 )
+module.add_url_rule("/CreateDb", view_func=CreateDb.as_view("CreateDb"))
