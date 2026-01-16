@@ -19,7 +19,7 @@ make_client_cert()
     local ca_crt="test_ca_crt.pem"
     local ca_key="test_ca_key.pem"
     #local cli_addr=$(hostname -i)
-    local cli_addr=$(ifconfig eth0 | grep 'inet ' | awk '{ print $2}')
+    local cli_addr=$(ifconfig | grep 'inet '| head -1 | awk '{ print $2}')
 
     mkdir $cli_name
     make_key $cli_name

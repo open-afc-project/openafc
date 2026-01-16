@@ -425,10 +425,19 @@ def create_email_attachment(filename):
 
 def send_email(cfg):
     """Send an email to predefined adress using gmail smtp server"""
-    sender = cfg['email_from']
-    recipient = cfg['email_to']
+    sender = cfg.get('email_from')
+    recipient = cfg.get('email_to')
+
+    if sender is None or recipient is None:
+        app_log.warning("Sender or recipient email is not defined.")
+        return
+
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
                   f" from: {sender}, to: {recipient}")
+    if isinstance(cfg['email_to'], type(None)):
+        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
+                      f" Not sending email because no receiver specified")
+        return
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
         server.login(sender, cfg['email_pwd'])
@@ -547,6 +556,10 @@ def _send_recv(cfg, req_data, ssn=None):
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as err:
         app_log.error(f"{err}")
+        return
+
+    if (rawresp.status_code != 200):
+        app_log.error(f"Error in request to service: Response status code {rawresp.status_code} : {rawresp.reason}")
         return
 
     resp = rawresp.json()
@@ -1221,13 +1234,18 @@ def export_admin_config(cfg):
         found_aps = cur.fetchall()
         con.close()
 
+        afc = ''
+        for count, val in enumerate(found_cfg):
+            afc += str(val[1]) + ','
+        app_log.debug('Found AFCs: %s\n', afc[:-1])
+
         aps = ''
         idx = 0
         for count, val in enumerate(found_aps):
             aps += str(val[1]) + ','
         app_log.debug('Found APs: %s\n', aps[:-1])
 
-        out_str = '{"afcAdminConfig":' + found_cfg[0][1] + ', '\
+        out_str = '{"afcAdminConfig":{ "afcConfigs": [' + afc[:-1] + ']}' + ', '\
                   '"userConfig":' + found_user[0][1] + ', '\
                   '"apConfig":[' + aps[:-1] + ']}'
         fp_exp.write(out_str)
@@ -1693,9 +1711,17 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         if isinstance(resp, type(None)):
             test_res = AFC_ERR
             all_test_res = AFC_ERR
-        elif cfg['webui'] is True:
-            pass
+        elif 'error' in resp:
+            app_log.error(f"Test case {req_id} returned error: {resp['error']}")
+            test_res = AFC_ERR
         else:
+            if cfg['webui'] is True:
+                # remove the mapping info from the response
+                # to make sure the base data matches - not checking map results
+                parent = resp['availableSpectrumInquiryResponses'][0]
+                if 'vendorExtensions' in parent:
+                    parent.pop('vendorExtensions')
+
             json_lookup('availabilityExpireTime', resp, '0')
             upd_data = json.dumps(resp, sort_keys=True)
 
@@ -1722,6 +1748,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
 
         # For saving test results option
         if not isinstance(cfg['outfile'], type(None)):
+            app_log.debug(f"upd_data: {upd_data}")
             test_report(cfg['outfile'][0], float(tm_secs),
                         test_case, req_id,
                         ("PASS" if test_res == AFC_OK else "FAIL"),
