@@ -21,6 +21,12 @@ ENV VIRTUAL_ENV=/venv
 # to alleviate various venv shortcomings
 ENV PYTHONPATH=/venv/lib/python${AFC_PYTHONVERSION}/site-packages:/usr/lib/python${AFC_PYTHONVERSION}/site-packages:${PYTHONPATH}
 
+# Configure pip and npm to use package registry proxies (optional)
+ARG PIP_INDEX_URL
+ARG NPM_REGISTRY
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+ENV NPM_REGISTRY=${NPM_REGISTRY}
+
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka
 #   version in requirements.txt may need to be updated on Alpine version change
@@ -56,9 +62,27 @@ ARG NODE_OPTIONS=--openssl-legacy-provider
 RUN apk list -I && \
     apk add --update --no-cache build-base cmake ninja yarn \
         apr-util-dev python3-dev=~${AFC_PYTHONVERSION} && \
+    (if [ -n "${NPM_REGISTRY}" ]; then \
+        yarn config set registry ${NPM_REGISTRY} && \
+        # Network timeout set to 10 minutes (600000ms) to handle slow corporate proxies
+        # and large package downloads. Default is 60s which may be insufficient.
+        yarn config set network-timeout 600000 && \
+        # Limit concurrency to 1 to avoid overwhelming proxy servers
+        yarn config set network-concurrency 1 && \
+        echo "registry \"${NPM_REGISTRY}\"" > /wd/src/web/.yarnrc && \
+        echo "network-timeout 600000" >> /wd/src/web/.yarnrc && \
+        echo "network-concurrency 1" >> /wd/src/web/.yarnrc && \
+        if [ -f /wd/src/web/yarn.lock ]; then \
+            sed -i "s|https://registry\.yarnpkg\.com/|${NPM_REGISTRY}|g" /wd/src/web/yarn.lock; \
+        fi; \
+    fi) && \
     cd /wd/build && \
     cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiWebDebug -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
+    (if [ -n "${NPM_REGISTRY}" ] && [ -f /wd/build/src/web/pkg/yarn.lock ]; then \
+        sed -i "s|https://registry\.yarnpkg\.com/|${NPM_REGISTRY}|g" /wd/build/src/web/pkg/yarn.lock; \
+    fi) && \
     env PYTHONPATH=${PYTHONPATH} \
+        NPM_REGISTRY=${NPM_REGISTRY} \
         ninja -j$(nproc) install && \
     yarn cache clean && \
     apk del --purge build-base cmake ninja yarn apr-util-dev python3-dev && \
