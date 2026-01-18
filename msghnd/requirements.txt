@@ -62,6 +62,6 @@ SQLAlchemy==1.4.54
 typeguard==2.13.3
 urllib3==1.26.19
 vine==5.1.0
-Werkzeug==3.0.6
+Werkzeug==3.1.5
 WsgiDAV==4.1.0
 WTForms==3.0.1
