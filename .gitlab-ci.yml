@@ -6,6 +6,18 @@
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 
+# Configure Broadcom Artifactory proxies for pip and npm to mitigate supply chain attacks
+variables:
+  PIP_INDEX_URL: "https://usw2p-edge.packages.broadcom.net/artifactory/api/pypi/pypi-remote/simple"
+  NPM_REGISTRY: "https://usw2p-edge.packages.broadcom.net/artifactory/api/npm/npm/"
+
+# Global before_script to configure npm registry for all jobs
+before_script:
+  - |
+    if type npm >/dev/null 2>&1 || hash npm 2>/dev/null || command -v npm >/dev/null 2>&1; then
+      npm config set registry ${NPM_REGISTRY} || true
+    fi
+
 stages:          # List of stages for jobs, and their order of execution
   - merge_upstream
   - getsrc
@@ -24,6 +36,10 @@ merge_upstream_changes:
   environment:
     name: development
   before_script:
+  - |
+    if type npm >/dev/null 2>&1 || hash npm 2>/dev/null || command -v npm >/dev/null 2>&1; then
+      npm config set registry ${NPM_REGISTRY} || true
+    fi
   - git remote set-url origin https://git:${CI_PUSH_TOKEN}@wcc-gitlab.lvn.broadcom.net:30443/afc/brcm-afc.git
   - git config --global user.email "gitlab-runner@broadcom.com"
   - git config --global user.name "gitlab-runner"
@@ -81,6 +97,7 @@ build_job:
   environment:
     name: development
   before_script:
+    - npm config set registry https://usw2p-edge.packages.broadcom.net/artifactory/api/npm/npm/ || true
     - if [ "$PUSH_DI" = "1" ]; then echo $ARTIFACTORY_PASSWORD | docker login -u $ARTIFACTORY_USER --password-stdin $PRIV_REPO; fi
   script:
     ######## git clone sources ##############
@@ -119,6 +136,7 @@ test_job:
   variables:
     RUN_FROM_RAND: 1
   before_script:
+    - npm config set registry https://usw2p-edge.packages.broadcom.net/artifactory/api/npm/npm/ || true
     # start dev srvr
     - bash "${WD}/${REGRD}/run_srvr.sh" ${WD} ${RAND} ${RUN_FROM_RAND}
   script:
