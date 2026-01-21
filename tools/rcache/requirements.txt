@@ -4,12 +4,12 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-aiohttp==3.11.13
+aiohttp==3.13.3
 asyncpg==0.29.0
 greenlet==3.1.1
 psycopg2-binary==2.9.10
 pydantic==1.10.21
-requests==2.32.3
+requests==2.32.5
 SQLAlchemy==1.4.54
 tabulate==0.9.0
 PyYAML==6.0.1

@@ -15,7 +15,7 @@ setup(
     description='AFC packages',
     py_modules=["afcobjst"],
     packages=["afcobjst"],
-    install_requires=["requests==2.32.3", "flask==2.3.2", "werkzeug==3.0.6",
+    install_requires=["requests==2.32.5", "flask==2.3.2", "werkzeug==3.1.5",
                       "waitress==3.0.1", "google.cloud.storage==2.9.0", "posix_ipc==1.1.1"],
     cmdclass={
         'install': InstallCmdWrapper,
