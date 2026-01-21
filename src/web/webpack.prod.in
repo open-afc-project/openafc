@@ -34,15 +34,20 @@ module.exports = merge(common, {
     rules: [
       {
         test: /\.css$/,
-        include: [
-          "@ADD_DIST_LIB_SOURCECOPY@/src",
-          "@ADD_DIST_LIB_SOURCECOPY@/node_modules/patternfly",
-          "@ADD_DIST_LIB_SOURCECOPY@/node_modules/@patternfly/patternfly",
-          "@ADD_DIST_LIB_SOURCECOPY@/node_modules/@patternfly/react-core/dist/styles/base.css",
-          "@ADD_DIST_LIB_SOURCECOPY@/node_modules/@patternfly/react-core/dist/esm/@patternfly/patternfly",
-          "@ADD_DIST_LIB_SOURCECOPY@/node_modules/@patternfly/react-styles/css",
-          "@ADD_DIST_LIB_SOURCECOPY@/node_modules/@patternfly/react-core"
-        ],
+        include: (input) => {
+          // Match CSS files from src directory
+          if (input.indexOf("@ADD_DIST_LIB_SOURCECOPY@/src") !== -1) {
+            return true;
+          }
+          // Match CSS files from patternfly packages (including nested node_modules)
+          if (input.indexOf("@patternfly/react-styles/css") !== -1 ||
+              input.indexOf("@patternfly/react-core") !== -1 ||
+              input.indexOf("@patternfly/patternfly") !== -1 ||
+              input.indexOf("/node_modules/patternfly") !== -1) {
+            return true;
+          }
+          return false;
+        },
         use: [MiniCssExtractPlugin.loader, "css-loader"]
       }
     ]

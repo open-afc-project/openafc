@@ -561,7 +561,15 @@ If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Lo
 |AFC_ALS_MONTH_PARTITIONS_AHEAD|6|als_siphon|Number of monthly partitions ahead to maintain on each container start|
 |KAFKA_ADVERTISED_HOST|als_kafka|als_kafka|Advertised Kafka server name|
 |KAFKA_CLIENT_PORT|9092|als_kafka|Advertised Kafka server port|
+|**Package Registry Proxy settings (Build-time)**||||
+|PIP_INDEX_URL||All containers|Optional. URL for pip package registry proxy. Used during Docker build to configure pip to use a custom package registry (e.g., corporate proxy). Example: `https://pypi.company.com/simple`|
+|NPM_REGISTRY||rat_server|Optional. URL for npm/yarn package registry proxy. Used during Docker build to configure npm and yarn to use a custom package registry (e.g., corporate proxy). Example: `https://registry.npmjs.org/` or `https://npm.company.com/`. When set, also configures yarn with increased network timeout (10 minutes) and reduced concurrency (1) to handle slow corporate proxies.|
 
+**Note:** The package registry proxy variables (`PIP_INDEX_URL` and `NPM_REGISTRY`) are build-time arguments that can be passed when building Docker images. These are useful in corporate environments where access to public package registries may be restricted or when using internal package mirrors. To use them during build, pass them as build arguments:
+
+```
+docker build --build-arg PIP_INDEX_URL=https://pypi.company.com/simple --build-arg NPM_REGISTRY=https://npm.company.com/ -t rat_server -f rat_server/Dockerfile .
+```
 
 ## RabbitMQ settings
 
