@@ -11,14 +11,17 @@ module.exports = merge(common, {
   mode: "development",
   devtool: "source-map",
   devServer: {
-    contentBase: "@CMAKE_CURRENT_BINARY_DIR@",
+    static: {
+      directory: "@CMAKE_CURRENT_BINARY_DIR@"
+    },
     host: HOST,
     port: PORT,
     compress: true,
-    inline: true,
     historyApiFallback: true,
     hot: true,
-    overlay: true,
+    client: {
+      overlay: true
+    },
     open: true
   },
   plugins: [
