@@ -6,9 +6,9 @@
   "main": "index.js",
   "private": true,
   "scripts": {
-    "build": "webpack --config webpack.prod.js --display minimal",
-    "build-dev": "webpack --config webpack.dev.js --display normal",
-    "build-prod": "webpack --config webpack.prod.js --display normal",
+    "build": "webpack --config webpack.prod.js --stats minimal",
+    "build-dev": "webpack --config webpack.dev.js --stats normal",
+    "build-prod": "webpack --config webpack.prod.js --stats normal",
     "build-docs": "typedoc --out docs --mode modules --ignoreCompilerErrors src/app",
     "start": "webpack-dev-server --hot --watch --color --progress --info=true --config webpack.dev.js",
     "test": "jest",
@@ -89,5 +89,8 @@
     "jsdom": "^16.5.0",
     "node-fetch": "^3.2.10",
     "terser": "^4.8.1"
+  },
+  "resolutions": {
+    "js-yaml": "^4.1.1"
   }
 }
