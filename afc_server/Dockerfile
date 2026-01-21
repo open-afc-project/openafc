@@ -90,6 +90,10 @@ RUN mkdir -p $PROMETHEUS_MULTIPROC_DIR
 
 RUN apk add --update --no-cache curl
 
+# Configure pip to use package registry proxy (optional)
+ARG PIP_INDEX_URL
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
     --no-cache-dir -r /wd/afc-packages/pkgs.afc_server \

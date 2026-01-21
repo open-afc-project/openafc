@@ -10,6 +10,10 @@ FROM python:3.12-alpine3.21
 ENV AFC_PYTHONVERSION=3.12
 
 
+# Configure pip to use package registry proxy (optional)
+ARG PIP_INDEX_URL
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+
 COPY objstorage/requirements.txt /wd/
 RUN apk add --update --no-cache gcc python3-dev libc-dev && \
     pip3 install --no-cache-dir -r /wd/requirements.txt && \
