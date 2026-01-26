@@ -113,6 +113,18 @@ build_dev_server() {
   # get last git commit hash number
   BUILDREV=`git rev-parse --short HEAD`
 
+  # Configure package registry proxies for pip and npm (optional, for supply chain security)
+  # Can be set via environment variables or .env file
+  PIP_INDEX_URL="${PIP_INDEX_URL:-}"
+  NPM_REGISTRY="${NPM_REGISTRY:-}"
+  PACKAGE_REGISTRY_ARGS=""
+  if [ -n "${PIP_INDEX_URL}" ]; then
+    PACKAGE_REGISTRY_ARGS="${PACKAGE_REGISTRY_ARGS} --build-arg PIP_INDEX_URL=${PIP_INDEX_URL}"
+  fi
+  if [ -n "${NPM_REGISTRY}" ]; then
+    PACKAGE_REGISTRY_ARGS="${PACKAGE_REGISTRY_ARGS} --build-arg NPM_REGISTRY=${NPM_REGISTRY}"
+  fi
+
 # if login if docker push required
 #  if [ ${push} -eq 1 ]; then
 #    docker_login "${pub_repo_login}" "${priv_repo_login}"
@@ -120,7 +132,7 @@ build_dev_server() {
 
   # build regression test docker image
   cd ${wd}
-  docker_build tests/Dockerfile ${RTEST_DI}:${tag}
+  docker_build tests/Dockerfile ${RTEST_DI}:${tag} "${PACKAGE_REGISTRY_ARGS}"
   check_ret $?
 
   build_pids=(); build_names=(); failed_images=()
@@ -136,84 +148,83 @@ build_dev_server() {
   msg "prereqs are built"
 
   # build of ULS dockers
-  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=${BUILDREV}"
+  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=${BUILDREV} ${PACKAGE_REGISTRY_ARGS}"
   docker_build_and_push ${wd}/uls/Dockerfile-uls_service ${ULS_DOWNLOADER}:${tag} ${push} "${EXT_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${ULS_DOWNLOADER} )
 
   # build msghnd  (flask + gunicorn)
-  docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND}:${tag} ${push} &
+  docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${MSGHND} )
 
   # build worker image
-  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=worker"
+  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=worker ${PACKAGE_REGISTRY_ARGS}"
   docker_build_and_push ${wd}/worker/Dockerfile   ${WORKER}:${tag} ${push} "${EXT_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${WORKER} )
 
   # build afc ratdb docker image
-  docker_build_and_push ${wd}/ratdb/Dockerfile ${RATDB}:${tag} ${push} &
+  docker_build_and_push ${wd}/ratdb/Dockerfile ${RATDB}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${RATDB} )
 
   # build afc dynamic data storage image
-  docker_build_and_push ${wd}/objstorage/Dockerfile ${OBJST}:${tag} ${push} &
+  docker_build_and_push ${wd}/objstorage/Dockerfile ${OBJST}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${OBJST} )
   cd ${wd}
 
   # build afc rabbit MQ docker image
-  docker_build_and_push ${wd}/rabbitmq/Dockerfile ${RMQ}:${tag} ${push} &
+  docker_build_and_push ${wd}/rabbitmq/Dockerfile ${RMQ}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${RMQ} )
 
   # build afc dispatcher docker image
-  docker_build_and_push ${wd}/dispatcher/Dockerfile ${DISPATCHER}:${tag} ${push} &
+  docker_build_and_push ${wd}/dispatcher/Dockerfile ${DISPATCHER}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${DISPATCHER} )
 
   # build afc server docker image
-  EXT_ARGS="--build-arg BUILDREV=${BUILDREV}"
+  EXT_ARGS="--build-arg BUILDREV=${BUILDREV} ${PACKAGE_REGISTRY_ARGS}"
   docker_build_and_push ${wd}/rat_server/Dockerfile ${WEBUI}:${tag}  ${push} "${EXT_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${WEBUI} )
 
   # build ALS-related images
-  docker_build_and_push ${wd}/als/Dockerfile.siphon ${ALS_SIPHON}:${tag} ${push} &
+  docker_build_and_push ${wd}/als/Dockerfile.siphon ${ALS_SIPHON}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${ALS_SIPHON} )
 
-  cd ${wd}/als && docker_build_and_push Dockerfile.kafka ${ALS_KAFKA}:${tag} ${push} &
+  (cd ${wd}/als && docker_build_and_push Dockerfile.kafka ${ALS_KAFKA}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
   build_pids+=( $! ) ; build_names+=( ${ALS_KAFKA} )
 
-  cd ${wd}/bulk_postgres && docker_build_and_push Dockerfile ${BULK_POSTGRES}:${tag} ${push} &
+  (cd ${wd}/bulk_postgres && docker_build_and_push Dockerfile ${BULK_POSTGRES}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
   build_pids+=( $! ) ; build_names+=( ${BULK_POSTGRES} )
-  cd ${wd}
 
    # build cert db image
-  docker_build_and_push ${wd}/cert_db/Dockerfile ${CERT_DB}:${tag} ${push} &
+  docker_build_and_push ${wd}/cert_db/Dockerfile ${CERT_DB}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${CERT_DB} )
 
   # Build Request Cache
-  docker_build_and_push ${wd}/rcache/Dockerfile ${RCACHE}:${tag} ${push} &
+  docker_build_and_push ${wd}/rcache/Dockerfile ${RCACHE}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${RCACHE} )
 
   # Build AFC Server
-  docker_build_and_push ${wd}/afc_server/Dockerfile ${AFC_SERVER}:${tag} ${push} &
+  docker_build_and_push ${wd}/afc_server/Dockerfile ${AFC_SERVER}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${AFC_SERVER} )
 
   # Build Prometheus-related images
-  cd ${wd}/prometheus && docker_build_and_push Dockerfile-prometheus ${PROMETHEUS}:${tag} ${push} &
+  (cd ${wd}/prometheus && docker_build_and_push Dockerfile-prometheus ${PROMETHEUS}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
   build_pids+=( $! ) ; build_names+=( ${PROMETHEUS} )
 
-  cd ${wd}/prometheus && docker_build_and_push Dockerfile-cadvisor ${CADVISOR}:${tag} ${push} &
+  (cd ${wd}/prometheus && docker_build_and_push Dockerfile-cadvisor ${CADVISOR}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
   build_pids+=( $! ) ; build_names+=( ${CADVISOR} )
 
-  cd ${wd}/prometheus && docker_build_and_push Dockerfile-nginxexporter ${NGINXEXPORTER}:${tag} ${push} &
+  (cd ${wd}/prometheus && docker_build_and_push Dockerfile-nginxexporter ${NGINXEXPORTER}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
   build_pids+=( $! ) ; build_names+=( ${NGINXEXPORTER} )
 
-  docker_build_and_push ${wd}/grafana/Dockerfile-grafana ${GRAFANA}:${tag} ${push} &
+  docker_build_and_push ${wd}/grafana/Dockerfile-grafana ${GRAFANA}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${GRAFANA} )
 
-  cd ${wd}/grafana && docker_build_and_push Dockerfile-loki ${LOKI}:${tag} ${push} &
+  (cd ${wd}/grafana && docker_build_and_push Dockerfile-loki ${LOKI}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
   build_pids+=( $! ) ; build_names+=( ${LOKI} )
 
-  cd ${wd}/grafana && docker_build_and_push Dockerfile-promtail ${PROMTAIL}:${tag} ${push} &
+  (cd ${wd}/grafana && docker_build_and_push Dockerfile-promtail ${PROMTAIL}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
   build_pids+=( $! ) ; build_names+=( ${PROMTAIL} )
 
-  cd ${wd}/tools/geo_converters && docker_build_and_push Dockerfile ${GEO_CONVERTERS}:${tag} ${push} &
+  (cd ${wd}/tools/geo_converters && docker_build_and_push Dockerfile ${GEO_CONVERTERS}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
   build_pids+=( $! ) ; build_names+=( ${GEO_CONVERTERS} )
 
   msg "wait for all images to be built"

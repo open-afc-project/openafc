@@ -60,6 +60,10 @@ RUN apk add --update --no-cache curl
 
 WORKDIR /wd
 
+# Configure pip to use package registry proxy (optional)
+ARG PIP_INDEX_URL
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka
 #   version in requirements.txt may need to be updated on Alpine version change

@@ -35,6 +35,7 @@ export class LoginAvatar extends React.Component {
               onClick={() => {
                 history.push('/login');
               }}
+              aria-label="Login"
             >
               <UnknownIcon />
               {' Login'}

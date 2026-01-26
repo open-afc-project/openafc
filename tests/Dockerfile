@@ -7,6 +7,10 @@
 
 FROM python:3.11-slim
 
+# Configure pip to use package registry proxy (optional)
+ARG PIP_INDEX_URL
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+
 WORKDIR /usr/app
 COPY tests/requirements.txt /usr/app/
 

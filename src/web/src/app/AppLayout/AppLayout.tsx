@@ -55,7 +55,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   };
 
   const topNav = (
-    <Nav>
+    <Nav aria-label="Top navigation">
       <NavList variant={NavVariants.horizontal}>
         <UserContext.Consumer>
           {(u: UserState) =>
@@ -66,7 +66,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
                 </NavLink>
               </NavItem>
             ) : (
-              <NavItem />
+              <NavItem style={{ display: 'none' }} aria-hidden="true" />
             )
           }
         </UserContext.Consumer>
@@ -79,11 +79,10 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
                 </NavLink>
               </NavItem>
             ) : (
-              <NavItem />
+              <NavItem style={{ display: 'none' }} aria-hidden="true" />
             )
           }
         </UserContext.Consumer>
-
         <UserContext.Consumer>
           {(u: UserState) =>
             isAdmin() ? (
@@ -93,7 +92,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
                 </NavLink>
               </NavItem>
             ) : (
-              <NavItem />
+              <NavItem style={{ display: 'none' }} aria-hidden="true" />
             )
           }
         </UserContext.Consumer>
@@ -152,7 +151,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const Navigation = (
     <UserContext.Consumer>
       {(user) => (
-        <Nav id="nav-primary-simple">
+        <Nav id="nav-primary-simple" aria-label="Primary navigation">
           <NavList id="nav-list-simple" variant={NavVariants.simple}>
             <NavItem id="dashboard-link" itemId={'dashboard'}>
               <NavLink to="/dashboard" activeClassName="pf-m-current">

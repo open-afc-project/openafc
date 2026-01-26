@@ -18,6 +18,10 @@ ENV WORKDIR=$WORKDIR
 RUN mkdir -p -m 777 $WORKDIR
 WORKDIR $WORKDIR
 
+# Configure pip to use package registry proxy (optional)
+ARG PIP_INDEX_URL
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka
 #   version in requirements.txt may need to be updated on Alpine version change
@@ -61,6 +65,9 @@ ENV KAFKA_MAX_REQUEST_SIZE=
 # Prefix for Kafka topic names for JSON log records. Default is empty
 # ENV AFC_JSON_TOPIC_PREFIX
 
+# Number of month partitions ahead to create/ensure on each container start
+ENV AFC_ALS_MONTH_PARTITIONS_AHEAD=6
+
 # Connection string to ALS database (may be partial, leaving default parts).
 # Hostname better be specified, as default is 'localhost'
 # ENV POSTGRES_ALS_CONN_STR
@@ -98,11 +105,12 @@ ENV ALS_ALEMBIC_INITIAL_VERSION=4aaf4b7e53f5
 ENV KEYHOLE_TEMPLATE_FILE=$WORKDIR/keyhole_postgis.template
 
 COPY als/als_siphon.py als/als_query.py als/utils.py \
+    als/als_db_tool.py als/als_db_tool.yaml \
     tools/keyhole/keyhole_postgis.template $WORKDIR/
 COPY als/als_migrations $WORKDIR/als_migrations/
+COPY als/als_db_schema/ALS.sql $WORKDIR/als_db_schema/
 
 RUN chmod a+x $WORKDIR/als_*.py
-COPY als/ALS.sql $WORKDIR/
 
 ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_servers=$KAFKA_SERVERS \
@@ -119,7 +127,8 @@ ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --log_postgres_password_file=$POSTGRES_LOG_PASSWORD_FILE \
     --prometheus_port=$SIPHON_PROMETHEUS_PORT \
     --touch_file=$SIPHON_TOUCH_FILE \
-    --als_sql $WORKDIR/ALS.sql \
+    --als_sql=$WORKDIR/als_db_schema/ALS.sql \
+    --als_months_ahead=$AFC_ALS_MONTH_PARTITIONS_AHEAD \
     --als_alembic_config=$ALEMBIC_CONFIG \
     --als_alembic_initial_version=$ALS_ALEMBIC_INITIAL_VERSION
 

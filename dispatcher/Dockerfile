@@ -20,6 +20,10 @@ ENV VIRTUAL_ENV=/venv
 WORKDIR /wd
 # copy list of external packages
 COPY dispatcher/requirements.txt /wd
+# Configure pip to use package registry proxy (optional)
+ARG PIP_INDEX_URL
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+
 # copy internal packages
 COPY src/afc-packages ./afc-packages
 # install

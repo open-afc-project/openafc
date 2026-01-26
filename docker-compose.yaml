@@ -56,6 +56,7 @@ services:
 
   rat_server:
     image: ${PRIV_REPO:-ghcr.io/open-afc-project}/webui-image:${TAG:-latest}
+    restart: always
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
       - ./pipe:/pipe
@@ -263,7 +264,6 @@ services:
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE}
       - AFC_ALS_TOPIC_NAME=${AFC_ALS_TOPIC_NAME}
       - AFC_JSON_TOPIC_PREFIX=${AFC_JSON_TOPIC_PREFIX}
-      - RCACHE_UPDATE_ON_SEND=True
       # TIMEOUT
       - AFC_WORKER_ENG_TOUT=300
     depends_on:
@@ -298,6 +298,7 @@ services:
       - KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE}
       - AFC_ALS_TOPIC_NAME=${AFC_ALS_TOPIC_NAME}
       - AFC_JSON_TOPIC_PREFIX=${AFC_JSON_TOPIC_PREFIX}
+      - AFC_ALS_MONTH_PARTITIONS_AHEAD=6
     secrets:
       - ALS_DB_PASSWORD
       - ALS_JSON_LOG_DB_PASSWORD
