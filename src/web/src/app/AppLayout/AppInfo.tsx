@@ -45,7 +45,7 @@ class AppInfo extends React.Component<{}, { isModalOpen: boolean; expanded: stri
 
     return (
       <React.Fragment>
-        <Button variant="plain" isInline={true} onClick={this.handleModalToggle}>
+        <Button variant="plain" isInline={true} onClick={this.handleModalToggle} aria-label="About application">
           <InfoIcon />
         </Button>
         <AboutModal
