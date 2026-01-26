@@ -1,8 +1,8 @@
 const path = require("path");
-const merge = require("webpack-merge");
+const { merge } = require("webpack-merge");
 const common = require("@ADD_DIST_LIB_SOURCECOPY@/webpack.common.js");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
-const OptimizeCSSAssetsPlugin = require("optimize-css-assets-webpack-plugin");
+const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 
@@ -11,7 +11,7 @@ module.exports = merge(common, {
   mode: "production",
   optimization: {
     minimizer: [
-      new OptimizeCSSAssetsPlugin({}),
+      new CssMinimizerPlugin(),
       new TerserPlugin({
         parallel: true,
         terserOptions: {

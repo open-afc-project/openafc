@@ -24,8 +24,6 @@
       "@assets/*": ["node_modules/@patternfly/react-core/dist/styles/assets/*"]
     }
   },
-  "include": [
-    "**/*.ts"
-  ],
+  "include": ["**/*.ts"],
   "exclude": ["node_modules"]
 }

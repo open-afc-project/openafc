@@ -1,95 +1,46 @@
 {
-  "extends": [
-    "tslint-react",
-    "tslint-eslint-rules",
-    "tslint-config-prettier"
-  ],
+  "extends": ["tslint-react", "tslint-eslint-rules", "tslint-config-prettier"],
   "linterOptions": {
-    "exclude": [
-      "**/node_modules/**/*.ts",
-      "**/PawsApi.ts"
-    ]
+    "exclude": ["**/node_modules/**/*.ts", "**/PawsApi.ts"]
   },
   "rules": {
-    "ordered-imports": [
-      false
-    ],
+    "ordered-imports": [false],
     "interface-name": false,
-    "max-line-length": [
-      120
-    ],
+    "max-line-length": [120],
     "ban-types": {
       "options": [
-        [
-          "Object",
-          "Avoid using the `Object` type. Did you mean `object`?"
-        ],
-        [
-          "Function",
-          "Avoid using the `Function` type. Prefer a specific function type, like `() => void`."
-        ],
-        [
-          "Boolean",
-          "Avoid using the `Boolean` type. Did you mean `boolean`?"
-        ],
-        [
-          "Number",
-          "Avoid using the `Number` type. Did you mean `number`?"
-        ],
-        [
-          "String",
-          "Avoid using the `String` type. Did you mean `string`?"
-        ],
-        [
-          "Symbol",
-          "Avoid using the `Symbol` type. Did you mean `symbol`?"
-        ]
+        ["Object", "Avoid using the `Object` type. Did you mean `object`?"],
+        ["Function", "Avoid using the `Function` type. Prefer a specific function type, like `() => void`."],
+        ["Boolean", "Avoid using the `Boolean` type. Did you mean `boolean`?"],
+        ["Number", "Avoid using the `Number` type. Did you mean `number`?"],
+        ["String", "Avoid using the `String` type. Did you mean `string`?"],
+        ["Symbol", "Avoid using the `Symbol` type. Did you mean `symbol`?"]
       ]
     },
     "jsx-no-lambda": false,
     "callable-types": true,
     "class-name": true,
     "comment-format": {
-      "options": [
-        "check-space"
-      ]
+      "options": ["check-space"]
     },
     "import-spacing": true,
     "indent": {
-      "options": [
-        "spaces"
-      ]
+      "options": ["spaces"]
     },
     "no-debugger": true,
     "no-shadowed-variable": true,
     "prefer-const": true,
     "quotemark": {
-      "options": [
-        "double",
-        "avoid-escape"
-      ]
+      "options": ["double", "avoid-escape"]
     },
     "triple-equals": {
-      "options": [
-        "allow-null-check"
-      ]
+      "options": ["allow-null-check"]
     },
     "variable-name": {
-      "options": [
-        "ban-keywords",
-        "check-format",
-        "allow-pascal-case"
-      ]
+      "options": ["ban-keywords", "check-format", "allow-pascal-case"]
     },
     "whitespace": {
-      "options": [
-        "check-branch",
-        "check-decl",
-        "check-operator",
-        "check-separator",
-        "check-type",
-        "check-typecast"
-      ]
+      "options": ["check-branch", "check-decl", "check-operator", "check-separator", "check-type", "check-typecast"]
     }
   }
 }
