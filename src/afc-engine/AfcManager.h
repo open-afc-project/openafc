@@ -833,6 +833,26 @@ class AfcManager
 		void runTestWinner2(std::string inputFile, std::string outputFile);
 		void runAnalyzeNLCD();
 #endif
+		// KeyHoleShape stuff
+
+		void importKeyHoleShapeParameters(const QJsonObject &jsonObj);
+		void runKeyHoleShapeAnalysis();
+		QJsonDocument generateKeyHoleShapeJson();
+
+		std::map<double, double> _keyHoleShape; // Maps AOB in degrees to distance in meters
+
+		// Dataq from (optional) request parameters file
+		double _keyHoleAobStepDeg;  // Angle off boresight step of keyhole shape in degrees.
+		                            // Default is 0.1
+		double _keyHoleMinFreqMhz;  // Minimum frequency in MHz. Default is
+		                            // CConst::unii5StartFreqMHz
+		double _keyHoleMaxFreqMhz;  // Maximujm frequency in MHz. Default is
+		                            // CConst::unii8StopFreqMHz
+		double _keyHoleFreqStepMhz; // Frequency step in MHz. 0 (default) to take no
+		                            // intermediate points
+		double _keyHoleRadiusKm;    // Keyhole radius in KM. Default is "maxLinkDistance"
+		                            // from AFC config
+		std::string _keyHoleRxAntennaRegex;     // Regex for RX antenna name. Default is ^.*$
 };
 
 #endif // INCLUDE_AFCMANAGER_H
