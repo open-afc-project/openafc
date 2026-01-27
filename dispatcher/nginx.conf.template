@@ -60,8 +60,7 @@ http {
 
         add_header X-Content-Type-Options nosniff;
         add_header X-Frame-Options "SAMEORIGIN";
-        add_header Content-Security-Policy  "script-src 'self' 'unsafe-eval' https://maps.googleapis.com https://code.jquery.com https://netdna.bootstrapcdn.com/bootstrap https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://cdn.cookielaw.org/ 'sha256-uBBX2ol+XLa1cg+s2JIofRLVhyW3vzh04cebQIjgxXs='; style-src 'self' https://fonts.googleapis.com https://netdna.bootstrapcdn.com https://www.gstatic.com/recaptcha/ 'unsafe-inline'";
-        add_header X-XSS-Protection "1; mode=block";
+        add_header Content-Security-Policy  "script-src 'self' 'unsafe-eval' https://maps.googleapis.com https://code.jquery.com https://netdna.bootstrapcdn.com/bootstrap https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://cdn.cookielaw.org/ https://*.cookielaw.org/ 'sha256-uBBX2ol+XLa1cg+s2JIofRLVhyW3vzh04cebQIjgxXs=' 'sha256-iqOPaRlwwgtNy7J3vh/+LSW9/QVdN+Fl+YfMS8+GcPo=' 'sha256-zBC1179gsXAejqjjWOPyA9XBs4GAy4/sSApN6zUWwKc='; style-src 'self' https://fonts.googleapis.com https://netdna.bootstrapcdn.com https://www.gstatic.com/recaptcha/ https://cdn.cookielaw.org/ https://*.cookielaw.org/ 'unsafe-inline'; connect-src 'self' https://cdn.cookielaw.org/ https://*.cookielaw.org/; frame-src https://cdn.cookielaw.org/ https://*.cookielaw.org/; img-src 'self' https://cdn.cookielaw.org/ https://*.cookielaw.org/ data:";        add_header X-XSS-Protection "1; mode=block";
         add_header Referrer-Policy "strict-origin-when-cross-origin";
         add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=(), fullscreen=(self), sync-xhr=(), magnetometer=(), gyroscope=(), accelerometer=(), usb=(), autoplay=(), midi=(), encrypted-media=(), xr-spatial-tracking=()";
 
