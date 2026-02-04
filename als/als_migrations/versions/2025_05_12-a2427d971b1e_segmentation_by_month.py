@@ -603,6 +603,7 @@ FOREIGN KEY ("request_response_digest", "month_idx")
 REFERENCES "request_response" ("request_response_digest", "month_idx");
 """
 
+
 def get_existing_months() -> List[str]:
     """ Returns list of 'month_idx' values from all tables """
     ret: Set[int] = set()
@@ -616,6 +617,7 @@ def get_existing_months() -> List[str]:
                 ).fetchall()
             ret.update(row[0] for row in results)
     return [str(month_idx) for month_idx in sorted(ret)]
+
 
 def create_tables(table_name_prefix: Optional[str] = None,
                   months_ahead: Optional[str] = None,
