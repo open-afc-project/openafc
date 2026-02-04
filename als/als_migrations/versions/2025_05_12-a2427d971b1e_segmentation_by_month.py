@@ -11,7 +11,7 @@ import re
 import sqlalchemy as sa
 import subprocess
 import tempfile
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 
 # revision identifiers, used by Alembic.
@@ -603,22 +603,38 @@ FOREIGN KEY ("request_response_digest", "month_idx")
 REFERENCES "request_response" ("request_response_digest", "month_idx");
 """
 
+def get_existing_months() -> List[str]:
+    """ Returns list of 'month_idx' values from all tables """
+    ret: Set[int] = set()
+    for m_table in re.finditer(r'CREATE TABLE "(\w+)" \(([^;]+?)\);', raw_sql):
+        table_name = m_table.group(1)
+        for m_idx in re.finditer(r'"(month_idx)" smallint', m_table.group(2)):
+            column_name = m_idx.group(1)
+            results = \
+                op.get_bind().execute(sa.text(
+                    f"SELECT DISTINCT {column_name} FROM {table_name}")
+                ).fetchall()
+            ret.update(row[0] for row in results)
+    return [str(month_idx) for month_idx in sorted(ret)]
 
 def create_tables(table_name_prefix: Optional[str] = None,
-                  months_ahead: Optional[str] = None) -> List[str]:
+                  months_ahead: Optional[str] = None,
+                  existing_months: Optional[List[str]] = None) -> List[str]:
     """ Create tables
 
     Arguments:
     table_name_prefix -- Table name prefix (for intermediate tables) or None
     months_ahead      -- Number of month segments ahead to create as string
                          (for segmented tables) or None (for monolythic)
+    existing_months   -- List of other (existing) months to add (for segmented
+                         tables) or None (for monolythic)
     Returns list of table names
     """
     with tempfile.TemporaryDirectory() as tmpdirname:
         raw_sql_file = os.path.join(tmpdirname, "raw.sql")
         with open(raw_sql_file, "w", encoding="utf-8") as fo:
             fo.write(raw_sql)
-        prepared_sql_file = os.path.join(tmpdirname, "prepred.sql")
+        prepared_sql_file = os.path.join(tmpdirname, "prepared.sql")
         tables = \
             subprocess.check_output(
                 ["als_db_tool.py", "prepare_sql", "--if_not_exists",
@@ -626,6 +642,8 @@ def create_tables(table_name_prefix: Optional[str] = None,
                 (["--prefix", table_name_prefix] if table_name_prefix
                  else []) +
                 (["--months_ahead", months_ahead] if months_ahead is not None
+                 else []) +
+                (["--month_idx", ",".join(existing_months)] if existing_months
                  else []) +
                 [raw_sql_file, prepared_sql_file], text=True).splitlines()
         with open(prepared_sql_file, encoding="utf-8") as fi:
@@ -661,9 +679,8 @@ def reset_last_values(last_values: Dict[str, int]) -> None:
 
 def upgrade() -> None:
     # Partitioning requires partition column to be a part of PK
-    op.drop_constraint(
-        constraint_name="decode_error_pkey", table_name="decode_error",
-        type_="primary")
+    op.execute(
+        "ALTER TABLE decode_error DROP CONSTRAINT IF EXISTS decode_error_pkey")
     op.create_primary_key(
         constraint_name="decode_error_pkey", table_name="decode_error",
         columns=["id", "month_idx"])
@@ -675,6 +692,9 @@ def upgrade() -> None:
     if not months_ahead:
         raise RuntimeError(
             f"'{MONTHS_AHEAD_ENV}' environment varible not defined")
+
+    # Month indices already in database
+    existing_months = get_existing_months()
 
     # Creating intermediate tables
     table_names = create_tables(table_name_prefix=INTERMEDIATE_PREFIX)
@@ -689,7 +709,7 @@ def upgrade() -> None:
         op.execute(f"DROP TABLE IF EXISTS {table_name} CASCADE")
 
     # Creating partitioned tables
-    create_tables(months_ahead=months_ahead)
+    create_tables(months_ahead=months_ahead, existing_months=existing_months)
 
     # Copying data into them from intermediate tables
     for table_name in table_names:
