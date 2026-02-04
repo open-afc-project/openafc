@@ -93,13 +93,13 @@ def get_month_list(year_month: Optional[str], months_ahead: Optional[int],
         step = 1 if months_ahead >= 0 else -1
         ret.update(
             range(current_month_idx, current_month_idx + months_ahead + step,
-            step))
+                  step))
     for mis in month_idx:
         for mi in mis.split(","):
             if mi:
                 try:
                     ret.add(int(mi))
-                except:
+                except ValueError:
                     error(
                         "--month_idx must be comma-separeted list of integres")
     error_if(not ret, "No month indices specified")
