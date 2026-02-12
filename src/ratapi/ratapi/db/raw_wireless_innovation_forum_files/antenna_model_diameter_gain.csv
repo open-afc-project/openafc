@@ -522,8 +522,10 @@ COMMSCOPE,HP12-65E,HP1265E,12,3.66,45.6,https://objects.eanixter.com/PD353931.PD
 ANDREW,HP12-65G,HP1265G,12,3.66,45.6,https://www.digchip.com/datasheets/parts/datasheet/3751/HP10-65E-pdf.php
 COMMSCOPE,HP1265G,HP1265G,12,3.66,45.6,https://objects.eanixter.com/PD353931.PDF
 COMMSCOPE,HP12-65G,HP1265G,12,3.66,45.6,https://objects.eanixter.com/PD353931.PDF
-ANDREW,HP15-59D,HP1559D,15,4.57,46.4,https://www.datasheet.directory/pdfviewer?url=https%3A%2F%2Fdatasheet.iiic.cc%2Fdatasheets-1%2Fandrew%2FHP15-59.pdf
+Commscope,HP15-59,HP1559,15,4.57,46.4,https://objects.eanixter.com/PD400300.PDF
+ANDREW,HP15-59D,HP1559D,15,4.57,46.4,https://objects.eanixter.com/PD400300.PDF
 COMMSCOPE,HP15-59D,HP1559D,15,4.57,46.4,https://objects.eanixter.com/PD400300.PDF
+ANDREW,HP15-59WB,HP1559WB,15,4.57,46.8,Comsearch's Frequency Coordination Database
 "RADIO WAVES, INC",HP3-59,HP359,3,0.91,33,Comsearch's Frequency Coordination Database
 RADIO WAVES,HP3-6,HP36,3,0.91,33.3,https://www.radiowaves.com/getmedia/70a14957-da0c-43d1-9642-f4def2654c20/HP3-6.aspx
 RADIO WAVES,HP3-6.4,HP364,3,0.91,33.4,https://www.radiowaves.com/en/product/hp3-6-4
@@ -723,6 +725,7 @@ ANDREW,HPX10-65D,HPX1065D,10,3.05,44,https://www.digchip.com/datasheets/parts/da
 COMMSCOPE,HPX10-65D,HPX1065D,10,3.05,44,https://objects.eanixter.com/PD354274.PDF
 ANDREW,HPX10A-59,HPX10A59,10,3.05,43.1,https://objects.eanixter.com/PD354271.PDF
 COMMSCOPE,HPX10A-59,HPX10A59,10,3.05,43.1,Comsearch's Frequency Coordination Database
+CommScope,HPX10-E,HPX10E,10,3.05,,10 foot antenna. Various bands have gain range of 43.4 - 44.6
 ANDREW,HPX12-59,HPX1259,12,3.66,44.8,https://www.digchip.com/datasheets/parts/datasheet/3751/HP12-59E-pdf.php
 ANDREW,HPX12-59D,HPX1259D,12,3.66,44.8,https://www.digchip.com/datasheets/parts/datasheet/3751/HP12-59E-pdf.php
 COMMSCOPE,HPX12-59E,HPX1259E,12,3.66,44.8,https://www.digchip.com/datasheets/parts/datasheet/3751/HP12-59E-pdf.php
@@ -2117,6 +2120,9 @@ GABRIEL ELECTRONICS,RF16P-2J23,RF16P2J23,16,4.88,47,Comsearch's Frequency Coordi
 GABRIEL ELECTRONICS,RF8C-J45,RF8CJ45,8,2.44,42,Comsearch's Frequency Coordination Database
 GABRIEL ELECTRONICS,RFB10P-59,RFB10P59,10,3.05,43.2,Comsearch's Frequency Coordination Database
 "RF Communications, LLC",RFCM-0640UH18WD,RFCM0640UH18WD,6,1.83,39.4,Comsearch's Frequency Coordination Database
+"RF Communications, LLC",RFCM-0734U09CD,RFCM0734U09CD,3,0.91,33.5,Comsearch's Frequency Coordination Database
+"RF Communications, LLC",RFCM-0737U12CD,RFCM0737U12CD,4,1.2,36.6,Comsearch's Frequency Coordination Database
+"RF Communications, LLC",RFCM-736UH1.2WD,RFCM736UH12WD,4,1.2,35.6,Typo.  Should be RFMA-0736UH1.2WS.  Data for this is from Comsearch's frequency coordination Database. 
 GABRIEL ELECTRONICS,RFD8-264BSE,RFD8264BSE,8,2.44,41.7,Comsearch's Frequency Coordination Database
 RF Engineering and Energy,RFMA-0640UH1 8WS,RFMA0640UH18WS,6,1.83,39.4,Comsearch's Frequency Coordination Database
 RF ENGINEERING AND ENERGY,RFMA-0640UH1.8WSXX,RFMA0640UH18WSXX,6,1.83,39.4,Comsearch's Frequency Coordination Database
@@ -2176,7 +2182,9 @@ RFS,SCX3-W60AMPT,SCX3W60AMPT,3,0.91,33.2,https://www.rfsworld.com/pim/product/ht
 RFS,SCX3-W60W,SCX3W60W,3,0.91,33.2,https://www.rfsworld.com/pim/product/html/SCX3-W60BC
 COMMSCOPE,SEUHX6-59 RF,SEUHX659RF,6,1.83,38.8,Comsearch's Frequency Coordination Database
 Commscope,SHP3-6W,SHP36W,3,0.91,33.6,https://www.commscope.com/globalassets/digizuite/696934-p360-shp3-6w-4wh-b-external.pdf
+ANDREW,SHP3-6WB,SHP36WB,3,0.91,33.6,Comsearch's Frequency Coordination Database
 Commscope,SHP3-6W/BUS,SHP36WBUS,3,0.91,33.6,Comsearch's Frequency Coordination Database
+CommScope,SHP4-6W,SHP46W,4,1.22,35.5,Comsearch's Frequency Coordination Database
 RADIO WAVES,SHP6-59,SHP659,6,1.83,39,https://www.radiowaves.com/getmedia/22d052e7-9370-4f2b-81b5-0dafc7c72849/SHP6-5.9.aspx
 RADIO WAVES,SHP6-6,SHP66,6,1.83,39.3,https://www.radiowaves.com/getmedia/f938b911-2fb8-4c71-8b06-53a59d88df1f/SHP6-6.aspx
 RADIO WAVES,SHPD6-5.9,SHPD659,6,1.83,38.8,https://www.radiowaves.com/getmedia/12291e54-5884-4572-a349-1f5c81405ccb/SHPD6-5.9.aspx
@@ -3095,6 +3103,7 @@ COMMSCOPE,USX6-59L RF,USX659LRF,6,1.83,38.8,Typo could be UHX using that gain.
 ANDREW,USX6-6W,USX66W,6,1.83,38.8,https://www.commscope.com/globalassets/digizuite/261438-p360-usx6-6w-external.pdf
 COMMSCOPE,USX6-6W,USX66W,6,1.83,38.8,https://www.commscope.com/globalassets/digizuite/261438-p360-usx6-6w-external.pdf
 COMMSCOPE,USX6--6W,USX66W,6,1.83,38.8,https://www.commscope.com/globalassets/digizuite/261438-p360-usx6-6w-external.pdf
+CommScope,USX6-6W-6GF,USX66W6GF,6,1.83,38.8,https://www.commscope.com/globalassets/digizuite/261438-p360-usx6-6w-external.pdf
 COMMSCOPE,USX6-6W-6GR,USX66W6GR,6,1.83,38.8,https://www.commscope.com/globalassets/digizuite/261438-p360-usx6-6w-external.pdf
 RFS,USX-6W,USX6W,,,,No diameter available in the model so cannot discern proper gain
 CommScope,USX8-56W,USX856W,8,1.83,41.6,Typo should be USX8-6W
@@ -3260,6 +3269,7 @@ RFS,UXA8-59A LF,UXA859ALF,8,2.44,41.3,https://www.rfsworld.com/pim/product/html/
 RADIO FREQUENCY SYSTEMS,UXA8-59A RF,UXA859ARF,8,2.44,41.3,https://www.rfsworld.com/pim/product/html/UXA8-59AC
 RFS,UXA8-59A RF,UXA859ARF,8,2.44,41.3,https://www.rfsworld.com/pim/product/html/UXA8-59AC
 RFS,UXA8-59B,UXA859B,8,2.44,41.3,https://www.rfsworld.com/pim/product/html/UXA8-59AC
+RFS,UXA8-59BC-RF,UXA859BCRF,8,2.44,41.3,https://www.rfsworld.com/pim/product/html/UXA8-59AC
 RFS,UXA8-59B LF,UXA859BLF,8,2.44,41.3,https://www.rfsworld.com/pim/product/html/UXA8-59AC
 COMMSCOPE,UXA8-59B RF,UXA859BRF,8,2.44,41.3,Comsearch's Frequency Coordination Database
 RFS,UXA8-59B RF,UXA859BRF,8,2.44,41.3,https://www.rfsworld.com/pim/product/html/UXA8-59AC
@@ -3315,6 +3325,7 @@ RFS,UXA-W59A RF,UXAW59ARF,,,,Indeterminate.
 COMMSCOPE,UXH10-59J RF,UXH1059JRF,10,3.05,43.2,https://www.digchip.com/datasheets/parts/datasheet/3751/HP12-59E-pdf.php
 ANDREW,UXH10-59K RF,UXH1059KRF,10,3.05,43.2,https://www.digchip.com/datasheets/parts/datasheet/3751/HP12-59E-pdf.php
 ANDREW,UXH12-59E LF,UXH1259ELF,12,3.66,44.8,https://www.digchip.com/datasheets/parts/datasheet/3751/HP12-59E-pdf.php
+CommScope,UXH12-59W RF,UXH1259WRF,12,3.66,44.8,"Typo, should be UHX12-59W RF.  "
 COMMSCOPE,UXH6-59L RF,UXH659LRF,6,1.83,38.8,Typo should be UHX659LRF. Using that gain. 
 ANDREW,UXH8-59H,UXH859H,8,2.44,41.7,https://www.digchip.com/datasheets/parts/datasheet/3751/HP12-59E-pdf.php
 ANDREW,UXH8-59H LF,UXH859HLF,8,2.44,41.7,https://www.digchip.com/datasheets/parts/datasheet/3751/HP12-59E-pdf.php
@@ -3404,6 +3415,7 @@ NOKIA,vWVCE61-L3-1024A30S-230,VWVCE61L31024A30S230,,,,Radio - Indeterminate.
 Nokia,WCE61-L2-1024A30S-230,WCE61L21024A30S230,,,,Radio - Indeterminate. 
 COMMSCOPE,WEHP6-59K,WEHP659K,6,1.83,38.9,Comsearch's Frequency Coordination Database
 COMMSCOPE,WEUHX10-59K RF,WEUHX1059KRF,10,3.05,43.2,https://www.digchip.com/datasheets/parts/datasheet/3751/HP12-59E-pdf.php
+COMMSCOPE,WHLP6-6WB,WHLP66WB,6,1.83,39.3,"Typo, should be VHLP6-6WB"
 COMMSCOPE,WHP6-59J,WHP659J,6,1.83,38.9,Comsearch's Frequency Coordination Database
 COMMSCOPE,WHP6-59WC,WHP659WC,6,1.83,39.4,Comsearch's Frequency Coordination Database
 ANDREW,WHP8-59F,WHP859F,8,2.44,41.5,Comsearch's Frequency Coordination Database
