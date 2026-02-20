@@ -19,7 +19,7 @@ setup(
         'install': InstallCmdWrapper,
     },
     install_requires=[
-        'Flask==2.3.2',
+        'Flask==3.1.3',
         'Flask-SQLAlchemy==2.5.1'
     ]
 )
