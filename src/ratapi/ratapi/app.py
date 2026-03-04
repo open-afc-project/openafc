@@ -220,7 +220,8 @@ def create_app(config_override=None):
         @flaskapp.after_request
         def make_csrf_cookie(response):
             from flask_login import current_user
-            response.set_cookie('csrf_token', generate_csrf())
+            if current_user.is_authenticated:
+                response.set_cookie('csrf_token', generate_csrf())
             return response
 
         if not os.path.exists(os.path.join(
