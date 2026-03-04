@@ -18,7 +18,7 @@ import re
 import sqlalchemy as sa
 import sys
 import tabulate
-from typing import Any, Dict, List, NamedTuple, NoReturn, Optional
+from typing import Any, Dict, List, NamedTuple, NoReturn, Optional, Set
 import yaml
 
 import utils
@@ -67,29 +67,43 @@ def start_month_idx(year_month: Optional[str],
     return max(0, utils.get_month_idx() - (keep_months - 1))
 
 
-def end_month_idx(year_month: Optional[str],
-                  months_ahead: Optional[int]) -> int:
-    """ Month index that corresponds to given month past now
+def get_month_list(year_month: Optional[str], months_ahead: Optional[int],
+                   month_idx: List[str]) -> List[int]:
+    """ Month indices from now to given boundary plus some
 
     Arguments:
-    year_month   -- "year-month" string or None
-    months_ahead -- Number of months ahead or None
-    Returns month index of interval end """
-    error_if(
-        (year_month is None) == (months_ahead is None),
-        "Either --up_to or --months_ahead (but not both) should be specified")
+    year_month   -- "year-month" string of interval end
+    months_ahead -- Number of months ahead of current or None
+    month_idx    -- List of comma separeted explixitly specified month indices
+    Returns ordered list of months """
+    ret: Set[int] = set()
+    current_month_idx = utils.get_month_idx()
     if year_month:
         try:
             dt = datetime.datetime.strptime(year_month, "%Y-%m")
         except ValueError:
             error("Invalid format of --up_to. Must be 'year-month'")
+        end = utils.get_month_idx(year=dt.year, month=dt.month)
+        step = 1 if end >= current_month_idx else -1
         error_if(dt < (datetime.datetime.now() -
                        dateutil.relativedelta.relativedelta(months=1)),
                  "--up_to must be past now")
-        return utils.get_month_idx(year=dt.year, month=dt.month)
-    assert months_ahead is not None
-    error_if(months_ahead < 0, "--months_ahead must be nonnegative")
-    return utils.get_month_idx() + months_ahead
+        ret.update(range(current_month_idx, end + step, step))
+    if months_ahead is not None:
+        step = 1 if months_ahead >= 0 else -1
+        ret.update(
+            range(current_month_idx, current_month_idx + months_ahead + step,
+                  step))
+    for mis in month_idx:
+        for mi in mis.split(","):
+            if mi:
+                try:
+                    ret.add(int(mi))
+                except ValueError:
+                    error(
+                        "--month_idx must be comma-separeted list of integres")
+    error_if(not ret, "No month indices specified")
+    return list(sorted(ret))
 
 
 def do_prepare_sql(cfg: Dict[str, Any], args: argparse.Namespace) -> None:
@@ -148,14 +162,15 @@ def do_prepare_sql(cfg: Dict[str, Any], args: argparse.Namespace) -> None:
                             f"{stmt[m_create.start(1):]}")
                     continue
                 if m_create:
-                    if args.up_to or (args.months_ahead is not None):
+                    if args.up_to or (args.months_ahead is not None) or \
+                            args.month_idx:
                         write_sql(f"{stmt.rstrip(';')} "
                                   f"PARTITION BY LIST (month_idx)")
                         for month_idx in \
-                                range(utils.get_month_idx(),
-                                      end_month_idx(
-                                          year_month=args.up_to,
-                                          months_ahead=args.months_ahead) + 1):
+                                get_month_list(
+                                    year_month=args.up_to,
+                                    months_ahead=args.months_ahead,
+                                    month_idx=args.month_idx):
                             table_name = \
                                 cfg["partition_name_template"].\
                                 format(table_name=m_create.group(1),
@@ -262,14 +277,13 @@ def do_add_partitions(cfg: Dict[str, Any], args: argparse.Namespace) -> None:
     cfg  -- Yaml config file in dictionary form
     args -- Parsed command line arguments
     """
-    end_month = \
-        end_month_idx(year_month=args.up_to, months_ahead=args.months_ahead)
+    month_list = \
+        get_month_list(year_month=args.up_to,
+                       months_ahead=args.months_ahead, month_idx=args.month_idx)
     db = Db(cfg=cfg, dsn=args.dsn,  password_file=args.password_file,
             verbose=args.verbose)
-    current_month_idx = utils.get_month_idx()
     for parent_table, partitions in db.get_partitions().items():
-        last_month_idx = max(partitions)
-        for month_idx in range(current_month_idx, end_month + 1):
+        for month_idx in month_list:
             if any(pi.month_idx == month_idx for pi in partitions):
                 continue
             partition_name = \
@@ -394,6 +408,11 @@ def main(argv: List[str]) -> None:
     switches_partitions.add_argument(
         "--up_to", metavar="YEAR-MONTH",
         help="Prepare tables' partitions for up to given month of given year")
+    switches_partitions.add_argument(
+        "--month_idx", metavar="month1[,month2,...]",
+        action="append", default=[],
+        help="Comma-separated list of other months to add. May be specified "
+        "more than once")
 
     # Top level parser
     argument_parser = argparse.ArgumentParser(
@@ -409,8 +428,8 @@ def main(argv: List[str]) -> None:
         "--prefix", metavar="DB_NAME_PREFIX",
         help="Prefix to add to names of generated tables. If this parameter "
         "specified, only nonsegmented tables are created (as intermediate "
-        "containers for alembic miggrations) - indices, constraints and "
-        "comments are not createed. Can't be specified together with "
+        "containers for alembic migrations) - indices, constraints and "
+        "comments are not created. Can't be specified together with "
         "--months_ahead or --up_to")
     parser_prepare_sql.add_argument(
         "--if_not_exists", action="store_true",
