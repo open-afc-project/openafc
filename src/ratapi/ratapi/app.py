@@ -144,7 +144,13 @@ def create_app(config_override=None):
         def load_user(_id):
             ''' Load user invoked from flask login
             '''
-            return User.get(_id)
+            try:
+                return User.get(_id)
+            except exc.DataError:
+                LOGGER.warning("Invalid user_id in session cookie "
+                               "(secret key mismatch?), forcing re-login")
+                db.session.rollback()
+                return None
     else:
         # Non OIDC login.
         from flask_user import UserManager
