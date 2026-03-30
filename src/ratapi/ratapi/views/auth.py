@@ -132,8 +132,13 @@ class LoginAPI(MethodView):
         if not flask.current_app.config['OIDC_LOGIN']:
             return flask.redirect(flask.url_for('user.login'))
 
-        flask.session['app_state'] = secrets.token_urlsafe(64)
-        flask.session['code_verifier'] = secrets.token_urlsafe(64)
+        next_url = flask.request.args.get('next')
+        if next_url:
+            flask.session['next'] = next_url
+
+        if 'app_state' not in flask.session:
+            flask.session['app_state'] = secrets.token_urlsafe(64)
+            flask.session['code_verifier'] = secrets.token_urlsafe(64)
         # calculate code challenge
         hashed = hashlib.sha256(
             flask.session['code_verifier'].encode('ascii')).digest()
@@ -284,7 +289,8 @@ class CallbackAPI(MethodView):
                           'user': user.username,
                           'from': flask.request.remote_addr,
                           'status': 'success'})
-        return flask.redirect(flask.url_for("root"))
+        next_url = flask.session.pop('next', None) or flask.url_for("root")
+        return flask.redirect(next_url)
 
 
 class LogoutAPI(MethodView):
@@ -373,6 +379,18 @@ class UserAPI(MethodView):
 
         return flask.make_response(flask.jsonify(responseObject)), 200
 
+class AdminCheckAPI(MethodView):
+    """Auth check that returns 200 for Admin/Super users, 403 otherwise.
+    Used by Nginx auth_request for role-gated locations."""
+
+    def get(self):
+        if not current_user.is_authenticated:
+            return flask.make_response("", 401)
+        role_names = [r.name for r in current_user.roles]
+        if "Super" in role_names or "Admin" in role_names:
+            return flask.make_response("", 200)
+        return flask.make_response("Forbidden", 403)
+
 
 # define the API resources
 user_view = UserAPI.as_view('UserAPI')
@@ -380,11 +398,17 @@ logout_view = LogoutAPI.as_view('LogoutAPI')
 login_view = LoginAPI.as_view('LoginAPI')
 about_login_view = AboutLoginAPI.as_view('AboutLoginAPI')
 callback_view = CallbackAPI.as_view('CallbackAPI')
+admin_check_view = AdminCheckAPI.as_view('AdminCheckAPI')
 
 # add Rules for API Endpoints
 module.add_url_rule(
     '/status',
     view_func=user_view,
+    methods=['GET']
+)
+module.add_url_rule(
+    '/admin_check',
+    view_func=admin_check_view,
     methods=['GET']
 )
 module.add_url_rule(

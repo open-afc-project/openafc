@@ -217,6 +217,42 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
                 {history}
               </NavItem>
             )}
+            {isAdmin() && guiConfig.grafana_enabled && <NavItemSeparator />}
+            {isAdmin() && guiConfig.grafana_enabled && (
+              <NavItem id="grafana-link" itemId="grafana-link-item">
+                <a target="_blank" rel="noopener noreferrer" href="/fbrat/grafana/">
+                  Grafana
+                </a>
+              </NavItem>
+            )}
+            {isAdmin() && guiConfig.grafana_enabled && (
+              <NavItem id="prometheus-link" itemId="prometheus-link-item">
+                <a target="_blank" rel="noopener noreferrer" href="/fbrat/prometheus/">
+                  Prometheus
+                </a>
+              </NavItem>
+            )}
+            {isAdmin() && guiConfig.grafana_enabled && (
+              <NavItem id="cadvisor-link" itemId="cadvisor-link-item">
+                <a target="_blank" rel="noopener noreferrer" href="/fbrat/cadvisor/">
+                  cAdvisor
+                </a>
+              </NavItem>
+            )}
+            {isAdmin() && guiConfig.grafana_enabled && (
+              <NavItem id="rabbitmq-link" itemId="rabbitmq-link-item">
+                <a target="_blank" rel="noopener noreferrer" href="/fbrat/rabbitmq/">
+                  RabbitMQ
+                </a>
+              </NavItem>
+            )}
+            {isAdmin() && guiConfig.grafana_enabled && (
+              <NavItem id="kafka-ui-link" itemId="kafka-ui-link-item">
+                <a target="_blank" rel="noopener noreferrer" href="/fbrat/kafka-ui/">
+                  Kafka UI
+                </a>
+              </NavItem>
+            )}
             {!isLoggedIn() && showAbout() && (
               <NavItem id="about-link" itemId="about-link-item">
                 <NavLink to="/about" activeClassName="pf-m-current">

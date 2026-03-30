@@ -10,8 +10,9 @@
 FROM nginx/nginx-prometheus-exporter:0.11
 
 # URL on which Nginx' stub_status is exported
-ENV NGINXEXPORTER_STUB_URL=http://dispatcher:8080/stub_status
+ENV SCRAPE_URI=http://dispatcher:8080/stub_status
+ENV SSL_VERIFY=false
 
 EXPOSE 9113/tcp
 
-ENTRYPOINT ["nginx-prometheus-exporter", "-nginx.scrape-uri=${NGINXEXPORTER_STUB_URL}"]
+ENTRYPOINT ["nginx-prometheus-exporter"]
