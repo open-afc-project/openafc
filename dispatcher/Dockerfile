@@ -52,6 +52,8 @@ COPY dispatcher/nginx.conf /etc/nginx/
 COPY dispatcher/nginx.conf.template /etc/nginx/templates/
 
 COPY dispatcher/acceptor.py /wd/
+COPY dispatcher/25-strip-monitoring.sh /docker-entrypoint.d/
+RUN chmod +x /docker-entrypoint.d/25-strip-monitoring.sh
 
 ENV AFC_MSGHND_NAME=${AFC_MSGHND_NAME:-msghnd}
 ENV AFC_MSGHND_PORT=${AFC_MSGHND_PORT:-8000}
@@ -64,15 +66,13 @@ ENV AFC_PROXY_CONN_TOUT=${AFC_PROXY_CONN_TOUT:-720}
 #
 ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 
-# 'true' to enable access to Prometheus via dispatcher
-ENV AFC_PROMETHEUS_ENABLED=false
-# Host and port of Prometheus server
-ENV AFC_PROMETHEUS_TARGET=prometheus:9090
-
-# 'true' to enable access to Grafana via dispatcher
+# 'true' to enable monitoring UIs (Grafana, Prometheus, cAdvisor, RabbitMQ, Kafka UI)
 ENV AFC_GRAFANA_ENABLED=false
-# Host and port of Grafana server
 ENV AFC_GRAFANA_TARGET=grafana:3000
+ENV AFC_PROMETHEUS_TARGET=prometheus:9090
+ENV AFC_KAFKA_UI_TARGET=kafka_ui:8080
+ENV AFC_CADVISOR_TARGET=cadvisor:8080
+ENV AFC_RABBITMQ_TARGET=rmq:15672
 
 COPY dispatcher/entrypoint.sh /
 RUN chmod +x /entrypoint.sh

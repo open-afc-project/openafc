@@ -1,0 +1,6 @@
+groups:
+  - name: als_siphon
+    interval: 15s
+    rules:
+      - record: siphon_consumer_lag
+        expr: siphon_fetched_offsets - siphon_comitted_offsets

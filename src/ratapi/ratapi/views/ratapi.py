@@ -157,6 +157,8 @@ class GuiConfig(MethodView):
             about_sitekey=about_sitekey if about_sitekey else None,
             app_name=flask.current_app.config['USER_APP_NAME'],
             version=serververs,
+            grafana_enabled=os.environ.get(
+                'AFC_GRAFANA_ENABLED', 'false').lower() == 'true',
         )
         return resp
 
