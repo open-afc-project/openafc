@@ -3,7 +3,7 @@
 #ifndef SRC_RATCOMMON_TEXTHELPERS_H_
 #define SRC_RATCOMMON_TEXTHELPERS_H_
 
-//#include "ratcommon_export.h"
+// #include "ratcommon_export.h"
 #include <QString>
 
 class QAbstractSocket;

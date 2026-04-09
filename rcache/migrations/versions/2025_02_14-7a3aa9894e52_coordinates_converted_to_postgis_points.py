@@ -34,6 +34,13 @@ def upgrade() -> None:
                 f"privileges. Please install \"postgis\" extension on \"als\" "
                 f"database before proceed")
 
+    # Check if coordinates column already exists to prevent duplicate column error on pre-existing tables
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = [c["name"] for c in inspector.get_columns("aps")]
+    if "coordinates" in columns:
+        return
+
     op.add_column(
         "aps",
         sa.Column("coordinates",

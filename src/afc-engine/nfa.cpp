@@ -223,6 +223,12 @@ void NFAClass::readTable()
 /******************************************************************************************/
 double NFAClass::computeNFA(double xdb, double u, double eff)
 {
+	if (!std::isfinite(xdb) || !std::isfinite(u) || !std::isfinite(eff)) {
+		return 0.0;
+	}
+	if (numxdb < 2 || numu < 2 || numeff < 2) {
+		return 0.0;
+	}
 	double xdbIdxDbl = (xdb - xdbStart) / xdbStep;
 	double uIdxDbl = (u - uStart) / uStep;
 	double effIdxDbl = (eff - effStart) / effStep;

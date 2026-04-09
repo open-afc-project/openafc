@@ -39,9 +39,16 @@ def main():
             flow = InstalledAppFlow.from_client_secrets_file(
                 'credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open('token.json', 'w') as token:
+        # Save the credentials for the next run. The file holds a live
+        # refresh token, so create it owner-readable only (0600) instead
+        # of relying on the process umask.
+        fd = os.open('token.json',
+                     os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, 'w') as token:
             token.write(creds.to_json())
+        # Tighten permissions of a token.json created by earlier runs
+        # (O_CREAT mode only applies to newly created files).
+        os.chmod('token.json', 0o600)
 
     try:
         service = build('sheets', 'v4', credentials=creds)
@@ -56,14 +63,17 @@ def main():
             print('No data found.')
             return
 
-        with open(args.out, 'w', encoding='utf-8') as csv_file:
+        import csv
+        _CSV_FORMULA_LEAD = ('=', '+', '-', '@', '\t', '\r')
+
+        def _csv_safe(v):
+            s = str(v)
+            return ("'" + s) if (s and s[0] in _CSV_FORMULA_LEAD) else s
+
+        with open(args.out, 'w', encoding='utf-8', newline='') as csv_file:
+            writer = csv.writer(csv_file)
             for row in values:
-                length = len(row)
-                if length > 0:
-                    csv_file.write('\"%s\"' % (row[0]))
-                    for i in range(1, length):
-                        csv_file.write(',\"%s\"' % (row[i]))
-                    csv_file.write('\n')
+                writer.writerow([_csv_safe(cell) for cell in row])
     except HttpError as err:
         print(err)
 

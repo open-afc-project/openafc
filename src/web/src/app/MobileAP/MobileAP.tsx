@@ -1,7 +1,8 @@
-import * as React from 'react';
+import React from 'react';
 import {
   PageSection,
-  CardHead,
+  CardHeader,
+  CardTitle,
   CardBody,
   Card,
   Button,
@@ -289,6 +290,7 @@ class MobileAP extends React.Component<
       logger.info('Running mobile AP with config:', conf);
       this.setState({
         apConfig: conf,
+        // @ts-ignore
         minEIRP: afcConfig.result.minEIRP,
         currentFrame: 0,
         maxFrame: conf.path[conf.path.length - 1].frame,
@@ -324,12 +326,14 @@ class MobileAP extends React.Component<
         if (spectrumResult === undefined) return;
         const filteredSpectrum = filterUNII(spectrumResult);
         if (spectrumResult !== undefined) {
-          this.state.spectrumCache[i] = {
+          const newSpectrumCache = { ...this.state.spectrumCache };
+          newSpectrumCache[i] = {
             spec: filteredSpectrum,
+            // @ts-ignore
             channels: pawsToChannels(filteredSpectrum, config.minEIRP, config.maxEIRP),
             frameStamp: this.state.currentFrame,
           };
-          this.setState({ spectrums: this.state.spectrums });
+          this.setState({ spectrumCache: newSpectrumCache, spectrums: this.state.spectrums });
         }
       }
 
@@ -340,6 +344,7 @@ class MobileAP extends React.Component<
       this.setState({ timeEditDisabled: false });
     } catch (e) {
       logger.error(e);
+      // @ts-ignore
       this.setState({ messageType: 'Error', messageTitle: 'Error: ' + e.code || '', messageValue: e.message });
       this.clearThisInterval();
     }
@@ -435,6 +440,7 @@ class MobileAP extends React.Component<
 
         if (this.state.currentFrame == to) {
           this.clearThisInterval();
+          // @ts-ignore
           resolve(); // return to awaiter once interval has cleared
         }
       }, this.intervalUpdatePeriod);
@@ -513,6 +519,7 @@ class MobileAP extends React.Component<
       // add the polyline for the AP's path
       //@ts-ignore
       .concat(
+        // @ts-ignore
         !this.state.apConfig
           ? []
           : [
@@ -629,10 +636,12 @@ class MobileAP extends React.Component<
     if (!this.state.apConfig) return;
 
     // Update the spectrum list from cache so that it follows playback accuratly
+    const newSpectrums = [...this.state.spectrums];
     for (let i = 0; i < this.state.apConfig.requests.length; i++) {
       const cache = this.state.spectrumCache[i];
-      this.state.spectrums[i] = cache && cache.frameStamp <= this.state.currentFrame ? cache.spec : undefined;
+      newSpectrums[i] = cache && cache.frameStamp <= this.state.currentFrame ? cache.spec : undefined;
     }
+    this.setState({ spectrums: newSpectrums });
 
     // get map display data
     const markerPosition = this.getMarkerPosition(this.state.apConfig.path, frameNum);
@@ -675,13 +684,13 @@ class MobileAP extends React.Component<
     return (
       <PageSection id="mobile-ap-page">
         <Card>
-          <CardHead>
-            <Title size="lg">Run Mobile AP</Title>
-          </CardHead>
+          <CardHeader>
+            <Title headingLevel="h2">Run Mobile AP</Title>
+          </CardHeader>
           <CardBody>
             <FormGroup label="Mobile AP Path Configuration" fieldId="mobile-ap-run-config">
               <InputGroup>
-                <input id="mobile-ap-run-config-input" type="file" accept=".json,application/json" />
+                <input id="mobile-ap-run-config" type="file" accept=".json,application/json" />
               </InputGroup>
             </FormGroup>
             <br />
@@ -695,7 +704,7 @@ class MobileAP extends React.Component<
           <Alert
             title={this.state.extraWarningTitle || 'Warning'}
             variant="warning"
-            action={
+            actionClose={
               <AlertActionCloseButton
                 onClose={() => this.setState({ extraWarning: undefined, extraWarningTitle: undefined })}
               />
@@ -721,9 +730,11 @@ class MobileAP extends React.Component<
         )}
         <br />
         <Card>
-          <CardHead>Time Line</CardHead>
+          <CardHeader>
+            <CardTitle>Time Line</CardTitle>
+          </CardHeader>
           <CardBody>
-            <span>
+            <span className="afc-button-group--row">
               <Button
                 key="play-pause"
                 variant="primary"
@@ -731,7 +742,7 @@ class MobileAP extends React.Component<
                 onClick={() => this.playPause()}
               >
                 {this.state.isPlaying ? 'Pause' : 'Play'}
-              </Button>{' '}
+              </Button>
               <Button
                 key="slower-butn"
                 variant="secondary"
@@ -739,7 +750,7 @@ class MobileAP extends React.Component<
                 onClick={() => this.slowDown()}
               >
                 Slower
-              </Button>{' '}
+              </Button>
               <Button
                 key="faster-butn"
                 variant="secondary"
@@ -747,8 +758,8 @@ class MobileAP extends React.Component<
                 onClick={() => this.speedUp()}
               >
                 Faster
-              </Button>{' '}
-              {this.state.frameIncrement + 'x'}
+              </Button>
+              <span>{this.state.frameIncrement + 'x'}</span>
             </span>
             <br />
             <br />
@@ -788,7 +799,8 @@ class MobileAP extends React.Component<
           .map((spec, i) => (
             <React.Fragment key={i}>
               <br />
-              <Card isHoverable={true}>
+              {/* @ts-ignore */}
+              <Card>
                 <CardBody>
                   <Measure
                     bounds={true}

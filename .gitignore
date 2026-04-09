@@ -28,3 +28,4 @@ __pycache__/
 *.pyc
 Chart.lock
 **/charts/*.tgz
+dispatcher/certs/clients/test_ca_key.pem

@@ -17,4 +17,4 @@ then
   sed -i "s/scrape_timeout:\\s*[0-9]\\+./scrape_timeout: $PROMETHEUS_SCRAPE_TIMEOUT/g" prometheus.yml
 fi
 
-prometheus --web.enable-lifecycle --storage.tsdb.path="$PROMETHEUS_DATA"
+prometheus --storage.tsdb.path="$PROMETHEUS_DATA"

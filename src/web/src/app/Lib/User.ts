@@ -34,6 +34,8 @@ export interface UserState {
         firstName?: string;
         lastName?: string;
         active: boolean;
+        /** False when OIDC / IdP owns email & password (see UserAPI guiconfig). */
+        editCredential?: boolean;
       };
 }
 
@@ -112,6 +114,7 @@ export const retrieveUserData = async (): Promise<RatResponse<string>> => {
 /**
  * Is user credential is editable
  */
+// @ts-ignore
 export const isEditCredential = () => getUser().data.editCredential;
 
 /**

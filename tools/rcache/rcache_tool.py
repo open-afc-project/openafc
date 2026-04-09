@@ -392,7 +392,7 @@ async def fill_worker(args: Any, reporter: Reporter,
             batch.append(RrkGen.rrk(item))
         if len(batch) < (1 if end else args.batch):
             continue
-        update_req = RcacheUpdateReq(req_resp_keys=batch).dict()
+        update_req = RcacheUpdateReq(req_resp_keys=batch).model_dump()
         errmsg: Optional[str] = None
         if (not args.dry) or args.dry_remote:
             backoff_window = 1
@@ -469,7 +469,7 @@ async def lookup_worker(postgres_dsn: str, metadata: Optional[sa.MetaData],
                 scheme=f"{dsn_parts.scheme}+{ASYNC_DRIVER_NAME}"))
     async_engine = None if dry else sa_async.create_async_engine(async_dsn)
     dry_result = \
-        [ApDbRecord.from_req_resp_key(RrkGen.rrk(idx)).dict()
+        [ApDbRecord.from_req_resp_key(RrkGen.rrk(idx)).model_dump()
          for idx in range(batch_size)] if dry else None
     done = 0
     while done < count:
@@ -481,7 +481,7 @@ async def lookup_worker(postgres_dsn: str, metadata: Optional[sa.MetaData],
         if dry:
             assert dry_result is not None
             result = \
-                [ApDbRecord.parse_obj(dry_result[idx]).get_patched_response()
+                [ApDbRecord.model_validate(dry_result[idx]).get_patched_response()
                  for idx in range(len(batch))]
         else:
             assert async_engine is not None
@@ -496,7 +496,7 @@ async def lookup_worker(postgres_dsn: str, metadata: Optional[sa.MetaData],
                               (table.c.state == ApDbRespState.Valid.name))
                     async with async_engine.connect() as conn:
                         rp = await conn.execute(s)
-                    result = [ApDbRecord.parse_obj(rec).get_patched_response()
+                    result = [ApDbRecord.model_validate(rec).get_patched_response()
                               for rec in rp]
                     break
                 except sa.exc.SQLAlchemyError as ex:
@@ -557,11 +557,11 @@ async def do_invalidate(args: Any) -> None:
         path = f"invalidation_state/{json.dumps(bool(args.enable))}"
     elif args.all:
         error_if(args.tile or args.ruleset, "Incompatible parameters")
-        invalidate_req = RcacheInvalidateReq().dict()
+        invalidate_req = RcacheInvalidateReq().model_dump()
         path = "invalidate"
     elif args.ruleset:
         error_if(args.tile, "Incompatible parameters")
-        invalidate_req = RcacheInvalidateReq(ruleset_ids=args.ruleset).dict()
+        invalidate_req = RcacheInvalidateReq(ruleset_ids=args.ruleset).model_dump()
         path = "invalidate"
     elif args.tile:
         tiles: List[LatLonRect] = []
@@ -585,7 +585,7 @@ async def do_invalidate(args: Any) -> None:
             tiles.append(
                 LatLonRect(min_lat=min_lat, min_lon=min_lon, max_lat=max_lat,
                            max_lon=max_lon))
-        invalidate_req = RcacheSpatialInvalidateReq(tiles=tiles).dict()
+        invalidate_req = RcacheSpatialInvalidateReq(tiles=tiles).model_dump()
         path = "spatial_invalidate"
     elif args.beam:
         beams: List[Beam] = []
@@ -609,7 +609,7 @@ async def do_invalidate(args: Any) -> None:
                               tx_lat=tx1 if tx2 is not None else None,
                               tx_lon=tx2,
                               azimuth_to_tx=tx1 if tx2 is None else None))
-            invalidate_req = RcacheDirectionalInvalidateReq(beams=beams).dict()
+            invalidate_req = RcacheDirectionalInvalidateReq(beams=beams).model_dump()
             path = "directional_invalidate"
     else:
         error("No invalidation type parameters specified")
@@ -666,8 +666,8 @@ async def do_status(args: Any) -> None:
     while True:
         async with aiohttp.ClientSession() as session:
             async with session.get(rcache_url(args, "status")) as resp:
-                status = RcacheStatus.parse_obj(await resp.json())
-        print(tabulate.tabulate(status.dict().items(),
+                status = RcacheStatus.model_validate(await resp.json())
+        print(tabulate.tabulate(status.model_dump().items(),
                                 tablefmt="plain", colalign=("left", "right")))
         if args.interval is None:
             break

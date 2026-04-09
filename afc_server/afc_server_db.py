@@ -14,6 +14,8 @@
 
 import asyncio
 from collections.abc import Coroutine
+import datetime
+import os
 import urllib.parse
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sa_async
@@ -23,9 +25,10 @@ from typing import Any, Callable, cast, Dict, Generic, List, NamedTuple, \
     Optional, Set, TypeVar, Union
 
 import afcmodels.hardcoded_relations as hardcoded_relations
-import afc_server_models
+from afcmodels import afc_server_models
 from log_utils import dp, error, error_if, get_module_logger
 import rcache_models
+from rcache_db import RCACHE_MAX_AGE
 import db_utils
 
 __all__ = ["AfcCertReq", "AfcCertResp", "AfcRcacheResp", "AfcServerDb"]
@@ -51,23 +54,37 @@ class AfcCertReq:
     serial         -- AP Serial Number
     certifications -- AP certifications (set of Certification objects)
     """
-    def __init__(self, dev_dsc: afc_server_models.Rest_DeviceDescriptor_1_4) \
-            -> None:
+
+    def __init__(
+            self, dev_dsc: afc_server_models.Rest_DeviceDescriptor_1_4,
+            mtls_dn: Optional[str] = None) -> None:
         """ Constructor from Rest_DeviceDescriptor_1_4 object """
-        self.serial = dev_dsc.serialNumber
+        self.serial = dev_dsc.serialNumber.strip().upper() if dev_dsc.serialNumber else dev_dsc.serialNumber
+        # Canonicalize the certification id exactly as the deny-list write
+        # path does (aaa.AccessPointDeny.normalize_certification_id: strip):
+        # the deny/cert queries compare against the stored canonical form,
+        # so a non-canonical variant (e.g. leading whitespace) of a denied
+        # id must not evade AccessPointDeny revocation — especially on the
+        # internal path, where the cert_undefined registration check that
+        # fails such variants closed externally is deliberately relaxed.
         self.certifications = \
-            {Certification(ruleset_name=c.rulesetId, certification_id=c.id)
+            {Certification(ruleset_name=c.rulesetId,
+                           certification_id=c.id.strip())
              for c in dev_dsc.certificationId}
+        # Normalized client TLS subject from nginx mTLS-DN header.
+        self.mtls_dn = mtls_dn.strip() if mtls_dn else None
 
     def __hash__(self) -> int:
         """ Hash function """
-        return hash(self.serial) + sum(hash(ci) for ci in self.certifications)
+        return (hash(self.serial) + sum(hash(ci) for ci in self.certifications) +
+                hash(self.mtls_dn or ""))
 
     def __eq__(self, other: Any) -> bool:
         """ Equality comparison """
         return isinstance(other, self.__class__) and \
             (self.serial == other.serial) and \
-            (self.certifications == other.certifications)
+            (self.certifications == other.certifications) and \
+            (self.mtls_dn == other.mtls_dn)
 
 
 class AfcCertResp:
@@ -89,16 +106,18 @@ class AfcCertResp:
         cert_denied: bool
         # Given serial number blacklisted for certification
         serial_denied: bool
+        # CertId.refreshed_at older than AFC_CERT_ID_MAX_STALE_DAYS
+        cert_stale: bool = False
 
     # Certification deny criterion descriptor
     DenyCriterion = \
         NamedTuple(
             "DenyCriterion",
             [
-             # Function to call to check if certificate is denied
-             ("predicate", Callable[["AfcCertResp.CertResp"], bool]),
-             # Deny explanation
-             ("explanation", str)])
+                # Function to call to check if certificate is denied
+                ("predicate", Callable[["AfcCertResp.CertResp"], bool]),
+                # Deny explanation
+                ("explanation", str)])
 
     # Certification deny criteria
     _deny_criteria = \
@@ -110,23 +129,44 @@ class AfcCertResp:
             explanation="certificate denied"),
          DenyCriterion(
             predicate=lambda cr: getattr(cr, "serial_denied"),
-            explanation="AP serial number denied")]
+            explanation="AP serial number denied"),
+         DenyCriterion(
+            predicate=lambda cr: getattr(cr, "cert_stale"),
+            explanation="certificate record stale "
+                        "(refreshed_at > AFC_CERT_ID_MAX_STALE_DAYS)")]
 
-    def __init__(self, bypass_checks: Optional[AfcCertReq] = None) -> None:
+    def __init__(self, bypass_checks: Optional[AfcCertReq] = None,
+                 cert_location_flags: Optional[Dict[str, int]] = None) \
+            -> None:
         """Constructor
 
         Arguments:
-        bypass_checks -- None or request for which everything should be allowed
+        bypass_checks       -- None or request for which deny-list is skipped
+        cert_location_flags -- Optional dict from certification_id to location
+                               flags, obtained from DB for the bypass path.
+                               Callers should supply this so that indoor certs
+                               are not incorrectly downgraded to outdoor-only.
         """
         self.cert_responses: List["AfcCertResp.CertResp"] = []
         if bypass_checks is not None:
             for cert in bypass_checks.certifications:
+                # Prefer caller-supplied DB-sourced location flags, then
+                # special (test) certificate overrides, then fall back to
+                # outdoor-only for any cert that is entirely unknown.
+                if cert_location_flags is not None and \
+                        cert.certification_id in cert_location_flags:
+                    loc_flags = cert_location_flags[cert.certification_id]
+                else:
+                    scp = hardcoded_relations.SpecialCertifications.\
+                        get_properties(
+                            cert_id=cert.certification_id,
+                            serial_number=bypass_checks.serial)
+                    loc_flags = scp.location_flags if scp is not None \
+                        else hardcoded_relations.CERT_ID_LOCATION_OUTDOOR
                 self.cert_responses.append(
                     self.CertResp(
                         ruleset_name=cert.ruleset_name,
-                        location_flags=hardcoded_relations.
-                        CERT_ID_LOCATION_INDOOR |
-                        hardcoded_relations.CERT_ID_LOCATION_OUTDOOR,
+                        location_flags=loc_flags,
                         cert_undefined=False, cert_denied=False,
                         serial_denied=False))
 
@@ -279,7 +319,19 @@ class DbPipeline(Generic[ReqType, RespType]):
                         continue
                     reqs.add(req)
                 # Do the deed
-                responses = await self._db_access(reqs)
+                try:
+                    responses = await self._db_access(reqs)
+                except Exception as ex:
+                    LOGGER.error("DbPipeline %s _db_access failed for %d "
+                                 "request(s): %r; failing batch and "
+                                 "continuing.", self._name, len(reqs), ex)
+                    for failed_req in reqs:
+                        futures1 = self._request_futures.pop(failed_req, None)
+                        if futures1:
+                            for future in futures1:
+                                if not future.done():
+                                    future.set_exception(ex)
+                    continue
                 # Reporting results, unblocking pending process_req()
                 for req, resp in responses.items():
                     futures1 = self._request_futures.get(req)
@@ -408,6 +460,56 @@ class AfcServerDb:
         """ Lookup Certification information for AP """
         return await self._cert_lookup_pipeline.process_req(cert_req, deadline)
 
+    async def get_bypass_location_flags(
+            self, cert_req: AfcCertReq, deadline: float) -> Dict[str, int]:
+        """Look up location flags from DB for the internal (bypass) path.
+
+        Queries only the cert/ruleset tables — no deny-list join — so the
+        internal path gets correct indoor/outdoor flags without consulting the
+        allow/deny list.  Returns a dict mapping certification_id → location
+        flags integer.  Returns an empty dict on any DB error so callers fall
+        back to the outdoor-only conservative default.
+
+        Arguments:
+        cert_req -- Certification request from the device descriptor
+        deadline -- Absolute time (monotonic seconds) by which to complete
+        """
+        certifications = list(cert_req.certifications)
+        if not certifications:
+            return {}
+        cert_table = \
+            await self._get_table(
+                table_name=self._RATDB_CERT_TABLE, meta=self._ratdb_meta,
+                engine=self._ratdb_engine, db_name="RatDB")
+        ruleset_table = \
+            await self._get_table(
+                table_name=self._RATDB_RULESET_TABLE, meta=self._ratdb_meta,
+                engine=self._ratdb_engine, db_name="RatDB")
+        try:
+            s = sa.select(
+                cert_table.c.certification_id,
+                cert_table.c.location).select_from(
+                ruleset_table.join(
+                    cert_table,
+                    ruleset_table.c.id == cert_table.c.ruleset_id)
+            ).where(
+                sa.tuple_(
+                    ruleset_table.c.name,
+                    cert_table.c.certification_id).in_(
+                    [(cert.ruleset_name, cert.certification_id)
+                     for cert in certifications])
+            )
+            result: Dict[str, int] = {}
+            async with self._ratdb_engine.connect() as conn:
+                rp = await conn.execute(s)
+                for row in rp:
+                    m = row._mapping
+                    result[m["certification_id"]] = m["location"]
+            return result
+        except (sa.exc.SQLAlchemyError, OSError) as ex:
+            error(f"RatDB bypass location flags lookup error: {ex}")
+        return {}
+
     async def get_afc_config(self, ruleset_name: str, deadline: float) \
             -> Optional[Dict[str, Any]]:
         """ Lookup AFC Config for given ruleset """
@@ -432,13 +534,13 @@ class AfcServerDb:
         if self._bypass_rcache:
             if self._sample_rcache_reply is None:
                 try:
-                    s = sa.select([ap_table])
+                    s = sa.select(ap_table)
                     async with self._rcache_engine.connect() as conn:
                         rp = await conn.execute(s)
                         row = rp.first()
                         if row:
                             self._sample_rcache_reply = \
-                                rcache_models.ApDbRecord.parse_obj(row).\
+                                rcache_models.ApDbRecord.model_validate(dict(row._mapping)).\
                                 get_patched_response()
                 except (sa.exc.SQLAlchemyError, OSError) as ex:
                     error(f"Rcache DB lookup error: {ex}")
@@ -447,19 +549,34 @@ class AfcServerDb:
                     for d in req_cfg_digests}
 
         try:
-            s = sa.select([ap_table]).\
+            s = sa.select(ap_table).\
                 where(ap_table.c.req_cfg_digest.in_(req_cfg_digests))
             if not self._return_invalidated:
                 s = s.where(ap_table.c.state ==
                             rcache_models.ApDbRespState.Valid.name)
+            s = s.where(ap_table.c.last_update >
+                        (datetime.datetime.now() - RCACHE_MAX_AGE))
             async with self._rcache_engine.connect() as conn:
                 rp = await conn.execute(s)
                 ret: Dict[str, AfcRcacheResp] = {}
                 for row in rp:
                     found = row.state == rcache_models.ApDbRespState.Valid.name
-                    response = rcache_models.ApDbRecord.parse_obj(row).\
-                        get_patched_response() \
-                        if found or self._return_invalidated else None
+                    try:
+                        row_dict = dict(row._mapping)
+                        if "coordinates" in row_dict and row_dict["coordinates"] is not None:
+                            try:
+                                import json
+                                if isinstance(row_dict["coordinates"], str):
+                                    row_dict["coordinates"] = json.loads(row_dict["coordinates"])
+                            except Exception:
+                                pass
+                        response = rcache_models.ApDbRecord.model_validate(
+                            row_dict).get_patched_response() if found or self._return_invalidated else None
+                    except Exception as e:
+                        import sys
+                        print(f"ERROR in row processing: {e}", file=sys.stderr)
+                        sys.stderr.flush()
+                        raise e
                     ret[row.req_cfg_digest] = \
                         AfcRcacheResp(found=found, response=response)
                 for req_cfg_digest in (req_cfg_digests - set(ret.keys())):
@@ -478,10 +595,14 @@ class AfcServerDb:
         Returns Per-request dictionary of responses
         """
         ret: Dict[AfcCertReq, AfcCertResp] = {}
-        if self._bypass_cert:
-            for req in reqs:
-                ret[req] = AfcCertResp(bypass_checks=req)
-            return ret
+        # AFC_SERVER_BYPASS_CERT is a performance-estimation aid: it may
+        # relax cert_undefined/cert_stale, but AccessPointDeny enforcement
+        # (cert_denied/serial_denied) must hold on every ingress path
+        # regardless of performance toggles (parity with the internal-path
+        # handling in afc_server_msg_proc.py and msghnd _auth_ap()). Do not
+        # short-circuit here: run the RatDB deny-list lookup below and
+        # substitute the permissive bypass response only for requests the
+        # deny table does not flag (see the end of this method).
 
         req_serials: Set[str] = set()
         req_certifications: Set[Certification] = set()
@@ -504,44 +625,80 @@ class AfcServerDb:
         class CertInfo(NamedTuple):
             """ Information about certification from select result """
             location_flags: int
+            refreshed_at: Optional[datetime.datetime]
             denied_serials: Set[Optional[str]] = set()
 
         try:
             s = sa.select(
-                    [ruleset_table.c.name, cert_table.c.certification_id,
-                     cert_table.c.location, deny_table.c.id,
-                     deny_table.c.serial_number]).select_from(
-                        ruleset_table.
-                        join(cert_table,
-                             ruleset_table.c.id == cert_table.c.ruleset_id).
-                        join(deny_table,
-                             (deny_table.c.certification_id ==
-                              cert_table.c.certification_id), isouter=True)
-                        ).where(
-                            sa.tuple_(ruleset_table.c.name,
-                                      cert_table.c.certification_id).in_(
-                                [(cert.ruleset_name, cert.certification_id)
-                                 for cert in req_certifications])
-                        ).where(deny_table.c.serial_number.is_(None) |
-                                deny_table.c.serial_number.in_(
-                                    list(req_serials)))
+                ruleset_table.c.name, cert_table.c.certification_id,
+                cert_table.c.location, cert_table.c.refreshed_at,
+                deny_table.c.id,
+                deny_table.c.serial_number).select_from(
+                ruleset_table.
+                join(cert_table,
+                     ruleset_table.c.id == cert_table.c.ruleset_id).
+                join(deny_table,
+                     (deny_table.c.certification_id ==
+                      cert_table.c.certification_id), isouter=True)
+            ).where(
+                sa.tuple_(ruleset_table.c.name,
+                          cert_table.c.certification_id).in_(
+                    [(cert.ruleset_name, cert.certification_id)
+                     for cert in req_certifications])
+            ).where(deny_table.c.serial_number.is_(None) |
+                    deny_table.c.serial_number.in_(
+                    list(req_serials)))
 
             cert_infos: Dict[Certification, CertInfo] = {}
             async with self._ratdb_engine.connect() as conn:
                 rp = await conn.execute(s)
                 for row in rp:
+                    m = row._mapping
                     res_certification = \
                         Certification(
-                            certification_id=row["certification_id"],
-                            ruleset_name=row["name"])
+                            certification_id=m["certification_id"],
+                            ruleset_name=m["name"])
                     cert_info = \
                         cert_infos.setdefault(
                             res_certification,
-                            CertInfo(location_flags=row["location"]))
-                    if row["id"] is not None:
-                        cert_info.denied_serials.add(row["serial_number"])
+                            CertInfo(location_flags=m["location"],
+                                     refreshed_at=m["refreshed_at"],
+                                     denied_serials=set()))
+                    if m["id"] is not None:
+                        cert_info.denied_serials.add(m["serial_number"])
         except (sa.exc.SQLAlchemyError, OSError) as ex:
             error(f"RatDB certification lookup error: {ex}")
+
+        # Deny rows must be keyed on the request's (certification_id, serial)
+        # alone: the ruleset-scoped cert_id join above misses deny rows when
+        # the cert is presented under a different rulesetId or its cert_id
+        # row was pruned, which the internal (bypass) path relies upon to
+        # enforce AccessPointDeny.
+        direct_deny: Dict[str, Set[Optional[str]]] = {}
+        try:
+            # Case-insensitive deny match: deny rows are stored canonical
+            # (stripped, registration-checked) but a byte-exact case
+            # comparison would let a case variant of a denied id evade
+            # revocation on the internal path, which waives the
+            # cert_undefined registration check that fails case variants
+            # closed on the external path.
+            sd = sa.select(
+                deny_table.c.certification_id,
+                deny_table.c.serial_number).where(
+                sa.func.lower(deny_table.c.certification_id).in_(
+                    [cert.certification_id.lower()
+                     for cert in req_certifications])).where(
+                deny_table.c.serial_number.is_(None) |
+                deny_table.c.serial_number.in_(list(req_serials)))
+            async with self._ratdb_engine.connect() as conn:
+                rp = await conn.execute(sd)
+                for row in rp:
+                    m = row._mapping
+                    direct_deny.setdefault(
+                        m["certification_id"].lower(),
+                        set()).add(m["serial_number"])
+        except (sa.exc.SQLAlchemyError, OSError) as ex:
+            error(f"RatDB deny-list lookup error: {ex}")
         # Note that resulting table contains excessive information: for each
         # denied certificate it contains all denied serials (from original list
         # of serials due to second 'where'), even if they were not in original
@@ -552,18 +709,40 @@ class AfcServerDb:
             ret[req] = AfcCertResp()
             for certification in req.certifications:
                 optional_cert_info = cert_infos.get(certification)
+                # Deny verdict from the direct lookup only - independent of
+                # cert_id registration under the presented ruleset (the
+                # direct lookup is a superset of the join-derived deny rows)
+                denied_serials = \
+                    direct_deny.get(certification.certification_id.lower(),
+                                    set())
                 ret[req].add_cert_resp(
                     AfcCertResp.CertResp(
                         ruleset_name=certification.ruleset_name,
                         location_flags=None if optional_cert_info is None
                         else optional_cert_info.location_flags,
                         cert_undefined=optional_cert_info is None,
-                        cert_denied=(optional_cert_info is not None) and
-                        (None in optional_cert_info.denied_serials),
-                        serial_denied=(optional_cert_info is not None) and
-                        (req.serial in optional_cert_info.denied_serials)),
+                        cert_denied=None in denied_serials,
+                        serial_denied=req.serial in denied_serials,
+                        cert_stale=(optional_cert_info is not None) and
+                        _cert_is_stale(optional_cert_info.refreshed_at)),
                     serial=req.serial,
                     certification_id=certification.certification_id)
+        if self._bypass_cert:
+            for req in reqs:
+                if any(cr.cert_denied or cr.serial_denied
+                       for cr in ret[req].cert_responses):
+                    # Deny-listed: keep the DB-derived response so that
+                    # allowed_cert_resps() rejects it even under bypass
+                    continue
+                cert_location_flags = {
+                    certification.certification_id:
+                        cert_infos[certification].location_flags
+                    for certification in req.certifications
+                    if certification in cert_infos and
+                    cert_infos[certification].location_flags is not None}
+                ret[req] = AfcCertResp(
+                    bypass_checks=req,
+                    cert_location_flags=cert_location_flags)
         return ret
 
     async def _get_afc_configs(self, ruleset_ids: Set[str]) \
@@ -594,7 +773,7 @@ class AfcServerDb:
             return {ruleset_id: None for ruleset_id in ruleset_ids}
 
         try:
-            s = sa.select([afc_config_table.c.config]).where(
+            s = sa.select(afc_config_table.c.config).where(
                 afc_config_table.c.config["regionStr"].astext.
                 in_(list(regions)))
             region_to_config: Dict[str, Dict[str, Any]] = {}
@@ -666,3 +845,10 @@ class AfcServerDb:
             error(f"Error opening {dsc} DSN '{db_utils.safe_dsn(dsn)}': "
                   f"{ex}")
         return engine
+
+
+def _cert_is_stale(refreshed_at: Optional[datetime.datetime]) -> bool:
+    """ Returns True if refreshed_at is older than AFC_CERT_ID_MAX_STALE_DAYS """
+    # Shared predicate keeps semantics identical to the ratafc.py ingress
+    # path (default 7; empty value tolerated; 0 disables; '>=' comparison)
+    return hardcoded_relations.cert_id_is_stale(refreshed_at)

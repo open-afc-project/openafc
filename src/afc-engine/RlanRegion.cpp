@@ -198,6 +198,12 @@ EllipseRlanRegionClass::EllipseRlanRegionClass(DoubleTriplet rlanLLA,
 	mxD(0, 1) = 0.0;
 	mxD(1, 0) = 0.0;
 
+	// Written as a positive-value check (rather than <= 0.0) so a NaN axis -
+	// for which every relational comparison is false - is rejected too,
+	// instead of silently constructing a degenerate/undefined region.
+	if (!(semiMinorAxis > 0.0) || !(semiMajorAxis > 0.0)) {
+		throw std::runtime_error("EllipseRlanRegionClass: semi-axis must be > 0");
+	}
 	arma::mat mxE(2, 2);
 	mxE(0, 0) = 1.0 / (semiMinorAxis * semiMinorAxis);
 	mxE(1, 1) = 1.0 / (semiMajorAxis * semiMajorAxis);
@@ -519,9 +525,26 @@ std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
 		int N = floor((semiMajorAxis / CConst::earthRadius) * (180.0 / M_PI) *
 			      pointsPerDegree / cosVal) +
 			1;
+		if ((long long)(2 * N + 1) * (2 * N + 1) * (long long)sizeof(int) > (1LL << 30)) {
+			throw std::runtime_error(
+				ErrStream() << "ERROR: EllipseRlanRegionClass::getScan() S-matrix "
+					       "allocation exceeds 1 GiB cap (N="
+					    << N << ")");
+		}
 		int **S = (int **)malloc((2 * N + 1) * sizeof(int *));
+		if (!S) {
+			throw std::runtime_error(ErrStream()
+						 << "ERROR: EllipseRlanRegionClass::getScan() "
+						    "malloc failed for S row-pointer array");
+		}
 		for (ix = 0; ix <= 2 * N; ++ix) {
 			S[ix] = (int *)malloc((2 * N + 1) * sizeof(int));
+			if (!S[ix]) {
+				throw std::runtime_error(
+					ErrStream() << "ERROR: EllipseRlanRegionClass::getScan() "
+						       "malloc failed for S row "
+						    << ix);
+			}
 			for (iy = 0; iy <= 2 * N; ++iy) {
 				S[ix][iy] = 0;
 			}
@@ -540,6 +563,8 @@ std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
 				int iA = ((int)floor(lonA * pointsPerDegree)) - lonN0;
 				int iB = ((int)floor(lonB * pointsPerDegree)) - lonN0;
 				for (ix = iA; ix <= iB; ++ix) {
+					if (N + ix < 0 || N + ix > 2 * N)
+						continue;
 					S[N + ix][N + iy] = 1;
 					S[N + ix][N + iy - 1] = 1;
 				}
@@ -555,6 +580,8 @@ std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
 				int iA = ((int)floor(latA * pointsPerDegree)) - latN0;
 				int iB = ((int)floor(latB * pointsPerDegree)) - latN0;
 				for (iy = iA; iy <= iB; ++iy) {
+					if (N + iy < 0 || N + iy > 2 * N)
+						continue;
 					S[N + ix][N + iy] = 1;
 					S[N + ix - 1][N + iy] = 1;
 				}
@@ -993,9 +1020,26 @@ std::vector<LatLon> PolygonRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
 				    pointsPerDegree) +
 			 2;
 		int NY = (int)floor((maxy - miny) * polygonResolution * pointsPerDegree) + 2;
+		if ((long long)NX * (long long)NY * (long long)sizeof(int) > (1LL << 30)) {
+			throw std::runtime_error(
+				ErrStream() << "ERROR: PolygonRlanRegionClass::getScan() S-matrix "
+					       "allocation exceeds 1 GiB cap (NX="
+					    << NX << " NY=" << NY << ")");
+		}
 		int **S = (int **)malloc((NX) * sizeof(int *));
+		if (!S) {
+			throw std::runtime_error(ErrStream()
+						 << "ERROR: PolygonRlanRegionClass::getScan() "
+						    "malloc failed for S row-pointer array");
+		}
 		for (ix = 0; ix < NX; ++ix) {
 			S[ix] = (int *)malloc((NY) * sizeof(int));
+			if (!S[ix]) {
+				throw std::runtime_error(
+					ErrStream() << "ERROR: PolygonRlanRegionClass::getScan() "
+						       "malloc failed for S row "
+						    << ix);
+			}
 			for (iy = 0; iy < NY; ++iy) {
 				S[ix][iy] = 0;
 			}
@@ -1021,6 +1065,8 @@ std::vector<LatLon> PolygonRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
 				int iA = ((int)floor(lonA * pointsPerDegree)) - lonN0;
 				int iB = ((int)floor(lonB * pointsPerDegree)) - lonN0;
 				for (ix = iA; ix <= iB; ++ix) {
+					if (ix < 0 || ix >= NX)
+						continue;
 					S[ix][iy] = 1;
 					S[ix][iy - 1] = 1;
 				}
@@ -1039,6 +1085,8 @@ std::vector<LatLon> PolygonRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
 				int iA = ((int)floor(latA * pointsPerDegree)) - latN0;
 				int iB = ((int)floor(latB * pointsPerDegree)) - latN0;
 				for (iy = iA; iy <= iB; ++iy) {
+					if (iy < 0 || iy >= NY)
+						continue;
 					S[ix][iy] = 1;
 					S[ix - 1][iy] = 1;
 				}
@@ -1233,7 +1281,12 @@ std::vector<std::tuple<int, int>> *RlanRegionClass::calcScanPointVirtices(int **
 			ix = (((dx == 1) || (incx == 1)) ? vx0 : vx0 - 1);
 			iy = (((dy == 1) || (incy == 1)) ? vy0 : vy0 - 1);
 			int n = 0;
-			while (S[ix][iy] == 0) {
+			// Bound the inward walk to at most NX+NY+2 steps so a degenerate
+			// scan matrix (all-zeros or incx==incy==0 due to a repeated
+			// vertex) cannot produce an unbounded loop.
+			int maxWalk = NX + NY + 2;
+			while (ix >= 0 && ix < NX && iy >= 0 && iy < NY && S[ix][iy] == 0 &&
+			       n < maxWalk) {
 				ix += incx;
 				iy += incy;
 				n++;

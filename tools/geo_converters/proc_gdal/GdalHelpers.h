@@ -17,7 +17,8 @@ class OGRGeometryCollection;
 class OGRFeature;
 class OGRSpatialReference;
 
-namespace GdalHelpers{
+namespace GdalHelpers
+{
 
 /** A helper function to construct new OGRGeometry-derived objects in the
  * proper dynamic library memory space (specifically for windows DLLs).
@@ -26,66 +27,70 @@ namespace GdalHelpers{
  * @return A new default instance of the desired class.
  */
 template<class Typ>
-Typ * createGeometry() = delete;
+Typ *createGeometry() = delete;
 
 template<>
-OGRPoint * createGeometry();
+OGRPoint *createGeometry();
 
 template<>
-OGRMultiPoint * createGeometry();
+OGRMultiPoint *createGeometry();
 
 template<>
-OGRLineString * createGeometry();
+OGRLineString *createGeometry();
 
 template<>
-OGRMultiLineString * createGeometry();
+OGRMultiLineString *createGeometry();
 
 template<>
-OGRLinearRing * createGeometry();
+OGRLinearRing *createGeometry();
 
 template<>
-OGRPolygon * createGeometry();
+OGRPolygon *createGeometry();
 
 template<>
-OGRMultiPolygon * createGeometry();
+OGRMultiPolygon *createGeometry();
 
 template<>
-OGRGeometryCollection * createGeometry();
+OGRGeometryCollection *createGeometry();
 
 /** Delete OGR data with OGRFree() in a DLL-safe way.
  */
-class OgrFreer{
-public:
-    /// Interface for std::unique_ptr deleter
-    void operator()(void *ptr) const;
+class OgrFreer
+{
+	public:
+		/// Interface for std::unique_ptr deleter
+		void operator()(void *ptr) const;
 };
 
 /** Delete OGRGeometry objects in a DLL-safe way.
-*/
-class GeometryDeleter{
-public:
-    /// Interface for std::unique_ptr deleter
-    void operator()(OGRGeometry *ptr) const;
+ */
+class GeometryDeleter
+{
+	public:
+		/// Interface for std::unique_ptr deleter
+		void operator()(OGRGeometry *ptr) const;
 };
 
 /// Convenience name for unique-pointer class
-template<class T=OGRGeometry>
+template<class T = OGRGeometry>
 using GeomUniquePtr = std::unique_ptr<T, GeometryDeleter>;
 
 /** Delete OGRFeature objects in a DLL-safe way.
-*/
-class FeatureDeleter{
-public:
-    /// Interface for std::unique_ptr deleter
-    void operator()(OGRFeature *obj);
+ */
+class FeatureDeleter
+{
+	public:
+		/// Interface for std::unique_ptr deleter
+		void operator()(OGRFeature *obj);
 };
 
 /** Delete OGRSpatialReference objects in a DLL-safe way.
-*/
-class SrsDeleter{
-public:
-    /// Interface for std::unique_ptr deleter
-    void operator()(OGRSpatialReference *obj);
+ */
+class SrsDeleter
+{
+	public:
+		/// Interface for std::unique_ptr deleter
+		void operator()(OGRSpatialReference *obj);
 };
 
 /** Move contained geometries from one collection to another.
@@ -117,7 +122,7 @@ std::string exportWkt(const OGRGeometry *geom);
  * @return The new created geometry.
  * Ownership is taken by the caller.
  */
-OGRGeometry * importWkt(const std::string &data);
+OGRGeometry *importWkt(const std::string &data);
 
 /** Export SRS to Well Known Text representation.
  *  @param srs Pointer to the object to export, which may be null.
@@ -131,7 +136,7 @@ std::string exportWkt(const OGRSpatialReference *srs);
  */
 std::string exportProj4(const OGRSpatialReference *srs);
 
-OGRSpatialReference * importWellKnownGcs(const std::string &name);
+OGRSpatialReference *importWellKnownGcs(const std::string &name);
 
 }
 

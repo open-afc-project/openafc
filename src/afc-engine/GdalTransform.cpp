@@ -44,12 +44,8 @@ void GdalTransform::BoundRect::combine(const GdalTransform::BoundRect &other)
 
 double GdalTransform::BoundRect::rebaseLon(double lon, double base)
 {
-	while ((lon - 360) >= base) {
-		lon -= 360;
-	}
-	while (lon < base) {
-		lon += 360;
-	}
+	// Normalise lon into [base, base+360) using constant-time modular arithmetic.
+	lon = base + std::fmod(std::fmod(lon - base, 360.0) + 360.0, 360.0);
 	return lon;
 }
 

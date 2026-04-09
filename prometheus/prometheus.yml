@@ -27,19 +27,31 @@ scrape_configs:
   - job_name: msghnd
     static_configs:
       - targets: [msghnd:8000]
+    http_headers:
+      X-AFC-Internal-Token:
+        files: [/run/secrets/AFC_INTERNAL_TOKEN]
   - job_name: afcserver
     static_configs:
       - targets: [afcserver:8000]
-    metrics_path: /metrics
+    metrics_path: /metrics/
+    http_headers:
+      X-AFC-Internal-Token:
+        files: [/run/secrets/AFC_INTERNAL_TOKEN]
   - job_name: als_siphon
     static_configs:
       - targets: [als_siphon:8080]
+    http_headers:
+      X-AFC-Internal-Token:
+        files: [/run/secrets/AFC_INTERNAL_TOKEN]
   - job_name: nginxexporter
     static_configs:
       - targets: [nginxexporter:9113]
   - job_name: uls_downloader
     static_configs:
       - targets: [uls_downloader:8000]
+    http_headers:
+      X-AFC-Internal-Token:
+        files: [/run/secrets/AFC_INTERNAL_TOKEN]
   - job_name: cadvisor
     static_configs:
       - targets: [cadvisor:8080]

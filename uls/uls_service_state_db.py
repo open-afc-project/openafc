@@ -13,6 +13,7 @@
 
 import datetime
 import enum
+import os
 import requests
 import shlex
 import sqlalchemy as sa
@@ -70,7 +71,7 @@ LogInfo = \
          ("log_type", LogType)])
 
 # Check type
-CheckType = enum.Enum("CheckType", ["ExtParams", "FsDatabase"])
+CheckType = enum.Enum("CheckType", ["ExtParams", "FsDatabase", "HashVerification"])
 
 # Information about check
 CheckInfo = \
@@ -95,13 +96,13 @@ AlarmInfo = \
     NamedTuple(
         "AlarmInfo",
         [
-         # Type of alarm
-         ("alarm_type", AlarmType),
-         # Specific reason for alarm (name of missing milestone,
-         # name of offending external file, etc.)
-         ("alarm_reason", str),
-         # Alarm timestramp
-         ("timestamp", datetime.datetime)])
+            # Type of alarm
+            ("alarm_type", AlarmType),
+            # Specific reason for alarm (name of missing milestone,
+            # name of offending external file, etc.)
+            ("alarm_reason", str),
+            # Alarm timestramp
+            ("timestamp", datetime.datetime)])
 
 
 class StateDb:
@@ -129,6 +130,12 @@ class StateDb:
 
     # Name of table with check results
     CHECKS_TABLE = "checks"
+
+    # Name of table with hash-manifest replay state (the '_iat' high-water
+    # mark). Deliberately NOT listed in ALL_TABLE_NAMES: pre-existing
+    # databases gain it via create_db() (create_all is idempotent), and its
+    # absence must not fail unrelated StateDb users during rollout
+    MANIFEST_STATE_TABLE_NAME = "manifest_state"
 
     # All known table names (not including Alembic, etc.)
     ALL_TABLE_NAMES = [MILESTONE_TABLE_NAME, ALARM_TABLE_NAME, LOG_TABLE_NAME,
@@ -180,6 +187,13 @@ class StateDb:
             sa.Column("check_item", sa.String(), primary_key=True, index=True),
             sa.Column("errmsg", sa.String(), nullable=True),
             sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False))
+        sa.Table(
+            self.MANIFEST_STATE_TABLE_NAME,
+            self.metadata,
+            sa.Column("name", sa.String(), primary_key=True),
+            sa.Column("value", sa.String(), nullable=False),
+            sa.Column("timestamp", sa.DateTime(timezone=True),
+                      nullable=False))
         self._engine: Any = None
 
     def create_db(self, db_creator_url: Optional[str],
@@ -207,13 +221,19 @@ class StateDb:
                 db_existed = \
                     db_creator.ensure_dsn(
                         dsn=self._arg_db_dsn,
-                        password_file=self._password_file)[1]
+                        password_file=self._password_file,
+                        # Grant SELECT to bulk_ro so read-only datasources can
+                        # read-only datasource can query fs_state.
+                        grant_readonly_role=os.environ.get(
+                            'AFC_BULK_DB_READONLY_ROLE'))[1]
             except RuntimeError as ex:
                 error(f"Error creating state database "
                       f"'{db_utils.safe_dsn(self._arg_db_dsn)}': {ex}")
             engine = self._create_engine(self._full_db_dsn)
-            if not db_existed:
-                self.metadata.create_all(engine)
+            # create_all is idempotent (checkfirst) — run it for
+            # pre-existing databases too, so tables added after initial
+            # deployment (e.g. manifest_state) get created
+            self.metadata.create_all(engine)
             if alembic_config:
                 err = \
                     db_utils.alembic_ensure_version(
@@ -295,6 +315,7 @@ class StateDb:
                 with self._engine.connect() as conn:
                     for op in ops:
                         ret = conn.execute(op)
+                    conn.commit()
                 return ret
             except sa.exc.SQLAlchemyError as ex:
                 if retry:
@@ -386,10 +407,44 @@ class StateDb:
         Returns by-region dictionary of milestone timetags
         """
         table = self.metadata.tables[self.MILESTONE_TABLE_NAME]
-        sel = sa.select([table.c.region, table.c.timestamp]).\
+        sel = sa.select(table.c.region, table.c.timestamp).\
             where(table.c.milestone == milestone.name)
         rp = self._execute([sel])
         return {rec.region or None: rec.timestamp for rec in rp}
+
+    def read_manifest_iat(self) -> Optional[int]:
+        """ Read the hash-manifest '_iat' replay high-water mark
+
+        Returns the last accepted manifest '_iat' epoch, or None if the
+        mark was never baselined (or is unreadable) — callers must treat
+        None as fail-closed
+        """
+        table = self.metadata.tables[self.MANIFEST_STATE_TABLE_NAME]
+        sel = sa.select(table.c.value).where(table.c.name == "manifest_iat")
+        rp = self._execute([sel])
+        row = rp.first()
+        if row is None:
+            return None
+        try:
+            return int(row.value)
+        except (TypeError, ValueError):
+            return None
+
+    def write_manifest_iat(self, iat: int) -> None:
+        """ Persist the hash-manifest '_iat' replay high-water mark
+
+        Arguments:
+        iat -- Last accepted manifest '_iat' epoch
+        """
+        table = self.metadata.tables[self.MANIFEST_STATE_TABLE_NAME]
+        ins = sa_pg.insert(table).values(
+            name="manifest_iat", value=str(iat),
+            timestamp=datetime.datetime.now(datetime.timezone.utc))
+        ins = ins.on_conflict_do_update(
+            index_elements=["name"],
+            set_={c.name: ins.excluded[c.name]
+                  for c in table.c if not c.primary_key})
+        self._execute([ins])
 
     def write_alarm_reasons(
             self, reasons: Optional[Dict[AlarmType, Set[str]]] = None) \
@@ -420,8 +475,8 @@ class StateDb:
         table = self.metadata.tables[self.ALARM_TABLE_NAME]
         rp = self._execute(
             [sa.select(
-                [table.c.alarm_type, table.c.alarm_reason,
-                 table.c.timestamp])])
+                table.c.alarm_type, table.c.alarm_reason,
+                table.c.timestamp)])
         return [AlarmInfo(alarm_type=AlarmType[rec.alarm_type],
                           alarm_reason=rec.alarm_reason,
                           timestamp=rec.timestamp)
@@ -453,7 +508,7 @@ class StateDb:
         Returns LogInfo object
         """
         table = self.metadata.tables[self.LOG_TABLE_NAME]
-        sel = sa.select([table.c.log_type, table.c.text, table.c.timestamp]).\
+        sel = sa.select(table.c.log_type, table.c.text, table.c.timestamp).\
             where(table.c.log_type == log_type.name)
         rp = self._execute([sel])
         row = rp.first()
@@ -488,8 +543,8 @@ class StateDb:
         Returns dictionary of CheckInfo items lists, indexed by check type
         """
         table = self.metadata.tables[self.CHECKS_TABLE]
-        sel = sa.select([table.c.check_type, table.c.check_item,
-                         table.c.errmsg, table.c.timestamp])
+        sel = sa.select(table.c.check_type, table.c.check_item,
+                        table.c.errmsg, table.c.timestamp)
         rp = self._execute([sel])
         ret: Dict[CheckType, List[CheckInfo]] = {}
         for rec in rp:

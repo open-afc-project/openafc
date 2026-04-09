@@ -17,6 +17,10 @@ import os
 
 LOGGER = logging.getLogger(__name__)
 
+# status.json lives in bearer-writable objstorage; bound the read so an
+# oversized stored body cannot be buffered wholesale into memory.
+MAX_STATUS_JSON_BYTES = 1024 * 1024
+
 
 class Task():
     """ Replacement for AsyncResult class and self serialization"""
@@ -27,17 +31,46 @@ class Task():
     STAT_FAILURE = "FAILURE"
 
     def __init__(self, task_id, dataif, hash_val=None, history_dir=None,
-                 is_internal_request=False):
+                 is_internal_request=False, owner_id=None):
+        import re
+        if not re.match(r'^[0-9a-fA-F-]{36}$', str(task_id)):
+            raise ValueError("Invalid task_id format")
         LOGGER.debug(f"Task.__init__() {task_id}")
         self.__dataif = dataif
-        self.__task_id = task_id
+        self.__task_id = str(task_id)
+        # If an existing status.json is present, read the owner_id from it so
+        # subsequent toJson() calls (e.g. from the Celery worker updating status
+        # to PROGRESS/SUCCESS) do not silently clear the ownership field that
+        # was written at task-creation time.
+        persisted_owner_id = owner_id
+        persisted_is_internal = is_internal_request
+        if owner_id is None:
+            fstatus = os.path.join("/responses", self.__task_id, "status.json")
+            try:
+                with self.__dataif.open(fstatus) as hfile:
+                    existing = json.loads(
+                        hfile.read(max_bytes=MAX_STATUS_JSON_BYTES))
+                    persisted_owner_id = existing.get('owner_id')
+                    persisted_is_internal = existing.get(
+                        'is_internal_request', is_internal_request)
+            except FileNotFoundError:
+                # status.json genuinely absent (objstorage 404): legitimate
+                # for a task that has not been dispatched yet -- keep the
+                # constructor values.  Any OTHER error (connection refused,
+                # timeout, 5xx, corrupt JSON) must propagate: swallowing it
+                # would let a later toJson() rewrite status.json with a
+                # cleared owner_id, reclassifying a session-owned task as
+                # ownerless (AP/internal) and voiding the per-user access
+                # checks on the status routes.
+                pass
         self.__stat = {
             'status': self.STAT_PENDING,
             'history_dir': history_dir,
             'hash': hash_val,
             'runtime_opts': None,
             'exit_code': 0,
-            'is_internal_request': is_internal_request
+            'is_internal_request': persisted_is_internal,
+            'owner_id': persisted_owner_id,
         }
 
     def get(self):
@@ -46,8 +79,8 @@ class Task():
         fstatus = os.path.join("/responses", self.__task_id, "status.json")
         try:
             with self.__dataif.open(fstatus) as hfile:
-                data = hfile.read()
-        except BaseException:
+                data = hfile.read(max_bytes=MAX_STATUS_JSON_BYTES)
+        except Exception:
             LOGGER.debug("task.get() no {}".format(
                 self.__dataif.rname(fstatus)))
             return self.__toDict(self.STAT_PENDING)
@@ -60,14 +93,21 @@ class Task():
                 'runtime_opts' not in stat or
                 'exit_code' not in stat):
             LOGGER.error("task.get() bad status.json: {}".format(stat))
-            raise Exception("Bad status.json")
-        if (stat['status'] != self.STAT_PROGRESS and
-                stat['status'] != self.STAT_SUCCESS and
-                stat['status'] != self.STAT_FAILURE):
+            raise ValueError("Bad status.json")
+        # PENDING written by build_task before the Celery task is dispatched is
+        # a valid "queued, not yet started" state.  Treat it the same as a
+        # missing status.json so that wait() keeps polling instead of raising
+        # immediately.  The priority queue ensures high-priority (USER) tasks
+        # are dequeued before NORMAL tasks as soon as the worker is free.
+        if stat['status'] == self.STAT_PENDING:
+            LOGGER.debug("task.get() task still PENDING (queued, not started)")
+            return self.__toDict(self.STAT_PENDING)
+        if stat['status'] not in (self.STAT_PROGRESS, self.STAT_SUCCESS,
+                                  self.STAT_FAILURE):
             LOGGER.error(
-                "task.get() bad status {} in status.json".format(
-                    stat['status']))
-            raise Exception("Bad status in status.json")
+                "task.get() unexpected status %r in status.json", stat['status'])
+            raise ValueError("Unexpected status in status.json: %r"
+                             % stat['status'])
         self.__stat = stat
         return self.__stat
 
@@ -82,6 +122,12 @@ class Task():
             if (stat['status'] == Task.STAT_SUCCESS or
                     stat['status'] == Task.STAT_FAILURE):
                 return stat
+            if stat['status'] == Task.STAT_PENDING:
+                # Task is queued but the worker hasn't picked it up yet.
+                # The priority queue will deliver high-priority (USER) tasks
+                # before NORMAL tasks as soon as the current task finishes.
+                LOGGER.debug("task.wait() task still queued (PENDING), "
+                             "elapsed=%.1fs", time.time() - time0)
             if (time.time() - time0) > timeout:
                 LOGGER.error("task.wait() timeout")
                 return self.__toDict(Task.STAT_PROGRESS)

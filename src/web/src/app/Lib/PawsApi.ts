@@ -25,6 +25,7 @@ var simple_jsonrpc: any = null;
   var _Promise = Promise;
 
   if (typeof _Promise === 'undefined') {
+    // @ts-ignore
     _Promise = root.Promise;
   }
 
@@ -32,25 +33,30 @@ var simple_jsonrpc: any = null;
     throw 'Promise is not supported! Use latest version node/browser or promise-polyfill';
   }
 
+  // @ts-ignore
   var isUndefined = function (value) {
     return value === undefined;
   };
 
   var isArray = Array.isArray;
 
+  // @ts-ignore
   var isObject = function (value) {
     var type = typeof value;
     return value != null && (type == 'object' || type == 'function');
   };
 
+  // @ts-ignore
   var isFunction = function (target) {
     return typeof target === 'function';
   };
 
+  // @ts-ignore
   var isString = function (value) {
     return typeof value === 'string';
   };
 
+  // @ts-ignore
   var isEmpty = function (value) {
     if (isObject(value)) {
       for (var idx in value) {
@@ -79,6 +85,7 @@ var simple_jsonrpc: any = null;
     }
   };
 
+  // @ts-ignore
   var clone = function (value) {
     return JSON.parse(JSON.stringify(value));
   };
@@ -128,6 +135,7 @@ var simple_jsonrpc: any = null;
       id = 0,
       dispatcher = {};
 
+    // @ts-ignore
     function setError(jsonrpcError, exception) {
       var error = clone(jsonrpcError);
       if (!!exception) {
@@ -181,6 +189,7 @@ var simple_jsonrpc: any = null;
       }
 
       return _Promise.all(promises).then(function (result) {
+        // @ts-ignore
         var toStream = [];
         forEach(result, function (r: any) {
           if (!isUndefined(r)) {
@@ -190,8 +199,10 @@ var simple_jsonrpc: any = null;
         });
 
         if (toStream.length === 1) {
+          // @ts-ignore
           self.toStream(JSON.stringify(toStream[0]));
         } else if (toStream.length > 1) {
+          // @ts-ignore
           self.toStream(JSON.stringify(toStream));
         }
         return result;
@@ -215,6 +226,7 @@ var simple_jsonrpc: any = null;
           });
         }
       } catch (e) {
+        // @ts-ignore
         logger.error('Resolver error:' + e.message, e);
         return _Promise.reject(e);
       }
@@ -222,34 +234,45 @@ var simple_jsonrpc: any = null;
 
     function rejectRequest(error: any) {
       if (waitingframe.hasOwnProperty(error.id)) {
+        // @ts-ignore
         waitingframe[error.id].reject(error.error);
       } else {
         logger.error('Unknown request', error);
       }
     }
 
+    // @ts-ignore
     function resolveRequest(result) {
       if (waitingframe.hasOwnProperty(result.id)) {
+        // @ts-ignore
         waitingframe[result.id].resolve(result.result);
+        // @ts-ignore
         delete waitingframe[result.id];
       } else {
         logger.error('unknown request', result);
       }
     }
 
+    // @ts-ignore
     function handleRemoteRequest(request) {
       if (dispatcher.hasOwnProperty(request.method)) {
         try {
           var result;
 
           if (request.hasOwnProperty('params')) {
+            // @ts-ignore
             if (dispatcher[request.method].params == 'pass') {
+              // @ts-ignore
               result = dispatcher[request.method].fn.call(dispatcher, request.params);
             } else if (isArray(request.params)) {
+              // @ts-ignore
               result = dispatcher[request.method].fn.apply(dispatcher, request.params);
             } else if (isObject(request.params)) {
+              // @ts-ignore
               if (dispatcher[request.method].params instanceof Array) {
+                // @ts-ignore
                 var argsValues = [];
+                // @ts-ignore
                 dispatcher[request.method].params.forEach(function (arg) {
                   if (request.params.hasOwnProperty(arg)) {
                     // @ts-ignore
@@ -270,6 +293,7 @@ var simple_jsonrpc: any = null;
                     }),
                   });
                 } else {
+                  // @ts-ignore
                   result = dispatcher[request.method].fn.apply(dispatcher, argsValues);
                 }
               } else {
@@ -281,29 +305,34 @@ var simple_jsonrpc: any = null;
               }
             }
           } else {
+            // @ts-ignore
             result = dispatcher[request.method].fn();
           }
 
           if (request.hasOwnProperty('id')) {
             if (isPromise(result)) {
-              return result
-                .then(function (res) {
-                  if (isUndefined(res)) {
-                    res = true;
-                  }
-                  return {
-                    jsonrpc: '2.0',
-                    id: request.id,
-                    result: res,
-                  };
-                })
-                .catch(function (e) {
-                  return {
-                    jsonrpc: '2.0',
-                    id: request.id,
-                    error: setError(ERRORS.INTERNAL_ERROR, e),
-                  };
-                });
+              return (
+                result
+                  // @ts-ignore
+                  .then(function (res) {
+                    if (isUndefined(res)) {
+                      res = true;
+                    }
+                    return {
+                      jsonrpc: '2.0',
+                      id: request.id,
+                      result: res,
+                    };
+                  })
+                  // @ts-ignore
+                  .catch(function (e) {
+                    return {
+                      jsonrpc: '2.0',
+                      id: request.id,
+                      error: setError(ERRORS.INTERNAL_ERROR, e),
+                    };
+                  })
+              );
             } else {
               if (isUndefined(result)) {
                 result = true;
@@ -336,6 +365,7 @@ var simple_jsonrpc: any = null;
       }
     }
 
+    // @ts-ignore
     function notification(method, params) {
       var message = {
         jsonrpc: '2.0',
@@ -350,6 +380,7 @@ var simple_jsonrpc: any = null;
       return message;
     }
 
+    // @ts-ignore
     function call(method, params) {
       id += 1;
       var message = {
@@ -365,6 +396,7 @@ var simple_jsonrpc: any = null;
 
       return {
         promise: new _Promise(function (resolve, reject) {
+          // @ts-ignore
           waitingframe[id.toString()] = {
             resolve: resolve,
             reject: reject,
@@ -378,18 +410,22 @@ var simple_jsonrpc: any = null;
       logger.error('Need define the toStream method before use', arguments);
     };
 
+    // @ts-ignore
     self.dispatch = function (functionName, paramsNameFn, fn) {
       if (isString(functionName) && paramsNameFn == 'pass' && isFunction(fn)) {
+        // @ts-ignore
         dispatcher[functionName] = {
           fn: fn,
           params: paramsNameFn,
         };
       } else if (isString(functionName) && isArray(paramsNameFn) && isFunction(fn)) {
+        // @ts-ignore
         dispatcher[functionName] = {
           fn: fn,
           params: paramsNameFn,
         };
       } else if (isString(functionName) && isFunction(paramsNameFn) && isUndefined(fn)) {
+        // @ts-ignore
         dispatcher[functionName] = {
           fn: paramsNameFn,
           params: null,
@@ -401,24 +437,32 @@ var simple_jsonrpc: any = null;
 
     self.on = self.dispatch;
 
+    // @ts-ignore
     self.off = function (functionName) {
+      // @ts-ignore
       delete dispatcher[functionName];
     };
 
+    // @ts-ignore
     self.call = function (method, params) {
       var _call = call(method, params);
       self.toStream(JSON.stringify(_call.message));
       return _call.promise;
     };
 
+    // @ts-ignore
     self.notification = function (method, params) {
       self.toStream(JSON.stringify(notification(method, params)));
     };
 
+    // @ts-ignore
     self.batch = function (requests) {
+      // @ts-ignore
       var promises = [];
+      // @ts-ignore
       var message = [];
 
+      // @ts-ignore
       forEach(requests, function (req) {
         if (req.hasOwnProperty('call')) {
           var _call = call(req.call.method, req.call.params);
@@ -442,7 +486,9 @@ var simple_jsonrpc: any = null;
         }
       });
 
+      // @ts-ignore
       self.toStream(JSON.stringify(message));
+      // @ts-ignore
       return _Promise.all(promises);
     };
 
@@ -461,7 +507,9 @@ var simple_jsonrpc: any = null;
       }
     };
 
+    // @ts-ignore
     self.customException = function (code, message, data) {
+      // @ts-ignore
       return new ServerError(code, message, data);
     };
   };
@@ -475,6 +523,7 @@ var simple_jsonrpc: any = null;
   } else if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
     module.exports = simple_jsonrpc;
   } else if (typeof root !== 'undefined') {
+    // @ts-ignore
     root.simple_jsonrpc = simple_jsonrpc;
   } else {
     return simple_jsonrpc;

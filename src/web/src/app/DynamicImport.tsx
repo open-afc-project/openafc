@@ -1,47 +1,77 @@
-import * as React from 'react';
+import React from 'react';
+import { PageSection, Card, CardBody, Alert } from '@patternfly/react-core';
 
-/**
- * DynamicImport.tsx: component which loads app modules from the server on demand
- * author: Sam Smucny
- */
-
-/**
- * Interface definition for `IDynamicImport`
- * @member load promise whose result is the page bundle with code needed to render children. Result is passed to the children rendering function
- * @member children interior elements to render
- * @member resolve promise object that is resoved before children are loaded. Once loaded the result of the promise can be accessed to construct the children
- */
 interface IDynamicImport<T = undefined> {
   load: () => Promise<any>;
+  // @ts-ignore
   children: (component: any, resolved: T) => JSX.Element;
   resolve?: Promise<T>;
 }
 
-/**
- * Class to dynamically load bundles from server
- * this decreases the transfer size of individual parts
- * also supports general resolves (can be used for API calls) when certain resources need to be
- * loaded before a component is mounted
- * @typeparam T (optional) type of resolve object
- */
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error?: Error }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <PageSection>
+          <Card>
+            <CardBody>
+              <Alert variant="danger" title="Page failed to load">
+                {this.state.error?.message || 'An unexpected error occurred while rendering this page.'}
+              </Alert>
+            </CardBody>
+          </Card>
+        </PageSection>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 class DynamicImport<T> extends React.Component<IDynamicImport<T>> {
   public state = {
     component: null,
     resolve: undefined,
+    loadError: undefined as string | undefined,
   };
   public componentDidMount() {
-    (this.props.resolve !== undefined ? this.props.resolve : Promise.resolve(undefined as unknown as T)).then(
-      (resolve) =>
+    (this.props.resolve !== undefined ? this.props.resolve : Promise.resolve(undefined as unknown as T))
+      .then((resolve) =>
         this.props.load().then((component) => {
           this.setState({
             component: component.default ? component.default : component,
             resolve: resolve,
           });
         }),
-    );
+      )
+      .catch((err) => {
+        this.setState({ loadError: String(err?.message || err) });
+      });
   }
   public render() {
-    return this.props.children(this.state.component, this.state.resolve);
+    if (this.state.loadError) {
+      return (
+        <PageSection>
+          <Card>
+            <CardBody>
+              <Alert variant="danger" title="Failed to load page module">
+                {this.state.loadError}
+              </Alert>
+            </CardBody>
+          </Card>
+        </PageSection>
+      );
+    }
+    // @ts-ignore
+    return <ErrorBoundary>{this.props.children(this.state.component, this.state.resolve)}</ErrorBoundary>;
   }
 }
 

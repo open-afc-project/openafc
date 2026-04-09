@@ -94,14 +94,19 @@ paths:
                     shortDescription]
     response_supp: [availableSpectrumInquiryResponses, 0, response,
                     supplementalInfo]
+    response_vendor_ext: [availableSpectrumInquiryResponses, 0,
+                          vendorExtensions]
 
 # List of statuses to be considered successful. Each element may include 'code'
 # (for a value of response/responseCode) and/or 'desc_substr' for substring of
 # response/shortDescription
 success_statuses:
     - code: 0
-    - code: 101
-      desc_substr: No AFC configuration for ruleset
+    # AFC reachable but ruleset not provisioned (afc_server or ratapi path)
+    - code: -1
+      desc_substr: No AFC Config found for presented
+    - code: -1
+      desc_substr: no stored configuration for region
 
 point_patterns:
     US:

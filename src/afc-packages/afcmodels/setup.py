@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 from setuptools.command.install import install
 import inspect
 
@@ -19,7 +19,9 @@ setup(
         'install': InstallCmdWrapper,
     },
     install_requires=[
-        'Flask==2.3.2',
-        'Flask-SQLAlchemy==2.5.1'
+        'Flask==3.1.3',
+        'Flask-SQLAlchemy==3.1.1',
+        'pydantic>=2.0',
+        'pydantic-settings>=2.0',
     ]
 )

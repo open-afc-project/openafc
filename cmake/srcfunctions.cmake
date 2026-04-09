@@ -474,10 +474,9 @@ function(add_dist_yarnlibrary)
     add_custom_command(
         DEPENDS ${SOURCES}
         OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/timestamp"
-        message(STATUS "Building YARN")
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/*" "${ADD_DIST_LIB_SOURCECOPY}"
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/src" "${ADD_DIST_LIB_SOURCECOPY}/src"
-        COMMAND ${YARN} --cwd ${ADD_DIST_LIB_SOURCECOPY}
+        COMMAND ${YARN} --cwd ${ADD_DIST_LIB_SOURCECOPY} --ignore-optional --ignore-scripts
         COMMAND ${YARN} --cwd ${ADD_DIST_LIB_SOURCECOPY} version --no-git-tag-version --new-version "${PROJECT_VERSION}-${SVN_LAST_REVISION}"
         COMMAND ${YARN} --cwd ${ADD_DIST_LIB_SOURCECOPY} ${YARN_BUILD_TYPE}
         COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/timestamp"

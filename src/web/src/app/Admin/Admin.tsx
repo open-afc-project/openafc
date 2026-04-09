@@ -1,12 +1,15 @@
-import * as React from 'react';
+import React from 'react';
 import {
   PageSection,
   Card,
-  CardHead,
-  CardBody,
   CardHeader,
+  CardTitle,
+  CardBody,
   Modal,
+  ModalBody,
+  ModalFooter,
   Button,
+  ActionGroup,
   FormGroup,
   FormSelect,
   FormSelectOption,
@@ -22,7 +25,7 @@ import { getUsers, addUserRole, deleteUser, removeUserRole, setMinimumEIRP, Limi
 import { logger } from '../Lib/Logger';
 import { UserAccount } from '../UserAccount/UserAccount';
 import { UserModel, RatResponse, FreqRange } from '../Lib/RatApiTypes';
-import { Table, TableHeader, TableBody, TableVariant } from '@patternfly/react-table';
+import { Table, Thead, Tr, Th, Tbody, Td, ActionsColumn } from '@patternfly/react-table';
 import { FrequencyRangeInput } from './FrequencyRangeInput';
 import { UserContext, hasRole } from '../Lib/User';
 import { updateAllAllowedRanges } from '../Lib/RatApi';
@@ -39,11 +42,6 @@ const sroles: Role[] = ['AP', 'Analysis', 'Admin', 'Super', 'Trial'];
 const roles: Role[] = ['AP', 'Analysis', 'Admin', 'Trial'];
 
 const cols = ['Region', 'Name', 'Low Frequency (MHz)', 'High Frequency (MHz)'];
-
-const freqBandToRow = (f: FreqRange, index) => ({
-  id: index,
-  cells: [f.region, f.name, f.startFreqMHz, f.stopFreqMHz],
-});
 
 /**
  * Administrator tab for managing users
@@ -206,7 +204,7 @@ export class Admin extends React.Component<
   private handleUserModalToggle = (id?: number) =>
     this.setState((s) => ({ userId: id, userModalOpen: !s.userModalOpen }));
   private updateEnforceLimit = (value: boolean, isIndoor: boolean) => {
-    let newState = { ...this.state.limit };
+    const newState = { ...this.state.limit };
     if (isIndoor) {
       newState.indoorEnforce = value;
     } else {
@@ -215,7 +213,7 @@ export class Admin extends React.Component<
     this.setState({ limit: newState });
   };
   private updateEirpLimit = (value: number, isIndoor: boolean) => {
-    let newState = { ...this.state.limit };
+    const newState = { ...this.state.limit };
     if (isIndoor) {
       newState.indoorLimit = value;
     } else {
@@ -225,7 +223,7 @@ export class Admin extends React.Component<
   };
   private submitMinEIRP = () => {
     setMinimumEIRP(this.state.limit).then((res) => {
-      let successMessage = 'Updated minimum EIRP values';
+      const successMessage = 'Updated minimum EIRP values';
       if (res.kind == 'Success') {
         this.setState({ messageSuccess: successMessage, messageError: undefined });
       } else {
@@ -242,14 +240,14 @@ export class Admin extends React.Component<
 
   private addNewBand = () => {
     const { frequencyBands } = this.state;
-    let newBand = { name: '', startFreqMHz: 5925, stopFreqMHz: 6425, region: 'US' } as FreqRange;
+    const newBand = { name: '', startFreqMHz: 5925, stopFreqMHz: 6425, region: 'US' } as FreqRange;
     frequencyBands.push(newBand);
     this.setState({ frequencyBands: frequencyBands });
   };
 
   private mapBandsToAllAllowedRanges = (bands: FreqRange[]) => {
-    let m = new Map<string, FreqRange[]>();
-    let regions = new Set(bands.map((x) => x.region));
+    const m = new Map<string, FreqRange[]>();
+    const regions = new Set(bands.map((x) => x.region));
     regions.forEach((x) => {
       if (x !== undefined) {
         m.set(x, []);
@@ -277,37 +275,49 @@ export class Admin extends React.Component<
     });
   };
 
-  actionResolver(data: any, extraData: any) {
-    return [
-      {
-        title: 'Edit Range',
-        onClick: (event: any, rowId: number, rowData: any, extra: any) =>
-          this.setState({ editingFrequency: true, frequencyEditIndex: rowId }),
-      },
-      {
-        title: 'Delete',
-        onClick: (event: any, rowId: any, rowData: any, extra: any) => this.removeFreqBand(rowId),
-      },
-    ];
-  }
-
   private updateTableEntry = (freq: FreqRange) => {
     const { frequencyEditIndex, frequencyBands } = this.state;
-    frequencyBands[frequencyEditIndex] = freq;
-    this.setState({ frequencyBands: frequencyBands });
+    if (frequencyEditIndex !== undefined) {
+      frequencyBands[frequencyEditIndex] = freq;
+      this.setState({ frequencyBands: frequencyBands });
+    }
   };
 
   private renderFrequencyTable = () => {
     return (
-      <Table
-        aria-label="freq-table"
-        actionResolver={(a, b) => this.actionResolver(a, b)}
-        variant={TableVariant.compact}
-        cells={cols as any}
-        rows={this.state.frequencyBands.map((fr, idx) => freqBandToRow(fr, idx))}
-      >
-        <TableHeader />
-        <TableBody />
+      <Table aria-label="freq-table" variant="compact">
+        <Thead>
+          <Tr>
+            {cols.map((col, idx) => (
+              <Th key={idx}>{col}</Th>
+            ))}
+            <Th screenReaderText="Actions" />
+          </Tr>
+        </Thead>
+        <Tbody>
+          {this.state.frequencyBands.map((fr, index) => (
+            <Tr key={index}>
+              <Td dataLabel={cols[0]}>{fr.region}</Td>
+              <Td dataLabel={cols[1]}>{fr.name}</Td>
+              <Td dataLabel={cols[2]}>{fr.startFreqMHz}</Td>
+              <Td dataLabel={cols[3]}>{fr.stopFreqMHz}</Td>
+              <Td isActionCell>
+                <ActionsColumn
+                  items={[
+                    {
+                      title: 'Edit Range',
+                      onClick: () => this.setState({ editingFrequency: true, frequencyEditIndex: index }),
+                    },
+                    {
+                      title: 'Delete',
+                      onClick: () => this.removeFreqBand(index),
+                    },
+                  ]}
+                />
+              </Td>
+            </Tr>
+          ))}
+        </Tbody>
       </Table>
     );
   };
@@ -316,10 +326,16 @@ export class Admin extends React.Component<
     return (
       <PageSection>
         <Card>
-          <CardHead>
-            <CardHeader>Limits</CardHeader>
-          </CardHead>
+          <CardHeader>
+            <CardTitle>Limits</CardTitle>
+          </CardHeader>
           <CardBody>
+            {!this.state.limit.limitsConfigured && (
+              <Alert title="Minimum EIRP limits not configured" variant="info" style={{ marginBottom: '1rem' }}>
+                No indoor/outdoor limit rows exist in the database yet. Values shown are placeholders (18 dBm); enforce
+                flags are off. Configure and save limits here when ready.
+              </Alert>
+            )}
             <Gallery>
               <GalleryItem>
                 {this.state.limit.indoorEnforce ? (
@@ -329,6 +345,7 @@ export class Admin extends React.Component<
                       type="checkbox"
                       checked={this.state.limit.indoorEnforce}
                       onChange={(e) => this.updateEnforceLimit(e.target.checked, true)}
+                      style={{ marginRight: '6px' }}
                     />
                     <label htmlFor="limitEnabled">Use Minimum Indoor EIRP values</label>
                     <br />
@@ -336,8 +353,8 @@ export class Admin extends React.Component<
                     <br />
                     <input
                       value={this.state.limit.indoorLimit}
-                      onChange={(event) => this.updateEirpLimit(Number(event.target.value), true)}
-                      id="min__Indoor_EIRP"
+                      onChange={(e) => this.updateEirpLimit(Number(e.target.value), true)}
+                      id="min_Indoor_EIRP"
                       type="number"
                     />
                     dBm
@@ -349,6 +366,7 @@ export class Admin extends React.Component<
                       type="checkbox"
                       checked={this.state.limit.indoorEnforce}
                       onChange={(e) => this.updateEnforceLimit(e.target.checked, true)}
+                      style={{ marginRight: '6px' }}
                     />
                     <label htmlFor="limitEnabledIndoor">Use Minimum indoor EIRP value</label>
                     <br />
@@ -359,19 +377,20 @@ export class Admin extends React.Component<
                 {this.state.limit.outdoorEnforce ? (
                   <>
                     <input
-                      id="limitEnabled"
+                      id="limitEnabledOutdoor"
                       type="checkbox"
                       checked={this.state.limit.outdoorEnforce}
                       onChange={(e) => this.updateEnforceLimit(e.target.checked, false)}
+                      style={{ marginRight: '6px' }}
                     />
-                    <label htmlFor="limitEnabled">Use Minimum outdoor EIRP values</label>
+                    <label htmlFor="limitEnabledOutdoor">Use Minimum outdoor EIRP values</label>
                     <br />
                     <label htmlFor="min_outdoor_EIRP">Minimum outdoor EIRP value</label>
                     <br />
                     <input
                       value={this.state.limit.outdoorLimit}
-                      onChange={(event) => this.updateEirpLimit(Number(event.target.value), false)}
-                      id="min__outdoor_EIRP"
+                      onChange={(e) => this.updateEirpLimit(Number(e.target.value), false)}
+                      id="min_outdoor_EIRP"
                       type="number"
                     />
                     dBm
@@ -379,37 +398,39 @@ export class Admin extends React.Component<
                 ) : (
                   <>
                     <input
-                      id="limitEnabledOutdoor"
+                      id="limitEnabledOutdoorUnchecked"
                       type="checkbox"
                       checked={this.state.limit.outdoorEnforce}
                       onChange={(e) => this.updateEnforceLimit(e.target.checked, false)}
+                      style={{ marginRight: '6px' }}
                     />
-                    <label htmlFor="limitEnabledOutdoor">Use Minimum outdoor EIRP value</label>
+                    <label htmlFor="limitEnabledOutdoorUnchecked">Use Minimum outdoor EIRP value</label>
                     <br />
                   </>
                 )}
               </GalleryItem>
             </Gallery>
-            <Button onClick={() => this.submitMinEIRP()}> Save</Button>
+            <ActionGroup style={{ marginTop: '15px' }}>
+              <Button onClick={() => this.submitMinEIRP()}> Save</Button>
+            </ActionGroup>
           </CardBody>
         </Card>
         <br />
         <Card>
-          <CardHead>
-            <CardHeader>Allowed Frequency band(s)</CardHeader>
-          </CardHead>
+          <CardHeader>
+            <CardTitle>Allowed Frequency band(s)</CardTitle>
+          </CardHeader>
           <CardBody>
-            <FormGroup fieldId="allowedFreqGroup">
+            <FormGroup>
               {this.state.frequencyBands ? this.renderFrequencyTable() : false}
-              <InputGroup>
+              <ActionGroup className="afc-button-group" style={{ marginTop: '15px' }}>
                 <Button variant="secondary" onClick={this.addNewBand}>
                   Add Another Range
                 </Button>
-
                 <Button onClick={this.putFrequencyBands} isDisabled={!this.state.frequencyBandsNeedSaving}>
                   Submit Frequency Ranges
                 </Button>
-              </InputGroup>
+              </ActionGroup>
             </FormGroup>
           </CardBody>
           <Modal
@@ -417,18 +438,22 @@ export class Admin extends React.Component<
             isOpen={this.state.editingFrequency}
             onClose={() => this.setState({ editingFrequency: false, frequencyEditIndex: undefined })}
           >
-            <FrequencyRangeInput
-              frequencyRange={this.state.frequencyBands[this.state.frequencyEditIndex]}
-              regions={this.state.regionsList}
-              onSuccess={(freq: FreqRange) => {
-                this.updateTableEntry(freq);
-                this.setState({
-                  editingFrequency: false,
-                  frequencyEditIndex: undefined,
-                  frequencyBandsNeedSaving: true,
-                });
-              }}
-            />
+            <ModalBody>
+              {this.state.frequencyEditIndex !== undefined && (
+                <FrequencyRangeInput
+                  frequencyRange={this.state.frequencyBands[this.state.frequencyEditIndex]}
+                  regions={this.state.regionsList}
+                  onSuccess={(freq: FreqRange) => {
+                    this.updateTableEntry(freq);
+                    this.setState({
+                      editingFrequency: false,
+                      frequencyEditIndex: undefined,
+                      frequencyBandsNeedSaving: true,
+                    });
+                  }}
+                />
+              )}
+            </ModalBody>
           </Modal>
         </Card>
         <br />
@@ -437,7 +462,7 @@ export class Admin extends React.Component<
             <Alert
               variant="danger"
               title="Error"
-              action={<AlertActionCloseButton onClose={() => this.setState({ messageError: undefined })} />}
+              actionClose={<AlertActionCloseButton onClose={() => this.setState({ messageError: undefined })} />}
             >
               {this.state.messageError}
             </Alert>
@@ -448,7 +473,7 @@ export class Admin extends React.Component<
             <Alert
               variant="success"
               title="Success"
-              action={<AlertActionCloseButton onClose={() => this.setState({ messageSuccess: undefined })} />}
+              actionClose={<AlertActionCloseButton onClose={() => this.setState({ messageSuccess: undefined })} />}
             >
               {this.state.messageSuccess}
             </Alert>
@@ -456,9 +481,9 @@ export class Admin extends React.Component<
         </>
         <br />
         <Card>
-          <CardHead>
-            <CardHeader>Users</CardHeader>
-          </CardHead>
+          <CardHeader>
+            <CardTitle>Users</CardTitle>
+          </CardHeader>
           <CardBody>
             <UserTable
               users={this.state.users}
@@ -469,74 +494,79 @@ export class Admin extends React.Component<
             />
           </CardBody>
           <Modal
-            isSmall={true}
+            variant="small"
             title="Add Role"
             isOpen={this.state.addRoleModalOpen}
-            onClose={this.handleAddRoleModalToggle}
-            actions={[
+            onClose={() => this.handleAddRoleModalToggle()}
+          >
+            <ModalBody>
+              <FormGroup label="New Role" fieldId="new-role">
+                <FormSelect
+                  value={this.state.newRole}
+                  onChange={(_event, x) => this.setState({ newRole: x as Role })}
+                  id="new-role"
+                  name="new-role"
+                >
+                  <FormSelectOption key={0} value={undefined} label={'Select a role'} />
+                  {hasRole('Super')
+                    ? sroles.map((r) => <FormSelectOption key={r} value={r} label={r} />)
+                    : roles.map((r) => <FormSelectOption key={r} value={r} label={r} />)}
+                </FormSelect>
+              </FormGroup>
+            </ModalBody>
+            <ModalFooter>
               <Button key="confirm" variant="primary" onClick={() => this.addRole()}>
                 Confirm
-              </Button>,
-            ]}
-          >
-            <FormGroup label="New Role" fieldId="new-role">
-              <FormSelect
-                value={this.state.newRole}
-                // @ts-ignore
-                onChange={(x) => this.setState({ newRole: x as Role })}
-                id="new-role"
-                name="new-role"
-              >
-                (<FormSelectOption key={0} value={undefined} label={'Select a role'} />
-                {hasRole('Super')
-                  ? sroles.map((r) => <FormSelectOption key={r} value={r} label={r} />)
-                  : roles.map((r) => <FormSelectOption key={r} value={r} label={r} />)}
-                )
-              </FormSelect>
-            </FormGroup>
+              </Button>
+            </ModalFooter>
           </Modal>
           <Modal
-            isSmall={true}
+            variant="small"
             title="Remove Role"
             isOpen={this.state.removeRoleModalOpen}
-            onClose={this.handleRemoveRoleModalToggle}
-            actions={[
+            onClose={() => this.handleRemoveRoleModalToggle()}
+          >
+            <ModalBody>
+              <FormGroup label="Select Role" fieldId="remove-role">
+                <FormSelect
+                  value={this.state.removeRole}
+                  onChange={(_event, x) => this.setState({ removeRole: x as Role })}
+                  id="remove-role"
+                  name="remove-role"
+                >
+                  <FormSelectOption key={0} value={undefined} label={'Select a role'} />
+                  {roles.map((r) => (
+                    <FormSelectOption key={r} value={r} label={r} />
+                  ))}
+                </FormSelect>
+              </FormGroup>
+            </ModalBody>
+            <ModalFooter>
               <Button key="confirm" variant="primary" onClick={() => this.removeRole()}>
                 Confirm
-              </Button>,
-            ]}
-          >
-            <FormGroup label="Select Role" fieldId="remove-role">
-              <FormSelect
-                value={this.state.removeRole}
-                // @ts-ignore
-                onChange={(x) => this.setState({ removeRole: x as Role })}
-                id="remove-role"
-                name="remove-role"
-              >
-                <FormSelectOption key={0} value={undefined} label={'Select a role'} />
-                {roles.map((r) => (
-                  <FormSelectOption key={r} value={r} label={r} />
-                ))}
-              </FormSelect>
-            </FormGroup>
+              </Button>
+            </ModalFooter>
           </Modal>
           <Modal
-            isSmall={true}
-            title="Delete User Confimation"
+            variant="small"
+            title="Delete User Confirmation"
             isOpen={this.state.deleteModalOpen}
-            onClose={this.handleDeleteModalToggle}
-            actions={[
+            onClose={() => this.handleDeleteModalToggle()}
+          >
+            <ModalBody>
+              Are you sure you want to delete{' '}
+              {this.state.deleteModalOpen && this.state.users.find((x) => x.id === this.state.userId)?.email}?
+            </ModalBody>
+            <ModalFooter>
               <Button key="confirm" variant="primary" onClick={() => this.deleteUser()}>
                 Confirm
-              </Button>,
-            ]}
-          >
-            Are you sure you want to delete{' '}
-            {this.state.deleteModalOpen && this.state.users.find((x) => x.id === this.state.userId)?.email}?
+              </Button>
+            </ModalFooter>
           </Modal>
-          <Modal title="Edit User" isOpen={this.state.userModalOpen} onClose={this.handleUserModalToggle}>
-            <UserAccount userId={this.state.userId!} onSuccess={() => this.userEdited()} />
+          <Modal title="Edit User" isOpen={this.state.userModalOpen} onClose={() => this.handleUserModalToggle()}>
+            <ModalBody>
+              <UserAccount userId={this.state.userId!} onSuccess={() => this.userEdited()} />
+            </ModalBody>
           </Modal>
         </Card>
         <br />

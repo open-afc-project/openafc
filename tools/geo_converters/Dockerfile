@@ -10,9 +10,9 @@
 
 
 
-FROM ghcr.io/osgeo/gdal:alpine-normal-3.10.2
+FROM ghcr.io/osgeo/gdal:alpine-normal-3.11.5@sha256:d8451ccd60ff6847e82ce4c839dde06eacceee1d422d5d2796c0eaa8e01b927e
 
-RUN apk add py3-pip py3-yaml py3-jsonschema
+RUN apk add --no-cache py3-pip py3-yaml py3-jsonschema
 WORKDIR /usr/app
 COPY geoutils.py /usr/app/
 COPY dir_md5.py g8l_info_schema.json /usr/app/
@@ -27,14 +27,15 @@ COPY proc_gdal/create_lidar_database_threaded.pl /usr/app/proc_gdal/
 RUN chmod a+x /usr/app/proc_gdal/*.pl
 USER root
 # Installed permanently
-RUN apk add perl musl
+RUN apk add --no-cache perl musl
 # Build stuff only installed for duration of build, then removed, thus saving
 # on image size
-RUN apk add cmake g++ make musl-dev && cd /usr/app/proc_gdal/src && \
+RUN apk add --no-cache cmake g++ make musl-dev && cd /usr/app/proc_gdal/src && \
   cmake . && make && mv proc_gdal /usr/app/proc_gdal && \
   cd .. && rm -rf src && apk del --purge cmake g++ make musl-dev
 # USER solr
 
 ENV PATH=$PATH:/usr/app:/usr/app/proc_gdal
 
+USER nobody
 CMD ["sh"]

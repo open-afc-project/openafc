@@ -1,7 +1,7 @@
-import * as React from 'react';
+import React from 'react';
 // import ReactTooltip from 'react-tooltip';
-import { Table, TableHeader, TableBody, TableVariant, TableProps } from '@patternfly/react-table';
-import { GalleryItem, FormGroup, InputGroup, Radio, TextInput, InputGroupText, Button } from '@patternfly/react-core';
+import { Table, Thead, Tr, Th, Tbody, Td, ActionsColumn } from '@patternfly/react-table';
+import { GalleryItem, FormGroup, InputGroup, InputGroupText, TextInput, Button } from '@patternfly/react-core';
 import { FrequencyRange } from '../Lib/RatAfcTypes';
 /** InquiredFrequencyFormParams.tsx - Form component to display and create the list of frequency
  *
@@ -41,25 +41,6 @@ export class InquiredFrequencyForm extends React.PureComponent<
   //     );
   // }
 
-  actionResolver(data: any, extraData: any) {
-    return [
-      {
-        title: 'Delete',
-        onClick: (event: any, rowId: any, rowData: any, extra: any) => this.removeFreqBand(rowId),
-      },
-    ];
-  }
-
-  //   private updateTableEntry = (freq :FrequencyRange) => {
-  //     const {frequencyEditIndex, frequencyBands} = this.state;
-  //     frequencyBands[frequencyEditIndex] = freq;
-  //     this.setState({frequencyBands: frequencyBands})
-  //   }
-
-  private freqBandToRow(band: FrequencyRange, index: number) {
-    return [String(index + 1), band.lowFrequency, band.highFrequency];
-  }
-
   private removeFreqBand(index: number) {
     var newRanges = this.props.inquiredFrequencyRange.slice();
     newRanges.splice(index, 1);
@@ -68,15 +49,34 @@ export class InquiredFrequencyForm extends React.PureComponent<
 
   private renderFrequencyTable = () => {
     return (
-      <Table
-        aria-label="freq-table"
-        actionResolver={(a, b) => this.actionResolver(a, b)}
-        variant={TableVariant.compact}
-        cells={this.state.columns}
-        rows={this.props.inquiredFrequencyRange.map((band, index) => this.freqBandToRow(band, index))}
-      >
-        <TableHeader />
-        <TableBody />
+      <Table aria-label="freq-table" variant="compact">
+        <Thead>
+          <Tr>
+            {this.state.columns?.map((col, idx) => (
+              <Th key={idx}>{col}</Th>
+            ))}
+            <Th screenReaderText="Actions" />
+          </Tr>
+        </Thead>
+        <Tbody>
+          {this.props.inquiredFrequencyRange.map((band, index) => (
+            <Tr key={index}>
+              <Td dataLabel={this.state.columns?.[0]}>{index + 1}</Td>
+              <Td dataLabel={this.state.columns?.[1]}>{band.lowFrequency}</Td>
+              <Td dataLabel={this.state.columns?.[2]}>{band.highFrequency}</Td>
+              <Td isActionCell>
+                <ActionsColumn
+                  items={[
+                    {
+                      title: 'Delete',
+                      onClick: () => this.removeFreqBand(index),
+                    },
+                  ]}
+                />
+              </Td>
+            </Tr>
+          ))}
+        </Tbody>
       </Table>
     );
   };
@@ -97,9 +97,10 @@ export class InquiredFrequencyForm extends React.PureComponent<
   render() {
     return (
       <GalleryItem>
-        <FormGroup label="Inquired Frequencies" fieldId="horizontal-form-includedFreq">
+        <fieldset>
+          <legend>Inquired Frequencies</legend>
           {this.renderFrequencyTable()}
-          <FormGroup label="Add Frequency Range (MHz)" fieldId="horizontal-form-addFreq">
+          <FormGroup label="Lower (MHz)" fieldId="band-lower-">
             <InputGroup>
               <TextInput
                 className="lowerInline"
@@ -109,19 +110,23 @@ export class InquiredFrequencyForm extends React.PureComponent<
                 name={'band-lower-'}
                 value={!this.state.newLowFreq ? '' : this.state.newLowFreq}
                 style={{ textAlign: 'right' }}
-                isValid={!this.state.newLowFreq || this.state.newLowFreq > 0}
-                onChange={(data) => this.setState({ newLowFreq: Number(data) })}
+                validated={!this.state.newLowFreq || this.state.newLowFreq > 0 ? 'default' : 'error'}
+                onChange={(_event, data) => this.setState({ newLowFreq: Number(data) })}
               />
-
+              <InputGroupText>–</InputGroupText>
               <TextInput
+                aria-label="Upper frequency (MHz)"
                 placeholder="Upper"
                 type="number"
                 id={'band-upper-'}
                 name={'band-upper-'}
                 value={!this.state.newHighFreq ? '' : this.state.newHighFreq}
                 style={{ textAlign: 'right' }}
-                isValid={!this.state.newHighFreq || this.state.newHighFreq > this.state.newLowFreq}
-                onChange={(data) => this.setState({ newHighFreq: Number(data) })}
+                // @ts-ignore
+                validated={
+                  !this.state.newHighFreq || this.state.newHighFreq > (this.state.newLowFreq ?? 0) ? 'default' : 'error'
+                }
+                onChange={(_event, data) => this.setState({ newHighFreq: Number(data) })}
                 className="upperInline"
               />
 
@@ -130,7 +135,7 @@ export class InquiredFrequencyForm extends React.PureComponent<
               </Button>
             </InputGroup>
           </FormGroup>
-        </FormGroup>
+        </fieldset>
       </GalleryItem>
     );
   }

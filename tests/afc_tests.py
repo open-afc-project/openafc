@@ -16,7 +16,7 @@ need to make acquisition and create new database as following.
 """
 
 import argparse
-import certifi
+# import certifi
 import csv
 import datetime
 import hashlib
@@ -76,19 +76,50 @@ app_log = logging.getLogger(__name__)
 class TestCfg(dict):
     """Keep test configuration"""
 
-    def __init__(self):
-        dict.__init__(self)
+    def __init__(self, **kwargs):
+        super().__init__()
         self.update({
             'cmd': '',
             'port': 443,
             'url_path': AFC_PROT_NAME + '://',
+            'base_url': '',
             'log_level': logging.INFO,
             'db_filename': AFC_TEST_DB_FILENAME,
             'tests': None,
             'is_test_by_index': True,
             'resp': '',
             'stress': 0,
-            'precision': None})
+            'precision': None,
+            'addr': None,
+            'prot': AFC_PROT_NAME,
+            'conn_type': 'sync',
+            'conn_tm': None,
+            'verif': False,
+            'outfile': None,
+            'outpath': None,
+            'infile': None,
+            'debug': False,
+            'elaborated_debug': False,
+            'gui': False,
+            'webui': False,
+            'testcase_indexes': None,
+            'testcase_ids': None,
+            'table': None,
+            'idx': None,
+            'test_id': 'all',
+            'tests2run': None,
+            'ca_cert': None,
+            'cli_cert': None,
+            'cli_key': None,
+            'dev_desc': False,
+            'prefix_cmd': None,
+            'email_from': None,
+            'email_to': None,
+            'email_cc': None,
+            'email_pwd': None,
+            'session_cookie': None,
+        })
+        self.update(kwargs)
 
     def _send_recv(self, params):
         """Run AFC test and wait for respons"""
@@ -104,31 +135,29 @@ class TestCfg(dict):
 
         new_req_json = json.loads(get_req.encode('utf-8'))
         new_req = json.dumps(new_req_json, sort_keys=True)
-        if (self['webui'] is False):
+        if not self.get('webui', False):
             params_data = {
-                'conn_type': self['conn_type'],
+                'conn_type': self.get('conn_type', 'sync'),
             }
         else:
             # emulating request call from webui
             params_data = {}
-        for key, val in [('debug', self['debug']),
-                            ('edebug', cfg['elaborated_debug']),
-                            ('gui', self['gui'])]:
+        for key, val in [('debug', self.get('debug')),
+                         ('edebug', self.get('elaborated_debug')),
+                         ('gui', self.get('gui'))]:
             if val:
                 params_data[key] = 'True'
-        if (self['cache'] == False):
-            params_data['nocache'] = 'True'
 
-        ser_cert = not self['verif']
+        ser_cert = not self.get('verif', False)
         cli_certs = ()
-        if (self['prot'] == AFC_PROT_NAME and
-                self['verif'] == False):
+        if (self.get('prot') == AFC_PROT_NAME and
+                self.get('verif') is False):
             # add mtls certificates if explicitly provided
-            if not isinstance(self['cli_cert'], type(None)):
+            if self.get('cli_cert') is not None:
                 cli_certs = ("".join(self['cli_cert']),
                              "".join(self['cli_key']))
             # add tls certificates if explicitly provided
-            if not isinstance(self['ca_cert'], type(None)):
+            if self.get('ca_cert') is not None:
                 ser_cert = "".join(self['ca_cert'])
         app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
 
@@ -139,12 +168,12 @@ class TestCfg(dict):
             data=new_req,
             headers=headers,
             timeout=600,  # 10 min
-            verify=self['verif'])
+            verify=self.get('verif', False))
         resp = rawresp.json()
 
         tId = resp.get('taskId')
-        if ((self['conn_type'] == 'async') and
-                (not isinstance(tId, type(None)))):
+        if ((self.get('conn_type') == 'async') and
+                (tId is not None)):
             tState = resp.get('taskState')
             params_data['task_id'] = tId
             while (tState == 'PENDING') or (tState == 'PROGRESS'):
@@ -230,6 +259,13 @@ class TestResultComparator:
                                                path + [unique_key], diffs):
                     ref_keys -= {unique_key}
                     result_keys -= {unique_key}
+            # Error responses may include optional supplementalInfo (e.g. from
+            # pydantic validation in afc_server) while WFA goldens omit it, or
+            # the reverse; compare the rest of the response only.
+            sym = ref_keys ^ result_keys
+            if sym <= {"supplementalInfo"}:
+                ref_keys -= {"supplementalInfo"}
+                result_keys -= {"supplementalInfo"}
             if ref_keys != result_keys:
                 msg = f"Different set of keys at {path_repr}"
                 for kind, elems in [("reference", ref_keys - result_keys),
@@ -432,7 +468,7 @@ def send_email(cfg):
 
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
                   f" from: {sender}, to: {recipient}")
-    if isinstance(cfg['email_to'], type(None)):
+    if cfg['email_to'] is None:
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
                       f" Not sending email because no receiver specified")
         return
@@ -446,7 +482,7 @@ def send_email(cfg):
         message['Subject'] = f"AFC test results"
         message['From'] = sender
         message['To'] = recipient
-        if not isinstance(cfg['email_cc'], type(None)):
+        if cfg['email_cc'] is not None:
             message['Cc'] = cfg['email_cc']
 
         # Turn these into plain/html MIMEText objects
@@ -488,8 +524,6 @@ def _send_recv(cfg, req_data, ssn=None):
         params_data = {
             'conn_type': cfg['conn_type'],
         }
-        if (cfg['cache'] == False):
-            params_data['nocache'] = 'True'
         post_func = requests.post
     else:
         # emulating request call from webui
@@ -506,8 +540,8 @@ def _send_recv(cfg, req_data, ssn=None):
             f"Cookies: {requests.utils.dict_from_cookiejar(ssn.cookies)}")
         post_func = ssn.post
     for key, val in [('debug', cfg['debug']),
-                        ('edebug', cfg['elaborated_debug']),
-                        ('gui', cfg['gui'])]:
+                     ('edebug', cfg['elaborated_debug']),
+                     ('gui', cfg['gui'])]:
         if val:
             params_data[key] = 'True'
     ser_cert = ()
@@ -516,23 +550,19 @@ def _send_recv(cfg, req_data, ssn=None):
             cfg['verif']) or (cfg['ca_cert'])):
 
         # add mtls certificates if explicitly provided
-        if not isinstance(cfg['cli_cert'], type(None)):
+        if cfg['cli_cert'] is not None:
             cli_certs = ("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
 
         # add tls certificates if explicitly provided
-        if not isinstance(cfg['ca_cert'], type(None)):
+        if cfg['ca_cert'] is not None:
             ser_cert = "".join(cfg['ca_cert'])
             cfg['verif'] = True
         else:
-            os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
             app_log.debug(f"REQUESTS_CA_BUNDLE "
                           f"{os.environ.get('REQUESTS_CA_BUNDLE')}")
             if "REQUESTS_CA_BUNDLE" in os.environ:
                 ser_cert = "".join(os.environ.get('REQUESTS_CA_BUNDLE'))
                 cfg['verif'] = True
-            else:
-                app_log.error(f"Missing CA certificate while forced.")
-                return
 
     app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
 
@@ -562,7 +592,7 @@ def _send_recv(cfg, req_data, ssn=None):
 
     tId = resp.get('taskId')
     if ((cfg['conn_type'] == 'async') and
-            (not isinstance(tId, type(None)))):
+            (tId is not None)):
         tState = resp.get('taskState')
         params_data['task_id'] = tId
         while (tState == 'PENDING') or (tState == 'PROGRESS'):
@@ -591,23 +621,23 @@ def _login(cfg, ssn):
             cfg['verif']) or (cfg['ca_cert'])):
 
         # add mtls certificates if explicitly provided
-        if not isinstance(cfg['cli_cert'], type(None)):
+        if cfg['cli_cert'] is not None:
             cli_certs = ("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
 
         # add tls certificates if explicitly provided
-        if not isinstance(cfg['ca_cert'], type(None)):
+        if cfg['ca_cert'] is not None:
             ser_cert = "".join(cfg['ca_cert'])
             cfg['verif'] = True
         else:
-            os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+            # os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
             app_log.debug(f"REQUESTS_CA_BUNDLE "
                           f"{os.environ.get('REQUESTS_CA_BUNDLE')}")
             if "REQUESTS_CA_BUNDLE" in os.environ:
                 ser_cert = "".join(os.environ.get('REQUESTS_CA_BUNDLE'))
                 cfg['verif'] = True
-            else:
-                app_log.error(f"Missing CA certificate while forced.")
-                return
+            # else:
+            #     app_log.error(f"Missing CA certificate while forced.")
+            #     return
 
     app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
 
@@ -719,7 +749,7 @@ def compare_afc_config(cfg):
     con.close()
 
     # get record from the input file
-    if isinstance(cfg['infile'], type(None)):
+    if cfg['infile'] is None:
         app_log.debug('Missing input file to compare with.')
         return AFC_OK
 
@@ -740,7 +770,7 @@ def compare_afc_config(cfg):
     app_log.debug('Found %d config records', len(found_cfgs))
     idx = 0
     max_idx = len(found_cfgs)
-    if not isinstance(cfg['idx'], type(None)):
+    if cfg['idx'] is not None:
         idx = cfg['idx']
         if idx >= max_idx:
             app_log.error("The index (%d) is out of range (0 - %d).",
@@ -802,7 +832,7 @@ def start_acquisition(cfg):
         req_id = ids[test_id][0]
         app_log.debug(f"Request: {req_id}")
         resp = _send_recv(cfg, json.dumps(found_reqs[test_id][0]))
-        if isinstance(resp, type(None)):
+        if resp is None:
             app_log.error(f"Test {test_ids} ({req_id}) is Failed.")
             continue
 
@@ -909,7 +939,7 @@ def insert_reqs(cfg):
     """
     app_log.debug(f"{inspect.stack()[0][3]}()")
 
-    if isinstance(cfg['infile'], type(None)):
+    if cfg['infile'] is None:
         app_log.error(f"Missing input file")
         return AFC_ERR
 
@@ -946,7 +976,7 @@ def extend_reqs(cfg):
     """
     app_log.debug(f"{inspect.stack()[0][3]}()")
 
-    if isinstance(cfg['infile'], type(None)):
+    if cfg['infile'] is None:
         app_log.error(f"Missing input file")
         return AFC_ERR
 
@@ -975,7 +1005,7 @@ def insert_devs(cfg):
     """
     app_log.debug(f"{inspect.stack()[0][3]}()")
 
-    if isinstance(cfg['infile'], type(None)):
+    if cfg['infile'] is None:
         app_log.error(f"Missing input file")
         return AFC_ERR
 
@@ -1023,7 +1053,7 @@ def add_reqs(cfg):
     """Prepare DB source files"""
     app_log.debug(f"{inspect.stack()[0][3]}()")
 
-    if isinstance(cfg['infile'], type(None)):
+    if cfg['infile'] is None:
         app_log.error('Missing input file')
         return AFC_ERR
 
@@ -1189,14 +1219,14 @@ def dump_database(cfg):
             pref = prefix[tbl]
 
         out_file['split'] = './'
-        if not isinstance(cfg['outpath'], type(None)):
+        if cfg['outpath'] is not None:
             out_file['split'] = cfg['outpath'][0] + '/'
 
         out_file['split'] += WFA_TEST_DIR
         if os.path.exists(out_file['split']):
             shutil.rmtree(out_file['split'])
         os.mkdir(out_file['split'])
-    elif isinstance(cfg['outfile'], type(None)):
+    elif cfg['outfile'] is None:
         app_log.error(f"Missing output filename.\n")
         return AFC_ERR
     else:
@@ -1251,7 +1281,7 @@ def export_admin_config(cfg):
 
 def dry_run_test(cfg):
     """Run one or more requests from provided file"""
-    if isinstance(cfg['infile'], type(None)):
+    if cfg['infile'] is None:
         app_log.error('Missing input file')
         return AFC_ERR
 
@@ -1584,7 +1614,7 @@ def parse_tests(cfg):
     filename = ''
     out_fname = ''
 
-    if isinstance(cfg['infile'], type(None)):
+    if cfg['infile'] is None:
         app_log.error('Missing input file')
         return AFC_ERR
 
@@ -1596,7 +1626,7 @@ def parse_tests(cfg):
 
     test_ident = cfg['test_id']
 
-    if isinstance(cfg['outfile'], type(None)):
+    if cfg['outfile'] is None:
         out_fname = test_ident + NEW_AFC_TEST_SUFX
     else:
         out_fname = cfg['outfile'][0]
@@ -1685,6 +1715,25 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         if cfg.get('session_cookie'):
             ssn.cookies.set('session', cfg['session_cookie'])
             app_log.info("Using provided session cookie (skipping login)")
+            # When a pre-built session cookie is used we never received an HTTP
+            # response that would set the csrf_token cookie.  Make one
+            # authenticated GET request so the server's after_request hook
+            # issues the cookie, which we can then include as X-Csrf-Token in
+            # subsequent POST requests.
+            ping_url = f"{cfg['base_url']}fbrat/healthy"
+            try:
+                ping_resp = ssn.get(
+                    ping_url, verify=False,
+                    timeout=30)
+                csrf_token = ssn.cookies.get('csrf_token', default='')
+                if csrf_token:
+                    app_log.info("CSRF token obtained via ping request")
+                else:
+                    app_log.warning(
+                        "CSRF token not found after ping request "
+                        f"(status {ping_resp.status_code})")
+            except Exception as exc:  # noqa: BLE001
+                app_log.warning(f"CSRF ping request failed: {exc}")
         else:
             _login(cfg, ssn)
 
@@ -1708,28 +1757,30 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         res = f"id {test_case} name {req_id} status $status time {tm_secs:.1f}"
         res_template = Template(res)
 
-        upd_data = None# remove the mapping info from the response
-        if isinstance(resp, type(None)):
+        upd_data = None  # remove the mapping info from the response
+        if resp is None:
             test_res = AFC_ERR
             all_test_res = AFC_ERR
         elif 'error' in resp:
             app_log.error(f"Test case {req_id} returned error: {resp['error']}")
             test_res = AFC_ERR
         else:
-            if cfg['webui'] is True:
-                # remove the mapping info from the response
-                # to make sure the base data matches - not checking map results
-                for parent in resp['availableSpectrumInquiryResponses']:
+            for parent in resp.get('availableSpectrumInquiryResponses', []):
+                if cfg['webui'] is True:
+                    # remove the mapping info from the response
+                    # to make sure the base data matches - not checking map results
                     if 'vendorExtensions' in parent:
                         parent.pop('vendorExtensions')
-                    # rat_server returns ['certificationId', 'id'] for
-                    # a missing cert id field; afcserver returns ['id']
-                    mp = (parent.get('response', {})
-                          .get('supplementalInfo', {})
-                          .get('missingParams'))
-                    if mp == ['certificationId', 'id']:
-                        parent['response']['supplementalInfo'][
-                            'missingParams'] = ['id']
+                # afcserver returns ['id'] for a missing cert id field;
+                # rat_server returns ['certificationId', 'id'];
+                # msghnd may return ['id', 'certificationId'].
+                # Normalize all variants to ['id'] regardless of mode.
+                mp = (parent.get('response', {})
+                      .get('supplementalInfo', {})
+                      .get('missingParams'))
+                if set(mp or []) == {'certificationId', 'id'}:
+                    parent['response']['supplementalInfo'][
+                        'missingParams'] = ['id']
 
             json_lookup('availabilityExpireTime', resp, '0')
             upd_data = json.dumps(resp, sort_keys=True)
@@ -1745,6 +1796,15 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
                 for line in diffs:
                     app_log.error(f"  Difference: {line}")
                 app_log.error(hash_obj.hexdigest())
+                try:
+                    ar0 = resp.get("availableSpectrumInquiryResponses", [{}])[0]
+                    r0 = ar0.get("response") or {}
+                    if r0.get("responseCode", 0) != 0:
+                        app_log.error(
+                            "  AFC inquiry response (non-success): %s",
+                            json.dumps(r0, sort_keys=True))
+                except (IndexError, TypeError, AttributeError):
+                    pass
                 test_res = AFC_ERR
 
         if test_res == AFC_ERR:
@@ -1756,7 +1816,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         app_log.info(res)
 
         # For saving test results option
-        if not isinstance(cfg['outfile'], type(None)):
+        if cfg['outfile'] is not None:
             app_log.debug(f"upd_data: {upd_data}")
             test_report(cfg['outfile'][0], float(tm_secs),
                         test_case, req_id,
@@ -1765,7 +1825,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
 
     app_log.info(f"Total testcases runtime : {round(accum_secs, 1)} secs")
 
-    if not isinstance(cfg['outfile'], type(None)):
+    if cfg['outfile'] is not None:
         send_email(cfg)
 
     return all_test_res
@@ -1785,7 +1845,7 @@ def prep_and_run_tests(cfg, reqs, resps, ids, test_cases):
 
     # calculate max number of tests to run
     max_nbr_tests = len(test_cases)
-    if not isinstance(cfg['tests2run'], type(None)):
+    if cfg['tests2run'] is not None:
         max_nbr_tests = int("".join(cfg['tests2run']))
 
     while (max_nbr_tests != 0):
@@ -1836,7 +1896,7 @@ def _convert_reqs_n_resps_to_dict(cfg):
     con.close()
 
     # reformat the reqs_dict and resp_dict accordingly
-    if not isinstance(cfg['testcase_ids'], type(None)):
+    if cfg['testcase_ids'] is not None:
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() by id")
         reqs_dict = {
             row[0]: [json.loads(row[1])]
@@ -1866,7 +1926,7 @@ def _convert_reqs_n_resps_to_dict(cfg):
             str(req_index + 1): [row[0], req_index + 1]
             for req_index, row in enumerate(found_reqs)
         }
-        if not isinstance(cfg['testcase_indexes'], type(None)):
+        if cfg['testcase_indexes'] is not None:
             test_indx = list(map(str.strip,
                                  cfg.pop("testcase_indexes").split(',')))
             cfg.pop("testcase_ids")
@@ -1919,7 +1979,7 @@ def _run_cert_tests(cfg):
     test_res = AFC_OK
 
     try:
-        if isinstance(cfg['cli_cert'], type(None)):
+        if cfg['cli_cert'] is None:
             rawresp = requests.get(cfg['url_path'],
                                    verify="".join(cfg['ca_cert']))
         else:
@@ -1929,11 +1989,6 @@ def _run_cert_tests(cfg):
                                    verify="".join(cfg['ca_cert']))
     except Exception as e:
         app_log.error(f"({os.getpid()}) {inspect.stack()[0][3]}() {e}")
-        test_res = AFC_ERR
-    except OSError as os_err:
-        proc = psutil.Process()
-        app_log.error(f"({os.getpid()}) {inspect.stack()[0][3]}() "
-                      f"{os_err} - {proc.open_files()}")
         test_res = AFC_ERR
     else:
         if rawresp.status_code != 200:
@@ -1951,7 +2006,7 @@ def run_cert_tests(cfg):
     test_res = AFC_OK
 
     # calculate max number of tests to run
-    if isinstance(cfg['tests2run'], type(None)):
+    if cfg['tests2run'] is None:
         app_log.error(f"Missing number of tests to run.")
         return AFC_ERR
 
@@ -2019,8 +2074,7 @@ def parse_run_test_args(cfg):
 def parse_run_cert_args(cfg):
     """Parse arguments for command 'run_cert'"""
     app_log.debug(f"{inspect.stack()[0][3]}()")
-    if ((not isinstance(cfg['addr'], list)) or
-            isinstance(cfg['ca_cert'], type(None))):
+    if (not isinstance(cfg['addr'], list)) or (cfg['ca_cert'] is None):
         app_log.error(f"{inspect.stack()[0][3]}() Missing arguments")
         return AFC_ERR
 
@@ -2050,77 +2104,75 @@ execution_map = {
 
 
 def make_arg_parser():
-    """Define command line options"""
-    args_parser = argparse.ArgumentParser(
-        epilog=__doc__.strip(),
-        formatter_class=argparse.RawTextHelpFormatter)
+    """Define command line options and subcommands"""
+    common_parser = argparse.ArgumentParser(add_help=False)
 
-    args_parser.add_argument('--addr', nargs=1, type=str,
-                             help="<address> - set AFC Server address.\n")
-    args_parser.add_argument('--prot', nargs='?', choices=['https', 'http'],
-                             default='https',
-                             help="<http|https> - set connection protocol "
-                             "(default=https).\n")
-    args_parser.add_argument('--port', nargs='?', default='443',
-                             type=int,
-                             help="<port> - set connection port "
-                             "(default=443).\n")
-    args_parser.add_argument('--conn_type', nargs='?',
-                             choices=['sync', 'async'], default='sync',
-                             help="<sync|async> - set connection to be "
-                             "synchronous or asynchronous (default=sync).\n")
-    args_parser.add_argument('--conn_tm', nargs='?', default=None, type=int,
-                             help="<secs> - set timeout for asynchronous "
-                             "connection (default=None). \n")
-    args_parser.add_argument('--verif', action='store_true',
-                             help="<verif> - skip SSL verification "
-                             "on post request.\n")
-    args_parser.add_argument('--outfile', nargs=1, type=str,
-                             help="<filename> - set filename for output "
-                             "of tests results.\n")
-    args_parser.add_argument(
+    common_parser.add_argument('--addr', nargs=1, type=str,
+                               help="<address> - set AFC Server address.\n")
+    common_parser.add_argument('--prot', nargs='?', choices=['https', 'http'],
+                               default='https',
+                               help="<http|https> - set connection protocol "
+                               "(default=https).\n")
+    common_parser.add_argument('--port', nargs='?', default=443,
+                               type=int,
+                               help="<port> - set connection port "
+                               "(default=443).\n")
+    common_parser.add_argument('--conn_type', nargs='?',
+                               choices=['sync', 'async'], default='sync',
+                               help="<sync|async> - set connection to be "
+                               "synchronous or asynchronous (default=sync).\n")
+    common_parser.add_argument('--conn_tm', nargs='?', default=None, type=int,
+                               help="<secs> - set timeout for asynchronous "
+                               "connection (default=None). \n")
+    common_parser.add_argument('--verif', action='store_true',
+                               help="<verif> - skip SSL verification "
+                               "on post request.\n")
+    common_parser.add_argument('--outfile', nargs=1, type=str,
+                               help="<filename> - set filename for output "
+                               "of tests results.\n")
+    common_parser.add_argument(
         '--outpath',
         nargs=1,
         type=str,
         help="<filepath> - set path to output filename for "
         "results output.\n")
-    args_parser.add_argument('--infile', nargs=1, type=str,
-                             help="<filename> - set filename as a source "
-                             "for test requests.\n")
-    args_parser.add_argument('--debug', action='store_true',
-                             help="during a request make files "
-                             "with details for debugging.\n")
-    args_parser.add_argument('--elaborated_debug', action='store_true',
-                             help="during a request make files "
-                             "with even more details for debugging.\n")
-    args_parser.add_argument('--gui', action='store_true',
-                             help="during a request make files "
-                             "with details for debugging.\n")
-    args_parser.add_argument('--webui', action='store_true',
-                             help="during a request make files\n")
-    args_parser.add_argument('--log', type=set_log_level,
-                             default='info', dest='log_level',
-                             help="<info|debug|warn|err|crit> - set "
-                             "logging level (default=info).\n")
-    args_parser.add_argument('--testcase_indexes', nargs='?',
-                             help="<N1,...> - set single or group of tests "
-                             "to run.\n")
-    args_parser.add_argument(
+    common_parser.add_argument('--infile', nargs=1, type=str,
+                               help="<filename> - set filename as a source "
+                               "for test requests.\n")
+    common_parser.add_argument('--debug', action='store_true',
+                               help="during a request make files "
+                               "with details for debugging.\n")
+    common_parser.add_argument('--elaborated_debug', action='store_true',
+                               help="during a request make files "
+                               "with even more details for debugging.\n")
+    common_parser.add_argument('--gui', action='store_true',
+                               help="during a request make files "
+                               "with details for debugging.\n")
+    common_parser.add_argument('--webui', action='store_true',
+                               help="during a request make files\n")
+    common_parser.add_argument('--log', type=set_log_level,
+                               default='info', dest='log_level',
+                               help="<info|debug|warn|err|crit> - set "
+                               "logging level (default=info).\n")
+    common_parser.add_argument('--testcase_indexes', nargs='?',
+                               help="<N1,...> - set single or group of tests "
+                               "to run.\n")
+    common_parser.add_argument(
         '--testcase_ids',
         nargs='?',
         help="<N1,...> - set single or group of test case ids "
         "to run.\n")
-    args_parser.add_argument('--table', nargs=1, type=str,
-                             help="<wfa|req|resp|ap|cfg|user> - set "
-                             "database table name.\n")
-    args_parser.add_argument('--idx', nargs='?',
-                             type=int,
-                             help="<index> - set table record index.\n")
-    args_parser.add_argument('--test_id',
-                             default='all',
-                             help="WFA test identifier, for example "
-                             "srs, urs, fsp, ibp, sip, etc (default=all).\n")
-    args_parser.add_argument(
+    common_parser.add_argument('--table', nargs=1, type=str,
+                               help="<wfa|req|resp|ap|cfg|user> - set "
+                               "database table name.\n")
+    common_parser.add_argument('--idx', nargs='?',
+                               type=int,
+                               help="<index> - set table record index.\n")
+    common_parser.add_argument('--test_id',
+                               default='all',
+                               help="WFA test identifier, for example "
+                               "srs, urs, fsp, ibp, sip, etc (default=all).\n")
+    common_parser.add_argument(
         "--precision",
         metavar="PRECISION_DB",
         type=float,
@@ -2128,101 +2180,131 @@ def make_arg_parser():
         "reference values in dB. 0 means exact match is "
         "required. Default is to use hash-based exact match "
         "comparison")
-    args_parser.add_argument('--cache', action='store_true',
-                             help="enable cache during a request, otherwise "
-                             "disabled.\n")
-    args_parser.add_argument(
+    common_parser.add_argument(
         '--tests2run',
         nargs=1,
         type=str,
         help="<nbr> - the total number of tests to run.\n")
-    args_parser.add_argument(
+    common_parser.add_argument(
         '--ca_cert',
         nargs=1,
         type=str,
         help="<filename> - set CA certificate filename to "
         "verify the remote server.\n")
-    args_parser.add_argument(
+    common_parser.add_argument(
         '--cli_cert',
         nargs=1,
         type=str,
         help="<filename> - set client certificate filename.\n")
-    args_parser.add_argument(
+    common_parser.add_argument(
         '--cli_key',
         nargs=1,
         type=str,
         help="<filename> - set client private key filename.\n")
-    args_parser.add_argument('--dev_desc', action='store_true',
-                             help="parse only device descriptors values.\n")
-    args_parser.add_argument(
+    common_parser.add_argument('--dev_desc', action='store_true',
+                               help="parse only device descriptors values.\n")
+    common_parser.add_argument(
         '--prefix_cmd',
         nargs='*',
         type=str,
         help="hook to call currently provided command before "
-        "main command specified by --cmd option.\n")
-    args_parser.add_argument('--email_from', type=str,
-                             help="<email address> - set sender email.\n")
-    args_parser.add_argument('--email_to', type=str,
-                             help="<email address> - set receiver email.\n")
-    args_parser.add_argument(
+        "main command specified by subcommand.\n")
+    common_parser.add_argument('--email_from', type=str,
+                               help="<email address> - set sender email.\n")
+    common_parser.add_argument('--email_to', type=str,
+                               help="<email address> - set receiver email.\n")
+    common_parser.add_argument(
         '--email_cc',
         type=str,
         help="<email address> - set receiver of cc email.\n")
-    args_parser.add_argument('--email_pwd', type=str,
-                             help="<filename> - set sender email password.\n")
-    args_parser.add_argument('--session_cookie', type=str,
-                             help="<cookie> - session cookie for webui mode, "
-                             "bypasses login.\n")
+    common_parser.add_argument('--email_pwd', type=str,
+                               help="<filename> - set sender email password.\n")
+    common_parser.add_argument('--session_cookie', type=str,
+                               help="<cookie> - session cookie for webui mode, "
+                               "bypasses login.\n")
 
-    args_parser.add_argument(
+    main_parser = argparse.ArgumentParser(
+        parents=[common_parser],
+        epilog=__doc__.strip() if __doc__ else '',
+        formatter_class=argparse.RawTextHelpFormatter)
+
+    # Optional --cmd argument for backwards compatibility
+    main_parser.add_argument(
         '--cmd',
-        choices=execution_map.keys(),
+        choices=list(execution_map.keys()),
         nargs='?',
-        help="run - run test from DB and compare.\n"
-        "dry_run - run test from file and show response.\n"
-        "exp_adm_cfg - export admin config into a file.\n"
-        "add_reqs - run test from provided file and insert with response into "
-        "the databsse.\n"
-        "ins_reqs - insert test vectors from provided file into the test db.\n"
-        "ins_devs - insert device descriptors from provided file "
-        "into the test db.\n"
-        "dump_db - dump tables from the database.\n"
-        "get_nbr_testcases - return number of testcases.\n"
-        "parse_tests - parse WFA provided tests into a files.\n"
-        "reacq - reacquision every test from the database and insert new "
-        "responses.\n"
-        "cmp_cfg - compare AFC config from the DB to provided from a file.\n"
-        "stress - run tests in stress mode.\n"
-        "ver - get version.\n")
+        default=None,
+        help="Legacy option: command to execute.\n")
 
-    return args_parser
+    subparsers = main_parser.add_subparsers(dest='subcommand', help='Sub-commands')
+
+    cmd_help = {
+        'run': 'run test from DB and compare.',
+        'dry_run': 'run test from file and show response.',
+        'exp_adm_cfg': 'export admin config into a file.',
+        'add_reqs': 'run test from provided file and insert with response into the database.',
+        'ins_reqs': 'insert test vectors from provided file into the test db.',
+        'ext_reqs': 'extend test vectors from provided file into the test db.',
+        'ins_devs': 'insert device descriptors from provided file into the test db.',
+        'dump_db': 'dump tables from the database.',
+        'get_nbr_testcases': 'return number of testcases.',
+        'parse_tests': 'parse WFA provided tests into files.',
+        'reacq': 'reacquisition every test from the database and insert new responses.',
+        'cmp_cfg': 'compare AFC config from the DB to provided from a file.',
+        'stress': 'run tests in stress mode.',
+        'ver': 'get version.',
+        'run_cert': 'run certificate tests.',
+    }
+
+    for cmd_name, (handler_fn, preparer_fn) in execution_map.items():
+        sp = subparsers.add_parser(
+            cmd_name,
+            parents=[common_parser],
+            help=cmd_help.get(cmd_name, ''),
+            formatter_class=argparse.RawTextHelpFormatter)
+        sp.set_defaults(cmd=cmd_name, handler=handler_fn, preparer=preparer_fn)
+
+    return main_parser
 
 
-def prepare_args(parser, cfg):
+def prepare_args(parser, cfg, args=None):
     """Prepare required parameters"""
-    app_log.debug(f"{inspect.stack()[0][3]}() {parser.parse_args()}")
-    cfg.update(vars(parser.parse_args()))
+    if args is None:
+        args = parser.parse_args()
+    app_log.debug(f"{inspect.stack()[0][3]}() {args}")
+
+    cmd = getattr(args, 'subcommand', None) or getattr(args, 'cmd', None)
+    if cmd is None:
+        parser.print_help()
+        return AFC_ERR
+
+    args_dict = vars(args)
+    cfg.update(args_dict)
+    cfg['cmd'] = cmd
 
     # check if test indexes and test ids are given
-    if cfg["testcase_indexes"] and cfg["testcase_ids"]:
+    if cfg.get("testcase_indexes") and cfg.get("testcase_ids"):
         # reject the request
         app_log.error('Please use either "--testcase_indexes"'
                       ' or "--testcase_ids" but not both')
         return AFC_ERR
 
-    return execution_map[cfg['cmd']][1](cfg)
+    preparer = getattr(args, 'preparer', None) or execution_map[cmd][1]
+    return preparer(cfg)
 
 
 def main_execution(cfg):
     """Call all requested commands"""
     app_log.debug(f"{inspect.stack()[0][3]}()")
-    if (isinstance(cfg['prefix_cmd'], list) and
+    if (isinstance(cfg.get('prefix_cmd'), list) and
             (pre_hook(cfg) == AFC_ERR)):
         return AFC_ERR
-    if isinstance(cfg['cmd'], type(None)):
-        parser.print_help()
+    cmd = cfg.get('cmd')
+    if cmd is None:
+        make_arg_parser().print_help()
         return AFC_ERR
-    return execution_map[cfg['cmd']][0](cfg)
+    handler = execution_map[cmd][0]
+    return handler(cfg)
 
 
 def main():

@@ -20,18 +20,38 @@
 #include <limits.h>
 #include <libgen.h>
 #include <semaphore.h>
+#include <signal.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
 #include <sys/time.h>
+#include <time.h>
 #include <sys/mman.h>
 #include <map>
 
 #define AEP_PATH_MAX PATH_MAX
 #define AEP_FILENAME_MAX FILENAME_MAX
 
-#define HASH_SIZE USHRT_MAX
+/* hash_fname() returns the full range of a uint16_t (0..USHRT_MAX inclusive,
+ * i.e. USHRT_MAX + 1 distinct values); the table it indexes into must have
+ * that many slots, not USHRT_MAX -- otherwise the single hash value
+ * USHRT_MAX indexes one element past the allocation on every array sized
+ * off this macro (open_files[], and now pin_journal[]). */
+#define HASH_SIZE ((size_t)USHRT_MAX + 1)
+
+/* Fixed-capacity journal of (pid, filename-hash) -> pin count records, kept
+ * alongside open_files[] in the shared segment. files_open_set() upserts an
+ * entry here whenever it changes open_files[]; reap_dead_pins() (invoked
+ * from reduce_cache()) scans it and reclaims pins whose owning pid no longer
+ * exists, so a SIGKILLed/aborted engine cannot strand an unevictable pin
+ * forever (see reap_dead_pins()). */
+#define PIN_JOURNAL_SIZE 4096
+typedef struct {
+		pid_t pid; /* 0 = free slot */
+		uint16_t hash;
+		int32_t count;
+} pin_entry_t;
 
 /* debug flags */
 #define DBG_LOG 1 /* statistic log */
@@ -232,9 +252,30 @@ static char *real_mountpoint = NULL; /* The path in which static data really is 
 static bool aep_use_gs = false;
 static int logfile = -1;
 static volatile int64_t *cache_size;
-static volatile int8_t *open_files;
+static volatile int32_t *open_files;
+static pin_entry_t *pin_journal;
 static sem_t *shmem_sem;
+/* Process-private fallback lock + backing store used when the shared
+ * aep_shmem_sem / aep_shmem segment is rejected as foreign-owned/permissive
+ * (see aep_private_mode()); accounting then stays process-local instead of
+ * aborting the engine. */
+static sem_t aep_private_sem;
+static bool aep_degraded = false;
 static int64_t claimed_size;
+
+/* Total size of the shared (or private-mode) accounting segment: cache_size
+ * total, followed by the open_files[] hash table, followed by the pin
+ * journal. Both the mmap'd shared-memory path and the malloc'd private-mode
+ * fallback path must agree on this layout. */
+#define AEP_ACCOUNTING_SIZE \
+	(sizeof(int64_t) + HASH_SIZE * sizeof(int32_t) + PIN_JOURNAL_SIZE * sizeof(pin_entry_t))
+
+static inline void aep_shm_layout(void *base)
+{
+	cache_size = (int64_t *)base;
+	open_files = (int32_t *)(cache_size + 1);
+	pin_journal = (pin_entry_t *)(open_files + HASH_SIZE);
+}
 
 static data_fd_t *fd_get_data_fd(const int fd);
 static char *fd_get_dbg_name(const int fd);
@@ -302,10 +343,377 @@ static sem_t *semopen(const char *fname)
 			tmp[i] = '_';
 		}
 	}
-	sem = sem_open(tmp, O_CREAT, 0666, 1);
+	/* Mode 0600: only the engine's own UID may open this semaphore. A
+	 * world-writable (0666) IPC object lets any local user drain/hold it and
+	 * deadlock every worker.
+	 * Use O_EXCL: on EEXIST re-open and verify ownership before use. */
+	sem = sem_open(tmp, O_CREAT | O_EXCL, 0600, 1);
+	if (!sem && errno == EEXIST) {
+		sem = sem_open(tmp, 0);
+		if (sem) {
+			struct stat st;
+			char sem_path[512];
+			snprintf(sem_path, sizeof(sem_path), "/dev/shm/sem.%s", tmp + 1);
+			/* Ownership verification must be fail-closed: reject whenever
+			 * stat() does NOT prove the object is ours (stat error --
+			 * ENOENT from a sem_unlink() race, or a musl/Alpine path
+			 * convention mismatch -- included), not only when it succeeds
+			 * and proves a bad owner/mode. Validate permissions and UID. */
+			if (stat(sem_path, &st) != 0 || st.st_uid != geteuid() ||
+			    (st.st_mode & 0077)) {
+				sem_close(sem);
+				sem = SEM_FAILED;
+				errno = EPERM;
+			}
+		}
+	}
 	free(tmp);
-	aep_assert(sem, "sem_open");
+	if (!sem || sem == SEM_FAILED) {
+		/* A rejected/foreign IPC object must degrade the caller to
+		 * uncached remote I/O, not abort(): a co-located different-UID
+		 * process could otherwise pin a predictable semaphore name and
+		 * repeatedly kill every afc-engine that touches the corresponding
+		 * data file. */
+		dbge("sem_open(%s) rejected (foreign owner or permissive mode)", fname);
+		return SEM_FAILED;
+	}
 	return sem;
+}
+
+/* Forward declarations (defined below with the other pass-through
+ * wrappers): the holder-liveness sidecar must bypass this library's own
+ * open/read/close interposers. */
+static inline int orig_open(const char *pathname, int flags, ...);
+static inline int orig_close(int fd);
+static inline ssize_t orig_read(int fd, void *buf, size_t count);
+static inline int orig_stat(const char *pathname, struct stat *statbuf);
+static inline int orig_lstat(const char *pathname, struct stat *statbuf);
+
+/* Holder-liveness sidecar.  Every successful acquisition records the
+ * holder's pid in /dev/shm; a timed-out waiter may only take over a
+ * semaphore whose recorded holder is positively dead (ESRCH).  A 60s
+ * sem_timedwait timeout alone is NOT proof of a SIGKILLed holder -- a
+ * large tile downloaded over slow NFS/GCS legitimately holds the
+ * per-file semaphore longer than that. */
+static void aep_sem_holder_path(char *buf, size_t buflen, const char *enc)
+{
+	snprintf(buf, buflen, "/dev/shm/aep_holder.%s", (enc[0] == '/') ? enc + 1 : enc);
+}
+
+static void aep_sem_holder_record(const char *enc)
+{
+	char path[PATH_MAX];
+	char pidstr[16];
+	int fd, n;
+
+	aep_sem_holder_path(path, sizeof(path), enc);
+	/* O_NOFOLLOW (and no O_TRUNC): a co-located UID can plant a symlink
+	 * under this predictable name in mode-1777 /dev/shm; following it
+	 * would truncate the TARGET before any ownership check could run
+	 * (ELOOP here reads as a squat: best-effort no-record, and the probe
+	 * side degrades fail-closed).  Truncation is deferred to ftruncate()
+	 * below, after the fail-closed ownership check passes. */
+	fd = orig_open(path, O_WRONLY | O_CREAT | O_NOFOLLOW);
+	if (fd < 0) {
+		return; /* best effort: a missing sidecar reads as takeable */
+	}
+	/* Fail-closed ownership check (mirrors semopen()/aep_init()): never
+	 * record our pid into a sidecar we do not own -- a co-located
+	 * different UID may pre-create this name in mode-1777 /dev/shm and
+	 * controls its contents. aep_sem_holder_probe() treats such a squat
+	 * as AEP_HOLDER_FOREIGN and degrades fail-closed. */
+	struct stat hst;
+	if (fstat(fd, &hst) != 0 || hst.st_uid != geteuid() || (hst.st_mode & 0077)) {
+		orig_close(fd);
+		return;
+	}
+	/* Ownership verified on the opened fd -- only now discard any stale
+	 * previous content (replaces the pre-check O_TRUNC). */
+	if (ftruncate(fd, 0) != 0) {
+		orig_close(fd);
+		return;
+	}
+	n = snprintf(pidstr, sizeof(pidstr), "%d", (int)getpid());
+	if (write(fd, pidstr, n) != n) {
+		dbge("aep_sem_holder_record(%s): short write", enc);
+	}
+	orig_close(fd);
+}
+
+/* Holder-liveness probe.  AEP_HOLDER_DEAD only when the recorded holder is
+ * positively dead (kill(pid, 0) fails with ESRCH).  A missing or malformed
+ * sidecar (semaphore created before this fix was deployed) reports dead so
+ * the pre-existing stale-holder recovery still works.  A sidecar that is
+ * not provably ours (unreadable, foreign st_uid or permissive mode) is
+ * AEP_HOLDER_FOREIGN: any local UID may pre-create these names in the
+ * mode-1777 /dev/shm, so a squat must fail closed (degrade to uncached
+ * remote I/O) instead of reading as a dead -- or forever-alive -- holder. */
+enum aep_holder_state {
+	AEP_HOLDER_DEAD,
+	AEP_HOLDER_ALIVE,
+	AEP_HOLDER_FOREIGN,
+};
+
+static enum aep_holder_state aep_sem_holder_probe(const char *enc)
+{
+	char path[PATH_MAX];
+	char pidstr[16];
+	struct stat st;
+	ssize_t n;
+	pid_t pid;
+	int fd;
+
+	aep_sem_holder_path(path, sizeof(path), enc);
+	/* O_NOFOLLOW: a planted symlink to an engine-owned non-numeric file
+	 * would pass the fstat TARGET-ownership check below and forge a DEAD
+	 * verdict (junk content -> atoi 0), letting a timed-out waiter
+	 * sem_unlink a LIVE holder's semaphore. */
+	fd = orig_open(path, O_RDONLY | O_NOFOLLOW);
+	if (fd < 0) {
+		if (errno == ENOENT) {
+			return AEP_HOLDER_DEAD;
+		}
+		/* ELOOP (symlink squat), EACCES, or any other non-ENOENT
+		 * failure on a name any local UID may create: a foreign
+		 * squat, not proof of death. */
+		return AEP_HOLDER_FOREIGN;
+	}
+	/* Fail-closed ownership check, as semopen()/aep_init() apply to the
+	 * sem/shm objects. */
+	if (fstat(fd, &st) != 0 || st.st_uid != geteuid() || (st.st_mode & 0077)) {
+		orig_close(fd);
+		return AEP_HOLDER_FOREIGN;
+	}
+	n = orig_read(fd, pidstr, sizeof(pidstr) - 1);
+	orig_close(fd);
+	if (n <= 0) {
+		return AEP_HOLDER_DEAD;
+	}
+	pidstr[n] = '\0';
+	pid = (pid_t)atoi(pidstr);
+	if (pid <= 0) {
+		return AEP_HOLDER_DEAD;
+	}
+	return (kill(pid, 0) < 0 && errno == ESRCH) ? AEP_HOLDER_DEAD : AEP_HOLDER_ALIVE;
+}
+
+/* Bounded sem_wait with stale-holder recovery.  A SIGKILLed afc-engine can
+ * strand a named semaphore at 0 in /dev/shm, which would otherwise block
+ * every future engine in this container.  Wait up to AEP_SEM_TIMEOUT_SEC;
+ * on timeout, race the other waiters to become the SOLE taker: unlink the
+ * stale name and try to (re-)create it fresh (value 0 = locked) under
+ * O_CREAT|O_EXCL. Exactly one waiter wins that create and proceeds as
+ * holder without waiting again; every other waiter (including any that
+ * arrive afterwards) opens the winner's fresh object by name and waits on
+ * it exactly like a normal semaphore, released by the winner's eventual
+ * sem_post(). This replaces the previous "every timed-out waiter proceeds
+ * concurrently" behavior, which let two or more processes enter the
+ * critical section at once and corrupt the non-atomic cache_size/
+ * open_files[] read-modify-writes it guards.
+ * *sem_ref is updated in place so callers that hold their own sem_t*
+ * variable (e.g. a per-file semaphore from semopen(), or the global
+ * shmem_sem) transparently observe the swap and later sem_post()/
+ * sem_close() the correct (possibly new) handle.
+ * Returns 0 once the semaphore is held. A lost takeover race reopens
+ * whatever object now bears the name, so the reopen applies the same
+ * fail-closed ownership check as semopen()/aep_init(). On a foreign
+ * object: shmem_sem degrades to private-mode accounting (still returns 0
+ * holding the private lock); a per-file semaphore is rejected -- all
+ * handles are closed, *sem_ref is set to SEM_FAILED and -1 is returned,
+ * and the caller must fall back exactly as for a semopen() rejection and
+ * must not sem_post()/sem_close(). */
+static void aep_private_mode(void);
+#define AEP_SEM_TIMEOUT_SEC 60
+static int aep_sem_wait(sem_t **sem_ref, const char *name)
+{
+	struct timespec ts;
+	char *enc = strdup(name);
+	int i, rc;
+	sem_t *sem;
+
+	for (i = 1; enc[i]; i++) {
+		if (enc[i] == '/') {
+			enc[i] = '_';
+		}
+	}
+
+	for (;;) {
+		sem = *sem_ref;
+		clock_gettime(CLOCK_REALTIME, &ts);
+		ts.tv_sec += AEP_SEM_TIMEOUT_SEC;
+		while ((rc = sem_timedwait(sem, &ts)) < 0 && errno == EINTR) {
+			/* retry */
+		}
+		if (rc == 0) {
+			if (!(sem_ref == &shmem_sem && aep_degraded)) {
+				/* Degraded mode's lock is process-private: do
+				 * not let it overwrite the shared sidecar the
+				 * real aep_shmem_sem holders rely on. */
+				aep_sem_holder_record(enc);
+			}
+			break; /* acquired normally */
+		}
+		aep_assert(errno == ETIMEDOUT, "aep_sem_wait(%s)", enc);
+		if (sem_ref == &shmem_sem && aep_degraded) {
+			/* Process-private degraded-mode lock (see
+			 * aep_private_mode()): no other process can be sharing it, so
+			 * a timeout here means a real bug in this process, not a
+			 * SIGKILLed peer -- there is nothing to take over. */
+			aep_assert(false, "aep_sem_wait(%s) degraded-mode timeout", enc);
+		}
+		enum aep_holder_state hstate = aep_sem_holder_probe(enc);
+		if (hstate == AEP_HOLDER_FOREIGN) {
+			/* Squatted foreign holder sidecar: fail closed exactly
+			 * like a semopen() rejection -- degrade this file to
+			 * uncached remote I/O rather than misread the squat as
+			 * a dead (or forever-alive) holder. */
+			dbge("aep_sem_wait(%s): foreign holder sidecar, not trusting it", enc);
+			sem_close(sem);
+			if (sem_ref == &shmem_sem) {
+				aep_private_mode();
+				continue;
+			}
+			*sem_ref = SEM_FAILED;
+			free(enc);
+			return -1;
+		}
+		if (hstate == AEP_HOLDER_ALIVE) {
+			/* The recorded holder is still ALIVE -- it is merely
+			 * slow (e.g. a >60s download under the per-file
+			 * semaphore).  Never unlink a live holder's semaphore;
+			 * reopen by name in case an earlier takeover swapped
+			 * the object, then keep waiting. */
+			dbge("aep_sem_wait(%s): %ds timeout but holder is "
+			     "alive; continuing to wait",
+			     enc,
+			     AEP_SEM_TIMEOUT_SEC);
+			sem_t *cur = sem_open(enc, 0);
+			if (cur == SEM_FAILED) {
+				/* name momentarily absent; keep old handle */
+			} else if (cur != sem) {
+				sem_close(sem);
+				*sem_ref = cur;
+			} else {
+				sem_close(cur); /* same object; drop extra ref */
+			}
+			continue;
+		}
+		dbge("aep_sem_wait(%s): %ds timeout, prior holder presumed "
+		     "SIGKILLed; racing to take over",
+		     enc,
+		     AEP_SEM_TIMEOUT_SEC);
+		/* Serialize the takeover with an O_EXCL lockfile so only ONE
+		 * waiter may unlink+recreate: an unconditional unlink here
+		 * could destroy a first winner's fresh (locked) semaphore and
+		 * admit multiple concurrent critical-section holders. */
+		char lockpath[PATH_MAX];
+		snprintf(lockpath,
+			 sizeof(lockpath),
+			 "/dev/shm/aep_takeover.%s",
+			 (enc[0] == '/') ? enc + 1 : enc);
+		int lockfd = orig_open(lockpath, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);
+		if (lockfd < 0) {
+			/* Another waiter is mid-takeover.  A live winner holds
+			 * the lockfile only for a few syscalls; one older than
+			 * the semaphore timeout means the winner died
+			 * mid-takeover -- clear it so recovery can proceed. */
+			struct stat lst;
+			if (orig_lstat(lockpath, &lst) == 0 && lst.st_uid != geteuid()) {
+				/* Foreign squat on the takeover lockfile: our
+				 * unlink() fails EPERM in the sticky /dev/shm
+				 * and the squatter can keep st_mtime fresh, so
+				 * the stale branch below never fires -- an
+				 * unbounded retry livelock.  Fail closed like a
+				 * semopen() rejection instead. */
+				dbge("aep_sem_wait(%s): foreign takeover lockfile, degrading", enc);
+				sem_close(sem);
+				if (sem_ref == &shmem_sem) {
+					aep_private_mode();
+					continue;
+				}
+				*sem_ref = SEM_FAILED;
+				free(enc);
+				return -1;
+			}
+			if (orig_lstat(lockpath, &lst) == 0 &&
+			    time(NULL) - lst.st_mtime > AEP_SEM_TIMEOUT_SEC) {
+				unlink(lockpath);
+				continue;
+			}
+			/* Reopen the winner's fresh semaphore by name (bounded
+			 * retry across the unlink/create window) and loop back
+			 * to wait on it. */
+			sem_t *cur = SEM_FAILED;
+			for (int retry = 0; retry < 500; retry++) {
+				cur = sem_open(enc, 0);
+				if (cur != SEM_FAILED) {
+					break;
+				}
+				usleep(10000);
+			}
+			if (cur == SEM_FAILED) {
+				/* Takeover winner died mid-takeover: clear the
+				 * stale lockfile and retry on the next pass. */
+				unlink(lockpath);
+				continue;
+			}
+			sem_close(sem);
+			*sem_ref = cur;
+			continue;
+		}
+		sem_unlink(enc);
+		sem_t *fresh = sem_open(enc, O_CREAT | O_EXCL, 0600, 0);
+		if (fresh != SEM_FAILED) {
+			/* Won the takeover race: the fresh semaphore is already
+			 * locked (value 0), so we hold it as-is without waiting. */
+			aep_sem_holder_record(enc);
+			sem_close(sem);
+			*sem_ref = fresh;
+			unlink(lockpath);
+			orig_close(lockfd);
+			break;
+		}
+		aep_assert(errno == EEXIST, "aep_sem_wait(%s) takeover", enc);
+		/* Lost the race: another waiter (or a third party) already
+		 * (re)created the name. Before adopting it, apply the same
+		 * fail-closed ownership check as semopen()/aep_init(): the
+		 * unlink->create window lets a co-located different-UID process
+		 * substitute its own object under this name, and a foreign
+		 * semaphore must not become the authoritative lock (it can be
+		 * held at 0 forever, or over-posted to admit concurrent writers
+		 * to the non-atomic accounting it guards). */
+		fresh = sem_open(enc, 0);
+		aep_assert(fresh != SEM_FAILED, "aep_sem_wait(%s) reopen", enc);
+		struct stat st;
+		char sem_path[512];
+		snprintf(sem_path,
+			 sizeof(sem_path),
+			 "/dev/shm/sem.%s",
+			 enc[0] == '/' ? enc + 1 : enc);
+		if (stat(sem_path, &st) != 0 || st.st_uid != geteuid() || (st.st_mode & 0077)) {
+			dbge("aep_sem_wait(%s): foreign takeover object, not adopting", enc);
+			sem_close(fresh);
+			sem_close(sem);
+			if (sem_ref == &shmem_sem) {
+				/* Degrade to process-private accounting instead of
+				 * serializing on an unowned lock;
+				 * loop back to acquire the private replacement. */
+				aep_private_mode();
+				continue;
+			}
+			/* Per-file semaphore: report rejection; the caller falls
+			 * back like a semopen() rejection. */
+			*sem_ref = SEM_FAILED;
+			free(enc);
+			return -1;
+		}
+		sem_close(sem);
+		*sem_ref = fresh;
+		unlink(lockpath);
+		orig_close(lockfd);
+	}
+	free(enc);
+	return 0;
 }
 
 static inline FILE *orig_fopen(const char *path, const char *mode)
@@ -345,7 +753,12 @@ static inline int orig_open(const char *pathname, int flags, ...)
 	int fd;
 	orig_open_t orig = (orig_open_t)dlsym(RTLD_NEXT, "open");
 
-	fd = (*orig)(pathname, flags, 0666);
+	/* Mode 0600: cache/log files created via this shim (fd_add touch,
+	 * download_file_gs/nfs destinations, the debug logfile) must be
+	 * writable only by the engine's own UID. 0666 let any co-located
+	 * process of a different UID modify cached terrain/ULS content in
+	 * place while the is_cached check (size+uid only) kept trusting it. */
+	fd = (*orig)(pathname, flags, 0600);
 	fd_set_dbg_name(fd, pathname);
 	return fd;
 }
@@ -398,7 +811,7 @@ static inline off_t orig_lseek(int fd, off_t offset, int whence)
 
 static inline struct dirent *orig_readdir(DIR *dir)
 {
-	typedef struct dirent *(*orig_readdir_t)(DIR * dir);
+	typedef struct dirent *(*orig_readdir_t)(DIR *dir);
 	orig_readdir_t orig = (orig_readdir_t)dlsym(RTLD_NEXT, "readdir");
 
 	return (*orig)(dir);
@@ -509,16 +922,33 @@ static fe_t *find_fe(char *tpath)
 
 /* FILE function pointers stubs */
 #ifndef __GLIBC__
-/* never used */
+/* Reached only by musl-internal buffered-stdio paths that are NOT separately
+ * interposed by this shim (fgets/fscanf/getline/getc_unlocked/... call
+ * __uflow -> f->read when the buffer needs refilling). Those APIs are not on
+ * the interposed list (only fread/fgetc/read/lseek/... are), so without this
+ * guard a caller using one of them against a virtualized file would have
+ * silently observed a 0-byte "read" -- indistinguishable from real EOF --
+ * and treated genuinely missing terrain/ULS data as an empty file. Fail
+ * loudly instead of fabricating success. */
 static size_t f_read(FILE *f, unsigned char *buf, size_t size)
 {
-	dbgo("FILE->read(%d(%s), %zu)", fileno(f), fd_get_dbg_name(fileno(f)), size);
+	aep_assert(false,
+		   "FILE->read(%d(%s), %zu): unsupported buffered-stdio API on "
+		   "an AEP-virtualized file (not interposed)",
+		   fileno(f),
+		   fd_get_dbg_name(fileno(f)),
+		   size);
 	return 0;
 }
-/* never used */
+/* AEP-virtualized files are read-only; a buffered write reaching here would
+ * otherwise silently report success while discarding the data. */
 static size_t f_write(FILE *f, const unsigned char *buff, size_t size)
 {
-	dbgo("FILE->write(%d(%s), %zu)", fileno(f), fd_get_dbg_name(fileno(f)), size);
+	aep_assert(false,
+		   "FILE->write(%d(%s), %zu): AEP-virtualized files are read-only",
+		   fileno(f),
+		   fd_get_dbg_name(fileno(f)),
+		   size);
 	f->wpos = 0;
 	return 0;
 }
@@ -558,7 +988,7 @@ static int f_close(FILE *f)
 
 static inline void cache_size_set(int64_t size)
 {
-	sem_wait(shmem_sem);
+	aep_sem_wait(&shmem_sem, "aep_shmem_sem");
 	*cache_size += size;
 	sem_post(shmem_sem);
 }
@@ -567,10 +997,28 @@ static inline int64_t cache_size_get()
 {
 	int64_t tmp;
 
-	sem_wait(shmem_sem);
+	aep_sem_wait(&shmem_sem, "aep_shmem_sem");
 	tmp = *cache_size;
 	sem_post(shmem_sem);
 	return tmp;
+}
+
+/* Atomically reserve `size` of cache-accounting headroom: the bound check
+ * and the add happen in ONE critical section under shmem_sem, so N
+ * concurrent downloaders cannot each pass a stale check and jointly overshoot
+ * max_cached_size. Returns true when reserved; on a failed download the
+ * caller must roll back with cache_size_set(-size). */
+static inline bool cache_size_reserve(int64_t size)
+{
+	bool ok = false;
+
+	aep_sem_wait(&shmem_sem, "aep_shmem_sem");
+	if (size + *cache_size < (int64_t)max_cached_size) {
+		*cache_size += size;
+		ok = true;
+	}
+	sem_post(shmem_sem);
+	return ok;
 }
 
 /* 16 bits hash */
@@ -581,36 +1029,141 @@ static uint16_t hash_fname(const char *str)
 	uint16_t hash = 0x5555;
 	str++; /* skip '/' */
 	while (*str) {
-		hash ^= *((uint16_t *)str) + cor;
-		str += 2;
+		/* Build a two-byte value from consecutive bytes without reading
+		 * past the NUL terminator when the remaining length is odd. */
+		uint16_t pair = (uint16_t)(unsigned char)str[0];
+		if (str[1]) {
+			pair |= (uint16_t)(unsigned char)str[1] << 8;
+			str += 2;
+		} else {
+			str += 1;
+		}
+		hash ^= pair + cor;
 		cor++;
 	}
 	return hash;
 }
 
-static uint8_t files_open_set(const char *name, int val)
+/* Upsert this pid's pin count for `hash` in the journal so a later
+ * reap_dead_pins() can find and reclaim it if this process dies without
+ * calling fd_rm(). Must be called with shmem_sem held. */
+static void pin_journal_add(pid_t pid, uint16_t hash, int32_t count)
+{
+	int free_slot = -1;
+
+	for (int i = 0; i < PIN_JOURNAL_SIZE; i++) {
+		if (pin_journal[i].pid == pid && pin_journal[i].hash == hash) {
+			pin_journal[i].count += count;
+			return;
+		}
+		if (free_slot < 0 && pin_journal[i].pid == 0) {
+			free_slot = i;
+		}
+	}
+	if (free_slot < 0) {
+		/* Journal exhausted: this pin loses per-pid liveness tracking, but
+		 * open_files[] itself -- the actual guard against evicting an
+		 * in-use file -- is unaffected; it just cannot be proactively
+		 * reclaimed if this process dies uncleanly. */
+		dbge("pin journal full, not tracking pid %d hash %u for reap", pid, hash);
+		return;
+	}
+	pin_journal[free_slot].pid = pid;
+	pin_journal[free_slot].hash = hash;
+	pin_journal[free_slot].count = count;
+}
+
+/* Release (part of) this pid's recorded pin. Must be called with shmem_sem
+ * held. */
+static void pin_journal_sub(pid_t pid, uint16_t hash, int32_t count)
+{
+	for (int i = 0; i < PIN_JOURNAL_SIZE; i++) {
+		if (pin_journal[i].pid == pid && pin_journal[i].hash == hash) {
+			pin_journal[i].count -= count;
+			if (pin_journal[i].count <= 0) {
+				pin_journal[i].pid = 0;
+				pin_journal[i].hash = 0;
+				pin_journal[i].count = 0;
+			}
+			return;
+		}
+	}
+	/* No entry: the journal was full when this pin was taken (see
+	 * pin_journal_add) or we are in private/degraded mode. Nothing to
+	 * release from the journal; open_files[] itself was already adjusted
+	 * by the caller. */
+}
+
+/* Reclaim pins left behind by processes that died without running fd_rm()
+ * (Celery hard-time-limit SIGKILL, OOM, or any aep_assert() abort while
+ * holding a pin) -- otherwise ftw_reduce_callback() would treat the file as
+ * permanently in-use and cache eviction would starve forever. Must be called
+ * with shmem_sem held. */
+static void reap_dead_pins(void)
+{
+	pid_t self = getpid();
+
+	for (int i = 0; i < PIN_JOURNAL_SIZE; i++) {
+		pid_t pid = pin_journal[i].pid;
+
+		if (pid == 0 || pid == self) {
+			continue;
+		}
+		if (kill(pid, 0) == 0 || errno != ESRCH) {
+			continue; /* still alive, or liveness indeterminate */
+		}
+		open_files[pin_journal[i].hash] -= pin_journal[i].count;
+		if (open_files[pin_journal[i].hash] < 0) {
+			open_files[pin_journal[i].hash] = 0;
+		}
+		dbge("reap_dead_pins: reclaimed %d pin(s) on hash %u from dead pid %d",
+		     pin_journal[i].count,
+		     pin_journal[i].hash,
+		     pid);
+		pin_journal[i].pid = 0;
+		pin_journal[i].hash = 0;
+		pin_journal[i].count = 0;
+	}
+}
+
+static int32_t files_open_set(const char *name, int val)
 {
 	aep_assert(strcmp(name, "noname"), "files_open_set(noname)");
 	uint16_t fno = hash_fname(name);
-	uint8_t ret;
+	int32_t ret;
 
-	sem_wait(shmem_sem);
+	aep_sem_wait(&shmem_sem, "aep_shmem_sem");
 	open_files[fno] += val;
 	if (open_files[fno] < 0) {
+		/* int32_t is wide enough that a wrap under any realistic
+		 * concurrency is not the concern int8_t used to be; a negative
+		 * value here means an accounting bug (mismatched inc/dec) rather
+		 * than overflow. Log loudly (not silently) and reset so eviction
+		 * doesn't get stuck believing the slot is permanently pinned. */
+		dbge("files_open_set(%s): count went negative (%d), resetting",
+		     name,
+		     open_files[fno]);
 		open_files[fno] = 0;
 	}
 	ret = open_files[fno];
+	if (!aep_degraded) {
+		if (val > 0) {
+			pin_journal_add(getpid(), fno, val);
+		} else if (val < 0) {
+			pin_journal_sub(getpid(), fno, -val);
+		}
+	}
 	sem_post(shmem_sem);
 	return ret;
 }
 
-static uint8_t files_open_get(const char *name)
+static int32_t files_open_get(const char *name)
 {
 	aep_assert(strcmp(name, "noname"), "files_open_get(noname)");
 	uint16_t fno = hash_fname(name);
-	uint8_t ret;
+	int32_t ret;
 
-	sem_wait(shmem_sem);
+	aep_sem_wait(&shmem_sem, "aep_shmem_sem");
 	ret = open_files[fno];
 	sem_post(shmem_sem);
 	return ret;
@@ -624,7 +1177,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	ssize_t (*read_remote_data)(void *destv, size_t size, char *tpath, off_t off) =
 		aep_use_gs ? read_remote_data_gs : read_remote_data_nfs;
 	/* define pointer to download file func */
-	int (*download_file)(data_fd_t * data_fd, char *dest);
+	int (*download_file)(data_fd_t *data_fd, char *dest);
 	download_file = aep_use_gs ? download_file_gs : download_file_nfs;
 	struct stat stat;
 	sem_t *sem;
@@ -634,27 +1187,60 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	strncat(fakepath, data_fd->tpath, AEP_PATH_MAX - strlen(fakepath));
 
 	sem = semopen(data_fd->tpath);
+	if (sem == SEM_FAILED) {
+		/* Per-file semaphore rejected (e.g. pre-created by a foreign UID):
+		 * degrade to uncached remote I/O for this file instead of
+		 * aborting the engine. */
+		ret = read_remote_data(destv, size, data_fd->tpath, data_fd->off);
+		aep_assert(ret >= 0, "read_data(%s) read_remote_data", fakepath);
+		data_fd->off += ret;
+		dbgd("read_data(%s, %zu) %zd", data_fd->tpath, size, ret);
+		return ret;
+	}
 	// dbg("read_data %s", data_fd->tpath);
-	sem_wait(sem);
+	if (aep_sem_wait(&sem, data_fd->tpath)) {
+		/* Takeover reopen refused a foreign per-file semaphore: degrade
+		 * to uncached remote I/O, mirroring the semopen() rejection path
+		 * above (handles already closed by aep_sem_wait()). */
+		ret = read_remote_data(destv, size, data_fd->tpath, data_fd->off);
+		aep_assert(ret >= 0, "read_data(%s) read_remote_data", fakepath);
+		data_fd->off += ret;
+		dbgd("read_data(%s, %zu) %zd", data_fd->tpath, size, ret);
+		return ret;
+	}
 
 	/* download whole file to cache if possible */
 	if (!orig_stat(fakepath, &stat)) {
-		if (data_fd->fe->size == stat.st_size) {
+		/* Trust a cache file as authoritative only when size, owner AND
+		 * mode all match: size+uid alone let a co-located different-UID
+		 * writer (permissive umask / shared cache volume) poison already
+		 * cached content in place -- a same-size, same-owner overwrite
+		 * would otherwise sail through this check forever. Mirrors the
+		 * mode checks already enforced for the semaphore and shm segment. */
+		if (data_fd->fe->size == stat.st_size && stat.st_uid == geteuid() &&
+		    (stat.st_mode & 0077) == 0) {
 			is_cached = true;
 		}
 		if (!is_cached && data_fd->fe->size <= (int64_t)max_cached_file_size) {
 			if (data_fd->fe->size + cache_size_get() > (int64_t)max_cached_size) {
 				reduce_cache(data_fd->fe->size);
 			}
-			if (data_fd->fe->size + cache_size_get() < (int64_t)max_cached_size) {
+			/* Reserve the headroom atomically (check-and-add under one
+			 * shmem_sem critical section, cache_size_reserve()) instead of
+			 * re-checking the bound and adding it in two separate,
+			 * separately-locked steps: with N engines concurrently past
+			 * the check-only gate, each could pass and each add, jointly
+			 * overshooting max_cached_size by up to N*max_cached_file_size. */
+			if (cache_size_reserve(data_fd->fe->size)) {
 				// dbg("download %s", data_fd->tpath);
 				if (!download_file(data_fd, fakepath)) {
-					cache_size_set(data_fd->fe->size);
 					dbg("download %s done, cs %ld",
 					    data_fd->tpath,
 					    *cache_size);
 					is_cached = true;
 				} else {
+					/* roll back the reservation */
+					cache_size_set(-data_fd->fe->size);
 					dbg("download %s failed, cs %ld",
 					    data_fd->tpath,
 					    *cache_size);
@@ -674,12 +1260,33 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 
 	if (is_cached) {
 		int fd;
+		struct stat vst;
 		struct timeval tv;
 		unsigned int us;
 
 		starttime(&tv);
-		fd = orig_open(fakepath, O_RDONLY);
-		aep_assert(fd >= 0, "read_data(%s) open", fakepath);
+		/* O_NOFOLLOW + re-verify on the OPENED fd: the stat() above
+		 * validated whatever the path resolved to at that moment; a
+		 * co-located writer who swaps the cache path for a symlink
+		 * between check and open would otherwise redirect this read to
+		 * a different (same-size, engine-owned) file. Apply the
+		 * size/uid/mode trust check to the very fd we read and degrade
+		 * to uncached remote I/O on any mismatch. */
+		fd = orig_open(fakepath, O_RDONLY | O_NOFOLLOW);
+		if (fd < 0 || orig_fstat(fd, &vst) != 0 || !S_ISREG(vst.st_mode) ||
+		    vst.st_size != data_fd->fe->size || vst.st_uid != geteuid() ||
+		    (vst.st_mode & 0077) != 0) {
+			if (fd >= 0) {
+				orig_close(fd);
+			}
+			sem_post(sem);
+			sem_close(sem);
+			ret = read_remote_data(destv, size, data_fd->tpath, data_fd->off);
+			aep_assert(ret >= 0, "read_data(%s) read_remote_data", fakepath);
+			data_fd->off += ret;
+			dbgd("read_data(%s, %zu) %zd", data_fd->tpath, size, ret);
+			return ret;
+		}
 		orig_lseek(fd, data_fd->off, SEEK_SET);
 		ret = orig_read(fd, destv, size);
 		aep_assert(ret >= 0, "read_data(%s) read", fakepath);
@@ -727,32 +1334,69 @@ static int fd_add(char *tpath)
 	strncat(fakepath, tpath, AEP_PATH_MAX - strlen(fakepath));
 
 	/* create cache file */
-	if (orig_stat(fakepath, &statbuf)) {
-		for (p = fakepath; *p; p++) {
-			if (*p == '/') {
-				*p = '\0';
-				mkdir(fakepath, 0777);
+	/* mkdir errors were silently ignored here, so a pre-created
+	 * attacker-owned directory (or symlink) anywhere in the cache
+	 * tree was accepted, handing a co-located different-UID writer
+	 * the rename/symlink primitive inside the tree. Refuse (the
+	 * caller degrades this file to uncached remote I/O) unless
+	 * every component from the cache root down is a real directory
+	 * owned by us and not writable by group/other. Run the walk on
+	 * the pre-existing-path branch too: a squat planted before the
+	 * engine first populates the tree makes orig_stat() succeed and
+	 * would otherwise bypass this validation entirely. */
+	for (p = fakepath + strlen(cache_path); *p; p++) {
+		if (*p == '/') {
+			struct stat dst;
+
+			*p = '\0';
+			if (mkdir(fakepath, 0700) != 0 &&
+			    (errno != EEXIST || orig_lstat(fakepath, &dst) != 0 ||
+			     !S_ISDIR(dst.st_mode) || dst.st_uid != geteuid() ||
+			     (dst.st_mode & 0022) != 0)) {
+				dbg("fd_add(%s): untrusted cache dir component", fakepath);
 				*p = '/';
+				return -1;
 			}
+			*p = '/';
 		}
+	}
+	if (orig_stat(fakepath, &statbuf)) {
 		if (fe->size) { /* it's a file, touch it */
 			int fd;
 
-			fd = orig_open(fakepath, O_CREAT | O_RDWR);
-			aep_assert(fd >= 0, "fd_add(%s) touch errno %d", fakepath, errno);
+			fd = orig_open(fakepath, O_CREAT | O_RDWR | O_NOFOLLOW);
+			if (fd < 0) {
+				/* Squatted/foreign cache object: degrade this file
+				 * to uncached remote I/O instead of aborting the
+				 * engine. */
+				dbg("fd_add(%s): touch errno %d", fakepath, errno);
+				return -1;
+			}
 			orig_close(fd);
 		} else { /* is dir */
-			mkdir(fakepath, 0777);
+			mkdir(fakepath, 0700);
 		}
 	}
 
 	if (fe->size) {
 		files_open_set(tpath, 1);
 	}
-	fd = orig_open(fakepath, O_RDONLY);
+	fd = orig_open(fakepath, O_RDONLY | O_NOFOLLOW);
+	if (fd < 0 || orig_fstat(fd, &statbuf)) {
+		/* Foreign 0600 file or planted symlink (EACCES/ELOOP):
+		 * degrade this file to uncached remote I/O instead of
+		 * aborting the engine mid-request. */
+		dbg("fd_add(%s): cache open/fstat errno %d", fakepath, errno);
+		if (fd >= 0) {
+			orig_close(fd);
+		}
+		if (fe->size) {
+			files_open_set(tpath, -1);
+		}
+		return -1;
+	}
 	data_fd = &data_fds[fd];
 	memset(data_fd, 0, sizeof(data_fd_t));
-	aep_assert(!orig_fstat(fd, &statbuf), "fd_add(%s) fstat", tpath);
 	data_fd->fe = fe;
 	data_fd->off = 0;
 #ifndef __GLIBC__
@@ -863,15 +1507,57 @@ static int ftw_reduce_callback(const char *fpath, const struct stat *sb, int typ
 		char *tpath = (char *)fpath + strlen(cache_path);
 		if (!files_open_get(tpath)) {
 			sem_t *sem;
+			struct stat cur;
+			int64_t victim_size = 0;
+
 			sem = semopen(tpath);
-			sem_wait(sem);
-			aep_assert(!truncate(fpath, 0), "truncate");
-			sem_post(sem);
-			cache_size_set(-sb->st_size);
-			if (cache_size_get() + claimed_size <= (int64_t)max_cached_size) {
-				return -1;
+			if (sem == SEM_FAILED) {
+				/* Semaphore rejected (foreign UID): skip this entry
+				 * rather than aborting the engine over an eviction
+				 * candidate. */
+				return 0;
 			}
-			dbg("truncate(%s) cs %ld", tpath, *cache_size);
+			if (aep_sem_wait(&sem, tpath)) {
+				/* Foreign takeover of the per-file name: skip this
+				 * eviction candidate, mirroring the semopen()
+				 * rejection path (handles already closed). */
+				return 0;
+			}
+			/* `sb` was captured by ftw() BEFORE this lock was acquired: a
+			 * concurrent walker may have already truncated (and
+			 * subtracted for) this exact file. Re-stat under the per-file
+			 * semaphore and only truncate/account a victim that is still
+			 * non-empty, so two overlapping reduce_cache() walks cannot
+			 * each subtract sb->st_size for the same physical eviction
+			 * and drive the floor-less shared cache_size negative --
+			 * which would permanently defeat the AFC_AEP_CACHE_MAX_SIZE
+			 * bound. */
+			/* lstat + S_ISREG: ftw() follows symlinks, so a planted
+			 * symlink in the cache tree would otherwise get its
+			 * TARGET truncated (and the target's size subtracted
+			 * from shared cache accounting). Evict only a real,
+			 * still-non-empty regular file. */
+			if (!orig_lstat(fpath, &cur) && S_ISREG(cur.st_mode) && cur.st_size) {
+				if (truncate(fpath, 0)) {
+					/* Foreign-owned unwritable file in the cache
+					 * tree: skip this eviction candidate (leaving
+					 * cache_size unadjusted), mirroring the
+					 * semopen() rejection skip, instead of
+					 * aborting the engine on every walk. */
+					dbg("truncate(%s) failed errno %d", fpath, errno);
+				} else {
+					victim_size = cur.st_size;
+				}
+			}
+			sem_post(sem);
+			sem_close(sem);
+			if (victim_size) {
+				cache_size_set(-victim_size);
+				if (cache_size_get() + claimed_size <= (int64_t)max_cached_size) {
+					return -1;
+				}
+				dbg("truncate(%s) cs %ld", tpath, *cache_size);
+			}
 		}
 	}
 	return 0;
@@ -881,6 +1567,14 @@ static void reduce_cache(uint64_t size)
 {
 	// dbg("reduce_cache(%lu)", size);
 	claimed_size = (int64_t)size;
+	if (!aep_degraded) {
+		/* Reclaim pins stranded by processes that died without running
+		 * fd_rm() (SIGKILL/OOM/abort) before walking the cache, so a dead
+		 * pid cannot permanently starve eviction of its files. */
+		aep_sem_wait(&shmem_sem, "aep_shmem_sem");
+		reap_dead_pins();
+		sem_post(shmem_sem);
+	}
 	ftw(cache_path, ftw_reduce_callback, 100);
 	// dbg("reduce_cache(%lu) done", size);
 }
@@ -889,6 +1583,29 @@ static int ftw_callback(const char *fpath, const struct stat *sb, int typeflag)
 {
 	*cache_size += sb->st_size;
 	return 0;
+}
+
+/* Degraded mode entered when the shared cache-accounting semaphore/segment
+ * ("aep_shmem_sem" / "aep_shmem") is rejected as foreign-owned or overly
+ * permissive -- i.e. pre-created by a different UID sharing this container's
+ * /dev/shm. Falls back to process-private accounting (no cross-process
+ * cache_size/open_files sharing, and no new files are added to the cache --
+ * existing cache hits still work via the size/uid/mode check in
+ * read_data()) instead of aep_assert-abort()ing the engine, so a co-tenant
+ * cannot pin a predictable IPC name and repeatedly kill every engine that
+ * starts in this container. */
+static void aep_private_mode(void)
+{
+	void *base;
+
+	aep_assert(!sem_init(&aep_private_sem, 0, 1), "aep_private_mode:sem_init");
+	shmem_sem = &aep_private_sem;
+	aep_degraded = true;
+	base = malloc(AEP_ACCOUNTING_SIZE);
+	aep_assert(base, "aep_private_mode:malloc");
+	memset(base, 0, AEP_ACCOUNTING_SIZE);
+	aep_shm_layout(base);
+	max_cached_file_size = 0; /* never cache new files in degraded mode */
 }
 
 /* This library entrypoint */
@@ -903,7 +1620,6 @@ void __attribute__((constructor)) aep_init(void)
 	fe_t *cfe = NULL; /* last file entry added to tree */
 	uint8_t *filelist_end;
 	uint8_t tab_prev = 0;
-	uint32_t entries_size;
 	char *filelist_path;
 	char *tmp;
 	int shm_fd;
@@ -980,20 +1696,34 @@ void __attribute__((constructor)) aep_init(void)
 	fl = filelist;
 	filelist_end = filelist + statbuf.st_size;
 
+	/* header is two uint32 entry counts plus one uint8 max_tab: refuse a
+	 * shorter file, which would otherwise be read out of bounds at once */
+	aep_assert(statbuf.st_size >= (off_t)(2 * sizeof(uint32_t) + sizeof(uint8_t)),
+		   "filelist shorter than its fixed header");
+
 	/* alloc file tree entries */
-	entries_size = *((uint32_t *)fl);
+	uint32_t entries_cnt1 = *((uint32_t *)fl);
 	fl += sizeof(uint32_t);
-	entries_size += *((uint32_t *)fl);
+	uint32_t entries_cnt2 = *((uint32_t *)fl);
 	fl += sizeof(uint32_t);
-	entries_size *= sizeof(fe_t);
-	fes = (fe_t *)calloc(1, entries_size);
+	/* Validate header record counts: size the arena in
+	 * 64-bit and bound it by what the file could legitimately hold (a
+	 * record is at least 1 name byte + NUL + 8 size bytes), so the
+	 * 32-bit add / *= sizeof(fe_t) can no longer wrap and undersize
+	 * the arena; calloc's two-argument form catches any residual
+	 * multiplication overflow. */
+	uint64_t entries_total = (uint64_t)entries_cnt1 + (uint64_t)entries_cnt2;
+	aep_assert(entries_total <= (uint64_t)statbuf.st_size / 10,
+		   "filelist header entry count exceeds file size");
+	fes = (fe_t *)calloc(entries_total, sizeof(fe_t));
 	if (!fes) {
 		dbge("Memory allocation");
 		exit(-ENOMEM);
 	}
 	free_fes = fes;
 
-	stack = (fe_t **)calloc(1, (*((uint8_t *)fl) + 1) * sizeof(fe_t *));
+	uint8_t max_tab = *((uint8_t *)fl);
+	stack = (fe_t **)calloc(1, (max_tab + 1) * sizeof(fe_t *));
 	if (!(stack)) {
 		dbge("Memory allocation");
 		exit(-ENOMEM);
@@ -1009,29 +1739,68 @@ void __attribute__((constructor)) aep_init(void)
 		char *name;
 		int64_t size;
 
-		/* read next line */
-		while (*fl == '\t') {
+		/* read next line (bounded: a trailing run of TABs must not walk
+		 * the scan past the end of the buffer) */
+		while ((fl < filelist_end) && (*fl == '\t')) {
 			tab++;
+			/* Filenames may legally contain TAB bytes and parse_fs.py
+			 * emits names verbatim while the 1-byte max_tab header
+			 * counts directory depth only: without this bound, a
+			 * crafted name desyncs the depth count from what the
+			 * header promised and indexes stack[]/stack[tab] below
+			 * (aep.cpp `stack[tab] = cfe`) past its (max_tab + 1)-slot
+			 * allocation. Checked on every increment (not just once
+			 * after the loop) so the uint8_t counter cannot wrap back
+			 * into an in-bounds-looking value before the check runs.
+			 * Hard-fail; do not clamp -- a clamp would silently
+			 * misattribute the entry to the wrong tree depth. */
+			aep_assert(tab <= max_tab, "filelist line depth exceeds header max_tab");
 			(fl)++;
 		}
 		name = (char *)(fl);
+		/* name must be NUL-terminated inside the buffer, else strlen (and
+		 * the size read below) runs past filelist_end */
+		aep_assert(memchr(fl, 0, (size_t)(filelist_end - fl)) != NULL,
+			   "filelist entry name not NUL-terminated");
+		/* The emulated struct dirent d_name is char[256]; parse_fs.py never
+		 * emits names longer than 255 bytes, so a longer name here is a
+		 * crafted filelist. Hard-fail rather than truncate -- truncation
+		 * would silently alias two distinct entries. */
+		aep_assert(strlen(name) < 256, "filelist name exceeds 255 bytes");
 		fl += strlen(name) + 1;
 
+		/* the 8-byte size field must fit in the remaining buffer */
+		aep_assert(fl + sizeof(int64_t) <= filelist_end,
+			   "filelist entry truncated before size field");
 		size = *((int64_t *)fl);
+		/* a negative size would corrupt the shared cache_size accounting
+		 * and surface as a negative st_size from the stat() interposer */
+		aep_assert(size >= 0, "filelist entry size is negative");
 		fl += sizeof(int64_t);
+		/* parse_fs.py deepens at most one level per entry; a crafted
+		 * depth jump (e.g. 0 -> 2) leaves intermediate stack[] slots
+		 * NULL and a first entry deeper than root would push cfe == NULL */
+		aep_assert(tab <= tab_prev + 1, "filelist depth jump exceeds one level");
 		if (tab != tab_prev) {
 			if (tab < tab_prev) {
 				cstack = stack[tab];
+				aep_assert(cstack, "filelist descends to unpopulated depth");
 				cfe = cstack->down;
 				while (cfe && cfe->next) {
 					cfe = cfe->next;
 				}
 			} else {
+				aep_assert(cfe, "filelist first entry deeper than root");
 				stack[tab] = cfe;
 				cstack = stack[tab];
 			}
 			tab_prev = tab;
 		}
+		/* the arena was sized from the header entry counts; a filelist
+		 * carrying more records than its header claims must hard-fail
+		 * like the other crafted-filelist inconsistencies above */
+		aep_assert(free_fes < fes + entries_total,
+			   "filelist record count exceeds header entry counts");
 		if (!cstack->down) {
 			cstack->down = free_fes;
 		} else {
@@ -1044,37 +1813,97 @@ void __attribute__((constructor)) aep_init(void)
 	}
 	free(stack);
 
-	/* share cache size */
-	shmem_sem = sem_open("aep_shmem_sem", O_CREAT, 0666, 1);
-	aep_assert(shmem_sem, "aep_init:sem_open");
-	shm_fd = shm_open("aep_shmem", O_RDWR | O_CREAT | O_EXCL, 0666);
+	/* share cache size — mode 0600 so only the engine's own UID can open the
+	 * shared semaphore / memory segment.
+	 * Use O_EXCL for sem_open; on EEXIST verify ownership before use. */
+	shmem_sem = sem_open("aep_shmem_sem", O_CREAT | O_EXCL, 0600, 1);
+	if (!shmem_sem && errno == EEXIST) {
+		/* Shared semaphore already exists — re-open and verify it is ours. */
+		shmem_sem = sem_open("aep_shmem_sem", 0);
+		if (shmem_sem) {
+			struct stat st;
+			char sem_path[256];
+			snprintf(sem_path, sizeof(sem_path), "/dev/shm/sem.aep_shmem_sem");
+			/* Fail-closed: reject whenever stat() does NOT prove the
+			 * object is ours, not only when it succeeds and proves a bad
+			 * owner/mode. A stat() failure here (ENOENT from a
+			 * sem_unlink() race, or a musl/Alpine path-convention
+			 * mismatch) used to be treated as "allow", the identical bug
+			 * fixed in semopen() above and for the same reason: validate
+			 * semaphore ownership and mode flags. */
+			if (stat(sem_path, &st) != 0 || st.st_uid != geteuid() ||
+			    (st.st_mode & 0077)) {
+				/* Pre-created by a different UID or with permissive mode */
+				sem_close(shmem_sem);
+				shmem_sem = SEM_FAILED;
+			}
+		}
+	}
+	if (!shmem_sem || shmem_sem == SEM_FAILED) {
+		/* Foreign-owned/unusable: degrade instead of aep_assert-abort so an
+		 * unowned semaphore name does not block engine initialization. */
+		dbge("aep_init: unusable aep_shmem_sem, degrading to private mode");
+		aep_private_mode();
+		dbg("aep_init done (private mode)");
+		return;
+	}
+	shm_fd = shm_open("aep_shmem", O_RDWR | O_CREAT | O_EXCL, 0600);
 	// dbg("aep_init");
-	sem_wait(shmem_sem);
+	aep_sem_wait(&shmem_sem, "aep_shmem_sem");
+	if (aep_degraded) {
+		/* The takeover reopen inside aep_sem_wait() refused a foreign
+		 * aep_shmem_sem and degraded to private-mode accounting: do NOT
+		 * attach the shared segment (it must not be guarded by the
+		 * process-private lock). aep_private_mode() already installed a
+		 * private layout; we hold its lock here. */
+		if (shm_fd >= 0) {
+			orig_close(shm_fd);
+			shm_unlink("aep_shmem");
+		}
+		sem_post(shmem_sem);
+		dbg("aep_init done (private mode)");
+		return;
+	}
 	if (shm_fd < 0) {
 		// dbg("aep_init cache skip");
 		/* O_CREAT | O_EXCL failed, so shared memory object already was initialized */
-		shm_fd = shm_open("aep_shmem", O_RDWR, 0666);
-		aep_assert(shm_fd >= 0, "shm_open");
-		cache_size = (int64_t *)mmap(NULL,
-					     sizeof(int64_t) + HASH_SIZE,
-					     PROT_READ | PROT_WRITE,
-					     MAP_SHARED,
-					     shm_fd,
-					     0);
-		aep_assert(cache_size, "mmap");
-		open_files = (int8_t *)(cache_size + 1);
+		shm_fd = shm_open("aep_shmem", O_RDWR, 0600);
+		struct stat st;
+		if (shm_fd < 0 || fstat(shm_fd, &st) != 0 || st.st_uid != geteuid() ||
+		    (st.st_mode & 0077) != 0 || st.st_size < (off_t)AEP_ACCOUNTING_SIZE) {
+			/* Unopenable, pre-created by a different UID, permissive
+			 * mode, or short size -- refuse to use it; degrade instead of aborting. */
+			dbge("aep_init: foreign/unusable aep_shmem, degrading to "
+			     "private mode");
+			if (shm_fd >= 0) {
+				orig_close(shm_fd);
+			}
+			sem_post(shmem_sem);
+			sem_close(shmem_sem);
+			aep_private_mode();
+			dbg("aep_init done (private mode)");
+			return;
+		}
+		void *base = mmap(NULL,
+				  AEP_ACCOUNTING_SIZE,
+				  PROT_READ | PROT_WRITE,
+				  MAP_SHARED,
+				  shm_fd,
+				  0);
+		aep_assert(base != MAP_FAILED, "mmap");
+		aep_shm_layout(base);
 	} else {
 		// dbg("aep_init recount cache");
-		aep_assert(!ftruncate(shm_fd, sizeof(uint64_t) + HASH_SIZE), "aep_init:ftruncate");
-		cache_size = (int64_t *)mmap(NULL,
-					     sizeof(int64_t) + HASH_SIZE,
-					     PROT_READ | PROT_WRITE,
-					     MAP_SHARED,
-					     shm_fd,
-					     0);
-		aep_assert(cache_size, "mmap");
-		open_files = (int8_t *)(cache_size + 1);
-		memset((void *)cache_size, 0, sizeof(int64_t) + HASH_SIZE);
+		aep_assert(!ftruncate(shm_fd, AEP_ACCOUNTING_SIZE), "aep_init:ftruncate");
+		void *base = mmap(NULL,
+				  AEP_ACCOUNTING_SIZE,
+				  PROT_READ | PROT_WRITE,
+				  MAP_SHARED,
+				  shm_fd,
+				  0);
+		aep_assert(base != MAP_FAILED, "mmap");
+		aep_shm_layout(base);
+		memset(base, 0, AEP_ACCOUNTING_SIZE);
 		/* count existing cache size */
 		ftw(cache_path, ftw_callback, 100);
 	}
@@ -1467,7 +2296,10 @@ struct dirent *readdir(DIR *dir)
 		}
 
 		data_fd->dirent.d_type = data_fd->readdir_p->size ? DT_REG : DT_DIR;
-		strncpy(data_fd->dirent.d_name, data_fd->readdir_p->name, 256);
+		/* strncpy does not terminate when the source fills the bound;
+		 * copy at most 255 bytes and terminate explicitly. */
+		strncpy(data_fd->dirent.d_name, data_fd->readdir_p->name, 255);
+		data_fd->dirent.d_name[255] = '\0';
 		// dbgd("readdir(%s) %s", fd_get_dbg_name(dirfd(dir)), data_fd->dirent.d_name);
 		return &data_fd->dirent;
 	} else {
@@ -1585,7 +2417,9 @@ static int download_file_gs(data_fd_t *data_fd, char *dest)
 #ifndef NO_GOOGLE_LINK
 	int output;
 
-	if ((output = orig_open(dest, O_CREAT | O_WRONLY)) < 0) {
+	/* O_NOFOLLOW: never create/write the cache destination through a
+	 * planted symlink. */
+	if ((output = orig_open(dest, O_CREAT | O_WRONLY | O_NOFOLLOW)) < 0) {
 		return -1;
 	}
 
@@ -1626,7 +2460,9 @@ static int download_file_nfs(data_fd_t *data_fd, char *dest)
 	strncat(realpath, data_fd->tpath, AEP_PATH_MAX - strlen(realpath));
 
 	starttime(&tv);
-	if ((output = orig_open(dest, O_CREAT | O_RDWR)) < 0) {
+	/* O_NOFOLLOW: never create/write the cache destination through a
+	 * planted symlink; sendfile() below writes through this fd only. */
+	if ((output = orig_open(dest, O_CREAT | O_RDWR | O_NOFOLLOW)) < 0) {
 		return -1;
 	}
 
