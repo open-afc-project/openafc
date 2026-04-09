@@ -1,7 +1,7 @@
-import * as React from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { Stage, Layer, Text, Shape, Rect, Line } from 'react-konva';
 import { ChannelData } from '../Lib/RatApiTypes';
-import { KonvaEventObject } from 'konva/types/Node';
+import type { KonvaEventObject } from 'konva';
 
 /**
  * ChannelDisplay.tsx: Draws channel shapes on page and colors/labels them according to props
@@ -12,7 +12,7 @@ import { KonvaEventObject } from 'konva/types/Node';
  * Channel set up data
  *   If changes are made here they need to be made in SpectrumDisplay.tsx as well
  */
-const emptyChannels: ChannelData[] = [
+export const emptyChannels: ChannelData[] = [
   {
     channelWidth: 20,
     startFrequency: 5945,
@@ -197,10 +197,25 @@ const lines = Array(15).fill(0);
 /**
  * top level component that renders multiple rows of channels
  */
-const ChannelDisplay: React.FunctionComponent<ChannelDisplayProps> = (props) => {
+export const ChannelDisplay: React.FunctionComponent<ChannelDisplayProps> = (props) => {
   if (props.channels === undefined) return <></>;
 
   const scaleFactor = calcScaleFactor(props);
+  // Match SpectrumDisplay / recharts axis ticks (same token as SVG `tick` fill).
+  const [axisLabelColor, setAxisLabelColor] = useState('#151515');
+  useLayoutEffect(() => {
+    const read = () => {
+      const v = getComputedStyle(document.documentElement)
+        .getPropertyValue('--pf-t--global--text--color--regular')
+        .trim();
+      const dark = document.documentElement.classList.contains('pf-v6-theme-dark');
+      setAxisLabelColor(v || (dark ? '#c8c8c8' : '#151515'));
+    };
+    read();
+    const mo = new MutationObserver(read);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => mo.disconnect();
+  }, []);
   return (
     <Stage width={props.totalWidth} height={(props.channelHeight + 10) * props.channels.length + 150}>
       <Layer>
@@ -245,6 +260,7 @@ const ChannelDisplay: React.FunctionComponent<ChannelDisplayProps> = (props) => 
               rotation={-90}
               fontSize={14}
               verticalAlign="top"
+              fill={axisLabelColor}
               x={80 * scaleFactor * i}
               y={140 + (10 + props.channelHeight) * props.channels!.length}
             />
@@ -256,6 +272,7 @@ const ChannelDisplay: React.FunctionComponent<ChannelDisplayProps> = (props) => 
               rotation={-90}
               fontSize={14}
               verticalAlign="top"
+              fill={axisLabelColor}
               x={60 * 20 * scaleFactor}
               y={140 + (10 + props.channelHeight) * props.channels!.length}
             />,
@@ -276,4 +293,3 @@ const ChannelDisplay: React.FunctionComponent<ChannelDisplayProps> = (props) => 
   );
 };
 
-export { ChannelDisplay, emptyChannels };

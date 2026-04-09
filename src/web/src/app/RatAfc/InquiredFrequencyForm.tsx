@@ -1,6 +1,7 @@
-import * as React from 'react';
+import React from 'react';
 // import ReactTooltip from 'react-tooltip';
-import { Table, TableHeader, TableBody, TableVariant, TableProps } from '@patternfly/react-table';
+import { TableVariant } from '@patternfly/react-table';
+import { Table, TableHeader, TableBody } from '@patternfly/react-table/dist/esm/deprecated';
 import { GalleryItem, FormGroup, InputGroup, Radio, TextInput, InputGroupText, Button } from '@patternfly/react-core';
 import { FrequencyRange } from '../Lib/RatAfcTypes';
 /** InquiredFrequencyFormParams.tsx - Form component to display and create the list of frequency
@@ -109,8 +110,8 @@ export class InquiredFrequencyForm extends React.PureComponent<
                 name={'band-lower-'}
                 value={!this.state.newLowFreq ? '' : this.state.newLowFreq}
                 style={{ textAlign: 'right' }}
-                isValid={!this.state.newLowFreq || this.state.newLowFreq > 0}
-                onChange={(data) => this.setState({ newLowFreq: Number(data) })}
+                validated={!this.state.newLowFreq || this.state.newLowFreq > 0 ? 'default' : 'error'}
+                onChange={(_event, data) => this.setState({ newLowFreq: Number(data) })}
               />
 
               <TextInput
@@ -120,8 +121,8 @@ export class InquiredFrequencyForm extends React.PureComponent<
                 name={'band-upper-'}
                 value={!this.state.newHighFreq ? '' : this.state.newHighFreq}
                 style={{ textAlign: 'right' }}
-                isValid={!this.state.newHighFreq || this.state.newHighFreq > this.state.newLowFreq}
-                onChange={(data) => this.setState({ newHighFreq: Number(data) })}
+                validated={!this.state.newHighFreq || this.state.newHighFreq > this.state.newLowFreq ? 'default' : 'error'}
+                onChange={(_event, data) => this.setState({ newHighFreq: Number(data) })}
                 className="upperInline"
               />
 

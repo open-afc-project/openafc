@@ -44,9 +44,9 @@ async def get_message_processor() \
     if g_message_processor is None:
         db = \
             afc_server_db.AfcServerDb(
-                ratdb_dsn=settings.ratdb_dsn,
+                ratdb_dsn=str(settings.ratdb_dsn),
                 ratdb_password_file=settings.ratdb_password_file,
-                rcache_dsn=settings.rcache_dsn,
+                rcache_dsn=str(settings.rcache_dsn),
                 rcache_password_file=settings.rcache_password_file,
                 bypass_cert=settings.bypass_cert,
                 bypass_rcache=settings.bypass_rcache,
@@ -54,7 +54,7 @@ async def get_message_processor() \
                     settings.afc_state_vendor_extensions))
         compute = \
             afc_server_compute.AfcServerCompute(
-                rmq_dsn=settings.rmq_dsn,
+                rmq_dsn=str(settings.rmq_dsn),
                 rmq_password_file=settings.rmq_password_file,
                 engine_request_type=settings.engine_request_type,
                 worker_mnt_root=settings.static_data_root or

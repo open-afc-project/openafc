@@ -1,19 +1,7 @@
-import * as React from 'react';
-import { AFCConfigFile, RatResponse } from '../Lib/RatApiTypes';
-import {
-  CardBody,
-  PageSection,
-  Card,
-  CardHead,
-  TextInput,
-  Alert,
-  AlertActionCloseButton,
-} from '@patternfly/react-core';
-import DownloadContents from '../Components/DownloadContents';
-import { exportCache, putAfcConfigFile, importCache, guiConfig } from '../Lib/RatApi';
-import { logger } from '../Lib/Logger';
+import React from 'react';
+import { CardBody, PageSection, Card, CardHeader, CardTitle } from '@patternfly/react-core';
 
-export class Replay extends React.Component {
+export class Replay extends React.Component<any, any> {
   state = {
     data: '',
     analysisType: '',
@@ -21,7 +9,7 @@ export class Replay extends React.Component {
     response: '',
   };
 
-  constructor(props) {
+  constructor(props: any) {
     super(props);
   }
 
@@ -45,14 +33,11 @@ export class Replay extends React.Component {
     return (
       <PageSection>
         <Card>
-          <CardHead>Export</CardHead>
+          <CardHeader><CardTitle>Export</CardTitle></CardHeader>
           <CardBody>
             <button onClick={() => this.Replay()}>Replay</button>
             <br />
             <p>{this.state.response}</p>
-            {console.log(this.state.data)}
-            {console.log(this.state.location)}
-            {console.log(this.state.response)}
             <br />
           </CardBody>
         </Card>
@@ -60,3 +45,5 @@ export class Replay extends React.Component {
     );
   }
 }
+
+export const ReplayPage = () => <Replay />;

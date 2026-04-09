@@ -88,7 +88,7 @@ class RcacheRmqConnection:
             self._channel.basic_publish(
                 exchange=RCACHE_RMQ_EXCHANGE_NAME, routing_key=self._queue_name,
                 body=RmqReqRespKey(
-                    afc_resp=response, req_cfg_digest=req_cfg_digest).json(),
+                    afc_resp=response, req_cfg_digest=req_cfg_digest).model_dump_json(),
                 properties=pika.BasicProperties(
                     content_type="application/json",
                     delivery_mode=pika.DeliveryMode.Transient),
@@ -125,7 +125,7 @@ class RcacheRmqConnection:
                     self._channel.consume(
                         queue=self._queue_name, auto_ack=True, exclusive=True):
                 try:
-                    rrk = RmqReqRespKey.parse_raw(body)
+                    rrk = RmqReqRespKey.model_validate_json(body)
                 except pydantic.ValidationError as ex:
                     LOGGER.error(f"Decode error on AFC Response Info "
                                  f"arrived from Worker: {ex}")

@@ -74,8 +74,7 @@ http {
 
         add_header X-Content-Type-Options nosniff;
         add_header X-Frame-Options "SAMEORIGIN";
-        add_header Content-Security-Policy  "script-src 'self' 'unsafe-eval' https://maps.googleapis.com https://code.jquery.com https://netdna.bootstrapcdn.com/bootstrap https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; style-src 'self' https://fonts.googleapis.com https://netdna.bootstrapcdn.com https://www.gstatic.com/recaptcha/ 'unsafe-inline'";
-        add_header X-XSS-Protection "1; mode=block";
+        add_header Content-Security-Policy  "script-src 'self' 'unsafe-eval' https://maps.googleapis.com https://code.jquery.com https://netdna.bootstrapcdn.com/bootstrap https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://cdn.cookielaw.org/ https://*.cookielaw.org/ 'sha256-uBBX2ol+XLa1cg+s2JIofRLVhyW3vzh04cebQIjgxXs=' 'sha256-iqOPaRlwwgtNy7J3vh/+LSW9/QVdN+Fl+YfMS8+GcPo=' 'sha256-zBC1179gsXAejqjjWOPyA9XBs4GAy4/sSApN6zUWwKc=' 'sha256-OALJd05VA6plD3fgIbugfhVZISrpVnS6yvmHPyBLmmg='; style-src 'self' https://fonts.googleapis.com https://netdna.bootstrapcdn.com https://www.gstatic.com/recaptcha/ https://cdn.cookielaw.org/ https://*.cookielaw.org/ 'unsafe-inline'; connect-src 'self' https://cdn.cookielaw.org/ https://*.cookielaw.org/; frame-src https://www.google.com/recaptcha/ https://recaptcha.google.com/ https://cdn.cookielaw.org/ https://*.cookielaw.org/; img-src 'self' https://cdn.cookielaw.org/ https://*.cookielaw.org/ data:";        add_header X-XSS-Protection "1; mode=block";
         add_header Referrer-Policy "strict-origin-when-cross-origin";
         add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=(), fullscreen=(self), sync-xhr=(), magnetometer=(), gyroscope=(), accelerometer=(), usb=(), autoplay=(), midi=(), encrypted-media=(), xr-spatial-tracking=()";
 
@@ -281,6 +280,10 @@ http {
             proxy_redirect /podman/ /fbrat/cadvisor/podman/;
         }
 
+        # RabbitMQ has management.path_prefix = /fbrat/rabbitmq in rabbitmq.conf,
+        # so it serves at /fbrat/rabbitmq/ and expects the full URI to be passed.
+        # Using $request_uri (like Grafana) avoids the redirect loop caused by
+        # stripping the prefix.
         location /fbrat/rabbitmq {
             auth_request /fbrat/_admin_check;
             error_page 401 = @auth_redirect;
@@ -290,17 +293,26 @@ http {
             proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header Authorization "Basic Y2VsZXJ5OmNlbGVyeQ==";
+            proxy_set_header Authorization "Basic ${RABBITMQ_BASIC_AUTH}";
             proxy_set_header Accept-Encoding "";
-            sub_filter '</head>' '<script>if(!localStorage.getItem("credentials")){localStorage.setItem("credentials","Y2VsZXJ5OmNlbGVyeQ==");localStorage.setItem("auth-scheme","Basic");location.reload();}</script></head>';
+            sub_filter '<head>' '<head><script>document.addEventListener(\"DOMContentLoaded\",function(){if(typeof set_basic_auth===\"function\"&&typeof has_auth_credentials===\"function\"&&!has_auth_credentials()){set_basic_auth(\"${RABBITMQ_USER}\",\"${RABBITMQ_PASSWORD}\");}});</script>';
             sub_filter_once on;
             sub_filter_types text/html;
             proxy_hide_header Content-Security-Policy;
+            proxy_hide_header WWW-Authenticate;
             add_header Content-Security-Policy  "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
             proxy_pass http://rabbitmq$request_uri;
             proxy_redirect http:// $scheme://;
         }
         # MONITORING_END
+
+        location = /fbrat/www/ {
+            return 301 $scheme://$http_host/fbrat/www/index.html;
+        }
+
+        location = /fbrat/www {
+            return 301 $scheme://$http_host/fbrat/www/index.html;
+        }
 
         location / {
             if ($request_uri = "/") {

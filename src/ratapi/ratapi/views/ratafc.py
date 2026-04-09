@@ -31,7 +31,6 @@ import werkzeug.exceptions
 import threading
 import inspect
 from typing import NamedTuple, Optional
-import six
 from appcfg import RatafcMsghndCfgIface, AFC_RATAPI_LOG_LEVEL
 from hchecks import RmqHealthcheck
 from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, \

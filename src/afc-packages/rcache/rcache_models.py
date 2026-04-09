@@ -14,6 +14,11 @@ import datetime
 import enum
 import json
 import pydantic
+from pydantic import ConfigDict
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    pass
 try:
     import sqlalchemy as sa
 except ImportError:
@@ -50,20 +55,17 @@ class IfDbExists(enum.Enum):
     clean = "clean"
 
 
-class RcacheServiceSettings(pydantic.BaseSettings):
+class RcacheServiceSettings(BaseSettings):
     """ Rcache service parameters, passed via environment """
 
-    class Config:
-        """ Metainformation """
-        # Prefix of environment variables
-        env_prefix = "RCACHE_"
+    model_config = ConfigDict(env_prefix="RCACHE_")
 
     enabled: bool = \
         pydantic.Field(
             True, title="Rcache enabled (False for legacy file-based cache")
 
     port: int = pydantic.Field(..., title="Port this service listens on",
-                               env="RCACHE_CLIENT_PORT")
+                               validation_alias="RCACHE_CLIENT_PORT")
     postgres_dsn: pydantic.PostgresDsn = \
         pydantic.Field(
             ...,
@@ -74,7 +76,7 @@ class RcacheServiceSettings(pydantic.BaseSettings):
     db_creator_url: Optional[pydantic.AnyHttpUrl] = \
         pydantic.Field(
             None, title="REST API URL for Postgres database creation",
-            env="AFC_DB_CREATOR_URL")
+            validation_alias="AFC_DB_CREATOR_URL")
     alembic_config: Optional[str] = \
         pydantic.Field(
             None,
@@ -110,8 +112,8 @@ class RcacheServiceSettings(pydantic.BaseSettings):
         pydantic.Field(
             None, description="Keyhole shape PostGIS template file")
 
+    @pydantic.model_validator(mode="before")
     @classmethod
-    @pydantic.root_validator(pre=True)
     def _remove_empty(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """ Removes empty entries """
         for key in list(values.keys()):
@@ -120,20 +122,16 @@ class RcacheServiceSettings(pydantic.BaseSettings):
         return values
 
 
-class RcacheClientSettings(pydantic.BaseSettings):
+class RcacheClientSettings(BaseSettings):
     """ Parameters of Rcache clients in various services, passed via
     environment """
-    class Config:
-        """ Metainformation """
-        # Prefix of environment variables
-        env_prefix = "RCACHE_"
 
-        @classmethod
-        def parse_env_var(cls, field_name: str, raw_val: str) -> Any:
-            """ Parses string list environment variable(s) """
-            if field_name == "afc_state_vendor_extensions":
-                return [x for x in raw_val.split(",") if x]
-            return cls.json_loads(raw_val)
+    model_config = ConfigDict(env_prefix="RCACHE_")
+
+    @classmethod
+    def settings_customise_sources(cls, settings_cls, **kwargs):
+        """ Custom env parsing for comma-separated list fields """
+        return super().settings_customise_sources(settings_cls, **kwargs)
 
     enabled: bool = \
         pydantic.Field(
@@ -163,15 +161,21 @@ class RcacheClientSettings(pydantic.BaseSettings):
             None,
             description="List of Set of vendor extensions from previously "
             "computed invalidated AFC response to be sent to AFC Engine",
-            env="AFC_STATE_VENDOR_EXTENSIONS")
+            validation_alias="AFC_STATE_VENDOR_EXTENSIONS")
 
+    @pydantic.model_validator(mode="before")
     @classmethod
-    @pydantic.root_validator(pre=True)
     def _remove_empty(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        """ Removes empty entries """
+        """ Removes empty entries and coerces comma-separated strings to
+        lists for list-typed fields """
         for key in list(values.keys()):
             if values[key] == "":
                 del values[key]
+        for key in ("afc_state_vendor_extensions",
+                    "AFC_STATE_VENDOR_EXTENSIONS"):
+            val = values.get(key)
+            if isinstance(val, str):
+                values[key] = [s.strip() for s in val.split(",") if s.strip()]
         return values
 
     def validate_for(self, db: bool = False, rmq: bool = False,
@@ -268,8 +272,8 @@ class Beam(pydantic.BaseModel):
             title="True WGS84 azimuth from RX to TX. Absent if TX position is "
             "specified")
 
+    @pydantic.model_validator(mode="before")
     @classmethod
-    @pydantic.root_validator()
     def one_definition(cls, v: Dict[str, Any]) -> Dict[str, Any]:
         """ Verifies that direction to TX specified in exactly one way """
         if (v.get("tx_lat") is None) != (v.get("tx_lon") is None):
@@ -278,6 +282,7 @@ class Beam(pydantic.BaseModel):
         if (v.get("tx_lat") is None) == (v.get("azimuth_to_tx") is None):
             raise ValueError("Either TX position or azimuth to TX (but not "
                              "both) should be specified")
+        return v
 
     def short_str(self) -> str:
         """ Condensed string representation """
@@ -371,7 +376,7 @@ class AfcReqDeviceDescriptor(pydantic.BaseModel):
     serialNumber: str = \
         pydantic.Field(..., title="Device serial number")
     certificationId: List[AfcReqCertificationId] = \
-        pydantic.Field(..., min_items=1, title="Device certifications")
+        pydantic.Field(..., min_length=1, title="Device certifications")
 
 
 class AFcReqPoint(pydantic.BaseModel):
@@ -390,7 +395,7 @@ class AfcReqEllipse(pydantic.BaseModel):
 class AfcReqLinearPolygon(pydantic.BaseModel):
     """ Interesting part of AFC Request's LinearPolygon structure """
     outerBoundary: List[AFcReqPoint] = \
-        pydantic.Field(..., title="List of vertices", min_items=1)
+        pydantic.Field(..., title="List of vertices", min_length=1)
 
 
 class AfcReqRadialPolygon(pydantic.BaseModel):
@@ -407,8 +412,8 @@ class AfcReqLocation(pydantic.BaseModel):
     radialPolygon: Optional[AfcReqRadialPolygon] = \
         pydantic.Field(None, title="Optional radial polygon descriptor")
 
+    @pydantic.model_validator(mode="before")
     @classmethod
-    @pydantic.root_validator()
     def one_definition(cls, v: Dict[str, Any]) -> Dict[str, Any]:
         """ Verifies that exactly one type of AP location is specified """
         if ((0 if v.get("ellipse") is None else 1) +
@@ -454,7 +459,7 @@ class AfcReqAvailableSpectrumInquiryRequestMessage(pydantic.BaseModel):
     AvailableSpectrumInquiryRequestMessage structure """
     availableSpectrumInquiryRequests: \
         List[AfcReqAvailableSpectrumInquiryRequest] = \
-        pydantic.Field(..., min_items=1, max_items=1,
+        pydantic.Field(..., min_length=1, max_length=1,
                        title="Single element list of requests")
 
 
@@ -475,8 +480,8 @@ class AfcRespAvailableSpectrumInquiryResponse(pydantic.BaseModel):
             "if response unsuccessful")
     response: AfcRespResponse = pydantic.Field(None, title="Response status")
 
+    @pydantic.field_validator('availabilityExpireTime')
     @classmethod
-    @pydantic.validator('availabilityExpireTime')
     def check_expiration_time_format(cls, v: Optional[str]) -> Optional[str]:
         """ Checks validity of 'availabilityExpireTime' """
         if v is not None:
@@ -489,7 +494,7 @@ class AfcRespAvailableSpectrumInquiryResponseMessage(pydantic.BaseModel):
     AvailableSpectrumInquiryResponseMessage structure """
     availableSpectrumInquiryResponses: \
         List[AfcRespAvailableSpectrumInquiryResponse] = \
-        pydantic.Field(..., min_items=1, max_items=1,
+        pydantic.Field(..., min_length=1, max_length=1,
                        title="Single-element list of responses")
 
 
@@ -522,7 +527,7 @@ class ApDbPk(pydantic.BaseModel):
         if req_pydantic is None:
             assert req_str is not None
             req_pydantic = \
-                AfcReqAvailableSpectrumInquiryRequestMessage.parse_raw(req_str)
+                AfcReqAvailableSpectrumInquiryRequestMessage.model_validate_json(req_str)
         first_request = req_pydantic.availableSpectrumInquiryRequests[0]
         return \
             ApDbPk(
@@ -567,19 +572,19 @@ class ApDbRecord(pydantic.BaseModel):
         if "sqlalchemy" not in sys.modules:
             raise RuntimeError("'sqlalchemy' module not imported")
         resp = \
-            AfcRespAvailableSpectrumInquiryResponseMessage.parse_raw(
+            AfcRespAvailableSpectrumInquiryResponseMessage.model_validate_json(
                 rrk.afc_resp).availableSpectrumInquiryResponses[0]
         if resp.response.responseCode != 0:
             return None
         req_pydantic = \
-            AfcReqAvailableSpectrumInquiryRequestMessage.parse_raw(
+            AfcReqAvailableSpectrumInquiryRequestMessage.model_validate_json(
                 rrk.afc_req)
         pk = ApDbPk.from_req(req_pydantic=req_pydantic)
         center = \
             req_pydantic.availableSpectrumInquiryRequests[0].location.center()
         return \
             ApDbRecord(
-                **pk.dict(),
+                **pk.model_dump(),
                 state=ApDbRespState.Valid.name,
                 config_ruleset=resp.rulesetId,
                 coordinates=sa.text(

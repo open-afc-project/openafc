@@ -1,9 +1,9 @@
-import * as React from 'react';
-import { Redirect, Route, RouteComponentProps, Switch } from 'react-router-dom';
+import React from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { DynamicImport } from './DynamicImport';
 import { NotFound } from './NotFound/NotFound';
 import { Dashboard } from './Dashboard/Dashboard';
-import { PageSection, Card, CardHeader } from '@patternfly/react-core';
+import { PageSection, Card, CardBody } from '@patternfly/react-core';
 import {
   getAfcConfigFile,
   getAllowedRanges,
@@ -20,16 +20,14 @@ import { Replay } from './Replay/Replay';
 import { getLastUsedRegionFromCookie } from './Lib/Utils';
 import { hasRole, isLoggedIn } from './Lib/User';
 
-/**
- * routes.tsx: definition of app routes
- * author: Sam Smucny
- */
+const LoadingCard = () => (
+  <PageSection>
+    <Card>
+      <CardBody>Loading...</CardBody>
+    </Card>
+  </PageSection>
+);
 
-// these define dynamic modules which use the DynamicImport module to load routes
-
-/**
- * Helper
- */
 const getSupportModuleAsync = () => {
   return () => import(/* webpackChunkName: "support" */ './Support/Support');
 };
@@ -37,15 +35,7 @@ const Support = () => {
   return (
     <DynamicImport load={getSupportModuleAsync()}>
       {(Component: any) => {
-        return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
-        ) : (
-          <Component.Support />
-        );
+        return Component === null ? <LoadingCard /> : <Component.Support />;
       }}
     </DynamicImport>
   );
@@ -65,11 +55,7 @@ const RatAfc = () => {
     <DynamicImport load={getRatAfcModuleAsync()} resolve={ratAfcResolves()}>
       {(Component: any, resolve) => {
         return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
+          <LoadingCard />
         ) : (
           <Component.RatAfc afcConfig={resolve.conf} limit={resolve.limit} rulesetIds={resolve.rulesetIds} />
         );
@@ -92,11 +78,7 @@ const About = () => {
     <DynamicImport load={getAboutAfcModuleAsync()} resolve={ratAboutAfcResolves()}>
       {(Component: any, resolve) => {
         return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
+          <LoadingCard />
         ) : (
           <Component.About content={resolve.content} sitekey={resolve.sitekey} />
         );
@@ -112,15 +94,7 @@ const MobileAP = () => {
   return (
     <DynamicImport load={getMobileAPModuleAsync()}>
       {(Component: any) => {
-        return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
-        ) : (
-          <Component.MobileAP />
-        );
+        return Component === null ? <LoadingCard /> : <Component.MobileAP />;
       }}
     </DynamicImport>
   );
@@ -131,7 +105,7 @@ const getAfcConfigModuleAsync = () => {
 };
 
 const afcConfigResolves = async () => {
-  var lastRegFromCookie = getLastUsedRegionFromCookie();
+  const lastRegFromCookie = getLastUsedRegionFromCookie();
 
   return {
     conf: await getAfcConfigFile(lastRegFromCookie!),
@@ -147,11 +121,7 @@ const AFCConfig = () => {
     <DynamicImport load={getAfcConfigModuleAsync()} resolve={afcConfigResolves()}>
       {(Component: any, resolve) => {
         return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
+          <LoadingCard />
         ) : (
           <Component.AFCConfig
             limit={resolve.limit}
@@ -177,15 +147,7 @@ const Convert = () => {
   return (
     <DynamicImport load={getConvertModuleAsync()} resolve={convertResolves()}>
       {(Component: any, resolve) => {
-        return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
-        ) : (
-          <Component.Convert ulsFilesCsv={resolve.ulsFilesCsv} />
-        );
+        return Component === null ? <LoadingCard /> : <Component.Convert ulsFilesCsv={resolve.ulsFilesCsv} />;
       }}
     </DynamicImport>
   );
@@ -201,15 +163,7 @@ const ExclusionZone = () => {
   return (
     <DynamicImport load={getExclusionZoneModuleAsync()} resolve={limitResolves()}>
       {(Component: any, resolve) => {
-        return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
-        ) : (
-          <Component.ExclusionZone limit={resolve.limit} />
-        );
+        return Component === null ? <LoadingCard /> : <Component.ExclusionZone limit={resolve.limit} />;
       }}
     </DynamicImport>
   );
@@ -227,11 +181,7 @@ const HeatMap = () => {
     <DynamicImport load={getHeatMapModuleAsync()} resolve={heatMapResolves()}>
       {(Component: any, resolve) => {
         return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
+          <LoadingCard />
         ) : (
           <Component.HeatMap limit={resolve.limit} rulesetIds={resolve.rulesetIds} />
         );
@@ -254,11 +204,7 @@ const Admin = () => {
     <DynamicImport load={getAdminModuleAsync()} resolve={adminResolves()}>
       {(Component: any, resolve) => {
         return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
+          <LoadingCard />
         ) : (
           <Component.Admin
             users={resolve.users}
@@ -284,15 +230,7 @@ const MTLSPage = () => {
   return (
     <DynamicImport load={getMTLSModuleAsync()}>
       {(Component: any) => {
-        return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
-        ) : (
-          <Component.MTLSPage />
-        );
+        return Component === null ? <LoadingCard /> : <Component.MTLSPage />;
       }}
     </DynamicImport>
   );
@@ -306,36 +244,7 @@ const DRListPage = () => {
   return (
     <DynamicImport load={getDRListModuleAsync()} resolve={drResolves()}>
       {(Component: any, resolve) => {
-        return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
-        ) : (
-          <Component.DRListPage regions={resolve.regions} />
-        );
-      }}
-    </DynamicImport>
-  );
-};
-
-const getReplayModuleAsync = () => {
-  return () => import(/* webpackChunkName: "replay" */ './Replay/Replay');
-};
-const ReplayPage = () => {
-  return (
-    <DynamicImport load={getReplayModuleAsync()}>
-      {(Component: any) => {
-        return Component === null ? (
-          <PageSection>
-            <Card>
-              <CardHeader>Loading...</CardHeader>
-            </Card>
-          </PageSection>
-        ) : (
-          <Component.ReplayPage />
-        );
+        return Component === null ? <LoadingCard /> : <Component.DRListPage regions={resolve.regions} />;
       }}
     </DynamicImport>
   );
@@ -343,117 +252,68 @@ const ReplayPage = () => {
 
 export interface IAppRoute {
   label: string;
-  component: React.ComponentType<RouteComponentProps<any>> | React.ComponentType<any>;
+  component: React.ComponentType<any>;
   icon: any;
-  exact?: boolean;
   path: string;
 }
 
-// definition of app routes
 const routes: IAppRoute[] = [
-  {
-    component: Dashboard, // Currently empty
-    exact: true,
-    icon: null,
-    label: 'Dashboard',
-    path: '/dashboard',
-  },
-  {
-    component: AppLoginPage, // Currently empty
-    exact: true,
-    icon: null,
-    label: 'Login',
-    path: '/login',
-  },
-  {
-    component: Support, // currently empty
-    exact: true,
-    icon: null,
-    label: 'Support',
-    path: '/support', // not pointed to anywhere
-  },
-  {
-    component: UserAccountPage,
-    exact: true,
-    icon: null,
-    label: 'Account',
-    path: '/account',
-  },
-  {
-    component: About,
-    exact: true,
-    icon: null,
-    label: 'About AFC',
-    path: '/about',
-  },
+  { component: Dashboard, icon: null, label: 'Dashboard', path: '/dashboard' },
+  { component: AppLoginPage, icon: null, label: 'Login', path: '/login' },
+  { component: Support, icon: null, label: 'Support', path: '/support' },
+  { component: UserAccountPage, icon: null, label: 'Account', path: '/account' },
+  { component: About, icon: null, label: 'About AFC', path: '/about' },
 ];
 
 const AppRoutes = () => (
-  <Switch>
-    {routes.map(({ path, exact, component }, idx) => (
-      <Route path={path} exact={exact} component={component} key={idx} />
+  <Routes>
+    {routes.map(({ path, component: Component }, idx) => (
+      <Route path={path} element={<Component />} key={idx} />
     ))}
 
-    {isLoggedIn() && (hasRole('Trial') || hasRole('AP')) ? (
-      <Route path="/ap-afc" exact={true} component={RatAfc}></Route>
-    ) : (
-      <Route path="/ap-afc" exact={true} component={Dashboard}></Route>
-    )}
-
-    {isLoggedIn() && hasRole('AP') ? (
-      <Route path="/mobile-ap" exact={true} component={MobileAP}></Route>
-    ) : (
-      <Route path="/mobile-ap" exact={true} component={Dashboard}></Route>
-    )}
-
-    {isLoggedIn() && (hasRole('AP') || hasRole('Analysis') || hasRole('Admin')) ? (
-      <Route path="/afc-config" exact={true} component={AFCConfig}></Route>
-    ) : (
-      <Route path="/afc-config" exact={true} component={Dashboard}></Route>
-    )}
-
-    {isLoggedIn() && hasRole('Admin') ? (
-      <Route path="/convert" exact={true} component={Convert}></Route>
-    ) : (
-      <Route path="/convert" exact={true} component={Dashboard}></Route>
-    )}
-
-    {isLoggedIn() && hasRole('Analysis') ? (
-      <Route path="/exclusion-zone" exact={true} component={ExclusionZone}></Route>
-    ) : (
-      <Route path="/exclusion-zone" exact={true} component={Dashboard}></Route>
-    )}
-
-    {isLoggedIn() && hasRole('Analysis') ? (
-      <Route path="/heat-map" exact={true} component={HeatMap}></Route>
-    ) : (
-      <Route path="/heat-map" exact={true} component={Dashboard}></Route>
-    )}
-
-    {isLoggedIn() && hasRole('Admin') ? (
-      <Route path="/admin" exact={true} component={Admin}></Route>
-    ) : (
-      <Route path="/admin" exact={true} component={Dashboard}></Route>
-    )}
-
-    {isLoggedIn() && hasRole('Admin') ? (
-      <Route path="/mtls" exact={true} component={MTLSPage}></Route>
-    ) : (
-      <Route path="/mtls" exact={true} component={Dashboard}></Route>
-    )}
-
-    {isLoggedIn() && hasRole('Admin') ? (
-      <Route path="/deniedRules" exact={true} component={DRListPage}></Route>
-    ) : (
-      <Route path="/deniedRules" exact={true} component={Dashboard}></Route>
-    )}
-
-    <Route path="/replay" exact={true} component={Replay}></Route>
-    <Redirect exact={true} from="/" to="/dashboard" />
-    <Redirect exact={true} from="www" to="/dashboard" />
-    <Route component={Dashboard} />
-    <Route component={NotFound} />
-  </Switch>
+    <Route
+      path="/ap-afc"
+      element={isLoggedIn() && (hasRole('Trial') || hasRole('AP')) ? <RatAfc /> : <Dashboard />}
+    />
+    <Route
+      path="/mobile-ap"
+      element={isLoggedIn() && hasRole('AP') ? <MobileAP /> : <Dashboard />}
+    />
+    <Route
+      path="/afc-config"
+      element={
+        isLoggedIn() && (hasRole('AP') || hasRole('Analysis') || hasRole('Admin')) ? <AFCConfig /> : <Dashboard />
+      }
+    />
+    <Route
+      path="/convert"
+      element={isLoggedIn() && hasRole('Admin') ? <Convert /> : <Dashboard />}
+    />
+    <Route
+      path="/exclusion-zone"
+      element={isLoggedIn() && hasRole('Analysis') ? <ExclusionZone /> : <Dashboard />}
+    />
+    <Route
+      path="/heat-map"
+      element={isLoggedIn() && hasRole('Analysis') ? <HeatMap /> : <Dashboard />}
+    />
+    <Route
+      path="/admin"
+      element={isLoggedIn() && hasRole('Admin') ? <Admin /> : <Dashboard />}
+    />
+    <Route
+      path="/mtls"
+      element={isLoggedIn() && hasRole('Admin') ? <MTLSPage /> : <Dashboard />}
+    />
+    <Route
+      path="/deniedRules"
+      element={isLoggedIn() && hasRole('Admin') ? <DRListPage /> : <Dashboard />}
+    />
+    <Route path="/replay" element={<Replay />} />
+    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+    <Route path="/www" element={<Navigate to="/dashboard" replace />} />
+    <Route path="*" element={<Dashboard />} />
+  </Routes>
 );
 
 export { AppRoutes, routes };

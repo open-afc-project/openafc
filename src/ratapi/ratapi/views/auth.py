@@ -135,10 +135,11 @@ class LoginAPI(MethodView):
         next_url = flask.request.args.get('next')
         if next_url:
             flask.session['next'] = next_url
+        else:
+            flask.session.pop('next', None)
 
-        if 'app_state' not in flask.session:
-            flask.session['app_state'] = secrets.token_urlsafe(64)
-            flask.session['code_verifier'] = secrets.token_urlsafe(64)
+        flask.session['app_state'] = secrets.token_urlsafe(64)
+        flask.session['code_verifier'] = secrets.token_urlsafe(64)
         # calculate code challenge
         hashed = hashlib.sha256(
             flask.session['code_verifier'].encode('ascii')).digest()
@@ -168,6 +169,25 @@ class LoginAPI(MethodView):
         )
         response = flask.redirect(request_uri)
         return response
+
+
+_MONITORING_PREFIXES = (
+    '/fbrat/grafana/',
+    '/fbrat/prometheus/',
+    '/fbrat/cadvisor/',
+    '/fbrat/rabbitmq/',
+    '/fbrat/kafka-ui/',
+)
+
+
+def _sanitize_next_url(url):
+    """Redirect to the base UI path when the next URL points at an
+    internal API endpoint of a proxied monitoring service (e.g.
+    Grafana's /api/user/auth-tokens/rotate)."""
+    for prefix in _MONITORING_PREFIXES:
+        if url.startswith(prefix) and '/api/' in url:
+            return prefix
+    return url
 
 
 class CallbackAPI(MethodView):
@@ -290,6 +310,7 @@ class CallbackAPI(MethodView):
                           'from': flask.request.remote_addr,
                           'status': 'success'})
         next_url = flask.session.pop('next', None) or flask.url_for("root")
+        next_url = _sanitize_next_url(next_url)
         return flask.redirect(next_url)
 
 

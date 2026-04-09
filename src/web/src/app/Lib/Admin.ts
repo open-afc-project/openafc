@@ -16,7 +16,6 @@ import {
 import { logger } from './Logger';
 import { Role, retrieveUserData } from './User';
 import { Rect } from 'react-konva';
-import { Circle } from 'konva/types/shapes/Circle';
 import { RatResponse } from './RatApiTypes';
 
 /**

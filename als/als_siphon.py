@@ -1414,7 +1414,7 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
                     assert isinstance(key, int)
                     new_value_months.remove((value, month_idx))
                 for value_month in new_value_months:
-                    s = sa.select([self._table]).\
+                    s = sa.select(self._table).\
                         where(self._value_column == value_month[0])
                     result = self._adb.conn.execute(s).fetchall()
                     self._by_value[value_month] = \

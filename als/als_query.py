@@ -528,7 +528,7 @@ def do_log(args: Any) -> None:
     if args.sources:
         error_if(args.SELECT, "SELECT may not be specified with --sources")
         if args.topic:
-            s = sa.select([metadata.tables[args.topic].c.source]).\
+            s = sa.select(metadata.tables[args.topic].c.source).\
                 distinct().order_by(metadata.tables[args.topic].c.source)
             if args.max_count:
                 s = s.limit(args.max_count)
@@ -546,7 +546,7 @@ def do_log(args: Any) -> None:
                 for topic in sorted(metadata.tables.keys()):
                     if "source" not in metadata.tables[topic].c:
                         continue
-                    s = sa.select([metadata.tables[topic].c.source]).\
+                    s = sa.select(metadata.tables[topic].c.source).\
                         distinct().order_by(metadata.tables[topic].c.source)
                     if args.max_count is not None:
                         s = s.limit(args.max_count - printer.count)
@@ -2168,8 +2168,8 @@ def do_als(args: Any) -> None:
         columns = metadata.tables["decode_error"].c
         s = \
             apply_common_limits(
-                sa.select([columns.time, columns.code_line, columns.msg,
-                           columns.data]).order_by(columns.time),
+                sa.select(columns.time, columns.code_line, columns.msg,
+                           columns.data).order_by(columns.time),
                 args=args, time_column=columns.time)
         with engine.connect() as conn, \
                 Printer.factory(

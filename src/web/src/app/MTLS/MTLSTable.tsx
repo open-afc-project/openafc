@@ -1,6 +1,7 @@
-import * as React from 'react';
-import { headerCol, Table, TableVariant, TableHeader, TableBody } from '@patternfly/react-table';
-import { AccessPointModel, UserModel } from '../Lib/RatApiTypes';
+import React from 'react';
+import { TableVariant } from '@patternfly/react-table';
+import { Table, TableHeader, TableBody } from '@patternfly/react-table/dist/esm/deprecated';
+import { AccessPointModel, MTLSModel, UserModel } from '../Lib/RatApiTypes';
 
 /**
  * MTLS.tsx: Table that displays mtls certs. Shows org column if filterId is 0
@@ -24,7 +25,7 @@ interface MTLSTableProps {
  */
 export class MTLSTable extends React.Component<MTLSTableProps, {}> {
   private columns = [
-    { title: 'Certificate ID', cellTransforms: [headerCol()] },
+    { title: 'Certificate ID' },
     { title: 'Note' },
     { title: 'Created' },
   ];

@@ -386,7 +386,7 @@ class StateDb:
         Returns by-region dictionary of milestone timetags
         """
         table = self.metadata.tables[self.MILESTONE_TABLE_NAME]
-        sel = sa.select([table.c.region, table.c.timestamp]).\
+        sel = sa.select(table.c.region, table.c.timestamp).\
             where(table.c.milestone == milestone.name)
         rp = self._execute([sel])
         return {rec.region or None: rec.timestamp for rec in rp}
@@ -420,8 +420,8 @@ class StateDb:
         table = self.metadata.tables[self.ALARM_TABLE_NAME]
         rp = self._execute(
             [sa.select(
-                [table.c.alarm_type, table.c.alarm_reason,
-                 table.c.timestamp])])
+                table.c.alarm_type, table.c.alarm_reason,
+                table.c.timestamp)])
         return [AlarmInfo(alarm_type=AlarmType[rec.alarm_type],
                           alarm_reason=rec.alarm_reason,
                           timestamp=rec.timestamp)
@@ -453,7 +453,7 @@ class StateDb:
         Returns LogInfo object
         """
         table = self.metadata.tables[self.LOG_TABLE_NAME]
-        sel = sa.select([table.c.log_type, table.c.text, table.c.timestamp]).\
+        sel = sa.select(table.c.log_type, table.c.text, table.c.timestamp).\
             where(table.c.log_type == log_type.name)
         rp = self._execute([sel])
         row = rp.first()
@@ -488,8 +488,8 @@ class StateDb:
         Returns dictionary of CheckInfo items lists, indexed by check type
         """
         table = self.metadata.tables[self.CHECKS_TABLE]
-        sel = sa.select([table.c.check_type, table.c.check_item,
-                         table.c.errmsg, table.c.timestamp])
+        sel = sa.select(table.c.check_type, table.c.check_item,
+                         table.c.errmsg, table.c.timestamp)
         rp = self._execute([sel])
         ret: Dict[CheckType, List[CheckInfo]] = {}
         for rec in rp:

@@ -219,11 +219,11 @@ class MapContainer extends React.Component<MapProps> {
       this.props.styles
         ? (feature: any) => {
             const kind = feature.getProperty('kind');
-            // @ts-ignore
-            if (this.props.styles.has(kind))
-              // @ts-ignore
-              const style = this.props.styles.get(kind);
-            return style instanceof Function ? style(feature) : style;
+            if (this.props.styles!.has(kind)) {
+              const style = this.props.styles!.get(kind);
+              return style instanceof Function ? style(feature) : style;
+            }
+            return {};
           }
         : {},
     );

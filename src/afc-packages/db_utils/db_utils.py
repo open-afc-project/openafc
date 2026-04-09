@@ -61,7 +61,7 @@ def substitute_password(dsn: Optional[str] = None,
         return dsn
 
     # Substituting password
-    dsn_parts = urllib.parse.urlparse(dsn)
+    dsn_parts = urllib.parse.urlparse(str(dsn))
     netloc = ""
     replacement: Optional[str]
     for partname, separator, replacement in [("username", "", None),
@@ -79,7 +79,7 @@ def safe_dsn(dsn: Optional[str]) -> Optional[str]:
     if not dsn:
         return dsn
     try:
-        parsed = urllib.parse.urlparse(dsn)
+        parsed = urllib.parse.urlparse(str(dsn))
         if not parsed.password:
             return dsn
         return \

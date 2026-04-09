@@ -27,9 +27,12 @@ import threading
 import time
 from flask.views import MethodView
 import werkzeug.exceptions
-from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
+import uuid
+import hashlib
+from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO
 from afc_worker import run
 from fst import DataIf
+import afctask
 from ncli import MsgPublisher
 from hchecks import RmqHealthcheck, ObjstHealthcheck
 from ..util import AFCEngineException, require_default_uls, \
@@ -627,7 +630,6 @@ class Phase1Analysis(MethodView):
                      f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
         user_id = auth(roles=['Analysis'])
-        user = User.query.filter_by(id=user_id).first()
 
         args = flask.request.data
         LOGGER.debug("Running phase 1 analysis with params: %s", args)
@@ -636,36 +638,50 @@ class Phase1Analysis(MethodView):
                           'ExclusionZoneAnalysis', 'HeatmapAnalysis']
         if request_type not in valid_requests:
             raise werkzeug.exceptions.BadRequest('Invalid request type')
-        temp_dir = getQueueDirectory(
-            flask.current_app.config['TASK_QUEUE'], request_type)
-        request_file_path = os.path.join(temp_dir, 'analysisRequest.json.gz')
 
-        response_file_path = os.path.join(
-            temp_dir, 'analysisResponse.json.gz')
+        # Decode request body
+        request_str = args.decode('utf-8') if isinstance(args, bytes) else args
 
-        LOGGER.debug("Writing request file: %s", request_file_path)
-        with open(request_file_path, "wb") as fle:
-            fle.write(args)
-        LOGGER.debug("Request file written")
-
-        task = build_task(request_file_path, response_file_path,
-                          request_type, user_id, user, temp_dir)
-
-        if task.state == 'FAILURE':
+        # Retrieve AFC config from DB (use first available)
+        config = AFCConfig.query.first()
+        if config is None:
             raise werkzeug.exceptions.InternalServerError(
-                'Task was unable to be started', dict(
-                    id=task.id, info=str(
-                        task.info)))
+                'No AFC configuration found in database')
+        config_str = json.dumps(config.config)
+
+        # Generate unique task ID and request/config hash
+        task_id = str(uuid.uuid4())
+        hash_val = hashlib.md5(
+            (request_str + config_str).encode('utf-8')).hexdigest()
+        config_path = os.path.join("/afc_config", hash_val, "afc_config.json")
+
+        dataif = DataIf()
+
+        # Write request and config to object storage
+        with dataif.open(
+                os.path.join("/responses", hash_val,
+                             "analysisRequest.json")) as hfile:
+            hfile.write(request_str)
+        with dataif.open(config_path) as hfile:
+            hfile.write(config_str)
+
+        # RNTM_OPT_GUI enables KMZ/progress files; exclude RNTM_OPT_DBG because
+        # history_dir=None causes the worker to crash when debug mode is on
+        runtime_opts = RNTM_OPT_GUI | RNTM_OPT_AFCENGINE_HTTP_IO
+        build_task(dataif=dataif, request_type=request_type,
+                   task_id=task_id, hash_val=hash_val,
+                   config_path=config_path, history_dir=None,
+                   runtime_opts=runtime_opts)
 
         include_kml = request_type in [
             'ExclusionZoneAnalysis', 'PointAnalysis']
 
         return flask.jsonify(
-            taskId=task.id,
+            taskId=task_id,
             statusUrl=flask.url_for(
-                'ratapi-v1.AnalysisStatus', task_id=task.id),
+                'ratapi-v1.AnalysisStatus', task_id=task_id),
             kmlUrl=(flask.url_for('ratapi-v1.AnalysisKmlResult',
-                                  task_id=task.id) if include_kml else None)
+                                  task_id=task_id) if include_kml else None)
         )
 
 
@@ -694,25 +710,26 @@ class AnalysisKmlResult(MethodView):
         LOGGER.debug(f"({threading.get_native_id()})"
                      f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
-        task = run.AsyncResult(task_id)
-        LOGGER.debug('state: %s', task.state)
+        dataif = DataIf()
+        task = afctask.Task(task_id, dataif)
+        stat = task.get()
 
-        if task.successful() and task.result['status'] == 'DONE':
-            if not os.path.exists(task.result['result_path']):
-                return flask.make_response(flask.json.dumps(
-                    dict(message='Resource already deleted')), 410)
-            if 'kml_path' not in task.result or not os.path.exists(
-                    task.result['kml_path']):
-                return werkzeug.exceptions.NotFound(
-                    'This task did not produce a KML')
-            resp = flask.make_response()
-            LOGGER.debug("Reading kml file: %s", task.result['kml_path'])
-            with self._open(task.result['kml_path'], 'rb') as resp_file:
-                resp.data = resp_file.read()
-            resp.content_type = 'application/octet-stream'
-            return resp
+        if stat['status'] != afctask.Task.STAT_SUCCESS:
+            raise werkzeug.exceptions.NotFound('KML not found')
 
-        raise werkzeug.exceptions.NotFound('KML not found')
+        try:
+            with dataif.open(
+                    os.path.join("/responses", task_id, "results.kmz")) \
+                    as hfile:
+                kml_data = hfile.read()
+        except Exception:
+            raise werkzeug.exceptions.NotFound(
+                'This task did not produce a KML')
+
+        resp = flask.make_response()
+        resp.data = kml_data
+        resp.content_type = 'application/octet-stream'
+        return resp
 
 
 class AnalysisStatus(MethodView):
@@ -739,116 +756,58 @@ class AnalysisStatus(MethodView):
         LOGGER.debug(f"({threading.get_native_id()})"
                      f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
-        task = run.AsyncResult(task_id)
+        dataif = DataIf()
+        task = afctask.Task(task_id, dataif)
+        stat = task.get()
+        status = stat['status']
 
-        LOGGER.debug('state: %s', task.state)
+        LOGGER.debug('task status: %s', status)
 
-        if task.info and task.info.get('progress_file') is not None and \
-                not os.path.exists(os.path.dirname(task.info['progress_file'])):
-            return flask.make_response(flask.json.dumps(
-                dict(percent=0, message="Try Again")), 503)
+        if status in (afctask.Task.STAT_PENDING, afctask.Task.STAT_PROGRESS):
+            return flask.make_response(
+                flask.json.dumps(dict(percent=0, message='In progress...')),
+                202)
 
-        if task.state == 'PROGRESS':
-            auth(is_user=task.info['user_id'])
-            # get progress and ETA
-            if not os.path.exists(task.info['progress_file']):
-                return flask.jsonify(
-                    percent=0,
-                    message='Initializing...'
-                ), 202
-            progress_file = task.info['progress_file']
-            with open(progress_file, 'r') as prog:
-                lines = prog.readlines()
-                if len(lines) <= 0:
-                    return flask.make_response(flask.json.dumps(
-                        dict(percent=0, message="Try Again")), 503)
-                LOGGER.debug(lines)
-                return flask.jsonify(
-                    percent=float(lines[0]),
-                    message=lines[1],
-                ), 202
+        if status == afctask.Task.STAT_FAILURE:
+            error_data = None
+            try:
+                with dataif.open(
+                        os.path.join("/responses", task_id,
+                                     "engine-error.txt")) as hfile:
+                    error_data = hfile.read().decode("utf-8", errors="replace")
+            except Exception:
+                pass
+            raise AFCEngineException(
+                description=error_data or 'Task execution failed',
+                exit_code=stat.get('exit_code', -1))
 
-        if not task.ready():
-            return flask.make_response(flask.json.dumps(
-                dict(percent=0, message='Pending...')), 202)
-
-        if task.failed():
-            raise werkzeug.exceptions.InternalServerError(
-                'Task execution failed')
-
-        if task.successful() and task.result['status'] == 'DONE':
-            auth(is_user=task.result['user_id'])
-            if not os.path.exists(task.result['result_path']):
-                return flask.make_response(flask.json.dumps(
-                    dict(message='Resource already deleted')), 410)
-            # read temporary file generated by afc-engine
+        if status == afctask.Task.STAT_SUCCESS:
+            hash_val = stat.get('hash')
+            if not hash_val:
+                raise werkzeug.exceptions.InternalServerError(
+                    'No result hash in task status')
             resp = flask.make_response()
-            LOGGER.debug("Reading result file: %s", task.result['result_path'])
-            with self._open(task.result['result_path'], 'rb') as resp_file:
-                resp.data = resp_file.read()
+            with dataif.open(
+                    os.path.join("/responses", hash_val,
+                                 "analysisResponse.json.gz")) as hfile:
+                resp.data = hfile.read()
             resp.content_type = 'application/json'
             resp.content_encoding = "gzip"
             return resp
 
-        elif task.successful() and task.result['status'] == 'ERROR':
-            auth(is_user=task.result['user_id'])
-            if not os.path.exists(task.result['error_path']):
-                return flask.make_response(flask.json.dumps(
-                    dict(message='Resource already deleted')), 410)
-            # read temporary file generated by afc-engine
-            LOGGER.debug("Reading error file: %s", task.result['error_path'])
-            with self._open(task.result['error_path'], 'rb') as error_file:
-                raise AFCEngineException(
-                    description=error_file.read(),
-                    exit_code=task.result['exit_code'])
-
-        else:
-            raise werkzeug.exceptions.NotFound('Task not found')
+        raise werkzeug.exceptions.NotFound('Task not found')
 
     def delete(self, task_id):
         ''' DELETE method for Analysis Status '''
 
-        task = run.AsyncResult(task_id)
-
-        if not task.ready():
-            # task is still running, terminate it
-            LOGGER.debug('Terminating %s', task_id)
-            task.revoke(terminate=True)
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
-
-        if task.failed():
+        dataif = DataIf()
+        task = afctask.Task(task_id, dataif)
+        try:
             task.forget()
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
-
-        if task.successful() and task.result['status'] == 'DONE':
-            auth(is_user=task.result['user_id'])
-            if not os.path.exists(task.info['result_path']):
-                return flask.make_response(flask.json.dumps(
-                    dict(message='Resource already deleted')), 410)
-            LOGGER.debug('Deleting %s', task.info.get('result_path'))
-            os.remove(task.info['result_path'])
-            if 'kml_path' in task.info and os.path.exists(
-                    task.info['kml_path']):
-                os.remove(task.info['kml_path'])
-            task.forget()
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
-
-        elif task.successful() and task.result['status'] == 'ERROR':
-            auth(is_user=task.result['user_id'])
-            if not os.path.exists(task.info['error_path']):
-                return flask.make_response(flask.json.dumps(
-                    dict(message='Resource already deleted')), 410)
-            LOGGER.debug('Deleting %s', task.info.get('result_path'))
-            os.remove(task.info['error_path'])
-            task.forget()
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
-
-        else:
-            raise werkzeug.exceptions.NotFound('Task not found')
+        except Exception:
+            pass
+        return flask.make_response(flask.json.dumps(
+            dict(message='Task deleted')), 200)
 
 
 class UlsDb(MethodView):

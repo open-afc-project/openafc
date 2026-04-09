@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import { PageSection, Title, Alert } from '@patternfly/react-core';
 import { AFCForm } from './AFCForm';
 import { AFCConfigFile, FreqRange, RatResponse } from '../Lib/RatApiTypes';
@@ -166,7 +166,7 @@ class AFCConfig extends React.Component<
   render() {
     return (
       <PageSection>
-        <Title size={'lg'}>AFC Configuration</Title>
+        <Title headingLevel="h2">AFC Configuration</Title>
         {this.state.messageType === 'Warn' && (
           <Alert title={this.state.messageTitle} variant="warning">
             <pre>{this.state.messageValue}</pre>

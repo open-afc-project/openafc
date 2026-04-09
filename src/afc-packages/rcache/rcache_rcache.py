@@ -40,7 +40,7 @@ class RcacheRcache:
         with FailOnError(fail_on_error):
             try:
                 self._post(command="update",
-                           json=RcacheUpdateReq(req_resp_keys=rrks).dict())
+                           json=RcacheUpdateReq(req_resp_keys=rrks).model_dump())
             except pydantic.ValidationError as ex:
                 error(f"Invalid argument format: {ex}")
             return True
@@ -61,7 +61,7 @@ class RcacheRcache:
             try:
                 self._post(
                     command="invalidate",
-                    json=RcacheInvalidateReq(ruleset_ids=ruleset_ids).dict())
+                    json=RcacheInvalidateReq(ruleset_ids=ruleset_ids).model_dump())
             except pydantic.ValidationError as ex:
                 error(f"Invalid argument format: {ex}")
             return True
@@ -79,7 +79,7 @@ class RcacheRcache:
         with FailOnError(fail_on_error):
             try:
                 self._post(command="spatial_invalidate",
-                           json=RcacheSpatialInvalidateReq(tiles=tiles).dict())
+                           json=RcacheSpatialInvalidateReq(tiles=tiles).model_dump())
             except pydantic.ValidationError as ex:
                 error(f"Invalid argument format: {ex}")
             return True
@@ -98,7 +98,7 @@ class RcacheRcache:
             try:
                 self._post(
                     command="directional_invalidate",
-                    json=RcacheDirectionalInvalidateReq(beams=beams).dict())
+                    json=RcacheDirectionalInvalidateReq(beams=beams).model_dump())
             except pydantic.ValidationError as ex:
                 error(f"Invalid argument format: {ex}")
             return True

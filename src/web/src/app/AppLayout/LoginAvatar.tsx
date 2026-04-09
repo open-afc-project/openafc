@@ -1,63 +1,41 @@
-import * as React from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@patternfly/react-core';
-import { Route } from 'react-router';
-import { isLoggedIn, logout, login, UserContext } from '../Lib/User';
-import { UserIcon } from '@patternfly/react-icons';
-import { UnknownIcon } from '@patternfly/react-icons';
+import { SignInAltIcon, SignOutAltIcon } from '@patternfly/react-icons';
+import { isLoggedIn, UserContext, UserState } from '../Lib/User';
 import { guiConfig } from '../Lib/RatApi';
 
-/**
- * LoginAvatar.ts: component for top right of page to login/logout
- * author: Sam Smucny
- */
+const navLinkStyle: React.CSSProperties = {
+  color: 'var(--pf-t--global--text--color--regular, #000)',
+  textDecoration: 'none',
+  padding: '0 8px',
+  whiteSpace: 'nowrap',
+};
 
-/**
- * Icon that indicates login status. If clicked, it either
- * redirects to login page or logs out current user.
- */
-export class LoginAvatar extends React.Component {
-  private LoginUrl = () => {
-    if (!guiConfig.about_url) {
-      return (
-        <a href={guiConfig.login_url}>
-          <button className="button-blue" type="button">
-            {' '}
-            Login <UserIcon />
-          </button>
-        </a>
-      );
-    } else {
-      return (
-        <Route
-          render={({ history }) => (
-            <Button
-              variant="plain"
-              onClick={() => {
-                history.push('/login');
-              }}
-              aria-label="Login"
-            >
-              <UnknownIcon />
-              {' Login'}
-            </Button>
-          )}
-        />
-      );
-    }
-  };
+const LoginButton: React.FunctionComponent = () => {
+  const navigate = useNavigate();
 
-  render() {
-    const showLogin = this.LoginUrl();
-
-    const showLogout = (
-      <a href={guiConfig.logout_url}>
-        <button className="button-blue" type="button">
-          {' '}
-          Logout <UserIcon />
-        </button>
-      </a>
+  if (!guiConfig.about_url) {
+    return (
+      <Button variant="link" component="a" href={guiConfig.login_url} style={navLinkStyle} icon={<SignInAltIcon />} iconPosition="end">
+        Login
+      </Button>
     );
-
-    return <UserContext.Consumer>{(user) => (isLoggedIn() ? showLogout : showLogin)}</UserContext.Consumer>;
+  } else {
+    return (
+      <Button variant="link" style={navLinkStyle} onClick={() => navigate('/login')} icon={<SignInAltIcon />} iconPosition="end">
+        Login
+      </Button>
+    );
   }
-}
+};
+
+export const LoginAvatar: React.FunctionComponent = () => {
+  const showLogout = (
+    <Button variant="link" component="a" href={guiConfig.logout_url} style={navLinkStyle} icon={<SignOutAltIcon />} iconPosition="end">
+      Logout
+    </Button>
+  );
+
+  return <UserContext.Consumer>{(user: UserState) => (isLoggedIn() ? showLogout : <LoginButton />)}</UserContext.Consumer>;
+};

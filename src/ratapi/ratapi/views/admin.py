@@ -114,17 +114,12 @@ class User(MethodView):
             user.active = user_props.get("active", user.active)
             if "password" in user_props:
                 if flask.current_app.config["OIDC_LOGIN"]:
-                    # OIDC, password is never stored locally
-                    # Still we hash it so that if we switch back
-                    # to non OIDC, the hash still match, and can be logged in
                     from passlib.context import CryptContext
-
                     password_crypt_context = CryptContext(["bcrypt"])
                     pass_hash = password_crypt_context.encrypt(password_in)
                 else:
-                    pass_hash = (
-                        flask.current_app.user_manager.password_manager.hash_password(
-                            user_props["password"]))
+                    from flask_security import hash_password
+                    pass_hash = hash_password(user_props["password"])
                 user.password = pass_hash
             db.session.commit()  # pylint: disable=no-member
 

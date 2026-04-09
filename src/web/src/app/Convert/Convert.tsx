@@ -1,9 +1,10 @@
-import * as React from 'react';
+import React from 'react';
 import {
   PageSection,
   Title,
   Card,
   CardHeader,
+  CardTitle,
   CardBody,
   FormGroup,
   FormSelect,
@@ -17,14 +18,6 @@ import { logger } from '../Lib/Logger';
 import { ulsFileConvert } from '../Lib/RatApi';
 import { Timer } from '../Components/Timer';
 
-/**
- * Convert.tsx: Page where use can convert files on server
- * author: Sam Smucny
- */
-
-/**
- * Interface definition of `Convert` state
- */
 interface ConvertState {
   ulsSelect?: string;
   ulsFilesCsv: string[];
@@ -32,18 +25,7 @@ interface ConvertState {
   ulsMessage?: string;
 }
 
-/**
- * Page level component that allows a user to convert file formats
- */
-class Convert extends React.Component<
-  {
-    /**
-     * List of csv files that can be converted
-     */
-    ulsFilesCsv: RatResponse<string[]>;
-  },
-  ConvertState
-> {
+class Convert extends React.Component<{ ulsFilesCsv: RatResponse<string[]> }, ConvertState> {
   constructor(props: Readonly<{ ulsFilesCsv: RatResponse<string[]> }>) {
     super(props);
 
@@ -89,14 +71,14 @@ class Convert extends React.Component<
   render() {
     return (
       <PageSection>
-        <Title size={'lg'}>File Conversion</Title>
+        <Title headingLevel="h2">File Conversion</Title>
         <Card>
-          <CardHeader>ULS Conversion</CardHeader>
+          <CardHeader><CardTitle>ULS Conversion</CardTitle></CardHeader>
           <CardBody>
             <FormGroup label="ULS File" fieldId="horizontal-form-uls-db">
               <FormSelect
                 value={this.state.ulsSelect}
-                onChange={(s: string | undefined) => this.updateUls(s)}
+                onChange={(_event, s: string) => this.updateUls(s)}
                 id="horizontal-form-uls-db"
                 name="horizontal-form-uls-db"
                 style={{ textAlign: 'right' }}
@@ -118,10 +100,10 @@ class Convert extends React.Component<
                 <Alert
                   variant={this.state.ulsMessageType}
                   title={this.state.ulsMessageType.toUpperCase()}
-                  action={
-                    this.state.ulsMessageType !== 'info' && (
+                  actionClose={
+                    this.state.ulsMessageType !== 'info' ? (
                       <AlertActionCloseButton onClose={() => this.setState({ ulsMessageType: undefined })} />
-                    )
+                    ) : undefined
                   }
                 >
                   {this.state.ulsMessage}

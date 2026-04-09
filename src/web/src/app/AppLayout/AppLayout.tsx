@@ -1,263 +1,277 @@
-import * as React from 'react';
+import React from 'react';
 import '@patternfly/react-core/dist/styles/base.css';
-import { NavLink, withRouter } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import {
   Nav,
   NavList,
   NavItem,
-  NavItemSeparator,
-  NavVariants,
+  Divider,
   Page,
-  PageHeader,
+  Masthead,
+  MastheadMain,
+  MastheadBrand,
+  MastheadLogo,
+  MastheadContent,
+  MastheadToggle,
   PageSidebar,
+  PageSidebarBody,
+  PageToggleButton,
   SkipToContent,
+  Toolbar,
+  ToolbarContent,
+  ToolbarItem,
   Button,
-  Avatar,
+  Tooltip,
 } from '@patternfly/react-core';
+import { BarsIcon, MoonIcon, SunIcon } from '@patternfly/react-icons';
 import '@app/app.css';
 import { guiConfig } from '../Lib/RatApi';
 import { AppInfo } from './AppInfo';
 import { LoginAvatar } from './LoginAvatar';
 import { UserContext, isAdmin, UserState, hasRole, isLoggedIn } from '../Lib/User';
 
-/**
- * AppLayout.tsx: defines navigation regions and buttons on app (sidebar/ header)
- * author: Sam Smucny
- */
-
-/**
- * Interface definition common to app layouts
- */
 interface IAppLayout {
   children: React.ReactNode;
 }
 
-/**
- * Wrapper component used to render navigation
- * @param children Interior components to render
- */
+const THEME_KEY = 'pf-theme';
+const DARK_CLASS = 'pf-v6-theme-dark';
+
+const initDarkMode = (): boolean => {
+  const stored = localStorage.getItem(THEME_KEY);
+  if (stored !== null) return stored === 'dark';
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+};
+
 const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
-  const logoProps = {
-    href: '/',
-    target: '_self',
-  };
   const [isNavOpen, setIsNavOpen] = React.useState(true);
   const [isMobileView, setIsMobileView] = React.useState(true);
   const [isNavOpenMobile, setIsNavOpenMobile] = React.useState(false);
-  const onNavToggleMobile = () => {
-    setIsNavOpenMobile(!isNavOpenMobile);
+  const [isDark, setIsDark] = React.useState(initDarkMode);
+
+  React.useEffect(() => {
+    document.documentElement.classList.toggle(DARK_CLASS, isDark);
+  }, [isDark]);
+
+  const toggleTheme = () => {
+    setIsDark((prev) => {
+      const next = !prev;
+      localStorage.setItem(THEME_KEY, next ? 'dark' : 'light');
+      return next;
+    });
   };
-  const onNavToggle = () => {
-    setIsNavOpen(!isNavOpen);
-  };
-  const onPageResize = (props: { mobileView: boolean; windowSize: number }) => {
+
+  const onNavToggleMobile = () => setIsNavOpenMobile(!isNavOpenMobile);
+  const onNavToggle = () => setIsNavOpen(!isNavOpen);
+  const onPageResize = (_event: any, props: { mobileView: boolean; windowSize: number }) => {
     setIsMobileView(props.mobileView);
   };
 
-  const topNav = (
-    <Nav aria-label="Top navigation">
-      <NavList variant={NavVariants.horizontal}>
-        <UserContext.Consumer>
-          {(u: UserState) =>
-            isLoggedIn() ? (
-              <NavItem id="account-link" itemId="account-link">
-                <NavLink to="/account" activeClassName="pf-m-current">
-                  Account
-                </NavLink>
-              </NavItem>
-            ) : (
-              <NavItem style={{ display: 'none' }} aria-hidden="true" />
-            )
-          }
-        </UserContext.Consumer>
-        <UserContext.Consumer>
-          {(u: UserState) =>
-            isAdmin() ? (
-              <NavItem id="admin-link" itemId="admin-link">
-                <NavLink to="/admin" activeClassName="pf-m-current">
-                  Administrator
-                </NavLink>
-              </NavItem>
-            ) : (
-              <NavItem style={{ display: 'none' }} aria-hidden="true" />
-            )
-          }
-        </UserContext.Consumer>
-        <UserContext.Consumer>
-          {(u: UserState) =>
-            isAdmin() ? (
-              <NavItem id="mtls-link" itemId="mtls-link">
-                <NavLink to="/mtls" activeClassName="pf-m-current">
-                  MTLS
-                </NavLink>
-              </NavItem>
-            ) : (
-              <NavItem style={{ display: 'none' }} aria-hidden="true" />
-            )
-          }
-        </UserContext.Consumer>
-        <UserContext.Consumer>
-          {(u: UserState) =>
-            isAdmin() ? (
-              <NavItem id="dr-link" itemId="dr-link">
-                <NavLink to="/deniedRules" activeClassName="pf-m-current">
-                  Denied Rules
-                </NavLink>
-              </NavItem>
-            ) : (
-              <NavItem />
-            )
-          }
-        </UserContext.Consumer>
-      </NavList>
-    </Nav>
-  );
+  const navLinkClassName = ({ isActive }: { isActive: boolean }) => (isActive ? 'pf-m-current' : '');
 
-  const Header = (
-    <PageHeader
-      logo={guiConfig.app_name}
-      logoProps={logoProps}
-      topNav={topNav}
-      toolbar={guiConfig.version === 'API NOT LOADED' ? 'API NOT LOADED' : <AppInfo />}
-      showNavToggle={true}
-      isNavOpen={isNavOpen}
-      onNavToggle={isMobileView ? onNavToggleMobile : onNavToggle}
-      avatar={<LoginAvatar />}
-    />
-  );
-
-  // @ts-ignore
   const uls: any = (
     <a target="_blank" rel="noopener noreferrer" href={guiConfig.uls_url}>
       ULS Databases
     </a>
   );
-  // @ts-ignore
   const antenna: any = (
     <a target="_blank" rel="noopener noreferrer" href={guiConfig.antenna_url}>
       Antenna Patterns
     </a>
   );
-  // @ts-ignore
   const history: any = (
     <a target="_blank" rel="noopener noreferrer" href={guiConfig.history_url}>
       Debug Files
     </a>
   );
-  // @ts-ignore
 
   const showAbout = () => guiConfig.about_url;
 
+  const topNavLinkStyle: React.CSSProperties = {
+    color: 'var(--pf-t--global--text--color--regular, #000)',
+    textDecoration: 'none',
+    padding: '0 8px',
+    whiteSpace: 'nowrap',
+  };
+
+  const headerToolbar = (
+    <Toolbar id="header-toolbar" className="pf-m-align-items-center">
+      <ToolbarContent className="pf-m-align-items-center">
+        <UserContext.Consumer>
+          {(u: UserState) =>
+            isLoggedIn() ? (
+              <ToolbarItem>
+                <NavLink to="/account" className={navLinkClassName} style={topNavLinkStyle}>
+                  Account
+                </NavLink>
+              </ToolbarItem>
+            ) : null
+          }
+        </UserContext.Consumer>
+        <UserContext.Consumer>
+          {(u: UserState) =>
+            isAdmin() ? (
+              <ToolbarItem>
+                <NavLink to="/admin" className={navLinkClassName} style={topNavLinkStyle}>
+                  Administrator
+                </NavLink>
+              </ToolbarItem>
+            ) : null
+          }
+        </UserContext.Consumer>
+        <UserContext.Consumer>
+          {(u: UserState) =>
+            isAdmin() ? (
+              <ToolbarItem>
+                <NavLink to="/mtls" className={navLinkClassName} style={topNavLinkStyle}>
+                  MTLS
+                </NavLink>
+              </ToolbarItem>
+            ) : null
+          }
+        </UserContext.Consumer>
+        <UserContext.Consumer>
+          {(u: UserState) =>
+            isAdmin() ? (
+              <ToolbarItem>
+                <NavLink to="/deniedRules" className={navLinkClassName} style={topNavLinkStyle}>
+                  Denied Rules
+                </NavLink>
+              </ToolbarItem>
+            ) : null
+          }
+        </UserContext.Consumer>
+        <ToolbarItem>
+          <Tooltip content={isDark ? 'Switch to light theme' : 'Switch to dark theme'}>
+            <Button variant="plain" aria-label="Toggle theme" onClick={toggleTheme}>
+              {isDark ? <SunIcon /> : <MoonIcon />}
+            </Button>
+          </Tooltip>
+        </ToolbarItem>
+        <ToolbarItem>
+          {guiConfig.version === 'API NOT LOADED' ? 'API NOT LOADED' : <AppInfo />}
+        </ToolbarItem>
+        <ToolbarItem>
+          <LoginAvatar />
+        </ToolbarItem>
+      </ToolbarContent>
+    </Toolbar>
+  );
+
+  const masthead = (
+    <Masthead display={{ default: 'inline' }}>
+      <MastheadMain style={{ display: 'flex', alignItems: 'center' }}>
+        <MastheadToggle>
+          <PageToggleButton
+            variant="plain"
+            aria-label="Global navigation"
+            isNavOpen={isMobileView ? isNavOpenMobile : isNavOpen}
+            onNavToggle={isMobileView ? onNavToggleMobile : onNavToggle}
+            id="nav-toggle"
+          >
+            <BarsIcon />
+          </PageToggleButton>
+        </MastheadToggle>
+        <MastheadBrand style={{ display: 'flex', alignItems: 'center' }}>
+          <MastheadLogo component="a" href="/">{guiConfig.app_name}</MastheadLogo>
+        </MastheadBrand>
+      </MastheadMain>
+      <MastheadContent>{headerToolbar}</MastheadContent>
+    </Masthead>
+  );
+
   const Navigation = (
     <UserContext.Consumer>
-      {(user) => (
+      {(user: UserState) => (
         <Nav id="nav-primary-simple" aria-label="Primary navigation">
-          <NavList id="nav-list-simple" variant={NavVariants.simple}>
+          <NavList id="nav-list-simple">
             <NavItem id="dashboard-link" itemId={'dashboard'}>
-              <NavLink to="/dashboard" activeClassName="pf-m-current">
+              <NavLink to="/dashboard" className={navLinkClassName}>
                 Dashboard
               </NavLink>
             </NavItem>
-            <NavItemSeparator />
+            <Divider component="li" />
             {hasRole('Analysis') && (
               <NavItem id="exclusion-contour-link" itemId={'exclusion-contour'}>
-                <NavLink to="/exclusion-zone" activeClassName="pf-m-current">
+                <NavLink to="/exclusion-zone" className={navLinkClassName}>
                   Exclusion Zone Analysis
                 </NavLink>
               </NavItem>
             )}
             {hasRole('Analysis') && (
               <NavItem id="heat-map-link" itemId={'heat-map'}>
-                <NavLink to="/heat-map" activeClassName="pf-m-current">
+                <NavLink to="/heat-map" className={navLinkClassName}>
                   Heat Map Analysis
                 </NavLink>
               </NavItem>
             )}
             {hasRole('AP') && (
               <NavItem id="mobile-ap-link" itemId={'mobile-ap'}>
-                <NavLink to="/mobile-ap" activeClassName="pf-m-current">
+                <NavLink to="/mobile-ap" className={navLinkClassName}>
                   Mobile AP
                 </NavLink>
               </NavItem>
             )}
             {(hasRole('AP') || hasRole('Trial')) && (
               <NavItem id="ap-afc-link" itemId={'ap-afc'}>
-                <NavLink to="/ap-afc" activeClassName="pf-m-current">
+                <NavLink to="/ap-afc" className={navLinkClassName}>
                   Virtual AP
                 </NavLink>
               </NavItem>
             )}
             {(hasRole('AP') || hasRole('Analysis') || hasRole('Admin')) && (
               <NavItem id="AFCConfig-link" itemId={'afc-config'}>
-                <NavLink to="/afc-config" activeClassName="pf-m-current">
+                <NavLink to="/afc-config" className={navLinkClassName}>
                   AFC Config
                 </NavLink>
               </NavItem>
             )}
-            {hasRole('Admin') && <NavItemSeparator />}
+            {hasRole('Admin') && <Divider component="li" />}
             {hasRole('Admin') && (
               <NavItem id="conversion-link" itemId={'conversion'}>
-                <NavLink to="/convert" activeClassName="pf-m-current">
+                <NavLink to="/convert" className={navLinkClassName}>
                   File Conversion
                 </NavLink>
               </NavItem>
             )}
             {hasRole('Analysis') && (
-              <NavItem id="uls-db-link" itemId="uls-db-link-item">
-                {uls}
-              </NavItem>
+              <NavItem id="uls-db-link" itemId="uls-db-link-item">{uls}</NavItem>
             )}
             {hasRole('Analysis') && (
-              <NavItem id="antenna-link" itemId="antenna-link-item">
-                {antenna}
-              </NavItem>
+              <NavItem id="antenna-link" itemId="antenna-link-item">{antenna}</NavItem>
             )}
             {hasRole('Analysis') && (
-              <NavItem id="history-link" itemId="history-link-item">
-                {history}
-              </NavItem>
+              <NavItem id="history-link" itemId="history-link-item">{history}</NavItem>
             )}
-            {isAdmin() && guiConfig.grafana_enabled && <NavItemSeparator />}
+            {isAdmin() && guiConfig.grafana_enabled && <Divider component="li" />}
             {isAdmin() && guiConfig.grafana_enabled && (
               <NavItem id="grafana-link" itemId="grafana-link-item">
-                <a target="_blank" rel="noopener noreferrer" href="/fbrat/grafana/">
-                  Grafana
-                </a>
+                <a target="_blank" rel="noopener noreferrer" href="/fbrat/grafana/">Grafana</a>
               </NavItem>
             )}
             {isAdmin() && guiConfig.grafana_enabled && (
               <NavItem id="prometheus-link" itemId="prometheus-link-item">
-                <a target="_blank" rel="noopener noreferrer" href="/fbrat/prometheus/">
-                  Prometheus
-                </a>
+                <a target="_blank" rel="noopener noreferrer" href="/fbrat/prometheus/">Prometheus</a>
               </NavItem>
             )}
             {isAdmin() && guiConfig.grafana_enabled && (
               <NavItem id="cadvisor-link" itemId="cadvisor-link-item">
-                <a target="_blank" rel="noopener noreferrer" href="/fbrat/cadvisor/">
-                  cAdvisor
-                </a>
+                <a target="_blank" rel="noopener noreferrer" href="/fbrat/cadvisor/">cAdvisor</a>
               </NavItem>
             )}
             {isAdmin() && guiConfig.grafana_enabled && (
               <NavItem id="rabbitmq-link" itemId="rabbitmq-link-item">
-                <a target="_blank" rel="noopener noreferrer" href="/fbrat/rabbitmq/">
-                  RabbitMQ
-                </a>
+                <a target="_blank" rel="noopener noreferrer" href="/fbrat/rabbitmq/">RabbitMQ</a>
               </NavItem>
             )}
             {isAdmin() && guiConfig.grafana_enabled && (
               <NavItem id="kafka-ui-link" itemId="kafka-ui-link-item">
-                <a target="_blank" rel="noopener noreferrer" href="/fbrat/kafka-ui/">
-                  Kafka UI
-                </a>
+                <a target="_blank" rel="noopener noreferrer" href="/fbrat/kafka-ui/">Kafka UI</a>
               </NavItem>
             )}
             {!isLoggedIn() && showAbout() && (
               <NavItem id="about-link" itemId="about-link-item">
-                <NavLink to="/about" activeClassName="pf-m-current">
-                  About
-                </NavLink>
+                <NavLink to="/about" className={navLinkClassName}>About</NavLink>
               </NavItem>
             )}
           </NavList>
@@ -265,10 +279,17 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
       )}
     </UserContext.Consumer>
   );
-  const Sidebar = <PageSidebar nav={Navigation} isNavOpen={isMobileView ? isNavOpenMobile : isNavOpen} />;
+
+  const Sidebar = (
+    <PageSidebar isSidebarOpen={isMobileView ? isNavOpenMobile : isNavOpen}>
+      <PageSidebarBody>{Navigation}</PageSidebarBody>
+    </PageSidebar>
+  );
+
   const PageSkipToContent = <SkipToContent href="#main-content-page-layout-default-nav">Skip to Content</SkipToContent>;
+
   return (
-    <Page header={Header} sidebar={Sidebar} onPageResize={onPageResize} skipToContent={PageSkipToContent}>
+    <Page masthead={masthead} sidebar={Sidebar} onPageResize={onPageResize} skipToContent={PageSkipToContent}>
       {children}
     </Page>
   );

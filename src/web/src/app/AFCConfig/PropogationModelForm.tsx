@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   FormGroup,
   FormSelect,
@@ -201,42 +201,42 @@ export class PropogationModelForm extends React.PureComponent<{
     }
   };
 
-  setWin2ConfidenceCombined = (s: string) => {
+  setWin2ConfidenceCombined = (_event: any, s: string) => {
     const n: number = Number(s);
     this.props.onChange(Object.assign(this.props.data, { win2ConfidenceCombined: n }));
   };
 
-  setWin2ConfidenceLOS = (s: string) => {
+  setWin2ConfidenceLOS = (_event: any, s: string) => {
     const n: number = Number(s);
     this.props.onChange(Object.assign(this.props.data, { win2ConfidenceLOS: n }));
   };
 
-  setWinConfidenceNLOS = (s: string) => {
+  setWinConfidenceNLOS = (_event: any, s: string) => {
     const n: number = Number(s);
     this.props.onChange(Object.assign(this.props.data, { win2ConfidenceNLOS: n }));
   };
 
-  setWin2ConfidenceLOS_NLOS = (s: string) => {
+  setWin2ConfidenceLOS_NLOS = (_event: any, s: string) => {
     const n: number = Number(s);
     this.props.onChange(Object.assign(this.props.data, { win2ConfidenceLOS: n, win2ConfidenceNLOS: n }));
   };
 
-  setItmConfidence = (s: string) => {
+  setItmConfidence = (_event: any, s: string) => {
     const n: number = Number(s);
     this.props.onChange(Object.assign(this.props.data, { itmConfidence: n }));
   };
 
-  setItmReliability = (s: string) => {
+  setItmReliability = (_event: any, s: string) => {
     const n: number = Number(s);
     this.props.onChange(Object.assign(this.props.data, { itmReliability: n }));
   };
 
-  setP2108Confidence = (s: string) => {
+  setP2108Confidence = (_event: any, s: string) => {
     const n: number = Number(s);
     this.props.onChange(Object.assign(this.props.data, { p2108Confidence: n }));
   };
 
-  setProbLOS = (s: string) => {
+  setProbLOS = (_event: any, s: string) => {
     const n: number = Number(s);
     this.props.onChange(Object.assign(this.props.data, { win2ProbLosThreshold: n }));
   };
@@ -298,15 +298,15 @@ export class PropogationModelForm extends React.PureComponent<{
     }
   };
 
-  setTerrainSource = (s: string) => {
+  setTerrainSource = (_event: any, s: string) => {
     this.props.onChange(Object.assign(this.props.data, { terrainSource: s }));
   };
 
-  setSurfaceDataSource = (s: string) => {
+  setSurfaceDataSource = (_event: any, s: string) => {
     this.props.onChange(Object.assign(this.props.data, { surfaceDataSource: s }));
   };
 
-  setLosOption = (s: string) => {
+  setLosOption = (_event: any, s: string) => {
     let newLos = s as CustomPropagationLOSOptions;
 
     const model = this.props.data as CustomPropagation;
@@ -355,7 +355,7 @@ export class PropogationModelForm extends React.PureComponent<{
     this.props.onChange(Object.assign(this.props.data, newModel));
   };
 
-  setItmClutterMethod = (s: string) => {
+  setItmClutterMethod = (_event: any, s: string) => {
     const model = this.props.data as CustomPropagation;
     if (model.rlanITMTxClutterMethod === 'BLDG_DATA' && s !== 'BLDG_DATA') {
       this.props.onChange(
@@ -386,7 +386,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   style={{
                     textAlign: 'right',
                   }}
-                  isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100}
+                  validated={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -396,13 +396,11 @@ export class PropogationModelForm extends React.PureComponent<{
                 <TextInput
                   value={model.win2ConfidenceLOS}
                   type="number"
-                  onChange={(v) => {
-                    this.setWin2ConfidenceLOS(v);
-                  }}
+                  onChange={this.setWin2ConfidenceLOS}
                   id="propogation-model-win-los-confidence"
                   name="propogation-model-win-los-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100}
+                  validated={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -417,13 +415,11 @@ export class PropogationModelForm extends React.PureComponent<{
                 <TextInput
                   value={model.win2ConfidenceLOS}
                   type="number"
-                  onChange={(v) => {
-                    this.setWin2ConfidenceLOS(v);
-                  }}
+                  onChange={this.setWin2ConfidenceLOS}
                   id="propogation-model-win-los-confidence"
                   name="propogation-model-win-los-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100}
+                  validated={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -438,13 +434,11 @@ export class PropogationModelForm extends React.PureComponent<{
                 <TextInput
                   value={model.win2ConfidenceNLOS}
                   type="number"
-                  onChange={(v) => {
-                    this.setWinConfidenceNLOS(v);
-                  }}
+                  onChange={this.setWinConfidenceNLOS}
                   id="propogation-model-win-nlos-confidence"
                   name="propogation-model-win-nlos-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.win2ConfidenceNLOS >= 0 && model.win2ConfidenceNLOS <= 100}
+                  validated={model.win2ConfidenceNLOS >= 0 && model.win2ConfidenceNLOS <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -465,7 +459,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   style={{
                     textAlign: 'right',
                   }}
-                  isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100}
+                  validated={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -476,14 +470,14 @@ export class PropogationModelForm extends React.PureComponent<{
                 <TextInput
                   value={model.win2ConfidenceLOS}
                   type="number"
-                  onChange={(v) => {
-                    this.setWin2ConfidenceLOS(v);
-                    this.setWinConfidenceNLOS(v);
+                  onChange={(_event, v) => {
+                    this.setWin2ConfidenceLOS(_event, v);
+                    this.setWinConfidenceNLOS(_event, v);
                   }}
                   id="propogation-model-win-los-nlos-confidence"
                   name="propogation-model-win-los-nlos-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100}
+                  validated={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -510,7 +504,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-itm-confidence"
                   name="propogation-model-itm-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.itmConfidence >= 0 && model.itmConfidence <= 100}
+                  validated={model.itmConfidence >= 0 && model.itmConfidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -524,7 +518,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-itm-reliability"
                   name="propogation-model-itm-reliability"
                   style={{ textAlign: 'right' }}
-                  isValid={model.itmReliability >= 0 && model.itmReliability <= 100}
+                  validated={model.itmReliability >= 0 && model.itmReliability <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -532,11 +526,11 @@ export class PropogationModelForm extends React.PureComponent<{
             <FormGroup label="Building Data Source" fieldId="propogation-model-data-source">
               <FormSelect
                 value={model.buildingSource}
-                onChange={(v) => this.setBuildingSource(v as BuildingSourceValues)}
+                onChange={(_event, v) => this.setBuildingSource(v as BuildingSourceValues)}
                 id="propogation-model-data-source"
                 name="propogation-model-data-source"
                 style={{ textAlign: 'right' }}
-                isValid={model.buildingSource === 'LiDAR' || model.buildingSource === 'B-Design3D'}
+                validated={model.buildingSource === 'LiDAR' || model.buildingSource === 'B-Design3D' ? 'default' : 'error'}
               >
                 <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
                 <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
@@ -556,7 +550,7 @@ export class PropogationModelForm extends React.PureComponent<{
                         id="prop-los-threshold"
                         name="prop-los-threshold"
                         style={{ textAlign: "right" }}
-                        isValid={model.win2ProbLosThreshold >= 0 && model.win2ProbLosThreshold <= 100} />
+                        validated={model.win2ProbLosThreshold >= 0 && model.win2ProbLosThreshold <= 100 ? 'default' : 'error'} />
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
@@ -565,11 +559,11 @@ export class PropogationModelForm extends React.PureComponent<{
                     ><InputGroup><TextInput
                         value={model.win2ConfidenceCombined}
                         type="number"
-                        onChange={this.setWin2Confidence}
+                        onChange={this.setWin2ConfidenceCombined}
                         id="propogation-model-win-confidence"
                         name="propogation-model-win-confidence"
                         style={{ textAlign: "right" }}
-                        isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100} />
+                        validated={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100 ? 'default' : 'error'} />
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
@@ -582,7 +576,7 @@ export class PropogationModelForm extends React.PureComponent<{
                         id="propogation-model-itm-confidence"
                         name="propogation-model-itm-confidence"
                         style={{ textAlign: "right" }}
-                        isValid={model.itmConfidence >= 0 && model.itmConfidence <= 100} />
+                        validated={model.itmConfidence >= 0 && model.itmConfidence <= 100 ? 'default' : 'error'} />
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
@@ -596,7 +590,7 @@ export class PropogationModelForm extends React.PureComponent<{
                             id="propogation-model-itm-reliability"
                             name="propogation-model-itm-reliability"
                             style={{ textAlign: "right" }}
-                            isValid={model.itmReliability >= 0 && model.itmReliability <= 100} />
+                            validated={model.itmReliability >= 0 && model.itmReliability <= 100 ? 'default' : 'error'} />
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
@@ -609,7 +603,7 @@ export class PropogationModelForm extends React.PureComponent<{
                         id="propogation-model-p2108-confidence"
                         name="propogation-model-p2108-confidence"
                         style={{ textAlign: "right" }}
-                        isValid={model.p2108Confidence >= 0 && model.p2108Confidence <= 100} />
+                        validated={model.p2108Confidence >= 0 && model.p2108Confidence <= 100 ? 'default' : 'error'} />
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
@@ -622,7 +616,7 @@ export class PropogationModelForm extends React.PureComponent<{
                             id="terrain-source"
                             name="terrain-source"
                             style={{ textAlign: "right" }}
-                            isValid={model.terrainSource === "SRTM (90m)" || model.terrainSource === "3DEP (30m)"}>
+                            validated={model.terrainSource === "SRTM (90m)" || model.terrainSource === "3DEP (30m)" ? 'default' : 'error'}>
                             <FormSelectOption key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
                             <FormSelectOption key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
                         </FormSelect>
@@ -640,7 +634,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-win-confidence"
                   name="propogation-model-win-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100}
+                  validated={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -652,13 +646,11 @@ export class PropogationModelForm extends React.PureComponent<{
                     <TextInput
                       value={model.win2ConfidenceLOS}
                       type="number"
-                      onChange={(v) => {
-                        this.setWin2ConfidenceLOS_NLOS(v);
-                      }}
+                      onChange={this.setWin2ConfidenceLOS_NLOS}
                       id="propogation-model-win-los-nlos-confidence"
                       name="propogation-model-win-los-nlos-confidence"
                       style={{ textAlign: 'right' }}
-                      isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100}
+                      validated={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100 ? 'default' : 'error'}
                     />
                     <InputGroupText>%</InputGroupText>
                   </InputGroup>
@@ -674,13 +666,11 @@ export class PropogationModelForm extends React.PureComponent<{
                     <TextInput
                       value={model.win2ConfidenceLOS}
                       type="number"
-                      onChange={(v) => {
-                        this.setWin2ConfidenceLOS(v);
-                      }}
+                      onChange={this.setWin2ConfidenceLOS}
                       id="propogation-model-win-los-confidence"
                       name="propogation-model-win-los-confidence"
                       style={{ textAlign: 'right' }}
-                      isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100}
+                      validated={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100 ? 'default' : 'error'}
                     />
                     <InputGroupText>%</InputGroupText>
                   </InputGroup>
@@ -698,7 +688,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-itm-confidence"
                   name="propogation-model-itm-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.itmConfidence >= 0 && model.itmConfidence <= 100}
+                  validated={model.itmConfidence >= 0 && model.itmConfidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -712,7 +702,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-itm-reliability"
                   name="propogation-model-itm-reliability"
                   style={{ textAlign: 'right' }}
-                  isValid={model.itmReliability >= 0 && model.itmReliability <= 100}
+                  validated={model.itmReliability >= 0 && model.itmReliability <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -726,7 +716,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-p2108-confidence"
                   name="propogation-model-p2108-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.p2108Confidence >= 0 && model.p2108Confidence <= 100}
+                  validated={model.p2108Confidence >= 0 && model.p2108Confidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -734,15 +724,13 @@ export class PropogationModelForm extends React.PureComponent<{
             <FormGroup label="Building Data Source" fieldId="propogation-model-data-source">
               <FormSelect
                 value={model.buildingSource}
-                onChange={(v) => this.setBuildingSource(v as BuildingSourceValues)}
+                onChange={(_event, v) => this.setBuildingSource(v as BuildingSourceValues)}
                 id="propogation-model-data-source"
                 name="propogation-model-data-source"
                 style={{ textAlign: 'right' }}
-                isValid={
-                  model.buildingSource === 'LiDAR' ||
+                validated={model.buildingSource === 'LiDAR' ||
                   model.buildingSource === 'B-Design3D' ||
-                  model.buildingSource === 'None'
-                }
+                  model.buildingSource === 'None' ? 'default' : 'error'}
               >
                 <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
                 <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
@@ -757,7 +745,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="terrain-source"
                   name="terrain-source"
                   style={{ textAlign: 'right' }}
-                  isValid={model.terrainSource === '3DEP (30m)'}
+                  validated={model.terrainSource === '3DEP (30m)' ? 'default' : 'error'}
                 >
                   <FormSelectOption key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
                   <FormSelectOption isDisabled={true} key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
@@ -851,7 +839,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   style={{
                     textAlign: 'right',
                   }}
-                  isValid={model.itmConfidence >= 0 && model.itmConfidence <= 100}
+                  validated={model.itmConfidence >= 0 && model.itmConfidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -865,7 +853,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-itm-reliability"
                   name="propogation-model-itm-reliability"
                   style={{ textAlign: 'right' }}
-                  isValid={model.itmReliability >= 0 && model.itmReliability <= 100}
+                  validated={model.itmReliability >= 0 && model.itmReliability <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -881,7 +869,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   style={{
                     textAlign: 'right',
                   }}
-                  isValid={model.p2108Confidence >= 0 && model.p2108Confidence <= 100}
+                  validated={model.p2108Confidence >= 0 && model.p2108Confidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -892,15 +880,13 @@ export class PropogationModelForm extends React.PureComponent<{
                 <FormGroup label="Building Data Source" fieldId="propogation-model-data-source">
                   <FormSelect
                     value={model.buildingSource}
-                    onChange={(v) => this.setBuildingSource(v as BuildingSourceValues)}
+                    onChange={(_event, v) => this.setBuildingSource(v as BuildingSourceValues)}
                     id="propogation-model-data-source"
                     name="propogation-model-data-source"
                     style={{ textAlign: 'right' }}
-                    isValid={
-                      model.buildingSource === 'LiDAR' ||
+                    validated={model.buildingSource === 'LiDAR' ||
                       model.buildingSource === 'B-Design3D' ||
-                      model.buildingSource === 'None'
-                    }
+                      model.buildingSource === 'None' ? 'default' : 'error'}
                   >
                     <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
                     <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
@@ -989,7 +975,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   style={{
                     textAlign: 'right',
                   }}
-                  isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100}
+                  validated={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1000,14 +986,14 @@ export class PropogationModelForm extends React.PureComponent<{
                 <TextInput
                   value={model.win2ConfidenceLOS}
                   type="number"
-                  onChange={(v) => {
-                    this.setWin2ConfidenceLOS(v);
-                    this.setWinConfidenceNLOS(v);
+                  onChange={(_event, v) => {
+                    this.setWin2ConfidenceLOS(_event, v);
+                    this.setWinConfidenceNLOS(_event, v);
                   }}
                   id="propogation-model-win-los-nlos-confidence"
                   name="propogation-model-win-los-nlos-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100}
+                  validated={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1056,7 +1042,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   style={{
                     textAlign: 'right',
                   }}
-                  isValid={model.itmConfidence >= 0 && model.itmConfidence <= 100}
+                  validated={model.itmConfidence >= 0 && model.itmConfidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1070,7 +1056,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-itm-reliability"
                   name="propogation-model-itm-reliability"
                   style={{ textAlign: 'right' }}
-                  isValid={model.itmReliability >= 0 && model.itmReliability <= 100}
+                  validated={model.itmReliability >= 0 && model.itmReliability <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1086,7 +1072,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   style={{
                     textAlign: 'right',
                   }}
-                  isValid={model.p2108Confidence >= 0 && model.p2108Confidence <= 100}
+                  validated={model.p2108Confidence >= 0 && model.p2108Confidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1164,7 +1150,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-win-confidence"
                   name="propogation-model-win-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100}
+                  validated={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1176,13 +1162,11 @@ export class PropogationModelForm extends React.PureComponent<{
                     <TextInput
                       value={model.win2ConfidenceLOS}
                       type="number"
-                      onChange={(v) => {
-                        this.setWin2ConfidenceLOS_NLOS(v);
-                      }}
+                      onChange={this.setWin2ConfidenceLOS_NLOS}
                       id="propogation-model-win-los-nlos-confidence"
                       name="propogation-model-win-los-nlos-confidence"
                       style={{ textAlign: 'right' }}
-                      isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100}
+                      validated={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100 ? 'default' : 'error'}
                     />
                     <InputGroupText>%</InputGroupText>
                   </InputGroup>
@@ -1198,13 +1182,11 @@ export class PropogationModelForm extends React.PureComponent<{
                     <TextInput
                       value={model.win2ConfidenceLOS}
                       type="number"
-                      onChange={(v) => {
-                        this.setWin2ConfidenceLOS(v);
-                      }}
+                      onChange={this.setWin2ConfidenceLOS}
                       id="propogation-model-win-los-confidence"
                       name="propogation-model-win-los-confidence"
                       style={{ textAlign: 'right' }}
-                      isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100}
+                      validated={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100 ? 'default' : 'error'}
                     />
                     <InputGroupText>%</InputGroupText>
                   </InputGroup>
@@ -1222,7 +1204,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-itm-confidence"
                   name="propogation-model-itm-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.itmConfidence >= 0 && model.itmConfidence <= 100}
+                  validated={model.itmConfidence >= 0 && model.itmConfidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1236,7 +1218,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-itm-reliability"
                   name="propogation-model-itm-reliability"
                   style={{ textAlign: 'right' }}
-                  isValid={model.itmReliability >= 0 && model.itmReliability <= 100}
+                  validated={model.itmReliability >= 0 && model.itmReliability <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1250,7 +1232,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-p2108-confidence"
                   name="propogation-model-p2108-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.p2108Confidence >= 0 && model.p2108Confidence <= 100}
+                  validated={model.p2108Confidence >= 0 && model.p2108Confidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1258,11 +1240,11 @@ export class PropogationModelForm extends React.PureComponent<{
             <FormGroup label="Building Data Source" fieldId="propogation-model-data-source">
               <FormSelect
                 value={model.buildingSource}
-                onChange={(v) => this.setBuildingSource(v as BuildingSourceValues)}
+                onChange={(_event, v) => this.setBuildingSource(v as BuildingSourceValues)}
                 id="propogation-model-data-source"
                 name="propogation-model-data-source"
                 style={{ textAlign: 'right' }}
-                isValid={model.buildingSource === 'None'}
+                validated={model.buildingSource === 'None' ? 'default' : 'error'}
               >
                 <FormSelectOption key="None" value="None" label="None" />
               </FormSelect>
@@ -1275,7 +1257,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="terrain-source"
                   name="terrain-source"
                   style={{ textAlign: 'right' }}
-                  isValid={model.terrainSource === 'SRTM (30m)'}
+                  validated={model.terrainSource === 'SRTM (30m)' ? 'default' : 'error'}
                 >
                   <FormSelectOption key="SRTM (30m)" value="SRTM (30m)" label="SRTM (30m)" />
                 </FormSelect>
@@ -1297,7 +1279,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-win-confidence"
                   name="propogation-model-win-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100}
+                  validated={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1309,13 +1291,11 @@ export class PropogationModelForm extends React.PureComponent<{
                     <TextInput
                       value={model.win2ConfidenceLOS}
                       type="number"
-                      onChange={(v) => {
-                        this.setWin2ConfidenceLOS_NLOS(v);
-                      }}
+                      onChange={this.setWin2ConfidenceLOS_NLOS}
                       id="propogation-model-win-los-nlos-confidence"
                       name="propogation-model-win-los-nlos-confidence"
                       style={{ textAlign: 'right' }}
-                      isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100}
+                      validated={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100 ? 'default' : 'error'}
                     />
                     <InputGroupText>%</InputGroupText>
                   </InputGroup>
@@ -1331,13 +1311,11 @@ export class PropogationModelForm extends React.PureComponent<{
                     <TextInput
                       value={model.win2ConfidenceLOS}
                       type="number"
-                      onChange={(v) => {
-                        this.setWin2ConfidenceLOS(v);
-                      }}
+                      onChange={this.setWin2ConfidenceLOS}
                       id="propogation-model-win-los-confidence"
                       name="propogation-model-win-los-confidence"
                       style={{ textAlign: 'right' }}
-                      isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100}
+                      validated={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100 ? 'default' : 'error'}
                     />
                     <InputGroupText>%</InputGroupText>
                   </InputGroup>
@@ -1355,7 +1333,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-itm-confidence"
                   name="propogation-model-itm-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.itmConfidence >= 0 && model.itmConfidence <= 100}
+                  validated={model.itmConfidence >= 0 && model.itmConfidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1369,7 +1347,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-itm-reliability"
                   name="propogation-model-itm-reliability"
                   style={{ textAlign: 'right' }}
-                  isValid={model.itmReliability >= 0 && model.itmReliability <= 100}
+                  validated={model.itmReliability >= 0 && model.itmReliability <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1383,7 +1361,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="propogation-model-p2108-confidence"
                   name="propogation-model-p2108-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={model.p2108Confidence >= 0 && model.p2108Confidence <= 100}
+                  validated={model.p2108Confidence >= 0 && model.p2108Confidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -1391,11 +1369,11 @@ export class PropogationModelForm extends React.PureComponent<{
             <FormGroup label="Building Data Source" fieldId="propogation-model-data-source">
               <FormSelect
                 value={model.buildingSource}
-                onChange={(v) => this.setBuildingSource(v as BuildingSourceValues)}
+                onChange={(_event, v) => this.setBuildingSource(v as BuildingSourceValues)}
                 id="propogation-model-data-source"
                 name="propogation-model-data-source"
                 style={{ textAlign: 'right' }}
-                isValid={model.buildingSource === 'None'}
+                validated={model.buildingSource === 'None' ? 'default' : 'error'}
               >
                 <FormSelectOption key="None" value="None" label="None" />
               </FormSelect>
@@ -1408,7 +1386,7 @@ export class PropogationModelForm extends React.PureComponent<{
                   id="terrain-source"
                   name="terrain-source"
                   style={{ textAlign: 'right' }}
-                  isValid={model.terrainSource === 'SRTM (30m)'}
+                  validated={model.terrainSource === 'SRTM (30m)' ? 'default' : 'error'}
                 >
                   <FormSelectOption key="SRTM (30m)" value="SRTM (30m)" label="SRTM (30m)" />
                 </FormSelect>
@@ -1468,10 +1446,10 @@ export class PropogationModelForm extends React.PureComponent<{
       </Tooltip>
       <FormSelect
         value={this.props.data.kind}
-        onChange={(x) => this.setKind(x)}
+        onChange={(_event, x) => this.setKind(x)}
         id="horzontal-form-propogation-model"
         name="horizontal-form-propogation-model"
-        isValid={this.props.data.kind !== undefined}
+        validated={this.props.data.kind !== undefined ? 'default' : 'error'}
         style={{ textAlign: 'right' }}
       >
         <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select Propogation Model" />

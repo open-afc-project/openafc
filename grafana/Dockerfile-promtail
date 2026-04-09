@@ -7,7 +7,7 @@
 
 # Promtail (docker log collector for Loki)
 
-FROM grafana/promtail:3.3.2
+FROM grafana/promtail:3.4.2
 
 ENV HOMEDIR=/root
 

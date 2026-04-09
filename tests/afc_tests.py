@@ -1716,20 +1716,22 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
             app_log.error(f"Test case {req_id} returned error: {resp['error']}")
             test_res = AFC_ERR
         else:
-            if cfg['webui'] is True:
-                # remove the mapping info from the response
-                # to make sure the base data matches - not checking map results
-                for parent in resp['availableSpectrumInquiryResponses']:
+            for parent in resp.get('availableSpectrumInquiryResponses', []):
+                if cfg['webui'] is True:
+                    # remove the mapping info from the response
+                    # to make sure the base data matches - not checking map results
                     if 'vendorExtensions' in parent:
                         parent.pop('vendorExtensions')
-                    # rat_server returns ['certificationId', 'id'] for
-                    # a missing cert id field; afcserver returns ['id']
-                    mp = (parent.get('response', {})
-                          .get('supplementalInfo', {})
-                          .get('missingParams'))
-                    if mp == ['certificationId', 'id']:
-                        parent['response']['supplementalInfo'][
-                            'missingParams'] = ['id']
+                # afcserver returns ['id'] for a missing cert id field;
+                # rat_server returns ['certificationId', 'id'];
+                # msghnd may return ['id', 'certificationId'].
+                # Normalize all variants to ['id'] regardless of mode.
+                mp = (parent.get('response', {})
+                      .get('supplementalInfo', {})
+                      .get('missingParams'))
+                if set(mp or []) == {'certificationId', 'id'}:
+                    parent['response']['supplementalInfo'][
+                        'missingParams'] = ['id']
 
             json_lookup('availabilityExpireTime', resp, '0')
             upd_data = json.dumps(resp, sort_keys=True)

@@ -1,10 +1,11 @@
-import * as React from 'react';
+import React from 'react';
 import { AFCConfigFile, RatResponse } from '../Lib/RatApiTypes';
 import {
   CardBody,
   PageSection,
   Card,
-  CardHead,
+  CardHeader,
+  CardTitle,
   TextInput,
   Alert,
   AlertActionCloseButton,
@@ -43,7 +44,7 @@ export class ImportExport extends React.Component<
       },
     );
 
-  private import = async (name: string, ev: React.FormEvent<HTMLInputElement>) => {
+  private import = async (name: string, ev: React.ChangeEvent<HTMLInputElement>) => {
     // @ts-ignore
     const file = ev.target.files[0];
     const reader = new FileReader();
@@ -69,9 +70,7 @@ export class ImportExport extends React.Component<
           }
 
           value.afcConfig = undefined;
-
           importCache(value);
-
           this.setState({ messageType: 'success', message: 'Import successful!' });
         } catch (e) {
           this.setState({ messageType: 'danger', message: 'Unable to import file' });
@@ -89,16 +88,14 @@ export class ImportExport extends React.Component<
     return (
       <PageSection>
         <Card>
-          <CardHead>Import</CardHead>
+          <CardHeader><CardTitle>Import</CardTitle></CardHeader>
           <CardBody>
             <br />
-            <TextInput
-              // @ts-ignore
+            <input
               type="file"
               id="file-import"
               name="file"
-              // @ts-ignore
-              onChange={(f, ev) => this.import(f, ev)}
+              onChange={(ev) => this.import((ev.target as any).value, ev as any)}
             />
             {this.state.messageType && (
               <>
@@ -106,8 +103,8 @@ export class ImportExport extends React.Component<
                 <br />
                 <Alert
                   variant={this.state.messageType}
-                  title={this.state.messageType.toUpperCase}
-                  action={<AlertActionCloseButton onClose={() => this.setState({ messageType: undefined })} />}
+                  title={this.state.messageType.toUpperCase()}
+                  actionClose={<AlertActionCloseButton onClose={() => this.setState({ messageType: undefined })} />}
                 >
                   <pre>{this.state.message}</pre>
                 </Alert>
@@ -117,7 +114,7 @@ export class ImportExport extends React.Component<
         </Card>
         <br />
         <Card>
-          <CardHead>Export</CardHead>
+          <CardHeader><CardTitle>Export</CardTitle></CardHeader>
           <CardBody>
             <DownloadContents fileName="RLAN_AFC_Tool.json" contents={() => this.export()} />
             <br />

@@ -7,7 +7,8 @@
 
 # Grafana dockerfile (for future expansion)
 
-FROM grafana/grafana:11.4.0-ubuntu
+# 11.6.11+ required for grafana-lokiexplore-app 1.0.38+ (see grafana/logs-drilldown#1787)
+FROM grafana/grafana:11.6.14-ubuntu
 
 EXPOSE 3000/tcp
 
@@ -109,10 +110,11 @@ RUN chmod u+s `which socat`
 
 USER grafana
 
-# Install required python modules
-COPY grafana/requirements-grafana.txt $WORKDIR/
-RUN pip3 install -r $WORKDIR/requirements-grafana.txt && \
-    rm -f $WORKDIR/requirements-grafana.txt
+# Install required python modules (requirements.txt includes -r requirements-grafana.txt
+# so Renovate/lockfile tooling can track grafana Python deps from one entry point)
+COPY grafana/requirements.txt grafana/requirements-grafana.txt $WORKDIR/
+RUN pip3 install -r $WORKDIR/requirements.txt && \
+    rm -f $WORKDIR/requirements.txt $WORKDIR/requirements-grafana.txt
 
 # Install shared AFC packages
 COPY --chown=grafana src/afc-packages $WORKDIR/afc-packages/
@@ -145,9 +147,15 @@ RUN mkdir -p $GF_PATHS_PLUGINS
 
 # Manually installing plugins (doing it at runtime with 'grafana cli plugin'
 # somehow doesn't work in Kubernetes environment, doing it via environment
-# requires Grafana restart)
+# requires Grafana restart). Version numbers are duplicated in comments in
+# templates/provisioning/plugins/pinned-plugins.yaml (keep in sync).
 RUN wget -qO plugin.zip 'https://grafana.com/api/plugins/yesoreyeram-infinity-datasource/versions/2.11.4/download?os=linux&arch=amd64' && \
      unzip plugin.zip -d $GF_PATHS_PLUGINS && \
      rm plugin.zip
+
+# Logs Drilldown (Drilldown > Logs). Plugin 1.0.38+ needs Grafana >=11.6.11 (logs-drilldown#1787).
+RUN wget -qO plugin-loki.zip 'https://grafana.com/api/plugins/grafana-lokiexplore-app/versions/1.0.39/download?os=linux&arch=amd64' && \
+     unzip plugin-loki.zip -d $GF_PATHS_PLUGINS && \
+     rm plugin-loki.zip
 
 ENTRYPOINT $WORKDIR/entrypoint-grafana.sh

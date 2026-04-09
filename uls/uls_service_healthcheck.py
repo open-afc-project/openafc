@@ -18,6 +18,7 @@ import email.mime.text
 import logging
 import os
 import pydantic
+from pydantic_settings import BaseSettings
 import smtplib
 import sqlalchemy as sa
 import sys
@@ -52,47 +53,47 @@ class SmtpSettings(NamedTuple):
         return bool(self.server) and bool(self.username)
 
 
-class Settings(pydantic.BaseSettings):
+class Settings(BaseSettings):
     """ Arguments from command lines - with their default values """
 
     service_state_db_dsn: str = \
-        pydantic.Field(..., env="ULS_SERVICE_STATE_DB_DSN")
+        pydantic.Field(..., validation_alias="ULS_SERVICE_STATE_DB_DSN")
     service_state_db_password_file: Optional[str] = \
-        pydantic.Field(None, env="ULS_SERVICE_STATE_DB_PASSWORD_FILE")
-    smtp_server: Optional[str] = pydantic.Field(None, env="ULS_SMTP_SERVER")
-    smtp_port: Optional[int] = pydantic.Field(None, env="ULS_SMTP_PORT")
+        pydantic.Field(None, validation_alias="ULS_SERVICE_STATE_DB_PASSWORD_FILE")
+    smtp_server: Optional[str] = pydantic.Field(None, validation_alias="ULS_SMTP_SERVER")
+    smtp_port: Optional[int] = pydantic.Field(None, validation_alias="ULS_SMTP_PORT")
     smtp_username: Optional[str] = \
-        pydantic.Field(None, env="ULS_SMTP_USERNAME")
+        pydantic.Field(None, validation_alias="ULS_SMTP_USERNAME")
     smtp_password_file: Optional[str] = \
-        pydantic.Field(None, env="ULS_SMTP_PASSWORD_FILE")
-    smtp_ssl: bool = pydantic.Field(False, env="ULS_SMTP_SSL")
-    smtp_tls: bool = pydantic.Field(False, env="ULS_SMTP_TLS")
-    email_to: Optional[str] = pydantic.Field(None, env="ULS_ALARM_EMAIL_TO")
+        pydantic.Field(None, validation_alias="ULS_SMTP_PASSWORD_FILE")
+    smtp_ssl: bool = pydantic.Field(False, validation_alias="ULS_SMTP_SSL")
+    smtp_tls: bool = pydantic.Field(False, validation_alias="ULS_SMTP_TLS")
+    email_to: Optional[str] = pydantic.Field(None, validation_alias="ULS_ALARM_EMAIL_TO")
     beacon_email_to: Optional[str] = \
-        pydantic.Field(None, env="ULS_BEACON_EMAIL_TO")
+        pydantic.Field(None, validation_alias="ULS_BEACON_EMAIL_TO")
     email_sender_location: Optional[str] = \
-        pydantic.Field(None, env="ULS_ALARM_SENDER_LOCATION")
+        pydantic.Field(None, validation_alias="ULS_ALARM_SENDER_LOCATION")
     alarm_email_interval_hr: Optional[float] = \
-        pydantic.Field(None, env="ULS_ALARM_ALARM_INTERVAL_HR")
+        pydantic.Field(None, validation_alias="ULS_ALARM_ALARM_INTERVAL_HR")
     beacon_email_interval_hr: Optional[float] = \
-        pydantic.Field(None, env="ULS_ALARM_BEACON_INTERVAL_HR")
+        pydantic.Field(None, validation_alias="ULS_ALARM_BEACON_INTERVAL_HR")
     download_attempt_max_age_health_hr: Optional[float] = \
-        pydantic.Field(6, env="ULS_HEALTH_ATTEMPT_MAX_AGE_HR")
+        pydantic.Field(6, validation_alias="ULS_HEALTH_ATTEMPT_MAX_AGE_HR")
     download_success_max_age_health_hr: Optional[float] = \
-        pydantic.Field(8, env="ULS_HEALTH_SUCCESS_MAX_AGE_HR")
+        pydantic.Field(8, validation_alias="ULS_HEALTH_SUCCESS_MAX_AGE_HR")
     update_max_age_health_hr: Optional[float] = \
-        pydantic.Field(40, env="ULS_HEALTH_UPDATE_MAX_AGE_HR")
+        pydantic.Field(40, validation_alias="ULS_HEALTH_UPDATE_MAX_AGE_HR")
     download_attempt_max_age_alarm_hr: Optional[float] = \
-        pydantic.Field(None, env="ULS_ALARM_ATTEMPT_MAX_AGE_HR")
+        pydantic.Field(None, validation_alias="ULS_ALARM_ATTEMPT_MAX_AGE_HR")
     download_success_max_age_alarm_hr: Optional[float] = \
-        pydantic.Field(None, env="ULS_ALARM_SUCCESS_MAX_AGE_HR")
+        pydantic.Field(None, validation_alias="ULS_ALARM_SUCCESS_MAX_AGE_HR")
     region_update_max_age_alarm: Optional[str] = \
-        pydantic.Field(None, env="ULS_ALARM_REG_UPD_MAX_AGE_HR")
+        pydantic.Field(None, validation_alias="ULS_ALARM_REG_UPD_MAX_AGE_HR")
     verbose: bool = pydantic.Field(False)
     force_success: bool = pydantic.Field(False)
     print_email: bool = pydantic.Field(False)
 
-    @pydantic.root_validator(pre=True)
+    @pydantic.model_validator(mode="before")
     @classmethod
     def remove_empty(cls, v: Any) -> Any:
         """ Prevalidator that removes empty values (presumably from environment

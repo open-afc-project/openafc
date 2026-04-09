@@ -45,12 +45,12 @@ def get_service() -> RcacheService:
     if rcache_service is None:
         rcache_service = \
             RcacheService(
-                rcache_db_dsn=settings.postgres_dsn,
+                rcache_db_dsn=str(settings.postgres_dsn),
                 rcache_db_password_file=settings.postgres_password_file,
                 precompute_quota=settings.precompute_quota,
-                afc_req_url=settings.afc_req_url,
-                rulesets_url=settings.rulesets_url,
-                config_retrieval_url=settings.config_retrieval_url,
+                afc_req_url=str(settings.afc_req_url) if settings.afc_req_url else None,
+                rulesets_url=str(settings.rulesets_url) if settings.rulesets_url else None,
+                config_retrieval_url=str(settings.config_retrieval_url) if settings.config_retrieval_url else None,
                 keyhole_template_file=settings.keyhole_template)
     return rcache_service
 

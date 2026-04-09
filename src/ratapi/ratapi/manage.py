@@ -17,7 +17,6 @@ import time
 import sys
 import click
 import flask
-from flask_migrate import MigrateCommand
 from flask.cli import FlaskGroup, with_appcontext
 from flask_migrate import Migrate
 import werkzeug.exceptions
@@ -203,6 +202,15 @@ class DbCreate:
             get_or_create(db.session, Role, name='Trial')
             for rule in ruleset_list:
                 get_or_create(db.session, Ruleset, name=rule)
+
+            import uuid
+            from afcmodels.aaa import User
+            for user in User.query.filter(
+                    (User.fs_uniquifier == None) |  # noqa: E711
+                    (User.fs_uniquifier == '')).all():
+                user.fs_uniquifier = uuid.uuid4().hex
+            db.session.commit()
+
             stamp(directory=os.path.join(os.path.dirname(__file__),
                                          "migrations"),
                   revision='head')
@@ -282,14 +290,12 @@ class DbExport:
 
 
 def setUserIdNextVal():
-    # Set nextval for the sequence so that next user record
-    # will not reuse older id.
     cmd = 'select max(id) from aaa_user'
-    res = db.session.execute(cmd)
+    res = db.session.execute(sqlalchemy.text(cmd))
     val = res.fetchone()[0]
     if val:
         cmd = 'ALTER SEQUENCE aaa_user_id_seq RESTART WITH ' + str(val + 1)
-    db.session.execute(cmd)
+    db.session.execute(sqlalchemy.text(cmd))
     db.session.commit()
 
 
@@ -425,15 +431,12 @@ class UserCreate:
                         password = pwfile.read().strip()
 
                 if flaskapp.config['OIDC_LOGIN']:
-                    # OIDC, password is never stored locally
-                    # Still we hash it so that if we switch back
-                    # to non OIDC, the hash still match, and can be logged in
                     from passlib.context import CryptContext
                     password_crypt_context = CryptContext(['bcrypt'])
                     passhash = password_crypt_context.encrypt(password_in)
                 else:
-                    passhash = flaskapp.user_manager.password_manager.hash_password(
-                        password)
+                    from flask_security import hash_password
+                    passhash = hash_password(password)
             else:
                 passhash = password_in
 
@@ -971,7 +974,7 @@ class CertIdSweep:
                             pass
                     ruleset_id = \
                         Ruleset.query.filter_by(name=ruleset_id_str).first().id
-                    db.engine.execute(
+                    db.session.execute(
                         CertId.__table__.delete().where(
                             (CertId.downloaded == True) &
                             (CertId.certification_id.notin_(cert_ids)) &
@@ -1056,7 +1059,7 @@ class CertIdSweep:
                             ruleset_id = \
                                 Ruleset.query.filter_by(name=ruleset_id_str).\
                                 first().id
-                            db.engine.execute(
+                            db.session.execute(
                                 CertId.__table__.delete().where(
                                     (CertId.downloaded == True) &
                                     (CertId.certification_id.notin_(cert_ids)) &

@@ -178,7 +178,7 @@ class AfcServerMessageProcessor:
             if predicate:
                 runtime_opt |= flag
 
-        req_msg_dict = req_msg.dict(exclude_none=True)
+        req_msg_dict = req_msg.model_dump(exclude_none=True)
         als_req_id = als.als_afc_req_id()
         als.als_afc_request(
             req_id=als_req_id, mtls_dn=mtls_dn, req=req_msg_dict,
@@ -230,7 +230,7 @@ class AfcServerMessageProcessor:
         """
         # Top-level format acceptable? Individual requests checked separately
         try:
-            Rest_ReqMsg_1_4.validate(req_msg_dict)
+            Rest_ReqMsg_1_4.model_validate(req_msg_dict)
         except pydantic.ValidationError as ex:
             return self._make_response_msg(
                 response_info=self._make_response_info(
@@ -311,7 +311,7 @@ class AfcServerMessageProcessor:
                 pass
             # Validate request format
             validated_dict = req_dict
-            req = Rest_AvailableSpectrumInquiryRequest_1_4.validate(req_dict)
+            req = Rest_AvailableSpectrumInquiryRequest_1_4.model_validate(req_dict)
             validated_dict = None
 
             # Find allowed certifications
@@ -381,9 +381,9 @@ class AfcServerMessageProcessor:
                     assert rcache_resp.response is not None
                     try:
                         ret = \
-                            Rest_RespMsg_1_4.parse_raw(rcache_resp.response).\
+                            Rest_RespMsg_1_4.model_validate_json(rcache_resp.response).\
                             availableSpectrumInquiryResponses[0].\
-                            dict(exclude_none=True)
+                            model_dump(exclude_none=True)
                     except pydantic.ValidationError:
                         ret = None
 
@@ -399,8 +399,8 @@ class AfcServerMessageProcessor:
                         self._afc_state_vendor_extensions:
                     try:
                         prev_response_dict = \
-                            Rest_RespMsg_1_4.parse_raw(rcache_resp.response).\
-                            dict()
+                            Rest_RespMsg_1_4.model_validate_json(rcache_resp.response).\
+                            model_dump()
                         for ve in prev_response_dict[
                                 "availableSpectrumInquiryResponses"][0].\
                                 get("vendorExtensions", []):
@@ -449,9 +449,9 @@ class AfcServerMessageProcessor:
                                 f"Task ID {task_id}"))
                     return ret
                 ret = \
-                    Rest_RespMsg_1_4.parse_raw(resp_str).\
+                    Rest_RespMsg_1_4.model_validate_json(resp_str).\
                     availableSpectrumInquiryResponses[0].\
-                    dict(exclude_none=True)
+                    model_dump(exclude_none=True)
 
             # Extract processing information from response...
             uls_id = "Unknown"
@@ -527,7 +527,7 @@ class AfcServerMessageProcessor:
         return \
             Rest_AvailableSpectrumInquiryResponseMinGen(
                 requestId=request_id, rulesetId=ruleset_id,
-                response=response_info).dict(exclude_none=True)
+                response=response_info).model_dump(exclude_none=True)
 
     def _make_response_info(
             self, ex: Optional[BaseException] = None,

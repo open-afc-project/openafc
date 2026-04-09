@@ -10,7 +10,10 @@ import os
 try:
     import pydantic
 except ImportError:
-    # To have access to, day, safe_dsn() even without pydantic
+    pass
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
     pass
 from typing import Any, Dict, List
 
@@ -19,7 +22,8 @@ def env_help(settings_class: Any, arg: str, prefix: str = ". ") -> str:
     """ Prints help on environment variable for given command line argument
     (aka setting name).
 
-    Environment variable name must be explicitly defined in Field() with 'env='
+    Environment variable name must be explicitly defined in Field() with
+    validation_alias= (pydantic v2) or env= (pydantic v1)
 
     Arguments:
     settings_class -- Type, derived from pydantic.BaseSettings
@@ -27,25 +31,26 @@ def env_help(settings_class: Any, arg: str, prefix: str = ". ") -> str:
     prefix         -- Prefix to use if result is nonempty
     Returns fragment for help message
     """
-    props = settings_class.schema()["properties"].get(arg)
-    assert props is not None, \
+    field_info = settings_class.model_fields.get(arg)
+    assert field_info is not None, \
         f"Command line argument '--{arg}' not found in settings class " \
-        f"{settings_class.schema()['title']}"
+        f"{settings_class.__name__}"
     ret: List[str] = []
-    default = props.get("default")
-    if default is not None:
-        ret.append(f"Default is '{default}'")
-    if "env" in props:
-        ret.append(f"May be set with '{props['env']}' environment variable")
-        value = os.environ.get(props["env"])
+    if field_info.default is not None:
+        ret.append(f"Default is '{field_info.default}'")
+    alias = field_info.validation_alias
+    if alias:
+        env_name = alias if isinstance(alias, str) else str(alias)
+        ret.append(f"May be set with '{env_name}' environment variable")
+        value = os.environ.get(env_name)
         if value is not None:
             ret[-1] += f" (which is currently '{value}')"
-    if "default" not in props:
+    if field_info.is_required():
         ret.append("This parameter is mandatory")
     return (prefix + ". ".join(ret)) if ret else ""
 
 
-def merge_args(settings_class: Any, args: Any) -> "pydantic.BaseSettings":
+def merge_args(settings_class: Any, args: Any) -> "BaseSettings":
     """ Merges settings from command line arguments and Pydantic settings
 
     Arguments:
@@ -54,6 +59,6 @@ def merge_args(settings_class: Any, args: Any) -> "pydantic.BaseSettings":
     Returns Object of type derived from pydantic.BaseSettings
     """
     kwargs: Dict[str, Any] = \
-        {k: getattr(args, k) for k in settings_class.schema()["properties"]
+        {k: getattr(args, k) for k in settings_class.model_fields
          if getattr(args, k, None) not in (None, False)}
     return settings_class(**kwargs)

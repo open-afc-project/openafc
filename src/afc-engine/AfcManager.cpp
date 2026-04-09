@@ -1,6 +1,7 @@
 // AfcManager.cpp -- Manages I/O and top-level operations for the AFC Engine
 #include <boost/format.hpp>
 #include <QFileInfo>
+#include <gdal.h>
 
 #include "AfcManager.h"
 #include "RlanRegion.h"
@@ -2433,6 +2434,45 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 	} else if (_analysisType == "test_winner2") {
 		// Do nothing
 #endif
+	} else if (_analysisType == "ExclusionZoneAnalysis") {
+		// Read Exclusion Zone parameters from GUI request JSON
+		_exclusionZoneFSID = jsonObj.contains("FSID") ? jsonObj["FSID"].toInt() : 0;
+		_exclusionZoneRLANEIRPDBm = jsonObj.contains("EIRP") ? jsonObj["EIRP"].toDouble() : 0.0;
+		_exclusionZoneRLANChanIdx = 0; // will be the first (and only) channel
+
+		double height = jsonObj.contains("height") ? jsonObj["height"].toDouble() : 0.0;
+		double heightUncertainty = jsonObj.contains("heightUncertainty") ? jsonObj["heightUncertainty"].toDouble() : 0.0;
+		// Store height in _rlanLLA; lat/lon are not used for ExclusionZone (derived from FS location)
+		_rlanLLA = std::make_tuple(quietNaN, quietNaN, height);
+		_rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, heightUncertainty);
+
+		QString htType = jsonObj.contains("heightType") ? jsonObj["heightType"].toString() : "AGL";
+		if (htType == "AMSL") {
+			_rlanHeightType = CConst::AMSLHeightType;
+		} else {
+			_rlanHeightType = CConst::AGLHeightType;
+		}
+
+		QString indoorOutdoor = jsonObj.contains("indoorOutdoor") ? jsonObj["indoorOutdoor"].toString() : "Outdoor";
+		if (indoorOutdoor == "Indoor") {
+			_rlanType = RLANType::RLAN_INDOOR;
+			_bodyLossDB = _bodyLossIndoorDB;
+		} else {
+			_rlanType = RLANType::RLAN_OUTDOOR;
+			_bodyLossDB = _bodyLossOutdoorDB;
+		}
+
+		// Set up a frequency range from centerFrequency +/- bandwidth/2 for channel computation
+		double centerFreqMHz = jsonObj.contains("centerFrequency") ? jsonObj["centerFrequency"].toDouble() : 0.0;
+		double bwMHz = jsonObj.contains("bandwidth") ? jsonObj["bandwidth"].toDouble() : 0.0;
+		if (centerFreqMHz <= 0.0 || bwMHz <= 0.0) {
+			_missingParams << "centerFrequency" << "bandwidth";
+			_responseInfo.reset(new ResponseInfo(CConst::missingParamResponseCode));
+			return;
+		}
+		int startFreqMHz = (int)(centerFreqMHz - bwMHz / 2.0 + 0.5);
+		int stopFreqMHz  = (int)(centerFreqMHz + bwMHz / 2.0 + 0.5);
+		_inquiredFrequencyRangesMHz.push_back(std::make_pair(startFreqMHz, stopFreqMHz));
 	} else {
 		throw std::runtime_error(QString("Invalid analysis type for version 1.1: %1").arg(QString::fromStdString(_analysisType)).toStdString());
 	}
@@ -3797,10 +3837,15 @@ QJsonDocument AfcManager::generateExclusionZoneJson()
 
 OGRLayer* AfcManager::createGeoJSONLayer(const char *tmpPath,  GDALDataset **dataSet)
 {
+	/* OGR drivers are only auto-registered when NLCD (CachedGdal) or similar
+	 * loads. ExclusionZoneAnalysis / other paths may never construct CachedGdal,
+	 * so register all drivers here before GeoJSON export. */
+	GDALAllRegister();
 	GDALDriver *driver = (GDALDriver*)GDALGetDriverByName("GeoJSON");
 	if (!driver)
 	{
-		throw std::runtime_error("GDALGetDriverByName() error");
+		throw std::runtime_error(
+			"GDAL OGR driver 'GeoJSON' not available after GDALAllRegister()");
 	}
 
 	/* create empty dataset */

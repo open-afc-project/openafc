@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { Card, CardHeader, CardBody, ClipboardCopy, ClipboardCopyVariant } from '@patternfly/react-core';
+import React from 'react';
+import { Card, CardHeader, CardTitle, CardBody, ClipboardCopy } from '@patternfly/react-core';
 
 /**
  * JsonRawDisp.tsx: Simple raw JSON display that can be used for debugging
@@ -15,9 +15,9 @@ export const JsonRawDisp: React.FunctionComponent<{ value?: any }> = (props) =>
     <Card />
   ) : (
     <Card>
-      <CardHeader>Raw JSON</CardHeader>
+      <CardHeader><CardTitle>Raw JSON</CardTitle></CardHeader>
       <CardBody>
-        <ClipboardCopy isReadOnly={true} variant={ClipboardCopyVariant.expansion} isCode={true}>
+        <ClipboardCopy isReadOnly variant="expansion" isCode={true}>
           {!!props.value && typeof props.value === 'string' ? props.value : JSON.stringify(props.value, undefined, 2)}
         </ClipboardCopy>
       </CardBody>

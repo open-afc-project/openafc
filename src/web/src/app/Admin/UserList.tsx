@@ -1,6 +1,7 @@
 import React from 'react';
 import { UserModel } from '../Lib/RatApiTypes';
-import { Table, TableHeader, TableBody, headerCol, TableVariant } from '@patternfly/react-table';
+import { TableVariant } from '@patternfly/react-table';
+import { Table, TableHeader, TableBody } from '@patternfly/react-table/dist/esm/deprecated';
 
 /**
  * UserList.tsx: Table of users with actions
@@ -38,7 +39,7 @@ const userToRow = (u: UserModel) => ({
  */
 export class UserTable extends React.Component<UserTableProps, {}> {
   private columns = [
-    { title: 'Email', cellTransforms: [headerCol()] },
+    { title: 'Email' },
     { title: 'Org' },
     { title: 'Active' },
     { title: 'Roles' },

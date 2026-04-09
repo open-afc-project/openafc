@@ -22,6 +22,7 @@ import json
 import operator
 import os
 import pydantic
+from pydantic_settings import BaseSettings
 import re
 import requests
 import subprocess
@@ -53,25 +54,25 @@ def error_if(condition: Any, errmsg: str) -> None:
         error(errmsg)
 
 
-class Settings(pydantic.BaseSettings):
+class Settings(BaseSettings):
     """ Command line arguments that also may be specified through environment
     variables """
     grafana_db_dsn: Optional[pydantic.PostgresDsn] = \
-        pydantic.Field(None, env="GRAFANA_DATABASE_URL")
+        pydantic.Field(None, validation_alias="GRAFANA_DATABASE_URL")
     grafana_db_password_file: Optional[str] = \
-        pydantic.Field(None, env="GRAFANA_DATABASE_PASSWORD_FILE")
+        pydantic.Field(None, validation_alias="GRAFANA_DATABASE_PASSWORD_FILE")
     admin_user: Optional[str] = \
-        pydantic.Field(None, env="GF_SECURITY_ADMIN_USER")
+        pydantic.Field(None, validation_alias="GF_SECURITY_ADMIN_USER")
     admin_password_file: Optional[str] = \
-        pydantic.Field(None, env="GRAFANA_ADMIN_PASSWORD_FILE")
-    grafana_dir: Optional[str] = pydantic.Field(None, env="GF_PATHS_HOME")
-    grafana_config: Optional[str] = pydantic.Field(None, env="GF_PATHS_CONFIG")
+        pydantic.Field(None, validation_alias="GRAFANA_ADMIN_PASSWORD_FILE")
+    grafana_dir: Optional[str] = pydantic.Field(None, validation_alias="GF_PATHS_HOME")
+    grafana_config: Optional[str] = pydantic.Field(None, validation_alias="GF_PATHS_CONFIG")
     docker_socket_port: Optional[int] = \
-        pydantic.Field(None, env="GRAFANA_DOCKER_SOCKET_PORT")
+        pydantic.Field(None, validation_alias="GRAFANA_DOCKER_SOCKET_PORT")
     compose_service: Optional[str] = \
-        pydantic.Field(None, env="GRAFANA_COMPOSE_SERVICE")
+        pydantic.Field(None, validation_alias="GRAFANA_COMPOSE_SERVICE")
 
-    @pydantic.root_validator(pre=True)
+    @pydantic.model_validator(mode="before")
     @classmethod
     def remove_empty(cls, v: Any) -> Any:
         """ Prevalidator that removes empty values (presumably from environment

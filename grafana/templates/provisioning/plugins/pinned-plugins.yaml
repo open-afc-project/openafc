@@ -1,0 +1,22 @@
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+# Installed plugin versions are pinned at image build time (see Dockerfile-grafana
+# wget URLs). This file provisions Grafana so the plugins stay enabled for org 1.
+# When bumping a plugin, update both this comment and the Dockerfile URLs together.
+#
+#   yesoreyeram-infinity-datasource  2.11.4
+#   grafana-lokiexplore-app          1.0.39
+---
+apiVersion: 1
+
+apps:
+  - type: yesoreyeram-infinity-datasource
+    org_id: 1
+    disabled: false
+
+  - type: grafana-lokiexplore-app
+    org_id: 1
+    disabled: false

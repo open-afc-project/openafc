@@ -48,13 +48,13 @@ export default class BuildlingPenetrationLossForm extends React.PureComponent<{
     }
   }
 
-  setBuildingType = (s: string) => {
+  setBuildingType = (_event: any, s: string) => {
     if (s === 'Traditional' || s === 'Efficient') {
       this.change({ kind: 'ITU-R Rec. P.2109', buildingType: s, confidence: (this.props.data as P2109).confidence });
     }
   };
 
-  setPercentile = (s: string) => {
+  setPercentile = (_event: any, s: string) => {
     this.change({
       kind: 'ITU-R Rec. P.2109',
       confidence: Number(s),
@@ -62,7 +62,7 @@ export default class BuildlingPenetrationLossForm extends React.PureComponent<{
     });
   };
 
-  setFixedValue = (s: string) => {
+  setFixedValue = (_event: any, s: string) => {
     this.change({ kind: 'Fixed Value', value: Number(s) });
   };
 
@@ -78,7 +78,7 @@ export default class BuildlingPenetrationLossForm extends React.PureComponent<{
                 id="penetration-loss-building-type"
                 name="penetration-loss-building-type"
                 style={{ textAlign: 'right' }}
-                isValid={this.props.data.buildingType !== undefined}
+                validated={this.props.data.buildingType !== undefined ? 'default' : 'error'}
               >
                 <FormSelectOption key="Traditional" value="Traditional" label="Traditional" />
                 <FormSelectOption key="Efficient" value="Efficient" label="Thermally-Efficient" />
@@ -93,7 +93,7 @@ export default class BuildlingPenetrationLossForm extends React.PureComponent<{
                   id="penetration-loss-building-confidence"
                   name="penetration-loss-building-confidence"
                   style={{ textAlign: 'right' }}
-                  isValid={this.props.data.confidence >= 0 && this.props.data.confidence <= 100}
+                  validated={this.props.data.confidence >= 0 && this.props.data.confidence <= 100 ? 'default' : 'error'}
                 />
                 <InputGroupText>%</InputGroupText>
               </InputGroup>
@@ -109,7 +109,7 @@ export default class BuildlingPenetrationLossForm extends React.PureComponent<{
                 type="number"
                 id="penetration-loss-fixed-value"
                 name="penetration-loss-fixed-value"
-                isValid={true}
+                validated='default'
                 value={this.props.data.value}
                 onChange={this.setFixedValue}
                 style={{ textAlign: 'right' }}
@@ -130,10 +130,10 @@ export default class BuildlingPenetrationLossForm extends React.PureComponent<{
         <InputGroup>
           <FormSelect
             value={this.props.data.kind}
-            onChange={(x) => this.setKind(x)}
+            onChange={(_event, x) => this.setKind(x)}
             id="horzontal-form-penetration-loss"
             name="horizontal-form-penetration-loss"
-            isValid={this.props.data.kind !== undefined}
+            validated={this.props.data.kind !== undefined ? 'default' : 'error'}
             style={{ textAlign: 'right' }}
           >
             {penetrationLossModels.map((option) => (

@@ -9,6 +9,9 @@
 
 FROM postgis/postgis:14-3.3
 
+COPY postgis-upgrade.sh /usr/local/bin/postgis-upgrade.sh
+RUN chmod +x /usr/local/bin/postgis-upgrade.sh
+
 ENV POSTGRES_PASSWORD=postgres
 ENV POSTGRES_HOST_AUTH_METHOD=trust
 ENV AFC_BULKDB_CONNS=${AFC_BULKDB_CONNS:-1000}

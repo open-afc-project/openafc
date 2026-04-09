@@ -237,7 +237,7 @@ class RcacheDbAsync(RcacheDb):
         """ Return number of requests currently being precomputed """
         assert self._engine is not None
         try:
-            sel = sa.select([sa.func.count()]).select_from(self.ap_table).\
+            sel = sa.select(sa.func.count()).select_from(self.ap_table).\
                 where(self.ap_table.c.state == ApDbRespState.Precomp.name)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
@@ -257,9 +257,9 @@ class RcacheDbAsync(RcacheDb):
         """
         assert self._engine is not None
         try:
-            sq = sa.select([self.ap_table.c.serial_number,
+            sq = sa.select(self.ap_table.c.serial_number,
                             self.ap_table.c.rulesets,
-                            self.ap_table.c.cert_ids]).\
+                            self.ap_table.c.cert_ids).\
                 where(self.ap_table.c.state == ApDbRespState.Invalid.name).\
                 order_by(sa.desc(self.ap_table.c.last_update)).\
                 limit(limit)
@@ -280,7 +280,7 @@ class RcacheDbAsync(RcacheDb):
         """ Returns number of invalidated records """
         assert self._engine is not None
         try:
-            sel = sa.select([sa.func.count()]).select_from(self.ap_table).\
+            sel = sa.select(sa.func.count()).select_from(self.ap_table).\
                 where(self.ap_table.c.state == ApDbRespState.Invalid.name)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
@@ -293,7 +293,7 @@ class RcacheDbAsync(RcacheDb):
         """ Returns total number entries in cache (including nonvalid) """
         assert self._engine is not None
         try:
-            sel = sa.select([sa.func.count()]).select_from(self.ap_table)
+            sel = sa.select(sa.func.count()).select_from(self.ap_table)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
                 return rp.fetchone()[0]
@@ -306,7 +306,7 @@ class RcacheDbAsync(RcacheDb):
         assert self._engine is not None
         try:
             d = sa.delete(self.ap_table)
-            for k, v in pk.dict().items():
+            for k, v in pk.model_dump().items():
                 d = d.where(self.ap_table.c[k] == v)
                 async with self._engine.begin() as conn:
                     await conn.execute(d)
@@ -320,7 +320,7 @@ class RcacheDbAsync(RcacheDb):
             return True
         try:
             table = self.metadata.tables[self.SWITCHES_TABLE_NAME]
-            sel = sa.select([table.c.state]).where(table.c.name == sw.name)
+            sel = sa.select(table.c.state).where(table.c.name == sw.name)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
                 v = rp.first()

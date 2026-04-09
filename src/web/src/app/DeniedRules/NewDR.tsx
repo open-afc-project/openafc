@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   AccessPointModel,
   DeniedRegion,
@@ -12,6 +12,9 @@ import {
   Gallery,
   GalleryItem,
   FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
   TextInput,
   Button,
   Alert,
@@ -309,7 +312,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
     return (
       <>
         <br />
-        <Gallery gutter="sm">
+        <Gallery hasGutter>
           <GalleryItem>
             <FormGroup label="Location Name" isRequired={true} fieldId="location-name-form">
               <TextInput
@@ -318,8 +321,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                 name="location-name-form"
                 aria-describedby="location-name-form-helper"
                 value={this.state.name}
-                onChange={(x) => this.setName(x)}
-                isValid={!!this.state.name && this.state.name.length > 0}
+                onChange={(_event, x) => this.setName(x)}
+                validated={!!this.state.name && this.state.name.length > 0 ? 'default' : 'error'}
               />
             </FormGroup>
           </GalleryItem>
@@ -331,8 +334,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                 name="start-freq-form"
                 aria-describedby="start-freq-form-helper"
                 value={this.state.startFreq}
-                onChange={(x) => this.setStartFreq(Number(x))}
-                isValid={!!this.state.startFreq && this.state.startFreq > 0}
+                onChange={(_event, x) => this.setStartFreq(Number(x))}
+                validated={!!this.state.startFreq && this.state.startFreq > 0 ? 'default' : 'error'}
               />
             </FormGroup>
           </GalleryItem>
@@ -341,7 +344,6 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
               label="End Frequency (MHz)"
               isRequired={true}
               fieldId="end-freq-form"
-              helperTextInvalid="End frequency must be provided and be larger than Start Frequency"
             >
               <TextInput
                 type="number"
@@ -349,11 +351,16 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                 name="end-freq-form"
                 aria-describedby="end-freq-form-helper"
                 value={this.state.endFreq}
-                onChange={(x) => this.setEndFreq(Number(x))}
-                isValid={
-                  !!this.state.endFreq && this.state.endFreq > 0 && (this.state.startFreq ?? 0) <= this.state.endFreq
-                }
+                onChange={(_event, x) => this.setEndFreq(Number(x))}
+                validated={!!this.state.endFreq && this.state.endFreq > 0 && (this.state.startFreq ?? 0) <= this.state.endFreq ? 'default' : 'error'}
               />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant={!!this.state.endFreq && this.state.endFreq > 0 && (this.state.startFreq ?? 0) <= this.state.endFreq ? 'default' : 'error'}>
+                    End frequency must be provided and be larger than Start Frequency
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
           </GalleryItem>
 
@@ -365,8 +372,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                 name="zone-type-form"
                 aria-describedby="zone-type-form-helper"
                 value={this.state.zoneType}
-                onChange={(x) => this.setZoneType(x)}
-                isValid={!!this.state.zoneType}
+                onChange={(_event, x) => this.setZoneType(x)}
+                validated={!!this.state.zoneType ? 'default' : 'error'}
               >
                 <FormSelectOption label="Circle" key="Circle" value="Circle" />
                 <FormSelectOption label="One Rectangle" key="One Rectangle" value="One Rectangle" />
@@ -387,8 +394,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-lat-form"
                       aria-describedby="circ-lat-form-helper"
                       value={this.state.circleLat}
-                      onChange={(x) => this.setCircleLat(Number(x))}
-                      isValid={this.state.circleLat !== undefined}
+                      onChange={(_event, x) => this.setCircleLat(Number(x))}
+                      validated={this.state.circleLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -400,8 +407,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-long-form"
                       aria-describedby="circ-long-form-helper"
                       value={this.state.circleLong}
-                      onChange={(x) => this.setCircleLong(Number(x))}
-                      isValid={this.state.circleLong !== undefined}
+                      onChange={(_event, x) => this.setCircleLong(Number(x))}
+                      validated={this.state.circleLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -413,8 +420,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-radius-form"
                       aria-describedby="circ-radius-form-helper"
                       value={this.state.radiusHeight}
-                      onChange={(x) => this.setCircleRadius(Number(x))}
-                      isValid={this.state.radiusHeight !== undefined}
+                      onChange={(_event, x) => this.setCircleRadius(Number(x))}
+                      validated={this.state.radiusHeight !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -432,8 +439,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-toplat-form"
                       aria-describedby="rect-toplat-form-helper"
                       value={this.state.rect1topLat}
-                      onChange={(x) => this.setRectTopLat(Number(x), 1)}
-                      isValid={this.state.circleLat !== undefined}
+                      onChange={(_event, x) => this.setRectTopLat(Number(x), 1)}
+                      validated={this.state.circleLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -445,8 +452,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-toplong-form"
                       aria-describedby="rect-toplong-form-helper"
                       value={this.state.rect1leftLong}
-                      onChange={(x) => this.setRectLeftLong(Number(x), 1)}
-                      isValid={this.state.rect1leftLong !== undefined}
+                      onChange={(_event, x) => this.setRectLeftLong(Number(x), 1)}
+                      validated={this.state.rect1leftLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -458,8 +465,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-botlat-form"
                       aria-describedby="rect-botlat-form-helper"
                       value={this.state.rect1bottomLat}
-                      onChange={(x) => this.setRectBottomLat(Number(x), 1)}
-                      isValid={this.state.rect1bottomLat !== undefined}
+                      onChange={(_event, x) => this.setRectBottomLat(Number(x), 1)}
+                      validated={this.state.rect1bottomLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -471,8 +478,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-rgtlon-formm"
                       aria-describedby="rect-rgtlon-form-helper"
                       value={this.state.rect1rightLong}
-                      onChange={(x) => this.setRectRightLong(Number(x), 1)}
-                      isValid={this.state.rect1rightLong !== undefined}
+                      onChange={(_event, x) => this.setRectRightLong(Number(x), 1)}
+                      validated={this.state.rect1rightLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -490,8 +497,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-toplat-form"
                       aria-describedby="rect-toplat-form-helper"
                       value={this.state.rect1topLat}
-                      onChange={(x) => this.setRectTopLat(Number(x), 1)}
-                      isValid={this.state.rect1topLat !== undefined}
+                      onChange={(_event, x) => this.setRectTopLat(Number(x), 1)}
+                      validated={this.state.rect1topLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -503,8 +510,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-long-form"
                       aria-describedby="rect-long-form-helper"
                       value={this.state.rect1leftLong}
-                      onChange={(x) => this.setRectLeftLong(Number(x), 1)}
-                      isValid={this.state.rect1leftLong !== undefined}
+                      onChange={(_event, x) => this.setRectLeftLong(Number(x), 1)}
+                      validated={this.state.rect1leftLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -516,8 +523,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-botlat-form"
                       aria-describedby="rect-botlat-form-helper"
                       value={this.state.rect1bottomLat}
-                      onChange={(x) => this.setRectBottomLat(Number(x), 1)}
-                      isValid={this.state.rect1bottomLat !== undefined}
+                      onChange={(_event, x) => this.setRectBottomLat(Number(x), 1)}
+                      validated={this.state.rect1bottomLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -529,8 +536,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-rgtlon-formm"
                       aria-describedby="rect-rgtlon-form-helper"
                       value={this.state.rect1rightLong}
-                      onChange={(x) => this.setRectRightLong(Number(x), 1)}
-                      isValid={this.state.rect1rightLong !== undefined}
+                      onChange={(_event, x) => this.setRectRightLong(Number(x), 1)}
+                      validated={this.state.rect1rightLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -544,8 +551,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect2-toplat-form"
                       aria-describedby="rect2-toplat-form-helper"
                       value={this.state.rect2topLat}
-                      onChange={(x) => this.setRectTopLat(Number(x), 2)}
-                      isValid={this.state.rect2topLat !== undefined}
+                      onChange={(_event, x) => this.setRectTopLat(Number(x), 2)}
+                      validated={this.state.rect2topLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -557,8 +564,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect2-leftlong-form"
                       aria-describedby="rect2-leftlong-form-helper"
                       value={this.state.rect2leftLong}
-                      onChange={(x) => this.setRectLeftLong(Number(x), 2)}
-                      isValid={this.state.rect2leftLong !== undefined}
+                      onChange={(_event, x) => this.setRectLeftLong(Number(x), 2)}
+                      validated={this.state.rect2leftLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -570,8 +577,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect2-botlat-form"
                       aria-describedby="rect2-botlat-form-helper"
                       value={this.state.rect2bottomLat}
-                      onChange={(x) => this.setRectBottomLat(Number(x), 2)}
-                      isValid={this.state.rect2bottomLat !== undefined}
+                      onChange={(_event, x) => this.setRectBottomLat(Number(x), 2)}
+                      validated={this.state.rect2bottomLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -583,8 +590,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect2-rgtlon-formm"
                       aria-describedby="rect2-rgtlon-form-helper"
                       value={this.state.rect2rightLong}
-                      onChange={(x) => this.setRectRightLong(Number(x), 2)}
-                      isValid={this.state.rect2rightLong !== undefined}
+                      onChange={(_event, x) => this.setRectRightLong(Number(x), 2)}
+                      validated={this.state.rect2rightLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -602,8 +609,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-lat-form"
                       aria-describedby="circ-lat-form-helper"
                       value={this.state.circleLat}
-                      onChange={(x) => this.setCircleLat(Number(x))}
-                      isValid={this.state.circleLat !== undefined}
+                      onChange={(_event, x) => this.setCircleLat(Number(x))}
+                      validated={this.state.circleLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -615,8 +622,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-long-form"
                       aria-describedby="circ-long-form-helper"
                       value={this.state.circleLong}
-                      onChange={(x) => this.setCircleLong(Number(x))}
-                      isValid={this.state.circleLong !== undefined}
+                      onChange={(_event, x) => this.setCircleLong(Number(x))}
+                      validated={this.state.circleLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -628,8 +635,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-radius-form"
                       aria-describedby="circ-radius-form-helper"
                       value={this.state.radiusHeight}
-                      onChange={(x) => this.setCircleRadius(Number(x))}
-                      isValid={this.state.radiusHeight !== undefined}
+                      onChange={(_event, x) => this.setCircleRadius(Number(x))}
+                      validated={this.state.radiusHeight !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>

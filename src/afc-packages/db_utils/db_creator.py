@@ -68,7 +68,7 @@ class DsnInfo:
                          unspecified - used as password source regardless of
                          password in 'dsn'
         """
-        parsed_dsn = urllib.parse.urlparse(dsn)
+        parsed_dsn = urllib.parse.urlparse(str(dsn))
 
         self.host = parsed_dsn.hostname
         error_if(not self.host, f"DSN '{safe_dsn(dsn)}' missing hostname")

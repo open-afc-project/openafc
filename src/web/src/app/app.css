@@ -1,5 +1,40 @@
 :root {
   --myApp-global--spacer--md: 30px;
+  /* ~half of PatternFly md gap between action buttons */
+  --afc-button-group-gap: calc(var(--pf-t--global--spacer--md, 1rem) / 2);
+}
+
+/*
+ * PatternFly ActionGroup lays out .pf-v6-c-form__actions children with per-item margins.
+ * That yields uneven gaps. Use flex + gap on the actions container and clear child margins.
+ */
+.afc-button-group .pf-v6-c-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--afc-button-group-gap);
+  margin: 0;
+}
+
+.afc-button-group .pf-v6-c-form__actions > * {
+  margin: 0 !important;
+}
+
+/* Plain flex rows (no ActionGroup): Mobile AP timeline, RatAfc map toolbar, etc. */
+.afc-button-group--row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--afc-button-group-gap);
+}
+
+.afc-button-group--after-form {
+  margin-top: var(--pf-t--global--spacer--sm, 0.5rem);
+}
+
+/* PatternFly checkboxes: a bit more space between the box and label in dense forms */
+.pf-v6-c-check:not(.pf-m-standalone) {
+  column-gap: var(--pf-t--global--spacer--sm, 0.5rem);
 }
 
 html,
@@ -27,8 +62,9 @@ pre {
   flex: 0 1 auto;
 }
 
-.pf-c-page__main {
-  background: #ededed;
+.pf-c-page__main,
+.pf-v6-c-page__main {
+  background: var(--pf-t--global--background--color--secondary--default, #ededed);
 }
 
 #nav-list-simple {
@@ -53,7 +89,7 @@ pre {
   width: 100%;
   height: 15px;
   border-radius: 5px;
-  background: #d3d3d3;
+  background: var(--pf-t--global--background--color--secondary--default, #d3d3d3);
   outline: none;
   opacity: 0.7;
   -webkit-transition: 0.2s;
@@ -78,18 +114,12 @@ pre {
   cursor: pointer;
 }
 
-#horizontal-form-certification-nra {
-  max-width: 50%;
-  display: inline;
-}
-
-#horizontal-form-certification-list {
-  max-width: 50%;
-  display: inline;
-}
+/* IDs used for name/id attributes only; no width constraints needed */
+#horizontal-form-certification-nra,
+#horizontal-form-certification-list {}
 
 .nestedGallery {
-  border: 1px solid darkgray;
+  border: 1px solid var(--pf-t--global--border--color--default, darkgray);
 }
 
 .inquiredChannelsSection {
@@ -118,19 +148,51 @@ pre {
 }
 
 .custom-tooltip {
-  background-color: white;
+  background-color: var(--pf-t--global--background--color--primary--default, white);
 }
 
 #aboutAccordion {
-  --pf-global--Color--100: white;
-  --pf-global--BackgroundColor--100: black;
-  --pf-c-accordion--BackgroundColor: black;
-  --pf-c-accordion__toggle--hover--BackgroundColor: darkgrey;
-  --pf-c-accordion__toggle--focus--BackgroundColor: darkgrey;
-  --pf-c-accordion__toggle--active--BackgroundColor: darkgrey;
-  --pf-c-accordion__expanded-content--Color: white;
+  --pf-v6-c-accordion--BackgroundColor: var(--pf-t--global--background--color--primary--default);
+  --pf-v6-c-accordion__toggle--hover--BackgroundColor: var(--pf-t--global--background--color--secondary--hover);
+  --pf-v6-c-accordion__toggle--focus--BackgroundColor: var(--pf-t--global--background--color--secondary--hover);
+  --pf-v6-c-accordion__toggle--active--BackgroundColor: var(--pf-t--global--background--color--secondary--hover);
+  --pf-v6-c-accordion__toggle--Color: var(--pf-t--global--text--color--regular);
+  --pf-v6-c-accordion__expanded-content-body--Color: var(--pf-t--global--text--color--regular);
 }
 
 #parametersList {
   font-size: large;
+}
+
+/* Masthead brand alignment */
+.pf-v6-c-masthead__main {
+  align-items: center !important;
+}
+.pf-v6-c-masthead__brand {
+  align-self: center !important;
+  display: flex !important;
+  align-items: center !important;
+}
+.pf-v6-c-masthead__logo {
+  display: flex !important;
+  align-items: center !important;
+  line-height: normal !important;
+}
+/* Ensure toolbar content row is also vertically centered */
+.pf-v6-c-masthead__content {
+  display: flex !important;
+  align-items: center !important;
+}
+/* PF6 toolbar__content-section defaults to align-items:start; override to center
+   so that text NavLinks and icon Buttons all align to the same vertical midpoint */
+.pf-v6-c-masthead .pf-v6-c-toolbar__content-section {
+  align-items: center !important;
+}
+
+/* PF6 form-control uses display:grid. Chrome does not auto-stretch replaced
+   elements (<input>, <select>) to fill the grid cell even with grid-column:1/-1.
+   Explicitly set width:100% on the inner elements so they fill the container. */
+.pf-v6-c-form-control > input,
+.pf-v6-c-form-control > select {
+  width: 100%;
 }

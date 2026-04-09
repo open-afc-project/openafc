@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import { FormGroup, TextInput, InputGroup, FormSelect, FormSelectOption, InputGroupText } from '@patternfly/react-core';
 import { PolarizationLossModel } from '../Lib/RatApiTypes';
 
@@ -40,7 +40,7 @@ export default class PolarizationMismatchLossForm extends React.PureComponent<{
     }
   }
 
-  setFixedValue = (s: string) => {
+  setFixedValue = (_event: any, s: string) => {
     this.change({ kind: 'Fixed Value', value: Number(s) });
   };
 
@@ -60,7 +60,7 @@ export default class PolarizationMismatchLossForm extends React.PureComponent<{
                 type="number"
                 id="polarization-loss-fixed-value"
                 name="polarization-loss-fixed-value"
-                isValid={true}
+                validated='default'
                 value={model.value}
                 onChange={this.setFixedValue}
                 style={{ textAlign: 'right' }}
@@ -86,7 +86,7 @@ export default class PolarizationMismatchLossForm extends React.PureComponent<{
                         onChange={x => this.setKind(x)}
                         id="horzontal-form-polarization-loss"
                         name="horizontal-form-polarization-loss"
-                        isValid={model.kind !== undefined}
+                        validated={model.kind !== undefined ? 'default' : 'error'}
                         style={{ textAlign: "right" }}
                     >
                         {polarizationLossModels.map((option) => (

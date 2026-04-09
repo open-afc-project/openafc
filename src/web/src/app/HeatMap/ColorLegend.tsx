@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import { Card, CardHeader, CardBody } from '@patternfly/react-core';
 import { HeatMapAnalysisType } from '../Lib/RatApiTypes';
 
@@ -64,19 +64,19 @@ export const ColorLegend: React.FunctionComponent<{ threshold: number; analysisT
     </CardHeader>
     <CardBody>
       <div key={100} style={{ height: '30px', width: '600px', backgroundColor: 'Black' }}>
-        <div style={{ height: '30px', width: '300px', backgroundColor: 'White', borderRightStyle: 'solid' }}>
+        <div style={{ height: '30px', width: '300px', backgroundColor: 'White', color: 'Black', borderRightStyle: 'solid' }}>
           Denied region
         </div>
       </div>
       <div key={101} style={{ height: '30px', width: '600px', backgroundColor: 'White' }}>
-        <div style={{ height: '30px', width: '300px', backgroundColor: 'White', borderRightStyle: 'solid' }}>
+        <div style={{ height: '30px', width: '300px', backgroundColor: 'White', color: 'Black', borderRightStyle: 'solid' }}>
           No restriction
         </div>
       </div>
       {props.analysisType === HeatMapAnalysisType.ItoN &&
         colorValues(props.threshold || -6).map((val, i) => (
           <div key={i} style={{ height: '30px', width: '600px', backgroundColor: val.color }}>
-            <div style={{ height: '30px', width: '300px', backgroundColor: 'White', borderRightStyle: 'solid' }}>
+            <div style={{ height: '30px', width: '300px', backgroundColor: 'White', color: 'Black', borderRightStyle: 'solid' }}>
               {val.label}
             </div>
           </div>
@@ -84,17 +84,17 @@ export const ColorLegend: React.FunctionComponent<{ threshold: number; analysisT
       {props.analysisType === HeatMapAnalysisType.EIRP && (
         <>
           <div key={200} style={{ height: '30px', width: '600px', backgroundColor: 'Green' }}>
-            <div style={{ height: '30px', width: '300px', backgroundColor: 'White', borderRightStyle: 'solid' }}>
+            <div style={{ height: '30px', width: '300px', backgroundColor: 'White', color: 'Black', borderRightStyle: 'solid' }}>
               maxEIRP is met
             </div>
           </div>
           <div key={201} style={{ height: '30px', width: '600px', backgroundColor: 'Yellow' }}>
-            <div style={{ height: '30px', width: '300px', backgroundColor: 'White', borderRightStyle: 'solid' }}>
+            <div style={{ height: '30px', width: '300px', backgroundColor: 'White', color: 'Black', borderRightStyle: 'solid' }}>
               minEIRP &lt;= EIRP &lt; maxEIRP
             </div>
           </div>
           <div key={202} style={{ height: '30px', width: '600px', backgroundColor: 'Red' }}>
-            <div style={{ height: '30px', width: '300px', backgroundColor: 'White', borderRightStyle: 'solid' }}>
+            <div style={{ height: '30px', width: '300px', backgroundColor: 'White', color: 'Black', borderRightStyle: 'solid' }}>
               EIRP &lt; minEIRP
             </div>
           </div>

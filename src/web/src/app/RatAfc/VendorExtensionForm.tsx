@@ -1,20 +1,14 @@
-import * as React from 'react';
+import React from 'react';
 // import ReactTooltip from 'react-tooltip';
 import {
   GalleryItem,
   FormGroup,
-  InputGroup,
-  Radio,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
   TextInput,
-  InputGroupText,
-  Select,
-  SelectOption,
-  SelectVariant,
-  CheckboxSelectGroup,
-  Checkbox,
   Gallery,
   Button,
-  Label,
   ClipboardCopy,
   ClipboardCopyVariant,
 } from '@patternfly/react-core';
@@ -103,27 +97,34 @@ export class VendorExtensionForm extends React.PureComponent<VendorExtensionForm
                 <TextInput
                   value={ve.extensionId}
                   type="text"
-                  onChange={(x) => this.setExtensionId(x, idx)}
+                  onChange={(_event, x) => this.setExtensionId(x, idx)}
                   id={'vendor-extension-id-' + idx}
                   name={'vendor-extension-id-' + idx}
-                  style={{ textAlign: 'left' }}
-                  isValid={!!ve.extensionId}
+                  style={{ textAlign: 'left', width: '100%' }}
+                  validated={!!ve.extensionId ? 'default' : 'error'}
                 />
               </FormGroup>
               <FormGroup
                 fieldId={'ve-form-group-' + idx}
                 label="Parameters"
                 className="vendorParamsEntry"
-                helperTextInvalid={this.state.parseValidationMessages[idx]}
-                validated={this.state.parseValidationMessages[idx] == '' ? 'success' : 'error'}
               >
                 <ClipboardCopy
                   id={'vendor-params-' + idx}
                   variant={ClipboardCopyVariant.expansion}
-                  onChange={(x) => this.setParameters(x as string, idx)}
+                  onChange={(_event, x) => this.setParameters(x as string, idx)}
                 >
                   {JSON.stringify(ve.parameters, null, ' ')}
                 </ClipboardCopy>
+                {this.state.parseValidationMessages[idx] && (
+                  <FormHelperText>
+                    <HelperText>
+                      <HelperTextItem variant={this.state.parseValidationMessages[idx] === '' ? 'default' : 'error'}>
+                        {this.state.parseValidationMessages[idx]}
+                      </HelperTextItem>
+                    </HelperText>
+                  </FormHelperText>
+                )}
               </FormGroup>
               <Button id={'delete-ve-' + idx} onClick={() => this.deleteVendorExtension(idx)} variant="tertiary">
                 Delete this Extension

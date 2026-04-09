@@ -1,33 +1,18 @@
 import React from 'react';
-import * as React from 'react';
 import {
   Title,
   Card,
-  CardHead,
-  CardHeader,
   CardBody,
   PageSection,
-  InputGroup,
-  TextInput,
-  FormGroup,
   Button,
   Alert,
   AlertActionCloseButton,
 } from '@patternfly/react-core';
+import { Navigate } from 'react-router-dom';
 import { guiConfig, getAboutLoginAfc } from '../Lib/RatApi';
+import { isLoggedIn, UserContext, UserState } from '../Lib/User';
 
-/**
- * AppLogin.ts: Login page for web site
- * author: patternfly, Sam Smucny
- */
-
-// Currently there is no logo/background on app pages, so if we want to brand the site this is one place to do it
-// Note: When using background-filter.svg, you must also include #image_overlay as the fragment identifier
-
-/**
- * Application login page
- */
-class AppLoginPage extends React.Component {
+class AppLoginPage extends React.Component<any, { content: string; messageType?: string; messageValue?: string }> {
   constructor(props: any) {
     super(props);
     this.state = { content: '' };
@@ -44,26 +29,32 @@ class AppLoginPage extends React.Component {
   private hideAlert = () => this.setState({ messageType: undefined });
 
   render() {
-    // the commented lines are not being used. If we want to add functionality for them at a later date then uncomment
     return (
-      <PageSection>
-        <div>
-          <Title size={'lg'}>AFC Login</Title>
-          <Card>
-            {' '}
-            <CardBody dangerouslySetInnerHTML={{ __html: this.state.content }} />
-          </Card>
-          <>
-            {this.state.messageType && (
-              <Alert
-                variant={this.state.messageType}
-                title={this.state.messageValue}
-                action={<AlertActionCloseButton onClose={this.hideAlert} />}
-              />
-            )}
-          </>
-        </div>
-      </PageSection>
+      <UserContext.Consumer>
+        {(u: UserState) =>
+          isLoggedIn() ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <PageSection>
+              <div>
+                <Title headingLevel="h2">AFC Login</Title>
+                <Card>
+                  <CardBody dangerouslySetInnerHTML={{ __html: this.state.content }} />
+                </Card>
+                <>
+                  {this.state.messageType && (
+                    <Alert
+                      variant={this.state.messageType as any}
+                      title={this.state.messageValue || ''}
+                      actionClose={<AlertActionCloseButton onClose={this.hideAlert} />}
+                    />
+                  )}
+                </>
+              </div>
+            </PageSection>
+          )
+        }
+      </UserContext.Consumer>
     );
   }
 }

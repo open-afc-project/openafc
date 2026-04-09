@@ -243,10 +243,16 @@ def create_handler(app, path):
 
     :return: The :py:cls:`JSONRPC` object created.
     '''
-    rpc = JSONRPC(service_url=path, enable_web_browsable_api=True)
-    rpc.method(
-        'spectrum.paws.getSpectrum(deviceDesc=object, location=object, antenna=object, capabilities=object, type=str, version=str) -> object',
-        validate=False)(getSpectrum)
+    import typing as t
+    rpc = JSONRPC(path=path, enable_web_browsable_api=True)
+
+    @rpc.method('spectrum.paws.getSpectrum', validate=False)
+    def paws_getSpectrum(deviceDesc: t.Any, location: t.Any, antenna: t.Any,
+                         capabilities: t.Any, type: str, version: str) -> t.Any:
+        return getSpectrum(deviceDesc=deviceDesc, location=location,
+                           antenna=antenna, capabilities=capabilities,
+                           type=type, version=version)
+
     rpc.init_app(app)
 
     return rpc

@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import { MTLSModel, RatResponse } from '../Lib/RatApiTypes';
 import {
   Gallery,
@@ -99,8 +99,8 @@ export class NewMTLS extends React.Component<NewMTLSProps, NewMTLSState> {
   }
 
   render() {
-    const noteChange = (s?: string) => this.setState({ note: s });
-    const orgChange = (s?: string) => this.setState({ org: s });
+    const noteChange = (_event: any, s?: string) => this.setState({ note: s });
+    const orgChange = (_event: any, s?: string) => this.setState({ org: s });
 
     return (
       <>
@@ -108,11 +108,11 @@ export class NewMTLS extends React.Component<NewMTLSProps, NewMTLSState> {
           <Alert
             variant={this.state.messageType}
             title={this.state.messageValue}
-            action={<AlertActionCloseButton onClose={this.hideAlert} />}
+            actionClose={<AlertActionCloseButton onClose={this.hideAlert} />}
           />
         )}
         <br />
-        <Gallery gutter="sm">
+        <Gallery hasGutter>
           <GalleryItem>
             <FormGroup label="CertificateBrowser" isRequired={true} fieldId="cert-browser-form">
               <input type="file" name="certificate file" onChange={(e) => this.fileChange(e)} />
@@ -147,12 +147,10 @@ export class NewMTLS extends React.Component<NewMTLSProps, NewMTLSState> {
               </FormGroup>
             </GalleryItem>
           )}
-          <GalleryItem>
-            <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()}>
-              Add
-            </Button>
-          </GalleryItem>
         </Gallery>
+        <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()} style={{ marginTop: '1rem' }}>
+          Add
+        </Button>
       </>
     );
   }
