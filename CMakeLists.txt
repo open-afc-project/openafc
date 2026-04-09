@@ -1,3 +1,6 @@
+# Must appear before project() (required by CMake 3.31+ and strict policies).
+cmake_minimum_required(VERSION 3.16)
+
 cmake_policy(SET CMP0020 NEW)
 cmake_policy(SET CMP0048 NEW)
 cmake_policy(SET CMP0057 NEW)
@@ -50,7 +53,6 @@ else()
     project(fbrat VERSION ${VERSIONFILE} LANGUAGES)
 endif()
 
-cmake_minimum_required(VERSION 3.4)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 option(BUILD_AFCENGINE "Build the AFC engine portion of the project" ON)
 

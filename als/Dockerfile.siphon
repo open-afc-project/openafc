@@ -9,7 +9,7 @@
 # Kafka and puts them to PostgreSQL+PostGIS database (optionally creating
 # necessary database before operation)
 
-FROM python:3.12-alpine3.21
+FROM python:3.12-alpine3.21@sha256:d4f9227f21409479c7fe92288f2e40b1a56ae591c8ad3b5446dfeaef90f67857
 
 # Destination in docker image. Not a parameter (i.e. no reasons to change it)
 ARG WORKDIR=/usr/app
@@ -20,7 +20,6 @@ WORKDIR $WORKDIR
 
 # Configure pip to use package registry proxy (optional)
 ARG PIP_INDEX_URL
-ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka
@@ -28,7 +27,8 @@ ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 RUN apk add --update --no-cache librdkafka-dev
 COPY als/requirements.txt $WORKDIR/
 RUN apk add --update --no-cache python3-dev build-base && \
-    pip3 install --root-user-action=ignore -r $WORKDIR/requirements.txt && \
+    pip3 install --root-user-action=ignore --require-hashes \
+        -r $WORKDIR/requirements.txt && \
     apk del --purge python3-dev build-base && rm -f $WORKDIR/requirements.txt
 
 COPY src/afc-packages /wd/afc-packages/
@@ -111,6 +111,13 @@ COPY als/als_migrations $WORKDIR/als_migrations/
 COPY als/als_db_schema/ALS.sql $WORKDIR/als_db_schema/
 
 RUN chmod a+x $WORKDIR/als_*.py
+
+# Run as non-root fbrat (uid/gid 1003).
+# No host bind mounts for als_siphon so the switch is safe.
+RUN addgroup -g 1003 fbrat && \
+    adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat && \
+    chown -R fbrat:fbrat $WORKDIR
+USER fbrat
 
 ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_servers=$KAFKA_SERVERS \

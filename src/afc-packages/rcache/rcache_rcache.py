@@ -12,7 +12,7 @@ import pydantic
 import requests
 from typing import Any, Dict, List, Optional
 
-from log_utils import dp, error, FailOnError
+from log_utils import error, FailOnError
 from rcache_models import AfcReqRespKey, Beam, LatLonRect, \
     RcacheDirectionalInvalidateReq, RcacheInvalidateReq, \
     RcacheSpatialInvalidateReq, RcacheUpdateReq
@@ -23,10 +23,18 @@ class RcacheRcache:
 
     Private attributes:
     _rcache_server_url -- Request cache service URL
+    _api_key           -- API key for authentication
     """
 
-    def __init__(self, rcache_server_url: str) -> None:
+    def __init__(self, rcache_server_url: str, api_key_file: Optional[str] = None) -> None:
         self._rcache_server_url = rcache_server_url.rstrip("/")
+        self._api_key = None
+        if api_key_file:
+            try:
+                with open(api_key_file, "r") as f:
+                    self._api_key = f.read().strip()
+            except Exception as ex:
+                error(f"Failed to read API key from {api_key_file}: {ex}")
 
     def update_cache(self, rrks: List[AfcReqRespKey],
                      fail_on_error: bool = True) -> bool:
@@ -40,7 +48,7 @@ class RcacheRcache:
         with FailOnError(fail_on_error):
             try:
                 self._post(command="update",
-                           json=RcacheUpdateReq(req_resp_keys=rrks).dict())
+                           json=RcacheUpdateReq(req_resp_keys=rrks).model_dump())
             except pydantic.ValidationError as ex:
                 error(f"Invalid argument format: {ex}")
             return True
@@ -61,7 +69,7 @@ class RcacheRcache:
             try:
                 self._post(
                     command="invalidate",
-                    json=RcacheInvalidateReq(ruleset_ids=ruleset_ids).dict())
+                    json=RcacheInvalidateReq(ruleset_ids=ruleset_ids).model_dump())
             except pydantic.ValidationError as ex:
                 error(f"Invalid argument format: {ex}")
             return True
@@ -79,7 +87,7 @@ class RcacheRcache:
         with FailOnError(fail_on_error):
             try:
                 self._post(command="spatial_invalidate",
-                           json=RcacheSpatialInvalidateReq(tiles=tiles).dict())
+                           json=RcacheSpatialInvalidateReq(tiles=tiles).model_dump())
             except pydantic.ValidationError as ex:
                 error(f"Invalid argument format: {ex}")
             return True
@@ -94,11 +102,17 @@ class RcacheRcache:
         fail_on_error -- True to fail on error, False to return False
         Returns True on success, False on known fail if fail_on_error is False
         """
+        # RcacheDirectionalInvalidateReq enforces max 3000 beams per call.
+        # Send in batches so large ULS updates (which may produce tens of
+        # thousands of changed beams) do not fail validation.
+        _BATCH = 3000
         with FailOnError(fail_on_error):
             try:
-                self._post(
-                    command="directional_invalidate",
-                    json=RcacheDirectionalInvalidateReq(beams=beams).dict())
+                for i in range(0, len(beams), _BATCH):
+                    self._post(
+                        command="directional_invalidate",
+                        json=RcacheDirectionalInvalidateReq(
+                            beams=beams[i:i + _BATCH]).model_dump())
             except pydantic.ValidationError as ex:
                 error(f"Invalid argument format: {ex}")
             return True
@@ -111,8 +125,14 @@ class RcacheRcache:
         command -- Command (last part of URL) to invoke
         json    -- Command parameters in JSON format
         """
+        headers = {}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"
         try:
-            requests.post(f"{self._rcache_server_url}/{command}", json=json)
+            resp = requests.post(
+                f"{self._rcache_server_url}/{command}",
+                json=json, headers=headers, timeout=30)
+            resp.raise_for_status()
         except requests.RequestException as ex:
             error(f"Error sending '{command}' post to Request cache Server: "
                   f"{ex}")

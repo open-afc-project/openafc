@@ -3,6 +3,7 @@
 #include <math.h>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <bsd/string.h>
 
 #include "global_fn.h"
@@ -56,10 +57,25 @@ UlsFileReader::UlsFileReader(const char *fpath,
 	LineTypeEnum lineType;
 
 	int linenum = 0;
+	// Warn (but do not abort) when input grows unexpectedly large.
+	// The FCC ULS database grows naturally as new stations are licensed, so a hard abort
+	// would trigger whenever the data crosses an arbitrary threshold. A warning at 50M lines
+	// provides early notice of an abnormal feed without rejecting legitimate data.
+	static const int LARGE_RECORD_WARN_THRESHOLD = 50000000;
 	QMap<QString, int> autoCellCounts;
 
 	while (fgetline(fi, line, false)) {
 		linenum++;
+		if (linenum >= LARGE_RECORD_WARN_THRESHOLD) {
+			if (fwarn) {
+				fprintf(fwarn,
+					"ERROR: input has exceeded %d lines at line %d — "
+					"feed is abnormally large, aborting parse.\n",
+					LARGE_RECORD_WARN_THRESHOLD,
+					linenum);
+			}
+			break;
+		}
 		std::vector<std::string> fieldList = split(line, '|');
 
 		lineType = unknownLineType;
@@ -144,13 +160,13 @@ UlsFileReader::UlsFileReader(const char *fpath,
 					/******************************************************************/
 
 					/******************************************************************/
-					/* Static Data                                                    */
+					/* Static Data */
 					/******************************************************************/
 				} else if (front == "US:SD") {
 					readStationDataStatic(fieldList,
-							  fwarn,
-							  alignFederatedFlag,
-							  alignFederatedScale);
+							      fwarn,
+							      alignFederatedFlag,
+							      alignFederatedScale);
 
 				} else {
 					errStr << std::string("ERROR: Unable to process inputFile "
@@ -200,7 +216,11 @@ inline bool isInvalidChar(char c)
 /**************************************************************************/
 void UlsFileReader::readIndividualPathUS(const std::vector<std::string> &fieldList)
 {
-	UlsPath current;
+	UlsPath current {};
+
+	if (fieldList.size() < 5) {
+		return;
+	}
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -286,7 +306,14 @@ void UlsFileReader::readIndividualPathUS(const std::vector<std::string> &fieldLi
 	}
 
 	allPaths << current;
-	pathMap[current.callsign] << current;
+	// Cap per-callsign list to bound linear-scan complexity in processUS.
+	// Record callsigns that hit the cap so processUS can omit them entirely,
+	// ensuring only fully-intact callsign records contribute to the output.
+	if (pathMap[current.callsign].size() < MAX_RECORDS_PER_CALLSIGN) {
+		pathMap[current.callsign] << current;
+	} else {
+		overCapCallsigns.insert(current.callsign);
+	}
 	return;
 }
 /**************************************************************************/
@@ -296,7 +323,7 @@ void UlsFileReader::readIndividualPathUS(const std::vector<std::string> &fieldLi
 /**************************************************************************/
 void UlsFileReader::readIndividualEmissionUS(const std::vector<std::string> &fieldList, FILE *fwarn)
 {
-	UlsEmission current;
+	UlsEmission current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -356,7 +383,12 @@ void UlsFileReader::readIndividualEmissionUS(const std::vector<std::string> &fie
 	}
 
 	allEmissions << current;
-	emissionMap[current.callsign] << current;
+	// Cap per-callsign list to bound processing complexity
+	if (emissionMap[current.callsign].size() < MAX_RECORDS_PER_CALLSIGN) {
+		emissionMap[current.callsign] << current;
+	} else {
+		overCapCallsigns.insert(current.callsign);
+	}
 
 	return;
 }
@@ -367,7 +399,7 @@ void UlsFileReader::readIndividualEmissionUS(const std::vector<std::string> &fie
 /**************************************************************************/
 void UlsFileReader::readIndividualMarketFrequencyUS(const std::vector<std::string> &fieldList)
 {
-	UlsMarketFrequency current;
+	UlsMarketFrequency current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -402,7 +434,7 @@ void UlsFileReader::readIndividualMarketFrequencyUS(const std::vector<std::strin
 /**************************************************************************/
 void UlsFileReader::readIndividualEntityUS(const std::vector<std::string> &fieldList)
 {
-	UlsEntity current;
+	UlsEntity current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -430,7 +462,12 @@ void UlsFileReader::readIndividualEntityUS(const std::vector<std::string> &field
 	}
 
 	allEntities << current;
-	entityMap[current.callsign] << current;
+	// Cap per-callsign list to bound processing complexity
+	if (entityMap[current.callsign].size() < MAX_RECORDS_PER_CALLSIGN) {
+		entityMap[current.callsign] << current;
+	} else {
+		overCapCallsigns.insert(current.callsign);
+	}
 
 	return;
 }
@@ -443,7 +480,7 @@ void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fie
 					     bool alignFederatedFlag,
 					     double alignFederatedScale)
 {
-	UlsLocation current;
+	UlsLocation current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -575,7 +612,12 @@ void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fie
 	}
 
 	allLocations << current;
-	locationMap[current.callsign] << current;
+	// Cap per-callsign list to bound processing complexity
+	if (locationMap[current.callsign].size() < MAX_RECORDS_PER_CALLSIGN) {
+		locationMap[current.callsign] << current;
+	} else {
+		overCapCallsigns.insert(current.callsign);
+	}
 
 	return;
 }
@@ -586,7 +628,7 @@ void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fie
 /**************************************************************************/
 void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fieldList, FILE *fwarn)
 {
-	UlsAntenna current;
+	UlsAntenna current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -718,7 +760,12 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
 	}
 
 	allAntennas << current;
-	antennaMap[current.callsign] << current;
+	// Cap per-callsign list to bound processing complexity
+	if (antennaMap[current.callsign].size() < MAX_RECORDS_PER_CALLSIGN) {
+		antennaMap[current.callsign] << current;
+	} else {
+		overCapCallsigns.insert(current.callsign);
+	}
 
 	return;
 }
@@ -730,7 +777,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
 void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fieldList,
 					      FILE *fwarn)
 {
-	UlsFrequency current;
+	UlsFrequency current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -846,6 +893,12 @@ void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fi
 	//  allFrequencies should now contain all the antenna records in the original
 	//  DB.
 	allFrequencies << current;
+	// Cap per-callsign list to bound linear-scan complexity in processUS.
+	if (frequencyMap[current.callsign].size() < MAX_RECORDS_PER_CALLSIGN) {
+		frequencyMap[current.callsign] << current;
+	} else {
+		overCapCallsigns.insert(current.callsign);
+	}
 
 	return;
 }
@@ -855,7 +908,7 @@ void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fi
 /**************************************************************************/
 void UlsFileReader::readIndividualHeaderUS(const std::vector<std::string> &fieldList)
 {
-	UlsHeader current;
+	UlsHeader current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -914,7 +967,12 @@ void UlsFileReader::readIndividualHeaderUS(const std::vector<std::string> &field
 
 	//  allHeaders should now contain all the header records in the original DB.
 	allHeaders << current;
-	headerMap[current.callsign] << current;
+	// Cap per-callsign list to bound processing complexity
+	if (headerMap[current.callsign].size() < MAX_RECORDS_PER_CALLSIGN) {
+		headerMap[current.callsign] << current;
+	} else {
+		overCapCallsigns.insert(current.callsign);
+	}
 
 	return;
 }
@@ -925,7 +983,7 @@ void UlsFileReader::readIndividualHeaderUS(const std::vector<std::string> &field
 /**************************************************************************/
 void UlsFileReader::readIndividualControlPointUS(const std::vector<std::string> &fieldList)
 {
-	UlsControlPoint current;
+	UlsControlPoint current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -968,7 +1026,12 @@ void UlsFileReader::readIndividualControlPointUS(const std::vector<std::string> 
 	}
 
 	allControlPoints << current;
-	controlPointMap[current.callsign] << current;
+	// Cap per-callsign list to bound processing complexity
+	if (controlPointMap[current.callsign].size() < MAX_RECORDS_PER_CALLSIGN) {
+		controlPointMap[current.callsign] << current;
+	} else {
+		overCapCallsigns.insert(current.callsign);
+	}
 
 	return;
 }
@@ -979,7 +1042,7 @@ void UlsFileReader::readIndividualControlPointUS(const std::vector<std::string> 
 /**************************************************************************/
 void UlsFileReader::readIndividualSegmentUS(const std::vector<std::string> &fieldList)
 {
-	UlsSegment current;
+	UlsSegment current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -1016,7 +1079,12 @@ void UlsFileReader::readIndividualSegmentUS(const std::vector<std::string> &fiel
 	}
 
 	allSegments << current;
-	segmentMap[current.callsign] << current;
+	// Cap per-callsign list to bound processing complexity
+	if (segmentMap[current.callsign].size() < MAX_RECORDS_PER_CALLSIGN) {
+		segmentMap[current.callsign] << current;
+	} else {
+		overCapCallsigns.insert(current.callsign);
+	}
 
 	return;
 }
@@ -1027,7 +1095,7 @@ void UlsFileReader::readIndividualSegmentUS(const std::vector<std::string> &fiel
 /**************************************************************************/
 void UlsFileReader::readIndividualRASUS(const std::vector<std::string> &fieldList)
 {
-	RASClass current;
+	RASClass current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -1114,7 +1182,7 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 				      bool alignFederatedFlag,
 				      double alignFederatedScale)
 {
-	StationDataCAClass current;
+	StationDataCAClass current {};
 
 	std::string linceseeName;
 
@@ -1285,7 +1353,10 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 		RASList << ras;
 	} else {
 		allStations << current;
-		stationMap[current.authorizationNumber.c_str()] << current;
+		if (stationMap[current.authorizationNumber.c_str()].size() <
+		    MAX_RECORDS_PER_CALLSIGN) {
+			stationMap[current.authorizationNumber.c_str()] << current;
+		}
 	}
 
 	return;
@@ -1296,11 +1367,11 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 /* UlsFileReader::readStationDataStatic()                                 */
 /**************************************************************************/
 void UlsFileReader::readStationDataStatic(const std::vector<std::string> &fieldList,
-				      FILE *fwarn,
-				      bool alignFederatedFlag,
-				      double alignFederatedScale)
+					  FILE *fwarn,
+					  bool alignFederatedFlag,
+					  double alignFederatedScale)
 {
-	StationDataCAClass current;
+	StationDataCAClass current {};
 
 	std::string linceseeName;
 
@@ -1471,7 +1542,10 @@ void UlsFileReader::readStationDataStatic(const std::vector<std::string> &fieldL
 		RASList << ras;
 	} else {
 		allStations << current;
-		stationMap[current.authorizationNumber.c_str()] << current;
+		if (stationMap[current.authorizationNumber.c_str()].size() <
+		    MAX_RECORDS_PER_CALLSIGN) {
+			stationMap[current.authorizationNumber.c_str()] << current;
+		}
 	}
 
 	return;
@@ -1484,7 +1558,7 @@ void UlsFileReader::readStationDataStatic(const std::vector<std::string> &fieldL
 void UlsFileReader::readBackToBackPassiveRepeaterCA(const std::vector<std::string> &fieldList,
 						    FILE *fwarn)
 {
-	BackToBackPassiveRepeaterCAClass current;
+	BackToBackPassiveRepeaterCAClass current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -1545,7 +1619,10 @@ void UlsFileReader::readBackToBackPassiveRepeaterCA(const std::vector<std::strin
 	}
 
 	allBackToBackPassiveRepeaters << current;
-	backToBackPassiveRepeaterMap[current.authorizationNumber.c_str()] << current;
+	if (backToBackPassiveRepeaterMap[current.authorizationNumber.c_str()].size() <
+	    MAX_RECORDS_PER_CALLSIGN) {
+		backToBackPassiveRepeaterMap[current.authorizationNumber.c_str()] << current;
+	}
 	return;
 }
 /**************************************************************************/
@@ -1556,7 +1633,7 @@ void UlsFileReader::readBackToBackPassiveRepeaterCA(const std::vector<std::strin
 void UlsFileReader::readReflectorPassiveRepeaterCA(const std::vector<std::string> &fieldList,
 						   FILE * /* fwarn */)
 {
-	ReflectorPassiveRepeaterCAClass current;
+	ReflectorPassiveRepeaterCAClass current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -1598,7 +1675,10 @@ void UlsFileReader::readReflectorPassiveRepeaterCA(const std::vector<std::string
 	}
 
 	allReflectorPassiveRepeaters << current;
-	reflectorPassiveRepeaterMap[current.authorizationNumber.c_str()] << current;
+	if (reflectorPassiveRepeaterMap[current.authorizationNumber.c_str()].size() <
+	    MAX_RECORDS_PER_CALLSIGN) {
+		reflectorPassiveRepeaterMap[current.authorizationNumber.c_str()] << current;
+	}
 
 	return;
 }
@@ -1609,7 +1689,7 @@ void UlsFileReader::readReflectorPassiveRepeaterCA(const std::vector<std::string
 /**************************************************************************/
 void UlsFileReader::readTransmitterCA(const std::vector<std::string> &fieldList, FILE *fwarn)
 {
-	TransmitterCAClass current;
+	TransmitterCAClass current {};
 
 	for (int fieldIdx = 0; fieldIdx < (int)fieldList.size(); ++fieldIdx) {
 		std::string field = fieldList[fieldIdx];
@@ -1691,7 +1771,9 @@ void UlsFileReader::readTransmitterCA(const std::vector<std::string> &fieldList,
 	}
 
 	allTransmitters << current;
-	transmitterMap[current.authorizationNumber.c_str()] << current;
+	if (transmitterMap[current.authorizationNumber.c_str()].size() < MAX_RECORDS_PER_CALLSIGN) {
+		transmitterMap[current.authorizationNumber.c_str()] << current;
+	}
 	return;
 }
 /**************************************************************************/
@@ -1874,6 +1956,20 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment,
 				foreach(const UlsSegment &segment, segmentsMap(freq.callsign))
 				{
 					int segmentNumber = segment.segmentNumber;
+					// Clamp to a sane physical limit to prevent OOM
+					// from a tampered ULS segmentNumber; no real microwave path
+					// has more than 16 passive repeater segments.
+					const int MAX_SEGMENT_NUMBER = 16;
+					if (segmentNumber > MAX_SEGMENT_NUMBER ||
+					    segmentNumber < 1) {
+						qWarning()
+							<< "WARNING: segmentNumber" << segmentNumber
+							<< "for callsign"
+							<< QString::fromStdString(segment.callsign)
+							<< "exceeds limit" << MAX_SEGMENT_NUMBER
+							<< "; clamped";
+						segmentNumber = MAX_SEGMENT_NUMBER;
+					}
 					if ((n == 0) || (segmentNumber > maxNumSegment)) {
 						maxNumSegment = segmentNumber;
 						maxNumSegmentCallsign = std::string(
@@ -1885,7 +1981,7 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment,
 		}
 	}
 
-	int maxNumPassiveRepeater = (n ? maxNumSegment - 1 : 0);
+	int maxNumPassiveRepeater = (n && maxNumSegment > 0) ? maxNumSegment - 1 : 0;
 
 	qDebug() << "DATA statistics:";
 	qDebug() << "paths" << paths().count();
@@ -1990,12 +2086,15 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
 				idxList.pop_back();
 				numMatchedBackToBack++;
 			} else {
-				fprintf(fwarn,
-					"UNMATCHED BACK-TO-BACK REPEATER: authorizationNumber: %s, "
-					"LON = %.6f, LAT = %.6f\n",
-					authorizationNumber.c_str(),
-					bbA.longitudeDeg,
-					bbA.latitudeDeg);
+				if (fwarn) {
+					fprintf(fwarn,
+						"UNMATCHED BACK-TO-BACK REPEATER: "
+						"authorizationNumber: %s, "
+						"LON = %.6f, LAT = %.6f\n",
+						authorizationNumber.c_str(),
+						bbA.longitudeDeg,
+						bbA.latitudeDeg);
+				}
 				idxList.pop_back();
 			}
 		}
@@ -2033,6 +2132,16 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
 		}
 
 		int numPR = passiveRepeaterMap[authorizationNumber.c_str()].size();
+
+		// Clamp the per-row passive-repeater column multiplier and the list
+		// itself to bound both the O(N^2) makeLink() loop and output size.
+		const int maxPassiveRepeaterClamp = 16;
+		if (numPR > maxPassiveRepeaterClamp) {
+			numPR = maxPassiveRepeaterClamp;
+			passiveRepeaterMap[authorizationNumber.c_str()] =
+				passiveRepeaterMap[authorizationNumber.c_str()]
+					.mid(0, maxPassiveRepeaterClamp);
+		}
 
 		if (numPR > maxNumPassiveRepeater) {
 			maxNumPassiveRepeater = numPR;

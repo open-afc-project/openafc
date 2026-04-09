@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM python:3.12-alpine3.21
+FROM python:3.12-alpine3.21@sha256:d4f9227f21409479c7fe92288f2e40b1a56ae591c8ad3b5446dfeaef90f67857
 
 # Default Rcache service port
 ENV RCACHE_CLIENT_PORT=8000
@@ -24,7 +24,7 @@ WORKDIR /wd
 RUN apk add --update --no-cache curl
 
 COPY tools/rcache/requirements.txt /wd
-RUN pip3 install --root-user-action=ignore -r /wd/requirements.txt
+RUN pip3 install --root-user-action=ignore --require-hashes -r /wd/requirements.txt
 
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
@@ -35,4 +35,5 @@ COPY tools/rcache/rcache_tool.py /wd
 COPY tools/load_tool/afc_load_tool.* /wd/
 RUN chmod a+x /wd/rcache_tool.py /wd/afc_load_tool.py
 
+USER nobody
 CMD sleep infinity

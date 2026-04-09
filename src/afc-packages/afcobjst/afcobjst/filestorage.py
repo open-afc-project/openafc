@@ -10,6 +10,8 @@
 Provides HTTP server for file exchange between Celery clients and workers.
 """
 
+import hashlib
+import hmac
 import os
 import logging
 import shutil
@@ -18,6 +20,7 @@ import abc
 import waitress
 from posix_ipc import Semaphore, O_CREAT
 from flask import Flask, request, abort, make_response
+from werkzeug.utils import secure_filename
 import google.cloud.storage
 from .objstconf import ObjstConfigInternal
 
@@ -26,6 +29,35 @@ SEM_TIMEOUT = 60  # Per file semaphore timeout
 
 objst_app = Flask(__name__)
 objst_app.config.from_object(ObjstConfigInternal())
+
+
+def _load_objst_api_key():
+    """ Return objst API key from file (AFC_OBJST_API_KEY_FILE) or None. """
+    key_file = os.environ.get("AFC_OBJST_API_KEY_FILE")
+    if key_file and os.path.isfile(key_file):
+        with open(key_file) as f:
+            return f.read().strip() or None
+    return None
+
+
+@objst_app.before_request
+def _require_objst_bearer_token():
+    """ Require bearer token on all routes except the healthcheck. """
+    if request.endpoint == "healthcheck":
+        return
+    expected = _load_objst_api_key()
+    if expected is None:
+        objst_app.logger.error(
+            "objst: AFC_OBJST_API_KEY_FILE not configured — "
+            "all requests rejected")
+        abort(503)
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        abort(401)
+    supplied = auth_header[len("Bearer "):]
+    if not hmac.compare_digest(supplied.encode(), expected.encode()):
+        abort(403)
+
 
 if objst_app.config['AFC_OBJST_LOG_FILE']:
     logging.basicConfig(filename=objst_app.config['AFC_OBJST_LOG_FILE'],
@@ -66,56 +98,104 @@ class ObjInt:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass
+        pass  # No resources to clean up in base class
 
 
 class ObjIntLocalFS(ObjInt):
+    # Fixed pool size for named lock semaphores. Distinct paths may map to
+    # the same semaphore (a collision merely serializes unrelated
+    # operations), but the number of permanent sem.afc_* entries in the
+    # container's /dev/shm tmpfs (Docker default: 64 MiB, one page + inode
+    # per name) is hard-bounded, instead of growing by one never-unlinked
+    # kernel object per unique storage path until Semaphore(O_CREAT) fails
+    # with ENOSPC (the wedge every task-based AFC request depends on).
+    SEM_POOL_SIZE = 256
+
     def __lock(self, name):
-        sem_name = "/" + name[1:].replace("/", "_")
+        # Hash the path onto the fixed-size semaphore pool. Callers acquire
+        # exactly one pool semaphore at a time, so collisions cannot
+        # deadlock — they only serialize unrelated paths against each other.
+        slot = int.from_bytes(
+            hashlib.sha256(name.encode()).digest()[:8], "big") \
+            % self.SEM_POOL_SIZE
+        sem_name = "/afc_%03d" % slot
         sem = Semaphore(sem_name, O_CREAT, initial_value=1)
         sem.acquire(timeout=SEM_TIMEOUT)
         return sem
 
     def __unlock(self, sem):
         sem.release()
+        # Do NOT unlink the semaphore here. Unlinking while another caller
+        # may already have opened the same name creates a 3-party window where
+        # two processes both believe they hold the exclusive lock (the old
+        # anonymous object and the freshly-minted replacement). Instead, we
+        # only close() our file descriptor; the kernel object stays in
+        # /dev/shm under its name so the next caller reuses it safely.
+        # /dev/shm entries are hard-bounded at SEM_POOL_SIZE names, so they
+        # cannot exhaust the tmpfs regardless of how many unique paths are
+        # ever locked.
         sem.close()
-        try:
-            sem.unlink()
-        except BaseException:
-            pass
 
     def write(self, data):
         self.__mkdir_local(os.path.dirname(self._file_name))
         sem = self.__lock(self._file_name)
-        with open(self._file_name, 'wb') as f:
-            f.write(data)
-        self.__unlock(sem)
+        try:
+            with open(self._file_name, 'wb') as f:
+                f.write(data)
+        finally:
+            self.__unlock(sem)
 
     def read(self):
         if not os.path.isfile(self._file_name):
             return None
         sem = self.__lock(self._file_name)
-        with open(self._file_name, "rb") as hfile:
-            ret = hfile.read()
-        self.__unlock(sem)
+        try:
+            with open(self._file_name, "rb") as hfile:
+                ret = hfile.read()
+        finally:
+            self.__unlock(sem)
         return ret
 
     def head(self):
         sem = self.__lock(self._file_name)
-        ret = os.path.exists(self._file_name)
-        self.__unlock(sem)
+        try:
+            ret = os.path.exists(self._file_name)
+        finally:
+            self.__unlock(sem)
         return ret
 
     def delete(self):
         """ During recursive dir delete only the dir is protected by semaphore from
         parallel use. Files in the dir arn't protected. """
+        root = os.path.realpath(objst_app.config["AFC_OBJST_FILE_LOCATION"])
+        full_path = os.path.realpath(self._file_name)
+        if os.path.commonpath([root, full_path]) != root:
+            return
         if os.path.exists(self._file_name):
             sem = self.__lock(self._file_name)
-            if os.path.isdir(self._file_name):
-                shutil.rmtree(self._file_name)
-            else:
-                os.remove(self._file_name)
-            self.__unlock(sem)
+            try:
+                if os.path.isdir(self._file_name):
+                    shutil.rmtree(self._file_name)
+                else:
+                    os.remove(self._file_name)
+            finally:
+                self.__unlock(sem)
+        # Cascade-delete the '<name>.hmac' signed sidecar some writers
+        # (e.g. MTLS._rebuild_cert_bundle's non-empty branch) pair with the
+        # main artifact. Deleting only the main file and leaving a
+        # still-HMAC-valid sidecar for the old content lets a later
+        # re-upload of the same bytes pass the sidecar's signature check —
+        # keep the write/delete artifact sets symmetric at the storage
+        # boundary regardless of which consumer issued the delete.
+        sidecar = self._file_name + ".hmac"
+        sidecar_full = os.path.realpath(sidecar)
+        if os.path.commonpath([root, sidecar_full]) == root and \
+                os.path.isfile(sidecar):
+            sem = self.__lock(sidecar)
+            try:
+                os.remove(sidecar)
+            finally:
+                self.__unlock(sem)
 
     def __mkdir_local(self, path):
         os.makedirs(path, exist_ok=True)
@@ -148,8 +228,15 @@ class ObjIntGoogleCloudBucket(ObjInt):
         for blob in blobs:
             try:
                 blob.delete(timeout=NET_TIMEOUT)
-            except BaseException:
+            except Exception:
                 pass  # ignore google.cloud.exceptions.NotFound
+        # Cascade-delete the '<name>.hmac' signed sidecar (see
+        # ObjIntLocalFS.delete for rationale) so a delete on this backend
+        # cannot leave a still-HMAC-valid sidecar for stale content.
+        try:
+            bucket.blob(self._file_name + ".hmac").delete(timeout=NET_TIMEOUT)
+        except Exception:
+            pass  # ignore google.cloud.exceptions.NotFound
 
 
 class Objstorage:
@@ -162,8 +249,15 @@ class Objstorage:
 
 
 def get_local_path(path):
-    path = os.path.join(objst_app.config["AFC_OBJST_FILE_LOCATION"], path)
-    return path
+    # Reject any '..' path segment up front so callers cannot rely on
+    # realpath collapsing dot-segments to land elsewhere under the root.
+    if ".." in path.split("/"):
+        abort(400)
+    root = os.path.realpath(objst_app.config["AFC_OBJST_FILE_LOCATION"])
+    full_path = os.path.realpath(os.path.join(root, path))
+    if os.path.commonpath([root, full_path]) != root:
+        abort(400)
+    return full_path
 
 
 @objst_app.route('/' + '<path:path>', methods=['POST'])
@@ -182,7 +276,17 @@ def post(path):
             if request.files['file'].filename == '':
                 objst_app.logger.error('Empty filename')
                 abort(400)
-            path = os.path.join(path, request.files['file'].filename)
+            filename = secure_filename(request.files['file'].filename)
+            if not filename:
+                objst_app.logger.error('Invalid filename')
+                abort(400)
+            path = os.path.join(path, filename)
+            root = os.path.realpath(objst_app.config["AFC_OBJST_FILE_LOCATION"])
+            full_path = os.path.realpath(path)
+            if os.path.commonpath([root, full_path]) != root:
+                objst_app.logger.error('Invalid path')
+                abort(400)
+            path = full_path
             data = request.files['file'].read()
         else:
             data = request.get_data()

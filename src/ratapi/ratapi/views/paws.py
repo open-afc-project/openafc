@@ -4,17 +4,15 @@ All of the API uses JSON-RPC transport on a single endpoint URI.
 
 import logging
 import datetime
-import subprocess
 import os
 import json
-import shutil
-from random import gauss, random
+from random import gauss
 import threading
 from flask_jsonrpc import JSONRPC
 from flask_jsonrpc.exceptions import (
     InvalidParamsError, ServerError)
 import flask
-from ..util import TemporaryDirectory, getQueueDirectory
+from ..util import getQueueDirectory
 from ..xml_utils import (datetime_to_xml)
 from afcmodels.aaa import User
 import gzip
@@ -58,7 +56,7 @@ def genProfiles(bandwith, start_freq, num_channels, start_mu, sigma):
     begin_freq = start_freq
     end_freq = begin_freq + bandwith
     for dbm in values:
-        if not (dbm is None):
+        if dbm is not None:
             current_profile.append(dict(dbm=dbm, hz=begin_freq))
             current_profile.append(dict(dbm=dbm, hz=end_freq))
         elif len(current_profile) > 0:
@@ -106,7 +104,7 @@ def getSpectrum(**kwargs):
         raise InvalidParamsError(
             'Required parameter names: {0}'.format(' '.join(REQUIRED_PARAMS)))
 
-    now_time = datetime.datetime.utcnow()
+    now_time = datetime.datetime.now(datetime.timezone.utc)
     spectrum_specs = []
 
     if flask.current_app.config["PAWS_RANDOM"]:
@@ -180,10 +178,10 @@ def getSpectrum(**kwargs):
 
     # authenitcate access point
     description = kwargs['deviceDesc']
-    auth_paws(description.get('serialNumber'),
-              description.get(- 'modelId'),
-              description.get('manufacturerId'),
-              description.get('rulesetIds'))
+    _auth_paws(description.get('serialNumber'),
+               description.get('modelId'),
+               description.get('manufacturerId'),
+               description.get('rulesetIds'))
     user_id = current_user.id
     user = User.query.filter_by(id=user_id).first()
 
@@ -243,10 +241,16 @@ def create_handler(app, path):
 
     :return: The :py:cls:`JSONRPC` object created.
     '''
-    rpc = JSONRPC(service_url=path, enable_web_browsable_api=True)
-    rpc.method(
-        'spectrum.paws.getSpectrum(deviceDesc=object, location=object, antenna=object, capabilities=object, type=str, version=str) -> object',
-        validate=False)(getSpectrum)
+    import typing as t
+    rpc = JSONRPC(path=path, enable_web_browsable_api=False)
+
+    @rpc.method('spectrum.paws.getSpectrum', validate=False)
+    def paws_getSpectrum(deviceDesc: t.Any, location: t.Any, antenna: t.Any,
+                         capabilities: t.Any, type: str, version: str) -> t.Any:
+        return getSpectrum(deviceDesc=deviceDesc, location=location,
+                           antenna=antenna, capabilities=capabilities,
+                           type=type, version=version)
+
     rpc.init_app(app)
 
     return rpc

@@ -797,8 +797,14 @@ AntennaModelClass *AntennaModelMapClass::find(std::string antPfx,
 
 	category = AntennaModel::UnknownCategory;
 
+	/* Cap input to the regex engine to bound worst-case backtracking on
+	 * complex patterns; actual model names from ULS data are much shorter. */
+	static const std::size_t MAX_MODEL_NAME_FOR_REGEX = 64;
+	std::string regexInput = (modelName.size() > MAX_MODEL_NAME_FOR_REGEX) ?
+					 modelName.substr(0, MAX_MODEL_NAME_FOR_REGEX) :
+					 modelName;
 	for (i = 0; (i < (int)regexList.size()) && (!found); ++i) {
-		if (regex_match(modelName, *regexList[i])) {
+		if (regex_match(regexInput, *regexList[i])) {
 			found = true;
 			antIdx = antIdxList[i];
 		}

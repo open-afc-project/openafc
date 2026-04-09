@@ -6,7 +6,7 @@
 #
 # Install required packages
 #
-FROM python:3.12-alpine3.21
+FROM python:3.12-alpine3.21@sha256:d4f9227f21409479c7fe92288f2e40b1a56ae591c8ad3b5446dfeaef90f67857
 # This variable should be set to used Python version (major.minor only)
 ENV AFC_PYTHONVERSION=3.12
 
@@ -15,17 +15,19 @@ ENV PYTHONUNBUFFERED=1
 # CMake installs packages to /usr/lib even though this image uses /usr/local/lib
 ENV PYTHONPATH=/usr/lib/python${AFC_PYTHONVERSION}/site-packages:/usr/local/lib/python${AFC_PYTHONVERSION}/site-packages:${PYTHONPATH}
 
-# Configure pip to use package registry proxy (optional)
-ARG PIP_INDEX_URL
-ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+# Private PyPI mirror credential is passed via BuildKit secret
+# (--secret id=pip_config,src=<pip.conf>) so it is never baked into image
+# layers or build-arg history. Omit --secret to use public PyPI.
 
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka
 #   version in requirements.txt may need to be updated on Alpine version change
 RUN apk add --update --no-cache librdkafka-dev
 COPY cert_db/requirements.txt /wd/
-RUN apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base && \
-    pip3 install --no-cache-dir -r /wd/requirements.txt && \
+RUN --mount=type=secret,id=pip_config,target=/root/.config/pip/pip.conf \
+    apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base && \
+    pip3 install --root-user-action=ignore --no-cache-dir --require-hashes \
+        -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
 
 RUN mkdir -p /etc/xdg/fbrat
@@ -55,7 +57,8 @@ apk del --purge cmake ninja && rm -rf /wd/cmake/ /wd/pkg/ /wd/src/ /wd/build
 # Install FCCID_DB application
 #
 COPY src/afc-packages /wd/afc-packages
-RUN pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
+RUN --mount=type=secret,id=pip_config,target=/root/.config/pip/pip.conf \
+    pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
         -r /wd/afc-packages/pkgs.cert_db \
     && rm -rf /wd/afc-packages
 RUN mkdir -m 755 -p /var/lib/fbrat
@@ -83,6 +86,10 @@ ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 COPY cert_db/entrypoint.sh cert_db/devel.sh cert_db/sweep.sh /wd/
 RUN chmod +x /wd/devel.sh /wd/sweep.sh /wd/entrypoint.sh
 RUN /wd/devel.sh
+# Allow fbrat to write the healthcheck touchfile to /wd.
+RUN chown fbrat:fbrat /wd
+# Switch to non-root user for runtime; fbrat was created above
+USER fbrat
 #
 CMD ["/wd/entrypoint.sh"]
 

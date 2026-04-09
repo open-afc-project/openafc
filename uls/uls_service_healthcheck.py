@@ -18,7 +18,9 @@ import email.mime.text
 import logging
 import os
 import pydantic
+from pydantic_settings import BaseSettings
 import smtplib
+import ssl
 import sqlalchemy as sa
 import sys
 from typing import Any, cast, Dict, List, NamedTuple, Optional, Set, Union
@@ -52,47 +54,47 @@ class SmtpSettings(NamedTuple):
         return bool(self.server) and bool(self.username)
 
 
-class Settings(pydantic.BaseSettings):
+class Settings(BaseSettings):
     """ Arguments from command lines - with their default values """
 
     service_state_db_dsn: str = \
-        pydantic.Field(..., env="ULS_SERVICE_STATE_DB_DSN")
+        pydantic.Field(..., validation_alias="ULS_SERVICE_STATE_DB_DSN")
     service_state_db_password_file: Optional[str] = \
-        pydantic.Field(None, env="ULS_SERVICE_STATE_DB_PASSWORD_FILE")
-    smtp_server: Optional[str] = pydantic.Field(None, env="ULS_SMTP_SERVER")
-    smtp_port: Optional[int] = pydantic.Field(None, env="ULS_SMTP_PORT")
+        pydantic.Field(None, validation_alias="ULS_SERVICE_STATE_DB_PASSWORD_FILE")
+    smtp_server: Optional[str] = pydantic.Field(None, validation_alias="ULS_SMTP_SERVER")
+    smtp_port: Optional[int] = pydantic.Field(None, validation_alias="ULS_SMTP_PORT")
     smtp_username: Optional[str] = \
-        pydantic.Field(None, env="ULS_SMTP_USERNAME")
+        pydantic.Field(None, validation_alias="ULS_SMTP_USERNAME")
     smtp_password_file: Optional[str] = \
-        pydantic.Field(None, env="ULS_SMTP_PASSWORD_FILE")
-    smtp_ssl: bool = pydantic.Field(False, env="ULS_SMTP_SSL")
-    smtp_tls: bool = pydantic.Field(False, env="ULS_SMTP_TLS")
-    email_to: Optional[str] = pydantic.Field(None, env="ULS_ALARM_EMAIL_TO")
+        pydantic.Field(None, validation_alias="ULS_SMTP_PASSWORD_FILE")
+    smtp_ssl: bool = pydantic.Field(False, validation_alias="ULS_SMTP_SSL")
+    smtp_tls: bool = pydantic.Field(True, validation_alias="ULS_SMTP_TLS")
+    email_to: Optional[str] = pydantic.Field(None, validation_alias="ULS_ALARM_EMAIL_TO")
     beacon_email_to: Optional[str] = \
-        pydantic.Field(None, env="ULS_BEACON_EMAIL_TO")
+        pydantic.Field(None, validation_alias="ULS_BEACON_EMAIL_TO")
     email_sender_location: Optional[str] = \
-        pydantic.Field(None, env="ULS_ALARM_SENDER_LOCATION")
+        pydantic.Field(None, validation_alias="ULS_ALARM_SENDER_LOCATION")
     alarm_email_interval_hr: Optional[float] = \
-        pydantic.Field(None, env="ULS_ALARM_ALARM_INTERVAL_HR")
+        pydantic.Field(None, validation_alias="ULS_ALARM_ALARM_INTERVAL_HR")
     beacon_email_interval_hr: Optional[float] = \
-        pydantic.Field(None, env="ULS_ALARM_BEACON_INTERVAL_HR")
+        pydantic.Field(None, validation_alias="ULS_ALARM_BEACON_INTERVAL_HR")
     download_attempt_max_age_health_hr: Optional[float] = \
-        pydantic.Field(6, env="ULS_HEALTH_ATTEMPT_MAX_AGE_HR")
+        pydantic.Field(6, validation_alias="ULS_HEALTH_ATTEMPT_MAX_AGE_HR")
     download_success_max_age_health_hr: Optional[float] = \
-        pydantic.Field(8, env="ULS_HEALTH_SUCCESS_MAX_AGE_HR")
+        pydantic.Field(8, validation_alias="ULS_HEALTH_SUCCESS_MAX_AGE_HR")
     update_max_age_health_hr: Optional[float] = \
-        pydantic.Field(40, env="ULS_HEALTH_UPDATE_MAX_AGE_HR")
+        pydantic.Field(40, validation_alias="ULS_HEALTH_UPDATE_MAX_AGE_HR")
     download_attempt_max_age_alarm_hr: Optional[float] = \
-        pydantic.Field(None, env="ULS_ALARM_ATTEMPT_MAX_AGE_HR")
+        pydantic.Field(None, validation_alias="ULS_ALARM_ATTEMPT_MAX_AGE_HR")
     download_success_max_age_alarm_hr: Optional[float] = \
-        pydantic.Field(None, env="ULS_ALARM_SUCCESS_MAX_AGE_HR")
+        pydantic.Field(None, validation_alias="ULS_ALARM_SUCCESS_MAX_AGE_HR")
     region_update_max_age_alarm: Optional[str] = \
-        pydantic.Field(None, env="ULS_ALARM_REG_UPD_MAX_AGE_HR")
+        pydantic.Field(None, validation_alias="ULS_ALARM_REG_UPD_MAX_AGE_HR")
     verbose: bool = pydantic.Field(False)
     force_success: bool = pydantic.Field(False)
     print_email: bool = pydantic.Field(False)
 
-    @pydantic.root_validator(pre=True)
+    @pydantic.model_validator(mode="before")
     @classmethod
     def remove_empty(cls, v: Any) -> Any:
         """ Prevalidator that removes empty values (presumably from environment
@@ -104,6 +106,17 @@ class Settings(pydantic.BaseSettings):
             if value is None:
                 del v[key]
         return v
+
+    @pydantic.model_validator(mode="after")
+    def check_smtp_tls(self) -> "Settings":
+        """ Reject credential-bearing SMTP config without transport encryption. """
+        if self.smtp_password_file and not self.smtp_ssl and not self.smtp_tls:
+            raise ValueError(
+                "SMTP credentials are configured (ULS_SMTP_PASSWORD_FILE) but "
+                "neither ULS_SMTP_SSL nor ULS_SMTP_TLS is enabled. "
+                "Credentials would be sent in cleartext. "
+                "Set ULS_SMTP_TLS=true (default) or ULS_SMTP_SSL=true.")
+        return self
 
 
 def send_email_smtp(smtp_settings: SmtpSettings, to: Optional[str],
@@ -133,14 +146,15 @@ def send_email_smtp(smtp_settings: SmtpSettings, to: Optional[str],
     to_list = to.split(",")
     msg["To"] = to
 
+    ctx = ssl.create_default_context()
     try:
-        with (smtplib.SMTP_SSL(**smtp_kwargs) if smtp_settings.ssl
+        with (smtplib.SMTP_SSL(**smtp_kwargs, context=ctx) if smtp_settings.ssl
               else smtplib.SMTP(**smtp_kwargs)) as smtp:
             if smtp_settings.tls:
-                smtp.starttls()
+                smtp.starttls(context=ctx)
             smtp.login(**login_kwargs)
             smtp.sendmail(msg["From"], to_list, msg.as_string())
-    except smtplib.SMTPException as ex:
+    except (smtplib.SMTPException, ssl.SSLError) as ex:
         error(f"Email send failure: {ex}")
 
 
@@ -151,10 +165,10 @@ def expired(event_td: Optional[datetime.datetime],
     Arguments:
     event_td   -- Optional event timedate. None means that yes, expired (unless
                   timeout is None)
-    max_age_hr -- Optional timeout in hours. None means no, not expired
+    max_age_hr -- Optional timeout in hours. None or <= 0 means no, not expired
     Returns true if timeout expired
     """
-    if max_age_hr is None:
+    if max_age_hr is None or max_age_hr <= 0:
         return False
     if event_td is None:
         return True
@@ -231,7 +245,8 @@ def email_if_needed(state_db: StateDb, settings: Any) -> None:
                     f"for more than {max_age_hr} hours"))
     check_prefixes = \
         {CheckType.ExtParams: "External parameters synchronization problem",
-         CheckType.FsDatabase: "FS database validity check problem"}
+         CheckType.FsDatabase: "FS database validity check problem",
+         CheckType.HashVerification: "FS database SHA-256 hash verification problem"}
     for check_type, check_infos in state_db.read_check_results().items():
         prefix = check_prefixes[check_type]
         for check_info in check_infos:

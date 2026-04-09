@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM python:3.12-alpine3.21
+FROM python:3.12-alpine3.21@sha256:d4f9227f21409479c7fe92288f2e40b1a56ae591c8ad3b5446dfeaef90f67857
 
 # True if enabled (default is True)
 # ENV RCACHE_ENABLED=True
@@ -60,21 +60,24 @@ RUN apk add --update --no-cache curl
 
 WORKDIR /wd
 
-# Configure pip to use package registry proxy (optional)
-ARG PIP_INDEX_URL
-ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+# Private PyPI mirror credential is passed via BuildKit secret
+# (--secret id=pip_config,src=<pip.conf>) so it is never baked into image
+# layers or build-arg history. Omit --secret to use public PyPI.
 
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka
 #   version in requirements.txt may need to be updated on Alpine version change
 RUN apk add --update --no-cache librdkafka-dev
 COPY rcache/requirements.txt /wd
-RUN apk add --update --no-cache python3-dev build-base && \
-    pip3 install --root-user-action=ignore  --no-cache-dir -r /wd/requirements.txt && \
+RUN --mount=type=secret,id=pip_config,target=/root/.config/pip/pip.conf \
+    apk add --update --no-cache python3-dev build-base && \
+    pip3 install --root-user-action=ignore --no-cache-dir --require-hashes \
+        -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
 
 COPY src/afc-packages /wd/afc-packages
-RUN pip3 install --use-pep517 --root-user-action=ignore \
+RUN --mount=type=secret,id=pip_config,target=/root/.config/pip/pip.conf \
+    pip3 install --use-pep517 --root-user-action=ignore \
         -r /wd/afc-packages/pkgs.rcache \
     && rm -rf /wd/afc-packages
 
@@ -84,6 +87,7 @@ COPY rcache/rcache_app.py rcache/rcache_app.py rcache/rcache_db_async.py \
 RUN chmod a+x /wd/rcache_tool.py /wd/keyhole_gen.py
 COPY rcache/migrations /wd/migrations
 
+USER nobody
 ENTRYPOINT uvicorn rcache_app:app --host 0.0.0.0 --port ${RCACHE_CLIENT_PORT} \
     ${RCACHE_UVICORN_PARAMS}
 

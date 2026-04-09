@@ -1,4 +1,4 @@
-import { guiConfig, getCSRF } from './RatApi';
+import { guiConfig, getCSRF, adminEirpMinUrl, adminUserByIdUrl, apDenyAdminUrl, mtlsAdminUrl } from './RatApi';
 import {
   UserModel,
   success,
@@ -16,7 +16,6 @@ import {
 import { logger } from './Logger';
 import { Role, retrieveUserData } from './User';
 import { Rect } from 'react-konva';
-import { Circle } from 'konva/types/shapes/Circle';
 import { RatResponse } from './RatApiTypes';
 
 /**
@@ -29,6 +28,9 @@ export class Limit {
   outdoorEnforce: boolean;
   indoorLimit: number;
   outdoorLimit: number;
+  /** False when Rat DB has no Limit rows; server returns suggested defaults. */
+  limitsConfigured = true;
+
   constructor(enforceIndoor: boolean, enforceOutdoor: boolean, indoorLimit: number, outdoorLimit: number) {
     this.indoorEnforce = enforceIndoor;
     this.outdoorEnforce = enforceOutdoor;
@@ -42,12 +44,17 @@ export class Limit {
  * @returns object indicating minimum value and whether or not it's enforced if successful, error otherwise
  */
 export const getMinimumEIRP = () =>
-  fetch(guiConfig.admin_url.replace('-1', 'eirp_min'), {
+  fetch(adminEirpMinUrl(), {
     method: 'GET',
   })
     .then(async (res) => {
       if (res.ok) {
-        return success((await res.json()) as Limit);
+        const data = (await res.json()) as Limit & { limitsConfigured?: boolean };
+        const lim = new Limit(data.indoorEnforce, data.outdoorEnforce, data.indoorLimit, data.outdoorLimit);
+        if (typeof data.limitsConfigured === 'boolean') {
+          lim.limitsConfigured = data.limitsConfigured;
+        }
+        return success(lim);
       } else {
         return error('Unable to load limits', res.status, res);
       }
@@ -62,8 +69,8 @@ export const getMinimumEIRP = () =>
  * @param limit the new EIRP value
  */
 export const setMinimumEIRP = async (limit: Limit) => {
-  let csrf_token = getCSRF();
-  return fetch(guiConfig.admin_url.replace('-1', 'eirp_min'), {
+  const csrf_token = getCSRF();
+  return fetch(adminEirpMinUrl(), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
     body: JSON.stringify(limit),
@@ -84,7 +91,7 @@ export const setMinimumEIRP = async (limit: Limit) => {
  * @returns list of users if successful, error otherwise
  */
 export const getUsers = () =>
-  fetch(guiConfig.admin_url.replace('-1', '0'), {
+  fetch(adminUserByIdUrl('0'), {
     method: 'GET',
   })
     .then(async (res) => {
@@ -105,7 +112,7 @@ export const getUsers = () =>
  * @return The user if found, error otherwise
  */
 export const getUser = (id: number) =>
-  fetch(guiConfig.admin_url.replace('-1', String(id)), {
+  fetch(adminUserByIdUrl(id), {
     method: 'GET',
   })
     .then(async (res) =>
@@ -121,8 +128,8 @@ export const getUser = (id: number) =>
  * @param user User to replace with
  */
 export const updateUser = async (user: { email: string; password: string; id: number; active: boolean }) => {
-  let csrf_token = getCSRF();
-  return fetch(guiConfig.admin_url.replace('-1', String(user.id)), {
+  const csrf_token = getCSRF();
+  return fetch(adminUserByIdUrl(user.id), {
     method: 'POST',
     body: JSON.stringify(Object.assign(user, { setProps: true })),
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
@@ -135,8 +142,8 @@ export const updateUser = async (user: { email: string; password: string; id: nu
  * @param role role to add
  */
 export const addUserRole = async (id: number, role: Role) => {
-  let csrf_token = getCSRF();
-  return fetch(guiConfig.admin_url.replace('-1', String(id)), {
+  const csrf_token = getCSRF();
+  return fetch(adminUserByIdUrl(id), {
     method: 'POST',
     body: JSON.stringify({ addRole: role }),
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
@@ -157,8 +164,8 @@ export const addUserRole = async (id: number, role: Role) => {
  * @param role role to remove
  */
 export const removeUserRole = async (id: number, role: Role) => {
-  let csrf_token = getCSRF();
-  return fetch(guiConfig.admin_url.replace('-1', id.toString()), {
+  const csrf_token = getCSRF();
+  return fetch(adminUserByIdUrl(id), {
     method: 'POST',
     body: JSON.stringify({ removeRole: role }),
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
@@ -178,8 +185,8 @@ export const removeUserRole = async (id: number, role: Role) => {
  * @param id user'd Id
  */
 export const deleteUser = async (id: number) => {
-  let csrf_token = getCSRF();
-  return fetch(guiConfig.admin_url.replace('-1', String(id)), {
+  const csrf_token = getCSRF();
+  return fetch(adminUserByIdUrl(id), {
     method: 'DELETE',
     headers: { 'X-CSRF-Token': csrf_token },
   })
@@ -201,7 +208,7 @@ export const deleteUser = async (id: number) => {
  * @returns list of access points if successful, error otherwise
  */
 export const getAccessPointsDeny = (userId?: number) =>
-  fetch(guiConfig.ap_deny_admin_url.replace('-1', String(userId || 0)), {
+  fetch(apDenyAdminUrl(userId || 0), {
     method: 'GET',
   })
     .then(async (res) => {
@@ -219,9 +226,9 @@ export const getAccessPointsDeny = (userId?: number) =>
  * @param userId owner of new access point
  */
 export const addAccessPointDeny = async (ap: AccessPointModel, userId: number) => {
-  let csrf_token = getCSRF();
+  const csrf_token = getCSRF();
 
-  return fetch(guiConfig.ap_deny_admin_url.replace('-1', String(userId)), {
+  return fetch(apDenyAdminUrl(userId), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
     body: JSON.stringify(ap),
@@ -244,8 +251,8 @@ export const addAccessPointDeny = async (ap: AccessPointModel, userId: number) =
  * @param userId owner of new access point
  */
 export const putAccessPointDenyList = async (ap: AccessPointListModel, userId: number) => {
-  let csrf_token = getCSRF();
-  return fetch(guiConfig.ap_deny_admin_url.replace('-1', String(userId)), {
+  const csrf_token = getCSRF();
+  return fetch(apDenyAdminUrl(userId), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
     body: JSON.stringify(ap),
@@ -268,8 +275,8 @@ export const putAccessPointDenyList = async (ap: AccessPointListModel, userId: n
  * @param userId who creates the new mtls cert
  */
 export const addMTLS = async (mtls: MTLSModel, userId: number) => {
-  let csrf_token = getCSRF();
-  return fetch(guiConfig.mtls_admin_url.replace('-1', String(userId)), {
+  const csrf_token = getCSRF();
+  return fetch(mtlsAdminUrl(userId), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
     body: JSON.stringify(mtls),
@@ -292,8 +299,8 @@ export const addMTLS = async (mtls: MTLSModel, userId: number) => {
  */
 export const deleteMTLSCert = async (id: number) => {
   // here the id in the url is the mtls id, not the user id
-  let csrf_token = getCSRF();
-  return fetch(guiConfig.mtls_admin_url.replace('-1', String(id)), {
+  const csrf_token = getCSRF();
+  return fetch(mtlsAdminUrl(id), {
     method: 'DELETE',
     headers: { 'X-CSRF-Token': csrf_token },
   })
@@ -316,7 +323,7 @@ export const deleteMTLSCert = async (id: number) => {
  * @returns list of mtls certs if successful, error otherwise
  */
 export const getMTLS = (userId?: number) =>
-  fetch(guiConfig.mtls_admin_url.replace('-1', String(userId || 0)), {
+  fetch(mtlsAdminUrl(userId || 0), {
     method: 'GET',
   })
     .then(async (res) => {
@@ -366,8 +373,8 @@ export const getDeniedRegionsCsvFile = (regionStr: string) => {
 
 // Update the denied regions for a given region
 export const updateDeniedRegions = async (records: DeniedRegion[], regionStr: string) => {
-  let body = mapDeniedRegionToCsv(records, regionStr, true);
-  let csrf_token = getCSRF();
+  const body = mapDeniedRegionToCsv(records, regionStr, true);
+  const csrf_token = getCSRF();
 
   return fetch(guiConfig.dr_admin_url.replace('XX', regionStr), {
     method: 'PUT',
@@ -393,7 +400,7 @@ function parseCSV(str: string, headers = true) {
 
   // Iterate over each character, keep track of current row and column (of the returned array)
   for (let row = 0, col = 0, c = 0; c < str.length; c++) {
-    let cc = str[c],
+    const cc = str[c],
       nc = str[c + 1]; // Current character, next character
     arr[row] = arr[row] || []; // Create a new row if necessary
     arr[row][col] = arr[row][col] || ''; // Create a new column (start with empty string) if necessary
@@ -446,7 +453,7 @@ function parseCSV(str: string, headers = true) {
   }
 
   if (headers) {
-    let headerRow = arr[0];
+    const headerRow = arr[0];
   }
 
   return arr;
@@ -473,13 +480,13 @@ function parseCSVtoObjects(csvString: string) {
 }
 
 const mapDeniedRegionFromCsv = (data: string, regionStr: string) => {
-  let records = parseCSVtoObjects(data);
-  let objects = records.map((x) => {
-    let newRegion: DeniedRegion = {
+  const records = parseCSVtoObjects(data);
+  const objects = records.map((x) => {
+    const newRegion: DeniedRegion = {
       regionStr: regionStr,
       name: x['Location'],
-      endFreq: x['Stop Freq (MHz)'],
-      startFreq: x['Start Freq (MHz)'],
+      endFreq: Number(x['Stop Freq (MHz)']),
+      startFreq: Number(x['Start Freq (MHz)']),
       exclusionZone: dummyExclusionZone,
       zoneType: 'Circle',
     };
@@ -488,45 +495,45 @@ const mapDeniedRegionFromCsv = (data: string, regionStr: string) => {
     if (!!x['Rectangle1 Lat 1']) {
       //Is a two rect if has a rect 2 lat 1
       if (!!x['Rectangle2 Lat 1']) {
-        let rect: ExclusionTwoRect = {
+        const rect: ExclusionTwoRect = {
           rectangleOne: {
-            topLat: x['Rectangle1 Lat 1'],
-            leftLong: x['Rectangle1 Lon 1'],
-            bottomLat: x['Rectangle1 Lat 2'],
-            rightLong: x['Rectangle1 Lon 2'],
+            topLat: Number(x['Rectangle1 Lat 1']),
+            leftLong: Number(x['Rectangle1 Lon 1']),
+            bottomLat: Number(x['Rectangle1 Lat 2']),
+            rightLong: Number(x['Rectangle1 Lon 2']),
           },
           rectangleTwo: {
-            topLat: x['Rectangle2 Lat 1'],
-            leftLong: x['Rectangle2 Lon 1'],
-            bottomLat: x['Rectangle2 Lat 2'],
-            rightLong: x['Rectangle2 Lon 2'],
+            topLat: Number(x['Rectangle2 Lat 1']),
+            leftLong: Number(x['Rectangle2 Lon 1']),
+            bottomLat: Number(x['Rectangle2 Lat 2']),
+            rightLong: Number(x['Rectangle2 Lon 2']),
           },
         };
         newRegion.exclusionZone = rect;
         newRegion.zoneType = 'Two Rectangles';
       } else {
-        let rect: ExclusionRect = {
-          topLat: x['Rectangle1 Lat 1'],
-          leftLong: x['Rectangle1 Lon 1'],
-          bottomLat: x['Rectangle1 Lat 2'],
-          rightLong: x['Rectangle1 Lon 2'],
+        const rect: ExclusionRect = {
+          topLat: Number(x['Rectangle1 Lat 1']),
+          leftLong: Number(x['Rectangle1 Lon 1']),
+          bottomLat: Number(x['Rectangle1 Lat 2']),
+          rightLong: Number(x['Rectangle1 Lon 2']),
         };
         newRegion.exclusionZone = rect;
         newRegion.zoneType = 'One Rectangle';
       }
     } else if (!!x['Circle Radius (km)']) {
-      let circ: ExclusionCircle = {
-        latitude: x['Circle center Lat'],
-        longitude: x['Circle center Lon'],
-        radiusKm: x['Circle Radius (km)'],
+      const circ: ExclusionCircle = {
+        latitude: Number(x['Circle center Lat']),
+        longitude: Number(x['Circle center Lon']),
+        radiusKm: Number(x['Circle Radius (km)']),
       };
       newRegion.exclusionZone = circ;
       newRegion.zoneType = 'Circle';
     } else {
-      let horz: ExclusionHorizon = {
-        latitude: x['Circle center Lat'],
-        longitude: x['Circle center Lon'],
-        aglHeightM: x['Antenna AGL height (m)'],
+      const horz: ExclusionHorizon = {
+        latitude: Number(x['Circle center Lat']),
+        longitude: Number(x['Circle center Lon']),
+        aglHeightM: Number(x['Antenna AGL height (m)']),
       };
       newRegion.exclusionZone = horz;
       newRegion.zoneType = 'Horizon Distance';
@@ -536,39 +543,63 @@ const mapDeniedRegionFromCsv = (data: string, regionStr: string) => {
   return objects;
 };
 
+// Neutralise formula-leading chars and RFC4180-quote string CSV cells
+const csvCell = (v: string): string => {
+  let s = String(v ?? '');
+  if (s.length > 0 && '=+-@\t\r'.indexOf(s.charAt(0)) >= 0) {
+    s = "'" + s;
+  }
+  if (/[",\r\n]/.test(s)) {
+    s = '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+};
+
+// Numeric CSV cell: coerce and reject NaN so only a validated numeric
+// literal is ever emitted (cannot carry formula or delimiter characters).
+// csvCell()'s leading '-' neutralisation is deliberately not applied here
+// because it would corrupt legitimate negative coordinates.
+const numCell = (v: string | number): string => {
+  const n = Number(v);
+  if (Number.isNaN(n)) {
+    throw 'Bad numeric data in mapDeniedRegionToCsv: ' + JSON.stringify(v);
+  }
+  return String(n);
+};
+
 const mapDeniedRegionToCsv = (records: DeniedRegion[], regionStr: string, includeHeader: boolean = true) => {
   let result: string[] = [];
   if (includeHeader) {
     result.push(defaultDeniedRegionHeaders);
   }
-  let strings = records
+  const strings = records
     .filter((x) => x.regionStr == regionStr)
     .map((rec) => {
-      let header = `${rec.name},${rec.startFreq},${rec.endFreq},${rec.zoneType},`;
+      const header = `${csvCell(rec.name)},${numCell(rec.startFreq)},${numCell(rec.endFreq)},${csvCell(rec.zoneType)},`;
       let excl = '';
       switch (rec.zoneType) {
         case 'Circle':
           {
-            let x = rec.exclusionZone as ExclusionCircle;
-            excl = `,,,,,,,,${x.radiusKm},${x.latitude},${x.longitude},`;
+            const x = rec.exclusionZone as ExclusionCircle;
+            excl = `,,,,,,,,${numCell(x.radiusKm)},${numCell(x.latitude)},${numCell(x.longitude)},`;
           }
           break;
         case 'One Rectangle':
           {
-            let x = rec.exclusionZone as ExclusionRect;
-            excl = `${x.topLat},${x.bottomLat},${x.leftLong},${x.rightLong},,,,,,,,`;
+            const x = rec.exclusionZone as ExclusionRect;
+            excl = `${numCell(x.topLat)},${numCell(x.bottomLat)},${numCell(x.leftLong)},${numCell(x.rightLong)},,,,,,,,`;
           }
           break;
         case 'Two Rectangles':
           {
-            let x = rec.exclusionZone as ExclusionTwoRect;
-            excl = `${x.rectangleOne.topLat},${x.rectangleOne.bottomLat},${x.rectangleOne.leftLong},${x.rectangleOne.rightLong},${x.rectangleTwo.topLat},${x.rectangleTwo.bottomLat},${x.rectangleTwo.leftLong},${x.rectangleTwo.rightLong},,,,`;
+            const x = rec.exclusionZone as ExclusionTwoRect;
+            excl = `${numCell(x.rectangleOne.topLat)},${numCell(x.rectangleOne.bottomLat)},${numCell(x.rectangleOne.leftLong)},${numCell(x.rectangleOne.rightLong)},${numCell(x.rectangleTwo.topLat)},${numCell(x.rectangleTwo.bottomLat)},${numCell(x.rectangleTwo.leftLong)},${numCell(x.rectangleTwo.rightLong)},,,,`;
           }
           break;
         case 'Horizon Distance':
           {
-            let x = rec.exclusionZone as ExclusionHorizon;
-            excl = `,,,,,,,,,${x.latitude},${x.longitude},${x.aglHeightM}`;
+            const x = rec.exclusionZone as ExclusionHorizon;
+            excl = `,,,,,,,,,${numCell(x.latitude)},${numCell(x.longitude)},${numCell(x.aglHeightM)}`;
           }
           break;
         default:

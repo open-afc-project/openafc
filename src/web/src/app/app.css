@@ -1,5 +1,40 @@
 :root {
   --myApp-global--spacer--md: 30px;
+  /* ~half of PatternFly md gap between action buttons */
+  --afc-button-group-gap: calc(var(--pf-t--global--spacer--md, 1rem) / 2);
+}
+
+/*
+ * PatternFly ActionGroup lays out .pf-v6-c-form__actions children with per-item margins.
+ * That yields uneven gaps. Use flex + gap on the actions container and clear child margins.
+ */
+.afc-button-group .pf-v6-c-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--afc-button-group-gap);
+  margin: 0;
+}
+
+.afc-button-group .pf-v6-c-form__actions > * {
+  margin: 0 !important;
+}
+
+/* Plain flex rows (no ActionGroup): Mobile AP timeline, RatAfc map toolbar, etc. */
+.afc-button-group--row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--afc-button-group-gap);
+}
+
+.afc-button-group--after-form {
+  margin-top: var(--pf-t--global--spacer--sm, 0.5rem);
+}
+
+/* PatternFly checkboxes: a bit more space between the box and label in dense forms */
+.pf-v6-c-check:not(.pf-m-standalone) {
+  column-gap: var(--pf-t--global--spacer--sm, 0.5rem);
 }
 
 html,
@@ -9,11 +44,16 @@ body,
 }
 
 pre {
-  white-space: pre-wrap; /* Since CSS 2.1 */
-  white-space: -moz-pre-wrap; /* Mozilla, since 1999 */
-  white-space: -pre-wrap; /* Opera 4-6 */
-  white-space: -o-pre-wrap; /* Opera 7 */
-  word-wrap: break-word; /* Internet Explorer 5.5+ */
+  white-space: pre-wrap;
+  /* Since CSS 2.1 */
+  white-space: -moz-pre-wrap;
+  /* Mozilla, since 1999 */
+  white-space: -pre-wrap;
+  /* Opera 4-6 */
+  white-space: -o-pre-wrap;
+  /* Opera 7 */
+  word-wrap: break-word;
+  /* Internet Explorer 5.5+ */
 }
 
 .app-container {
@@ -27,12 +67,12 @@ pre {
   flex: 0 1 auto;
 }
 
-.pf-c-page__main {
-  background: #ededed;
+.pf-c-page__main,
+.pf-v6-c-page__main {
+  background: var(--pf-t--global--background--color--secondary--default, #ededed);
 }
 
 #nav-list-simple {
-  height: 85hv;
 }
 
 #nav-footer {
@@ -53,7 +93,7 @@ pre {
   width: 100%;
   height: 15px;
   border-radius: 5px;
-  background: #d3d3d3;
+  background: var(--pf-t--global--background--color--secondary--default, #d3d3d3);
   outline: none;
   opacity: 0.7;
   -webkit-transition: 0.2s;
@@ -78,18 +118,13 @@ pre {
   cursor: pointer;
 }
 
-#horizontal-form-certification-nra {
-  max-width: 50%;
-  display: inline;
-}
-
+/* IDs used for name/id attributes only; no width constraints needed */
+#horizontal-form-certification-nra,
 #horizontal-form-certification-list {
-  max-width: 50%;
-  display: inline;
 }
 
 .nestedGallery {
-  border: 1px solid darkgray;
+  border: 1px solid var(--pf-t--global--border--color--default, darkgray);
 }
 
 .inquiredChannelsSection {
@@ -118,19 +153,141 @@ pre {
 }
 
 .custom-tooltip {
-  background-color: white;
+  background-color: var(--pf-t--global--background--color--primary--default, white);
 }
 
 #aboutAccordion {
-  --pf-global--Color--100: white;
-  --pf-global--BackgroundColor--100: black;
-  --pf-c-accordion--BackgroundColor: black;
-  --pf-c-accordion__toggle--hover--BackgroundColor: darkgrey;
-  --pf-c-accordion__toggle--focus--BackgroundColor: darkgrey;
-  --pf-c-accordion__toggle--active--BackgroundColor: darkgrey;
-  --pf-c-accordion__expanded-content--Color: white;
+  --pf-v6-c-accordion--BackgroundColor: var(--pf-t--global--background--color--primary--default);
+  --pf-v6-c-accordion__toggle--hover--BackgroundColor: var(--pf-t--global--background--color--secondary--hover);
+  --pf-v6-c-accordion__toggle--focus--BackgroundColor: var(--pf-t--global--background--color--secondary--hover);
+  --pf-v6-c-accordion__toggle--active--BackgroundColor: var(--pf-t--global--background--color--secondary--hover);
+  --pf-v6-c-accordion__toggle--Color: var(--pf-t--global--text--color--regular);
+  --pf-v6-c-accordion__expanded-content-body--Color: var(--pf-t--global--text--color--regular);
 }
 
 #parametersList {
   font-size: large;
+}
+
+/* Global link underlines: no underline by default, solid underline on hover */
+a,
+.pf-v6-c-nav__link,
+.pf-v6-c-button.pf-m-link {
+  text-decoration: none !important;
+}
+
+a:hover,
+.pf-v6-c-nav__link:hover,
+.pf-v6-c-button.pf-m-link:hover {
+  text-decoration: underline !important;
+  text-decoration-style: solid !important;
+}
+
+/* Masthead brand alignment */
+.pf-v6-c-masthead__main {
+  align-items: center !important;
+}
+
+.pf-v6-c-masthead__brand {
+  align-self: center !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.pf-v6-c-masthead__logo {
+  display: flex !important;
+  align-items: center !important;
+  line-height: normal !important;
+  text-decoration: none !important;
+}
+
+.pf-v6-c-masthead__logo:hover {
+  text-decoration: underline !important;
+  text-decoration-style: solid !important;
+}
+
+/* Ensure toolbar content row is also vertically centered */
+.pf-v6-c-masthead__content {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* PF6 toolbar__content-section defaults to align-items:start; override to center
+   so that text NavLinks and icon Buttons all align to the same vertical midpoint */
+.pf-v6-c-masthead .pf-v6-c-toolbar__content-section {
+  align-items: center !important;
+}
+
+/* PF6 form-control uses display:grid. Chrome does not auto-stretch replaced
+   elements (<input>, <select>) to fill the grid cell even with grid-column:1/-1.
+   Explicitly set width:100% on the inner elements so they fill the container. */
+.pf-v6-c-form-control > input,
+.pf-v6-c-form-control > select {
+  width: 100%;
+}
+
+/* Custom AboutModal styling to match PatternFly 4 look */
+.pf-v6-c-modal-box:has(.custom-about-modal) {
+  --pf-v6-c-modal-box--m-lg--lg--MaxWidth: 77rem;
+  /* Restore original PF4 1232px width */
+}
+
+.custom-about-modal {
+  /* 1fr .6fr means left side is 62.5%, right side is 37.5% */
+  --pf-v6-c-about-modal-box--lg--GridTemplateColumns: 1fr 0.6fr !important;
+
+  /* Mask the left 62.5% with the solid background color, let the image show on the right 37.5% */
+  background-image:
+    linear-gradient(to right, var(--pf-v6-c-about-modal-box--BackgroundColor) 62.5%, transparent 62.5%),
+    var(--pf-v6-c-about-modal-box--BackgroundImage) !important;
+  background-size:
+    100% 100%,
+    auto 100% !important;
+  background-position:
+    left top,
+    right top !important;
+  background-repeat: no-repeat, no-repeat !important;
+
+  max-height: calc(100% - 2rem);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure the content area can scroll when items are expanded */
+.custom-about-modal > .pf-v6-c-about-modal-box__content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.custom-about-modal .pf-v6-c-about-modal-box__close .pf-v6-c-button.pf-m-plain {
+  background-color: var(--pf-v6-c-about-modal-box--BackgroundColor) !important;
+  border-radius: 50% !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  max-width: 24px !important;
+  max-height: 24px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+.custom-about-modal .pf-v6-c-description-list {
+  --pf-v6-c-description-list--m-horizontal__term--width: 8ch;
+  --pf-v6-c-description-list--m-horizontal__description--width: auto;
+  white-space: nowrap;
+}
+
+.custom-about-modal .pf-v6-c-about-modal-box__close .pf-v6-c-button.pf-m-plain svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.pf-v6-c-nav__item .pf-v6-c-divider {
+  margin: 0 !important;
+  width: 100% !important;
 }

@@ -217,6 +217,12 @@ def main(argv):
                 else:
                     pkggrp = seen_pkg
                     archname = head[rpm.RPMTAG_ARCH]
+                    # Reject arch names with invalid path characters
+                    if not archname or '/' in archname or '..' in archname or \
+                            '\x00' in archname:
+                        raise ValueError(
+                            f'Invalid RPMTAG_ARCH {archname!r} in {filename!r}; '
+                            f'value contains disallowed characters')
 
                 # check for dupes
                 if pkgname in pkggrp and not args.ignore_dupes:
@@ -237,6 +243,13 @@ def main(argv):
                 os.mkdir(arch_path)
             # copy, preserving permission/time
             dst_path = os.path.join(tgtpath, archname, filename)
+            # Realpath containment check — ensure destination is under tgtpath
+            real_dst = os.path.realpath(dst_path)
+            real_tgt = os.path.realpath(tgtpath)
+            # This uses os.path.commonpath instead of real_dst.startswith(real_tgt)
+            if os.path.commonpath([real_dst, real_tgt]) != real_tgt:
+                raise ValueError(
+                    f'Destination {dst_path!r} escapes target root {tgtpath!r}')
             shutil.copyfile(src_path, dst_path)
             shutil.copystat(src_path, dst_path)
 

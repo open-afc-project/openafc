@@ -12,8 +12,16 @@
 
 import datetime
 import enum
+import hashlib
+import hmac
 import json
+import os
 import pydantic
+from pydantic import ConfigDict
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    pass
 try:
     import sqlalchemy as sa
 except ImportError:
@@ -21,15 +29,74 @@ except ImportError:
 import sys
 from typing import Any, Dict, List, Optional
 
-from log_utils import dp
 
 __all__ = ["AfcReqRespKey", "ApDbPk", "ApDbRecord", "ApDbRespState", "Beam",
-           "FuncSwitch", "IfDbExists", "LatLonRect", "RatapiAfcConfig",
-           "RatapiRulesetIds", "RcacheClientSettings",
+           "compute_rmq_resp_hmac", "FuncSwitch", "IfDbExists", "LatLonRect",
+           "RatapiAfcConfig", "RatapiRulesetIds", "RcacheClientSettings",
            "RcacheDirectionalInvalidateReq", "RcacheInvalidateReq",
            "RCACHE_RMQ_EXCHANGE_NAME", "RcacheServiceSettings",
            "RcacheSpatialInvalidateReq", "RcacheStatus", "RcacheUpdateReq",
-           "RmqReqRespKey"]
+           "RmqReqRespKey", "verify_rmq_resp_hmac"]
+
+
+def _load_rmq_resp_hmac_key() -> Optional[bytes]:
+    """ Load the shared secret used to authenticate worker->afc_server/
+    msghnd/rat_server RMQ responses (RmqReqRespKey.resp_hmac).
+
+    Deliberately reuses the objstore API key (AFC_OBJST_API_KEY_FILE) that
+    is already provisioned to every process in this trust domain (worker,
+    afc_server, msghnd, rat_server) for objstore access — it is a distinct
+    secret from BROKER_PWD, so a principal holding only the RabbitMQ broker
+    credential cannot forge this signature even though it can publish to
+    the broker (SUB-0138-13: 'Forged RMQ response settles AP request future
+    without authenticity check').
+    """
+    key_file = os.environ.get("AFC_OBJST_API_KEY_FILE")
+    if key_file and os.path.isfile(key_file):
+        try:
+            with open(key_file) as f:
+                key = f.read().strip()
+        except OSError:
+            key = ""
+        if key:
+            return key.encode("utf-8")
+    key = os.environ.get("AFC_OBJST_API_KEY")
+    return key.encode("utf-8") if key else None
+
+
+def compute_rmq_resp_hmac(req_cfg_digest: str, afc_resp: Optional[str]) -> \
+        Optional[str]:
+    """ Compute the HMAC-SHA256 signature over (req_cfg_digest || afc_resp)
+    that authenticates a worker -> afc_server/msghnd RMQ response as having
+    been produced by a holder of the objstore API key.
+
+    Returns None if no shared secret is configured (AFC_OBJST_API_KEY(_FILE)
+    unset) — callers on the producer side should treat that as a
+    configuration error, callers on the consumer side must fail closed
+    (see verify_rmq_resp_hmac).
+    """
+    key = _load_rmq_resp_hmac_key()
+    if key is None:
+        return None
+    msg = req_cfg_digest.encode("utf-8") + b"|" + \
+        (afc_resp or "").encode("utf-8")
+    return hmac.new(key, msg, hashlib.sha256).hexdigest()
+
+
+def verify_rmq_resp_hmac(req_cfg_digest: str, afc_resp: Optional[str],
+                         resp_hmac: Optional[str]) -> bool:
+    """ Verify a RmqReqRespKey's resp_hmac signature.
+
+    Fails closed: returns False (reject the message) both when the
+    signature does not match AND when either the shared secret or the
+    signature itself is absent — a message with no resp_hmac is exactly
+    what a mere-broker-credential attacker (who cannot read
+    AFC_OBJST_API_KEY_FILE) would send.
+    """
+    expected = compute_rmq_resp_hmac(req_cfg_digest, afc_resp)
+    if not expected or not resp_hmac:
+        return False
+    return hmac.compare_digest(expected, resp_hmac)
 
 
 # Name of RMQ exchange for delivering AFC Responses from Worker
@@ -50,20 +117,17 @@ class IfDbExists(enum.Enum):
     clean = "clean"
 
 
-class RcacheServiceSettings(pydantic.BaseSettings):
+class RcacheServiceSettings(BaseSettings):
     """ Rcache service parameters, passed via environment """
 
-    class Config:
-        """ Metainformation """
-        # Prefix of environment variables
-        env_prefix = "RCACHE_"
+    model_config = ConfigDict(env_prefix="RCACHE_")
 
     enabled: bool = \
         pydantic.Field(
             True, title="Rcache enabled (False for legacy file-based cache")
 
     port: int = pydantic.Field(..., title="Port this service listens on",
-                               env="RCACHE_CLIENT_PORT")
+                               validation_alias="RCACHE_CLIENT_PORT")
     postgres_dsn: pydantic.PostgresDsn = \
         pydantic.Field(
             ...,
@@ -71,10 +135,12 @@ class RcacheServiceSettings(pydantic.BaseSettings):
             "postgresql://[user[:password]]@host[:port]/database[?...]")
     postgres_password_file: Optional[str] = \
         pydantic.Field(None, title="File with password for database DSN")
+    api_key_file: Optional[str] = \
+        pydantic.Field(None, title="File with API key for authentication")
     db_creator_url: Optional[pydantic.AnyHttpUrl] = \
         pydantic.Field(
             None, title="REST API URL for Postgres database creation",
-            env="AFC_DB_CREATOR_URL")
+            validation_alias="AFC_DB_CREATOR_URL")
     alembic_config: Optional[str] = \
         pydantic.Field(
             None,
@@ -110,8 +176,8 @@ class RcacheServiceSettings(pydantic.BaseSettings):
         pydantic.Field(
             None, description="Keyhole shape PostGIS template file")
 
+    @pydantic.model_validator(mode="before")
     @classmethod
-    @pydantic.root_validator(pre=True)
     def _remove_empty(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """ Removes empty entries """
         for key in list(values.keys()):
@@ -120,20 +186,16 @@ class RcacheServiceSettings(pydantic.BaseSettings):
         return values
 
 
-class RcacheClientSettings(pydantic.BaseSettings):
+class RcacheClientSettings(BaseSettings):
     """ Parameters of Rcache clients in various services, passed via
     environment """
-    class Config:
-        """ Metainformation """
-        # Prefix of environment variables
-        env_prefix = "RCACHE_"
 
-        @classmethod
-        def parse_env_var(cls, field_name: str, raw_val: str) -> Any:
-            """ Parses string list environment variable(s) """
-            if field_name == "afc_state_vendor_extensions":
-                return [x for x in raw_val.split(",") if x]
-            return cls.json_loads(raw_val)
+    model_config = ConfigDict(env_prefix="RCACHE_")
+
+    @classmethod
+    def settings_customise_sources(cls, settings_cls, **kwargs):
+        """ Custom env parsing for comma-separated list fields """
+        return super().settings_customise_sources(settings_cls, **kwargs)
 
     enabled: bool = \
         pydantic.Field(
@@ -153,25 +215,40 @@ class RcacheClientSettings(pydantic.BaseSettings):
         pydantic.Field(
             None,
             description="Rcache server base RestAPI URL")
+    api_key_file: Optional[str] = \
+        pydantic.Field(
+            None,
+            description="File with API key for authentication")
     rmq_dsn: Optional[pydantic.AmqpDsn] = \
         pydantic.Field(
             None,
             description="RabbitMQ AMQP DSN: "
             "amqp://[user[:password]]@host[:port]")
+    rmq_password_file: Optional[str] = \
+        pydantic.Field(
+            None,
+            description="File with password for RabbitMQ DSN",
+            validation_alias="RCACHE_RMQ_PASSWORD_FILE")
     afc_state_vendor_extensions: Optional[List[str]] = \
         pydantic.Field(
             None,
             description="List of Set of vendor extensions from previously "
             "computed invalidated AFC response to be sent to AFC Engine",
-            env="AFC_STATE_VENDOR_EXTENSIONS")
+            validation_alias="AFC_STATE_VENDOR_EXTENSIONS")
 
+    @pydantic.model_validator(mode="before")
     @classmethod
-    @pydantic.root_validator(pre=True)
     def _remove_empty(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        """ Removes empty entries """
+        """ Removes empty entries and coerces comma-separated strings to
+        lists for list-typed fields """
         for key in list(values.keys()):
             if values[key] == "":
                 del values[key]
+        for key in ("afc_state_vendor_extensions",
+                    "AFC_STATE_VENDOR_EXTENSIONS"):
+            val = values.get(key)
+            if isinstance(val, str):
+                values[key] = [s.strip() for s in val.split(",") if s.strip()]
         return values
 
     def validate_for(self, db: bool = False, rmq: bool = False,
@@ -200,13 +277,17 @@ class RcacheClientSettings(pydantic.BaseSettings):
 class LatLonRect(pydantic.BaseModel):
     """ Latitude/longitude rectangle, used in spatial cache invalidation """
     min_lat: float = \
-        pydantic.Field(..., title="Minimum latitude in north-positive degrees")
+        pydantic.Field(..., ge=-90, le=90,
+                       title="Minimum latitude in north-positive degrees")
     max_lat: float = \
-        pydantic.Field(..., title="Maximum latitude in north-positive degrees")
+        pydantic.Field(..., ge=-90, le=90,
+                       title="Maximum latitude in north-positive degrees")
     min_lon: float = \
-        pydantic.Field(..., title="Minimum longitude in east-positive degrees")
+        pydantic.Field(..., ge=-180, le=180,
+                       title="Minimum longitude in east-positive degrees")
     max_lon: float = \
-        pydantic.Field(..., title="Maximum longitude in east-positive degrees")
+        pydantic.Field(..., ge=-180, le=180,
+                       title="Maximum longitude in east-positive degrees")
 
     def short_str(self) -> str:
         """ Condensed string representation """
@@ -231,7 +312,7 @@ class LatLonRect(pydantic.BaseModel):
 class RcacheInvalidateReq(pydantic.BaseModel):
     """ Rcache REST API cache invalidation request """
     ruleset_ids: Optional[List[str]] = \
-        pydantic.Field(None,
+        pydantic.Field(None, max_length=3000,
                        title="Optional list of ruleset IDs to invalidate. By "
                        "default invalidates everything")
 
@@ -239,37 +320,37 @@ class RcacheInvalidateReq(pydantic.BaseModel):
 class RcacheSpatialInvalidateReq(pydantic.BaseModel):
     """ Rcache REST API spatial invalidation request """
     tiles: List[LatLonRect] = \
-        pydantic.Field(..., title="List of rectangles, containing changed FSs")
+        pydantic.Field(..., max_length=3000, title="List of rectangles, containing changed FSs")
 
 
 class Beam(pydantic.BaseModel):
     """ Directed (point plus direction) spatial invalidation request """
     rx_lat: float = \
         pydantic.Field(
-            ...,
+            ..., ge=-90, le=90,
             title="FS/PR RX WGS84 latitude in north-positive degrees")
     rx_lon: float = \
         pydantic.Field(
-            ...,
+            ..., ge=-180, le=180,
             title="FS/PR RX WGS84 longitude in east-positive degrees")
     tx_lat: Optional[float] = \
         pydantic.Field(
-            None,
+            None, ge=-90, le=90,
             title="FS/PR TX WGS84 latitude in north-positive degrees. Absent "
             "if azimuth to TX is specified")
     tx_lon: Optional[float] = \
         pydantic.Field(
-            None,
+            None, ge=-180, le=180,
             title="FS/PR TX WGS84 longitude in east-positive degrees. Absent "
             "if azimuth to TX is specified")
     azimuth_to_tx: Optional[float] = \
         pydantic.Field(
-            None,
+            None, ge=-360, le=360, allow_inf_nan=False,
             title="True WGS84 azimuth from RX to TX. Absent if TX position is "
             "specified")
 
+    @pydantic.model_validator(mode="before")
     @classmethod
-    @pydantic.root_validator()
     def one_definition(cls, v: Dict[str, Any]) -> Dict[str, Any]:
         """ Verifies that direction to TX specified in exactly one way """
         if (v.get("tx_lat") is None) != (v.get("tx_lon") is None):
@@ -278,6 +359,7 @@ class Beam(pydantic.BaseModel):
         if (v.get("tx_lat") is None) == (v.get("azimuth_to_tx") is None):
             raise ValueError("Either TX position or azimuth to TX (but not "
                              "both) should be specified")
+        return v
 
     def short_str(self) -> str:
         """ Condensed string representation """
@@ -293,13 +375,14 @@ class Beam(pydantic.BaseModel):
 class RcacheDirectionalInvalidateReq(pydantic.BaseModel):
     """ Rcache REST API directional invalidation request """
     beams: List[Beam] = \
-        pydantic.Field(..., title="List of beam definitions for changed FSs")
+        pydantic.Field(..., max_length=3000, title="List of beam definitions for changed FSs")
 
 
 class AfcReqRespKey(pydantic.BaseModel):
     """ Information about single computed result, used in request cache update
     request """
-    afc_req: str = pydantic.Field(..., title="AFC Request as string")
+    afc_req: str = pydantic.Field(..., min_length=1,
+                                  title="AFC Request as string")
     afc_resp: str = pydantic.Field(..., title="AFC Response as string")
     req_cfg_digest: str = \
         pydantic.Field(
@@ -309,7 +392,7 @@ class AfcReqRespKey(pydantic.BaseModel):
 class RcacheUpdateReq(pydantic.BaseModel):
     """ Rcache REST API cache update request """
     req_resp_keys: List[AfcReqRespKey] = \
-        pydantic.Field(..., title="Computation results to add to cache")
+        pydantic.Field(..., max_length=3000, title="Computation results to add to cache")
 
 
 class RcacheStatus(pydantic.BaseModel):
@@ -359,11 +442,17 @@ class RcacheStatus(pydantic.BaseModel):
 
 class AfcReqCertificationId(pydantic.BaseModel):
     """ Interesting part of AFC Request's CertificationId structure """
+    # Excludes '|': ApDbPk.from_req below joins rulesetId/id across the
+    # whole certificationId list with "|" to build the rcache primary key;
+    # an embedded '|' would let a crafted list collide with a different
+    # device's decomposition of the same joined string (CWE-180).
     rulesetId: str = \
         pydantic.Field(
-            ..., title="Regulatory ruleset for which certificate was given")
+            ..., pattern=r'^[^|]+$',
+            title="Regulatory ruleset for which certificate was given")
     id: str = \
-        pydantic.Field(..., title="Certification ID for given ruleset")
+        pydantic.Field(..., pattern=r'^[^|]+$',
+                       title="Certification ID for given ruleset")
 
 
 class AfcReqDeviceDescriptor(pydantic.BaseModel):
@@ -371,26 +460,34 @@ class AfcReqDeviceDescriptor(pydantic.BaseModel):
     serialNumber: str = \
         pydantic.Field(..., title="Device serial number")
     certificationId: List[AfcReqCertificationId] = \
-        pydantic.Field(..., min_items=1, title="Device certifications")
+        pydantic.Field(..., min_length=1, title="Device certifications")
 
 
 class AFcReqPoint(pydantic.BaseModel):
     """ Interesting part of AFC Request's Point structure """
+    # Bound coordinates to valid WGS84 ranges. Unbounded values (e.g. 1e308)
+    # would defeat the centroid normalisation in AfcReqLocation.center() under
+    # IEEE-754 absorption, causing a non-terminating loop.
     longitude: float = \
-        pydantic.Field(..., title="Longitude in east-positive degrees")
+        pydantic.Field(..., ge=-180, le=180,
+                       title="Longitude in east-positive degrees")
     latitude: float = \
-        pydantic.Field(..., title="Latitude in north-positive degrees")
+        pydantic.Field(..., ge=-90, le=90,
+                       title="Latitude in north-positive degrees")
 
 
 class AfcReqEllipse(pydantic.BaseModel):
     """ Interesting part of AFC Request's Ellipse structure """
     center: AFcReqPoint = pydantic.Field(..., title="Ellipse center")
+    majorAxis: float = pydantic.Field(..., title="Major axis (meters)")
+    minorAxis: float = pydantic.Field(..., title="Minor axis (meters)")
+    orientation: float = pydantic.Field(..., title="Orientation (degrees)")
 
 
 class AfcReqLinearPolygon(pydantic.BaseModel):
     """ Interesting part of AFC Request's LinearPolygon structure """
     outerBoundary: List[AFcReqPoint] = \
-        pydantic.Field(..., title="List of vertices", min_items=1)
+        pydantic.Field(..., title="List of vertices", min_length=1)
 
 
 class AfcReqRadialPolygon(pydantic.BaseModel):
@@ -407,8 +504,8 @@ class AfcReqLocation(pydantic.BaseModel):
     radialPolygon: Optional[AfcReqRadialPolygon] = \
         pydantic.Field(None, title="Optional radial polygon descriptor")
 
+    @pydantic.model_validator(mode="before")
     @classmethod
-    @pydantic.root_validator()
     def one_definition(cls, v: Dict[str, Any]) -> Dict[str, Any]:
         """ Verifies that exactly one type of AP location is specified """
         if ((0 if v.get("ellipse") is None else 1) +
@@ -430,11 +527,12 @@ class AfcReqLocation(pydantic.BaseModel):
         lon: float = 0.
         lon0 = self.linearPolygon.outerBoundary[0].longitude
         for b in self.linearPolygon.outerBoundary:
-            blon = b.longitude
-            while blon > (lon0 + 360):
-                blon -= 360
-            while blon <= (lon0 - 360):
-                blon += 360
+            # Normalise into the [lon0-180, lon0+180) window with a single
+            # modular reduction so vertices west of lon0 stay west. The
+            # previous incremental while-loops could spin forever when |blon|
+            # was large enough that subtracting 360 was absorbed by IEEE-754
+            # rounding.
+            blon = lon0 + (((b.longitude - lon0 + 180) % 360) - 180)
             lon += blon
         lon /= len(self.linearPolygon.outerBoundary)
         return AFcReqPoint(latitude=lat, longitude=lon)
@@ -454,7 +552,7 @@ class AfcReqAvailableSpectrumInquiryRequestMessage(pydantic.BaseModel):
     AvailableSpectrumInquiryRequestMessage structure """
     availableSpectrumInquiryRequests: \
         List[AfcReqAvailableSpectrumInquiryRequest] = \
-        pydantic.Field(..., min_items=1, max_items=1,
+        pydantic.Field(..., min_length=1, max_length=1,
                        title="Single element list of requests")
 
 
@@ -475,8 +573,8 @@ class AfcRespAvailableSpectrumInquiryResponse(pydantic.BaseModel):
             "if response unsuccessful")
     response: AfcRespResponse = pydantic.Field(None, title="Response status")
 
+    @pydantic.field_validator('availabilityExpireTime')
     @classmethod
-    @pydantic.validator('availabilityExpireTime')
     def check_expiration_time_format(cls, v: Optional[str]) -> Optional[str]:
         """ Checks validity of 'availabilityExpireTime' """
         if v is not None:
@@ -489,7 +587,7 @@ class AfcRespAvailableSpectrumInquiryResponseMessage(pydantic.BaseModel):
     AvailableSpectrumInquiryResponseMessage structure """
     availableSpectrumInquiryResponses: \
         List[AfcRespAvailableSpectrumInquiryResponse] = \
-        pydantic.Field(..., min_items=1, max_items=1,
+        pydantic.Field(..., min_length=1, max_length=1,
                        title="Single-element list of responses")
 
 
@@ -500,6 +598,15 @@ class RmqReqRespKey(pydantic.BaseModel):
     req_cfg_digest: str = \
         pydantic.Field(
             ..., title="Request/Config hash (cache lookup key) as string")
+    resp_hmac: Optional[str] = \
+        pydantic.Field(
+            default=None,
+            title="HMAC-SHA256 over req_cfg_digest||afc_resp, keyed with "
+                  "the objstore API key. Authenticates this message as "
+                  "produced by a holder of that key (worker/afc_server "
+                  "trust domain) rather than a mere RabbitMQ broker "
+                  "credential holder. See compute_rmq_resp_hmac / "
+                  "verify_rmq_resp_hmac.")
 
 
 # Cache database row state (reflects status of response)
@@ -522,7 +629,7 @@ class ApDbPk(pydantic.BaseModel):
         if req_pydantic is None:
             assert req_str is not None
             req_pydantic = \
-                AfcReqAvailableSpectrumInquiryRequestMessage.parse_raw(req_str)
+                AfcReqAvailableSpectrumInquiryRequestMessage.model_validate_json(req_str)
         first_request = req_pydantic.availableSpectrumInquiryRequests[0]
         return \
             ApDbPk(
@@ -536,6 +643,8 @@ class ApDbPk(pydantic.BaseModel):
 
 
 class ApDbRecord(pydantic.BaseModel):
+    model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True, extra="ignore")
+
     """ Database AP record in Pydantic representation
 
     Structure must be kept in sync with one, defined in rcache_db.RcacheDb()
@@ -548,7 +657,7 @@ class ApDbRecord(pydantic.BaseModel):
         pydantic.Field(..., title="Ruleset used for computation")
     # Well, in fact it is # Annotated[str, geoalchemy2.types.WKBElement],
     # but bringing geoalchemy2 into all usage places is too daunting
-    coordinates: Any = \
+    coordinates: Optional[Any] = \
         pydantic.Field(..., title="Access Point WGS84 coordinates")
     last_update: datetime.datetime = \
         pydantic.Field(..., title="Time of last update")
@@ -567,22 +676,23 @@ class ApDbRecord(pydantic.BaseModel):
         if "sqlalchemy" not in sys.modules:
             raise RuntimeError("'sqlalchemy' module not imported")
         resp = \
-            AfcRespAvailableSpectrumInquiryResponseMessage.parse_raw(
+            AfcRespAvailableSpectrumInquiryResponseMessage.model_validate_json(
                 rrk.afc_resp).availableSpectrumInquiryResponses[0]
         if resp.response.responseCode != 0:
             return None
         req_pydantic = \
-            AfcReqAvailableSpectrumInquiryRequestMessage.parse_raw(
+            AfcReqAvailableSpectrumInquiryRequestMessage.model_validate_json(
                 rrk.afc_req)
         pk = ApDbPk.from_req(req_pydantic=req_pydantic)
         center = \
             req_pydantic.availableSpectrumInquiryRequests[0].location.center()
         return \
             ApDbRecord(
-                **pk.dict(),
+                **pk.model_dump(),
                 state=ApDbRespState.Valid.name,
                 config_ruleset=resp.rulesetId,
                 coordinates=sa.text(
+
                     f"ST_GeographyFromText('SRID=4326;"
                     f"POINT({center.longitude} {center.latitude})')"),
                 last_update=datetime.datetime.now(),
@@ -591,7 +701,7 @@ class ApDbRecord(pydantic.BaseModel):
                 if resp.availabilityExpireTime is None
                 else (datetime.datetime.strptime(
                       resp.availabilityExpireTime, RESP_EXPIRATION_FORMAT) -
-                      datetime.datetime.utcnow()).total_seconds(),
+                      datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)).total_seconds(),
                 request=rrk.afc_req,
                 response=rrk.afc_resp)
 
@@ -602,7 +712,7 @@ class ApDbRecord(pydantic.BaseModel):
         if self.validity_period_sec is not None:
             resp["availabilityExpireTime"] = \
                 datetime.datetime.strftime(
-                    datetime.datetime.utcnow() +
+                    datetime.datetime.now(datetime.timezone.utc) +
                     datetime.timedelta(seconds=self.validity_period_sec),
                     RESP_EXPIRATION_FORMAT)
         return json.dumps(ret_dict)
@@ -618,7 +728,7 @@ class RatapiRulesetIds(pydantic.BaseModel):
 class RatapiAfcConfig(pydantic.BaseModel):
     """ Interesting parts of AFC Config, returned by RapAPI REST request """
     maxLinkDistance: float = \
-        pydantic.Field(...,
+        pydantic.Field(..., gt=0, le=20000,
                        title="Maximum distance between AP and affected FS RX")
 
 

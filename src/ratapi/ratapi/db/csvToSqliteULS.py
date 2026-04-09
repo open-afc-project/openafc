@@ -1,12 +1,11 @@
 import csv
 import os
+import sys
 import sqlalchemy as sa
 from sqlalchemy import Column
-from sqlalchemy.sql.elements import and_, or_
-from sqlalchemy.sql.expression import tuple_
-from sqlalchemy.types import TypeDecorator, String, Boolean, Integer, Float, Unicode, DECIMAL
+from sqlalchemy.types import TypeDecorator, String, Boolean, Integer, Float, Unicode
 from numpy import loadtxt
-from sqlalchemy.orm import sessionmaker, load_only
+from sqlalchemy.orm import sessionmaker
 import sqlalchemy.ext.declarative as declarative
 
 #: Base class for declarative models
@@ -246,16 +245,24 @@ def _as_bool(s):
     return None
 
 
+def _csv_strip(s):
+    """Strip leading _csv_safe sentinel quote from a CSV field value."""
+    s = str(s).strip()
+    if s.startswith("'"):
+        s = s[1:].strip()
+    return s
+
+
 def _as_float(s):
     if s == '' or s is None:
         return None
-    return float(s)
+    return float(_csv_strip(s))
 
 
 def _as_int(s):
-    if s == '':
+    if s == '' or s is None:
         return None
-    return int(s)
+    return int(_csv_strip(s))
 
 
 def truncate(num, n):
@@ -364,14 +371,14 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile,
                     if fieldIdx == 0:
                         antaob = ANTAOB(
                             aob_idx=aobIdx,
-                            aob_deg=float(row[field])
+                            aob_deg=_as_float(row[field])
                         )
                         s.add(antaob)
                     else:
                         antIdx = fieldIdx - 1
                         antgain = ANTGAIN(
                             id=numAOB * antIdx + aobIdx,
-                            gain_db=float(row[field])
+                            gain_db=_as_float(row[field])
                         )
                         s.add(antgain)
                         count += 1
@@ -385,7 +392,7 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile,
                 logFile.write(errMsg)
                 sys.exit(errMsg)
 
-        if not (file_handle is None):
+        if file_handle is not None:
             file_handle.close()
         #######################################################################
 
@@ -430,7 +437,7 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile,
                 logFile.write(errMsg)
                 sys.exit(errMsg)
 
-        if not (file_handle is None):
+        if file_handle is not None:
             file_handle.close()
         #######################################################################
 
@@ -440,10 +447,8 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile,
         (data, file_handle) = load_csv_data(fsDataFile)
 
         # generate queries in chunks to reduce memory footprint
-        to_save = []
         invalid_rows = 0
         prCount = 0
-        errors = []
         uls = None
         pr = None
         antaob = None
@@ -613,7 +618,7 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile,
                 logFile.write('CSV to sqlite Up to FS entry ' +
                               str(count) + '\n')
 
-        if not (file_handle is None):
+        if file_handle is not None:
             file_handle.close()
         #######################################################################
 

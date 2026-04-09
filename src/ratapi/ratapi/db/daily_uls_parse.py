@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 import os
+import hashlib
 import datetime
 import zipfile
 import shutil
 import subprocess
-import sys
 import glob
 import argparse
 import csv
@@ -12,8 +12,6 @@ import urllib.request
 import urllib.parse
 import urllib.error
 from collections import OrderedDict
-import ssl
-from urllib.error import URLError
 from processAntennaCSVs import processAntFiles
 from csvToSqliteULS import convertULS
 # from sort_callsigns_all import sortCallsigns
@@ -23,8 +21,10 @@ from fix_params import fixParams
 import sqlalchemy as sa
 import hashlib
 import fnmatch
+import ssl
 
-ssl._create_default_https_context = ssl._create_unverified_context
+ssl._create_default_https_context = ssl.create_default_context
+
 
 # file types we need to consider along with their # of | symbols (i.e. #
 # of cols - 1)
@@ -84,6 +84,63 @@ monthMap = {
 ###############################################################################
 
 
+def safe_download(url, filename, md5_url=None):
+    if not url.startswith('http://') and not url.startswith('https://'):
+        raise ValueError("Invalid URL scheme")
+
+    def _cap(block_num, block_size, total_size):
+        if block_num * block_size > ULS_ZIP_MAX_BYTES:
+            raise RuntimeError(
+                'Rejecting %s: download exceeds cap (%d bytes)'
+                % (url, ULS_ZIP_MAX_BYTES))
+
+    urllib.request.urlretrieve(url, filename, reporthook=_cap)
+
+    # Bind integrity to the INPUT artifact: verify the publisher-supplied
+    # MD5 before any downstream consumer (extractZips / uls-script) sees
+    # the bytes. Fail closed on malformed digest or mismatch; treat HTTP 404
+    # as "publisher no longer provides MD5 for this file" and skip the check.
+    if md5_url is not None:
+        if not md5_url.startswith('https://'):
+            raise ValueError("Invalid MD5 URL scheme")
+        try:
+            with urllib.request.urlopen(md5_url, timeout=60) as r:
+                expected = r.read(4096).decode('ascii', 'strict').split()[0]
+            if len(expected) != 32:
+                raise ValueError('malformed digest')
+            int(expected, 16)
+            h = hashlib.md5(usedforsecurity=False)  # FCC publishes MD5 for download integrity
+            with open(filename, 'rb') as f:
+                for chunk in iter(lambda: f.read(1 << 20), b''):
+                    h.update(chunk)
+            if h.hexdigest().lower() != expected.lower():
+                raise ValueError('digest mismatch')
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                print(
+                    'WARNING: MD5 file not published by server for %s (HTTP 404) '
+                    '-- skipping MD5 check; rely on ULS_HASH_MANIFEST for '
+                    'output-artifact integrity' % url)
+            else:
+                try:
+                    os.remove(filename)
+                except OSError:
+                    pass
+                raise RuntimeError(
+                    'Rejecting %s: input-artifact MD5 verification failed '
+                    '(%s) -- refusing to feed unverified bytes to uls-script'
+                    % (url, e))
+        except Exception as e:
+            try:
+                os.remove(filename)
+            except OSError:
+                pass
+            raise RuntimeError(
+                'Rejecting %s: input-artifact MD5 verification failed '
+                '(%s) -- refusing to feed unverified bytes to uls-script'
+                % (url, e))
+
+
 def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
     regionDataDir = fullPathTempDir + '/' + region
     if (not os.path.isdir(regionDataDir)):
@@ -94,7 +151,8 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
         # download the latest Weekly Update
         weeklyURL = 'https://data.fcc.gov/download/pub/uls/complete/l_micro.zip'
         logFile.write('Downloading weekly' + '\n')
-        urllib.request.urlretrieve(weeklyURL, regionDataDir + '/weekly.zip')
+        safe_download(weeklyURL, regionDataDir + '/weekly.zip',
+                      md5_url=weeklyURL + '.md5')
 
         # download all the daily updates starting from Sunday up to that day
         # example: on Wednesday morning, we will download the weekly update
@@ -103,19 +161,20 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
             dayStr = day
             dailyURL = 'https://data.fcc.gov/download/pub/uls/daily/l_mw_' + dayStr + '.zip'
             logFile.write('Downloading ' + dayStr + '\n')
-            urllib.request.urlretrieve(
-                dailyURL, regionDataDir + '/' + dayStr + '.zip')
+            safe_download(
+                dailyURL, regionDataDir + '/' + dayStr + '.zip',
+                md5_url=dailyURL + '.md5')
             # Exit after processing today's file
             if (key == currentWeekday) and (day != 'sun'):
                 break
     elif region == 'CA':
-        urllib.request.urlretrieve(
+        safe_download(
             'https://www.ic.gc.ca/engineering/Stations_Data_Extracts.csv',
             regionDataDir + '/SD.csv')
-        urllib.request.urlretrieve(
+        safe_download(
             'https://www.ic.gc.ca/engineering/Passive_Repeater_data_extract.csv',
             regionDataDir + '/PP.csv')
-        urllib.request.urlretrieve(
+        safe_download(
             'https://www.ic.gc.ca/engineering/Passive_Reflectors_Data_Extract.csv',
             regionDataDir + '/PR.csv')
 
@@ -131,14 +190,16 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
         # else:
         #     raise Exception('ERROR: Unable to process CA file {}'.format("TAFL_LTAF_Fixe.zip"))
 
-        cmd = 'echo "Antenna Manufacturer,Antenna Model Number,Antenna Gain [dBi],Antenna Diameter,Beamwidth [deg],Last Updated,Pattern Type,Pattern Azimuth [deg],Pattern Attenuation [dB]" >| ' + regionDataDir + '/AP.csv'  # noqa
-        os.system(cmd)
-        urllib.request.urlretrieve(
+        with open(os.path.join(regionDataDir, 'AP.csv'), 'w') as f:
+            f.write(
+                "Antenna Manufacturer,Antenna Model Number,Antenna Gain [dBi],Antenna Diameter,Beamwidth [deg],Last Updated,Pattern Type,Pattern Azimuth [deg],Pattern Attenuation [dB]\n")
+        safe_download(
             'https://www.ic.gc.ca/engineering/Antenna_Patterns_6GHz.csv',
             regionDataDir + '/Antenna_Patterns_6GHz_orig.csv')
-        cmd = 'cat ' + regionDataDir + \
-            '/Antenna_Patterns_6GHz_orig.csv >> ' + regionDataDir + '/AP.csv'
-        os.system(cmd)
+        with open(os.path.join(regionDataDir, 'Antenna_Patterns_6GHz_orig.csv'), 'r') as src:
+            with open(os.path.join(regionDataDir, 'AP.csv'), 'a') as dst:
+                for chunk in iter(lambda: src.read(8192), ''):
+                    dst.write(chunk)
         os.remove(regionDataDir + '/Antenna_Patterns_6GHz_orig.csv')
 ###############################################################################
 
@@ -206,24 +267,21 @@ def prepareAFCGitHubFiles(rawDir, destDir, logFile):
     for dataFile in dataFileList:
         srcFile = os.path.join(rawDir, dataFile)
         dstFile = os.path.join(destDir, dataFile)
-        # Remove control characters.
-        cmd = 'tr -d \'\\200-\\377\\015\' < ' + srcFile + ' '
-        # Remove blank lines.
-        # cmd += '| gawk -F "," \'($2 != "") { print }\' ' \
-        # Fix spelling error.
-        # cmd += '| sed \'s/daimeter/diameter/\' ' \
-
-        cmd += '>| ' + dstFile
-        os.system(cmd)
+        with open(srcFile, 'rb') as f_in, open(dstFile, 'wb') as f_out:
+            for chunk in iter(lambda: f_in.read(8192), b''):
+                f_out.write(chunk.translate(None, bytes(range(128, 256)) + b'\r'))
         if dataFile == "fcc_fixed_service_channelization.csv":
-            cmd = 'echo -e "5967.4375,30,\n' \
-                + '6056.3875,30,\n' \
-                + '6189.8275,30,\n' \
-                + '6219.4775,30,\n' \
-                + '6308.4275,30," >> ' + dstFile
-            os.system(cmd)
+            with open(dstFile, 'a') as f_out:
+                f_out.write("5967.4375,30,\n6056.3875,30,\n6189.8275,30,\n6219.4775,30,\n6308.4275,30,\n")
 
 # Extracts all the zip files into sub-directories
+
+
+# Decompression-bomb guards for FCC ULS archives (CWE-400). The weekly
+# l_micro.zip historically expands to well under 5 GiB; reject anything
+# whose declared total or per-member ratio is implausibly large.
+ULS_ZIP_MAX_BYTES = 20 * 1024 * 1024 * 1024
+ULS_ZIP_MAX_RATIO = 100
 
 
 def extractZips(logFile, directory):
@@ -235,6 +293,17 @@ def extractZips(logFile, directory):
             fileName = os.path.abspath(
                 directory + '/' + tempZip)  # get full path
             zip_file = zipfile.ZipFile(fileName)  # zip object
+            total_out = 0
+            for zi in zip_file.infolist():
+                ratio = zi.file_size / max(zi.compress_size, 1)
+                total_out += zi.file_size
+                if ratio > ULS_ZIP_MAX_RATIO or total_out > ULS_ZIP_MAX_BYTES:
+                    zip_file.close()
+                    raise RuntimeError(
+                        'Rejecting %s: decompressed size %d / ratio %.1f '
+                        'exceeds cap (%d bytes / %d:1)'
+                        % (tempZip, total_out, ratio,
+                           ULS_ZIP_MAX_BYTES, ULS_ZIP_MAX_RATIO))
             subDirName = fileName.replace('.zip', '')
             os.mkdir(subDirName)  # sub-directory to extract to
             zip_file.extractall(subDirName)
@@ -252,12 +321,12 @@ def verifyCountsFile(directory):
         # remove non-date part of string
         dateStr = line.replace('File Creation Date: ', '')
         dateData = dateStr.split()  # split into word array
-        weekday = dateData[0]
+        dateData[0]
         # convert month string to an int between 1 and 12
         month = monthMap.get(dateData[1].lower(), 'err')
         day = int(dateData[2])  # day of the month as a Number
         time = dateData[3]
-        timeZone = dateData[4]
+        dateData[4]
         year = int(dateData[5])
         # convert string time to numbers array
         timeData = [int(string) for string in time.split(':')]
@@ -313,7 +382,7 @@ def removeFromCombinedFile(
                         if (fileType +
                                 ".dat" in list(neededFilesUS[versionIdx].keys())):
                             # only write when the id is not in the list of ids
-                            if (not cols[1] in ids_to_remove):
+                            if (cols[1] not in ids_to_remove):
                                 record += "\r\n"  # add newline
                                 withDaily.write(record)
                             # reset for the next record
@@ -331,7 +400,7 @@ def removeFromCombinedFile(
                 for line in weekly:
                     cols = line.split('|')
                     # only write when the id is not in the list of ids
-                    if (not cols[1] in ids_to_remove):
+                    if (cols[1] not in ids_to_remove):
                         withDaily.write(line)
         # remove old combined, move new one to right place
         os.remove(weeklyAndDailyPath)
@@ -497,7 +566,7 @@ def generateUlsScriptInputCA(directory, logFile, genFilename):
                                        ('|'.join(row)) + '|\n')
     if not sourceFilenames:
         raise Exception("CA source filenames not found")
-    sources_md5 = hashlib.md5()
+    sources_md5 = hashlib.md5(usedforsecurity=False)
     for sourceFilename in sorted(sourceFilenames):
         with open(os.path.join(directory, sourceFilename), mode="rb") as f:
             sources_md5.update(f.read())
@@ -535,10 +604,9 @@ def storeDataIdentities(sqlFile, identityDict):
     metadata.reflect(bind=engine)
     conn = engine.connect()
     if not sa.inspect(engine).has_table("data_ids"):
-        dataIdsTable = \
-            sa.Table("data_ids", metadata,
-                     sa.Column("region", sa.String(100), primary_key=True),
-                     sa.Column("identity", sa.String(1000), nullable=False))
+        sa.Table("data_ids", metadata,
+                 sa.Column("region", sa.String(100), primary_key=True),
+                 sa.Column("identity", sa.String(1000), nullable=False))
         metadata.create_all(engine)
     idsTable = metadata.tables["data_ids"]
     for region in sorted(identityDict.keys()):
@@ -840,7 +908,7 @@ def daily_uls_parse(state_root, interactive):
     # If processDownloadFlag set, process Download files to create combined.txt         #
     ###########################################################################
     if processDownloadFlag:
-        with open(fullPathCoalitionScriptInput, 'w', encoding='utf8') as combined:
+        with open(fullPathCoalitionScriptInput, 'w', encoding='utf8'):
             pass  # Do nothing, create empty file that will be appended to
 
         for region in regionList:
@@ -863,7 +931,7 @@ def daily_uls_parse(state_root, interactive):
                     rasDataFileUSTgt = regionDataDir + '/weekly/RA.dat_withDaily'
                     logFile.write("Copying " + rasDataFileUSSrc +
                                   ' to ' + rasDataFileUSTgt + '\n')
-                    subprocess.call(['cp', rasDataFileUSSrc, rasDataFileUSTgt])
+                    shutil.copy(rasDataFileUSSrc, rasDataFileUSTgt)
 
                     # generate the combined csv/txt file for the coalition uls
                     # processor
@@ -883,7 +951,7 @@ def daily_uls_parse(state_root, interactive):
                     rasDataFileUSTgt = regionDataDir + '/weekly/RA.dat_withDaily'
                     logFile.write("Copying " + rasDataFileUSSrc +
                                   ' to ' + rasDataFileUSTgt + '\n')
-                    subprocess.call(['cp', rasDataFileUSSrc, rasDataFileUSTgt])
+                    shutil.copy(rasDataFileUSSrc, rasDataFileUSTgt)
                     generateUlsScriptInputUS(
                         regionDataDir + '/weekly',
                         logFile,
@@ -900,7 +968,7 @@ def daily_uls_parse(state_root, interactive):
                         regionDataDir, logFile, fullPathCoalitionScriptInput)
             else:
                 logFile.write('ERROR: Invalid region = ' + region)
-                raise e
+                raise ValueError(f'Invalid region = {region}')
             assert dataIdentity is not None
             dataIdentities[region] = dataIdentity
 
@@ -1066,7 +1134,7 @@ def daily_uls_parse(state_root, interactive):
         fsidTableBakFile = root + '/data_files/fsid_table_bak_' + nameTime + '.csv'
         logFile.write("Backing up FSID table for to: " +
                       fsidTableBakFile + '\n')
-        subprocess.call(['cp', fsidTableFile, fsidTableBakFile])
+        shutil.copy(fsidTableFile, fsidTableBakFile)
         logFile.write("Running through sort callsigns add FSID script" + '\n')
         sortCallsignsAddFSID(
             bpsScriptOutput, fsidTableFile, sortedOutput, logFile)
@@ -1165,24 +1233,24 @@ def daily_uls_parse(state_root, interactive):
                 dirName = "WFA_testvector_FS_" + nameTime
             else:
                 dirName = str(nameTime + "_debug")
-            subprocess.call(['mkdir', dirName])
+            os.mkdir(dirName)
 
             # Get all files in temp dir
             for file in os.listdir(fullPathTempDir):
                 fullPathFile = fullPathTempDir + "/" + file
                 if (not os.path.isdir(fullPathFile)):
-                    subprocess.call(['cp', fullPathFile, dirName])
+                    shutil.copy(fullPathFile, dirName)
 
             # anomalousPath = root + '/' + 'anomalous_uls.csv'
             # warningPath = root + '/' + 'warning_uls.txt'
-            # subprocess.call(['mv', anomalousPath, dirName])
-            # subprocess.call(['mv', warningPath, dirName])
-            # subprocess.call(['cp', paramOutput, dirName])
+            # shutil.move(anomalousPath, dirName)
+            # shutil.move(warningPath, dirName)
+            # shutil.copy(paramOutput, dirName)
 
             shutil.make_archive(dirName, 'zip', root, dirName)
             zipName = dirName + ".zip"
             shutil.rmtree(dirName)  # delete debug directory
-            subprocess.call(['mv', zipName, state_root + '/ULS_Database/'])
+            shutil.move(zipName, state_root + '/ULS_Database/')
         except Exception as e:
             print('Error moving debug files:' + '\n')
             raise e
@@ -1190,7 +1258,7 @@ def daily_uls_parse(state_root, interactive):
         # copy sqlite to where GUI can see it
         print("Copying sqlite file" + '\n')
         try:
-            subprocess.call(['cp', outputSQL, state_root + '/ULS_Database/'])
+            shutil.copy(outputSQL, state_root + '/ULS_Database/')
         except Exception as e:
             print('Error copying ULS sqlite:' + '\n')
             raise e

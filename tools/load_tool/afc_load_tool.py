@@ -114,11 +114,7 @@ def yaml_load(yaml_s: str) -> Any:
     """ YAML/JSON dictionary for given YAML/JSON content """
     kwargs: Dict[str, Any] = {}
     if has_yaml:
-        if hasattr(yaml, "CLoader"):
-            kwargs["Loader"] = yaml.CLoader
-        elif hasattr(yaml, "FullLoader"):
-            kwargs["Loader"] = yaml.FullLoader
-        return yaml.load(yaml_s, **kwargs)
+        return yaml.safe_load(yaml_s)
     return json.loads(yaml_s)
 
 
@@ -1115,18 +1111,18 @@ class LoadRestDataHandler(RestDataHandlerBase):
 PostWorkerReqInfo = \
     NamedTuple("PostWorkerReqInfo",
                [
-                # Request indices, contained in REST API request data
-                ("req_indices", List[int]),
-                # REST API Request data
-                ("req_data", bytes)])
+                   # Request indices, contained in REST API request data
+                   ("req_indices", List[int]),
+                   # REST API Request data
+                   ("req_data", bytes)])
 
 
 # GET Worker request data and supplementary information
 GetWorkerReqInfo = \
     NamedTuple("GetWorkerReqInfo",
                [
-                # Number of GET requests to send
-                ("num_gets", int)])
+                   # Number of GET requests to send
+                   ("num_gets", int)])
 
 
 # REST API request results
@@ -1524,6 +1520,8 @@ def get_https_args(url: str, use_requests: bool, client_cert: Optional[str],
         ssl_context = \
             ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_cert)
         ssl_context.check_hostname = verify_server
+        if not verify_server:
+            ssl_context.verify_mode = ssl.CERT_NONE
         if client_cert:
             ssl_context.load_cert_chain(client_cert, client_key)
         ret["context"] = ssl_context
@@ -1832,7 +1830,7 @@ def run(url: str, parallel: int, backoff: float, timeout: float, retries: int,
         population_db: Optional[str] = None,
         rate_print_sec: Optional[float] = None,
         client_cert: Optional[str] = None, client_key: Optional[str] = None,
-        ca_cert: Optional[str] = None, verify_server: bool = False) -> None:
+        ca_cert: Optional[str] = None, verify_server: bool = True) -> None:
     """ Run the POST operation
 
     Arguments:
@@ -2197,9 +2195,9 @@ def do_preload(cfg: Config, args: Any) -> None:
     min_idx, max_idx = get_idx_range(args.idx_range)
 
     run(rest_data_handler=PreloadRestDataHandler(
-            cfg=cfg, afc_config=afc_config,
-            req_msg_pattern=patch_req(cfg=cfg, args_req=args.req),
-            csv_log=args.log),
+        cfg=cfg, afc_config=afc_config,
+        req_msg_pattern=patch_req(cfg=cfg, args_req=args.req),
+        csv_log=args.log),
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
         timeout=args.timeout, retries=args.retries, dry=args.dry,
         batch=args.batch, min_idx=min_idx, max_idx=max_idx,
@@ -2240,8 +2238,8 @@ def do_load(cfg: Config, args: Any) -> None:
         worker_url = parsed_url._replace(query=query).geturl()
     min_idx, max_idx = get_idx_range(args.idx_range)
     run(rest_data_handler=LoadRestDataHandler(
-            cfg=cfg, randomize=args.random, population_db=args.population,
-            req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
+        cfg=cfg, randomize=args.random, population_db=args.population,
+        req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
         timeout=args.timeout, retries=args.retries, dry=args.dry,
         batch=args.batch, min_idx=min_idx, max_idx=max_idx,
@@ -2363,7 +2361,8 @@ def do_afc_config(cfg: Config, args: Any) -> None:
         ratdb(
             cfg=cfg,
             command=cfg.ratdb.update_config_by_id.format(
-                afc_config=afc_config_str, region_str=afc_config["regionStr"]),
+                afc_config=afc_config_str.replace("'", "''"),
+                region_str=afc_config["regionStr"].replace("'", "''")),
             service_discovery=service_discovery)
     error_if(not (isinstance(result, int) and result > 0),
              "AFC Config update failed")
@@ -2479,8 +2478,8 @@ def main(argv: List[str]) -> None:
         "specified, AFC Requests are sent directly to msghnd (to avoid https "
         "issues on dispatcher")
     switches_afc.add_argument(
-        "--verify_server", action="store_true",
-        help="Verify HTTPS server identity")
+        "--no_verify_server", action="store_false", dest="verify_server",
+        help="Do not verify HTTPS server identity")
     switches_afc.add_argument(
         "--client_cert", metavar="CLIENT_CERT_OR_PEM_FILE",
         help="Client certificate for mTLS authentication. May be .cert file "

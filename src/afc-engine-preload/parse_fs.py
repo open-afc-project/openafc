@@ -19,6 +19,20 @@ max_tab = 0
 
 def write_obj(name, size, tab, outfile):
     # print(("\t"*tab) + "{} {}".format(name, size))
+    # Entry framing is ('\t' * depth) + name + '\0' + int64 size, and the
+    # header's max_tab field is a single byte recording directory depth
+    # only. Linux filenames may legally contain TAB/NUL bytes; a name
+    # containing one of these framing bytes (a leading TAB inflates the
+    # aep.cpp consumer's depth count past max_tab) or a depth over 255
+    # would desync the parser and index its stack[] out of bounds, so
+    # refuse to emit such entries rather than writing them verbatim.
+    if "\t" in name or "\n" in name or "\0" in name:
+        raise ValueError(
+            "refusing filelist entry with framing byte (TAB/NL/NUL) "
+            "in name: {!r}".format(name))
+    if tab > 255:
+        raise ValueError(
+            "filelist depth {} exceeds 1-byte max_tab".format(tab))
     outfile.write(("\t" * tab).encode('utf-8'))
     if tab > 0:
         global max_tab

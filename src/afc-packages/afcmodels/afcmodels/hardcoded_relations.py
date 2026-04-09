@@ -47,7 +47,7 @@ class RulesetVsRegion:
     def base_region_list(cls) -> List[str]:
         """ List of listable base (nonderived) AFC Region strings """
         cls._initialize()
-        return [r for r, dd in cls._by_region.iyems() if dd.is_base]
+        return [r for r, dd in cls._by_region.items() if dd.is_base]
 
     @classmethod
     def region_list(cls) -> List[str]:
@@ -62,7 +62,7 @@ class RulesetVsRegion:
         return [r for r, dd in cls._by_ruleset.items() if dd.is_listable]
 
     @classmethod
-    def region_to_ruleset(cls, region: str, exc: Exception) -> str:
+    def region_to_ruleset(cls, region: str, exc: type[Exception]) -> str:
         """ Returns Ruleset ID for given AFC Config region string.
         Generates exception of given type is not found """
         cls._initialize()
@@ -72,7 +72,7 @@ class RulesetVsRegion:
             raise exc(f"Invalid region name '{region}'")
 
     @classmethod
-    def ruleset_to_region(cls, ruleset: str, exc: Exception) -> str:
+    def ruleset_to_region(cls, ruleset: str, exc: type[Exception]) -> str:
         """ Returns AFC Config region string for given Ruleset ID.
         Generates exception of given type is not found """
         cls._initialize()
@@ -82,7 +82,7 @@ class RulesetVsRegion:
             raise exc(f"Invalid ruleset ID '{ruleset}'")
 
     @classmethod
-    def overwrite_region(cls, region: str, exc: Exception) -> Optional[str]:
+    def overwrite_region(cls, region: str, exc: type[Exception]) -> Optional[str]:
         """ Returns None or AFC Region string to use in AFC Config to send to\
         AFC Engine. Generates exception of given type is not found """
         cls._initialize()
@@ -132,25 +132,36 @@ class SpecialCertifications:
     # Certificate dictionary. Initialized on first call to class methods
     _special_certificates: Dict["SpecialCertifications._Key",
                                 "SpecialCertifications.Properties"] = {}
+    # Sentinel to avoid repeated initialization when env var is not set
+    _initialized: bool = False
 
     @classmethod
     def get_properties(cls, cert_id: str, serial_number: str) \
             -> Optional["SpecialCertifications.Properties"]:
         cls._initialize()
+        # Normalise serial_number the same way _auth_ap() does (strip + upper)
+        # so test certs are found regardless of how the caller normalises.
+        normalised_serial = \
+            serial_number.strip().upper() if serial_number else serial_number
         return \
             cls._special_certificates.get(
-                cls._Key(cert_id=cert_id, serial_number=serial_number))
+                cls._Key(cert_id=cert_id, serial_number=normalised_serial))
 
     @classmethod
     def _initialize(cls) -> None:
-        if cls._special_certificates:
+        if cls._initialized:
             return
+        cls._initialized = True
+        import os
+        if os.environ.get("AFC_ENABLE_TEST_CERTS", "").lower() \
+                not in ("1", "true", "yes"):
+            return
+        flags_both = CERT_ID_LOCATION_OUTDOOR | CERT_ID_LOCATION_INDOOR
         for cert_id, serial_number, location_flags in \
-                [("TestCertificationId", "TestSerialNumber",
-                  CERT_ID_LOCATION_OUTDOOR | CERT_ID_LOCATION_INDOOR),
-                 ("HeatMapCertificationId", "HeatMapSerialNumber",
-                  CERT_ID_LOCATION_OUTDOOR | CERT_ID_LOCATION_INDOOR)]:
-            key = cls._Key(cert_id=cert_id, serial_number=serial_number)
+                [("TestCertificationId", "TestSerialNumber", flags_both),
+                 ("HeatMapCertificationId", "HeatMapSerialNumber", flags_both)]:
+            key = cls._Key(cert_id=cert_id,
+                           serial_number=serial_number.strip().upper())
             assert key not in cls._special_certificates
             cls._special_certificates[key] = \
                 cls.Properties(location_flags=location_flags)

@@ -3,7 +3,7 @@
 #ifndef CPOBG_SRC_CPOCOMMON_ENVIRONMENTFLAG_H_
 #define CPOBG_SRC_CPOCOMMON_ENVIRONMENTFLAG_H_
 
-//#include "cpocommon_export.h"
+// #include "cpocommon_export.h"
 #include <string>
 #include <memory>
 

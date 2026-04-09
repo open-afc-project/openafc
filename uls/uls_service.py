@@ -17,11 +17,14 @@
 import argparse
 import datetime
 import glob
+import hashlib
+import hmac
 import json
 import logging
 import os
 import prometheus_client
 import pydantic
+from pydantic_settings import BaseSettings
 import re
 import shlex
 import shutil
@@ -37,6 +40,7 @@ from typing import Any, cast, Dict, Iterable, List, NamedTuple, Optional, \
     Tuple, Union
 import urllib.error
 import urllib.request
+import wsgiref.simple_server
 
 import als
 from db_utils import safe_dsn
@@ -76,26 +80,26 @@ HEALTHCHECK_SCRIPT = os.path.join(os.path.dirname(__file__),
 DEFAULT_STATSD_PORT = 8125
 
 
-class Settings(pydantic.BaseSettings):
+class Settings(BaseSettings):
     """ Arguments from command lines - with their default values """
     download_script: str = \
         pydantic.Field(
             "/mnt/nfs/rat_transfer/daily_uls_parse/daily_uls_parse.py",
-            env="ULS_DOWNLOAD_SCRIPT",
+            validation_alias="ULS_DOWNLOAD_SCRIPT",
             description="FS download script")
     download_script_args: Optional[str] = \
-        pydantic.Field(None, env="ULS_DOWNLOAD_SCRIPT_ARGS",
+        pydantic.Field(None, validation_alias="ULS_DOWNLOAD_SCRIPT_ARGS",
                        description="Additional download script parameters")
     region: Optional[str] = \
-        pydantic.Field(None, env="ULS_DOWNLOAD_REGION",
-                       description="Download regions", no="All")
+        pydantic.Field(None, validation_alias="ULS_DOWNLOAD_REGION",
+                       description="Download regions", json_schema_extra={"no": "All"})
     result_dir: str = \
         pydantic.Field(
-            "/mnt/nfs/rat_transfer/ULS_Database/", env="ULS_RESULT_DIR",
+            "/mnt/nfs/rat_transfer/ULS_Database/", validation_alias="ULS_RESULT_DIR",
             description="Directory where download script puts downloaded file")
     temp_dir: str = \
         pydantic.Field(
-            "/mnt/nfs/rat_transfer/daily_uls_parse/temp/", env="ULS_TEMP_DIR",
+            "/mnt/nfs/rat_transfer/daily_uls_parse/temp/", validation_alias="ULS_TEMP_DIR",
             description="Temporary directory of ULS download script, cleaned "
             "before downloading")
     save_dir: str = \
@@ -107,56 +111,56 @@ class Settings(pydantic.BaseSettings):
                        description="Number of backup saved for data")
     ext_db_dir: str = \
         pydantic.Field(
-            ..., env="ULS_EXT_DB_DIR",
+            ..., validation_alias="ULS_EXT_DB_DIR",
             description="Ultimate downloaded file destination directory")
     ext_db_symlink: str = \
-        pydantic.Field(..., env="ULS_CURRENT_DB_SYMLINK",
+        pydantic.Field(..., validation_alias="ULS_CURRENT_DB_SYMLINK",
                        description="Symlink pointing to current ULS file")
     fsid_file: str = \
         pydantic.Field(
             "/mnt/nfs/rat_transfer/daily_uls_parse/data_files/fsid_table.csv",
-            env="ULS_FSID_FILE",
+            validation_alias="ULS_FSID_FILE",
             description="FSID file location expected by ULS download script")
     ext_ras_database: str = \
-        pydantic.Field(..., env="ULS_EXT_RAS_DATABASE",
+        pydantic.Field(..., validation_alias="ULS_EXT_RAS_DATABASE",
                        description="RAS database")
     ras_database: str = \
         pydantic.Field(
             "/mnt/nfs/rat_transfer/daily_uls_parse/data_files/RASdatabase.dat",
-            env="ULS_RAS_DATABASE",
+            validation_alias="ULS_RAS_DATABASE",
             description="Where from ULS script reads RAS database")
     service_state_db_dsn: str = \
         pydantic.Field(
-            ..., env="ULS_SERVICE_STATE_DB_DSN",
+            ..., validation_alias="ULS_SERVICE_STATE_DB_DSN",
             description="Connection string to service state database",
-            convert=safe_dsn)
+            json_schema_extra={"convert": safe_dsn})
     service_state_db_password_file: Optional[str] = \
         pydantic.Field(
-            None, env="ULS_SERVICE_STATE_DB_PASSWORD_FILE",
+            None, validation_alias="ULS_SERVICE_STATE_DB_PASSWORD_FILE",
             description="Optional name of file with password for state "
             "database DSN")
     db_creator_url: Optional[str] = \
         pydantic.Field(
-            None, env="AFC_DB_CREATOR_URL",
+            None, validation_alias="AFC_DB_CREATOR_URL",
             description="Postgres database creator REST API URL")
     alembic_config: Optional[str] = \
         pydantic.Field(
-            None, env="ULS_ALEMBIC_CONFIG",
+            None, validation_alias="ULS_ALEMBIC_CONFIG",
             description="Optional name of Alembic config file")
     alembic_initial_version: Optional[str] = \
         pydantic.Field(
-            None, env="ULS_ALEMBIC_INITIAL_VERSION",
+            None, validation_alias="ULS_ALEMBIC_INITIAL_VERSION",
             description="Version to stamp Alembic database with")
     alembic_head_version: Optional[str] = \
         pydantic.Field(
-            None, env="ULS_ALEMBIC_HEAD_VERSION",
+            None, validation_alias="ULS_ALEMBIC_HEAD_VERSION",
             description="Version to stamp newly-created database with "
             "(default is 'head')")
     prometheus_port: Optional[int] = \
-        pydantic.Field(None, env="ULS_PROMETHEUS_PORT",
+        pydantic.Field(None, validation_alias="ULS_PROMETHEUS_PORT",
                        description="Port to serve Prometheus metrics on")
     statsd_server: Optional[str] = \
-        pydantic.Field(None, env="ULS_STATSD_SERVER",
+        pydantic.Field(None, validation_alias="ULS_STATSD_SERVER",
                        description="StatsD server to send metrics to")
     check_ext_files: Optional[List[str]] = \
         pydantic.Field(
@@ -167,67 +171,91 @@ class Settings(pydantic.BaseSettings):
             "category_b1_antennas.csv,high_performance_antennas.csv,"
             "fcc_fixed_service_channelization.csv,"
             "transmit_radio_unit_architecture.csv",
-            env="ULS_CHECK_EXT_FILES",
+            validation_alias="ULS_CHECK_EXT_FILES",
             description="Verify that that files are the same as in internet",
-            no="None")
+            json_schema_extra={"no": "None"})
     max_change_percent: Optional[float] = \
         pydantic.Field(
-            10., env="ULS_MAX_CHANGE_PERCENT",
+            10., validation_alias="ULS_MAX_CHANGE_PERCENT",
             description="Limit on number of paths changed",
-            convert=lambda v: f"{v}%" if v else "Don't check")
+            json_schema_extra={"convert": lambda v: f"{v}%" if v else "Don't check"})
+    hash_manifest_url: Optional[str] = \
+        pydantic.Field(
+            None, validation_alias="ULS_HASH_MANIFEST_URL",
+            description="HTTPS URL of JSON manifest mapping DB filenames to "
+            "expected SHA-256 hashes",
+            json_schema_extra={"no": "Don't check"})
+    hash_manifest_file: Optional[str] = \
+        pydantic.Field(
+            None, validation_alias="ULS_HASH_MANIFEST_FILE",
+            description="Local path to JSON manifest mapping DB filenames to "
+            "expected SHA-256 hashes",
+            json_schema_extra={"no": "Don't check"})
+    hash_manifest_hmac_key: Optional[str] = \
+        pydantic.Field(
+            None, validation_alias="ULS_HASH_MANIFEST_HMAC_KEY",
+            description="HMAC-SHA256 key for authenticating the hash manifest. "
+            "When set, a companion '.hmac' file (same URL "
+            "with '.hmac' suffix) is fetched and verified before parsing. "
+            "Reject manifest when HMAC is configured but absent or invalid.",
+            json_schema_extra={
+                "no": "No manifest authentication (insecure)",
+                "convert": lambda v: "<redacted>" if v else None})
     afc_url: Optional[str] = \
         pydantic.Field(
-            None, env="ULS_AFC_URL",
+            None, validation_alias="ULS_AFC_URL",
             description="AFC Service URL to use for database validity check",
-            no="Don't check")
+            json_schema_extra={"no": "Don't check"})
     afc_parallel: Optional[int] = \
         pydantic.Field(
-            None, env="ULS_AFC_PARALLEL",
+            None, validation_alias="ULS_AFC_PARALLEL",
             description="Number of parallel AFC Requests to use when doing "
-            "validity check", no="fs_afc.py's default")
+            "validity check", json_schema_extra={"no": "fs_afc.py's default"})
     rcache_url: Optional[str] = \
-        pydantic.Field(None, env="RCACHE_SERVICE_URL",
+        pydantic.Field(None, validation_alias="RCACHE_SERVICE_URL",
                        description="Rcache service url",
-                       no="Don't do spatial invalidation")
+                       json_schema_extra={"no": "Don't do spatial invalidation"})
     rcache_enabled: bool = \
-        pydantic.Field(True, env="RCACHE_ENABLED",
+        pydantic.Field(True, validation_alias="RCACHE_ENABLED",
                        description="Rcache spatial invalidation",
-                       yes="Enabled", no="Disabled")
+                       json_schema_extra={"yes": "Enabled", "no": "Disabled"})
     rcache_directional_invalidate: bool = \
         pydantic.Field(
-            True, env="RCACHE_DIRECTIONAL_INVALIDATE",
+            True, validation_alias="RCACHE_DIRECTIONAL_INVALIDATE",
             description="True to use directional invalidation (default), "
             "False to use tiled invalidation)")
     delay_hr: float = \
-        pydantic.Field(0., env="ULS_DELAY_HR",
+        pydantic.Field(0., validation_alias="ULS_DELAY_HR",
                        description="Hours to delay first download by")
     interval_hr: float = \
-        pydantic.Field(4, env="ULS_INTERVAL_HR",
+        pydantic.Field(4, validation_alias="ULS_INTERVAL_HR",
                        description="Download interval in hours")
     timeout_hr: float = \
-        pydantic.Field(1, env="ULS_TIMEOUT_HR",
+        pydantic.Field(1, validation_alias="ULS_TIMEOUT_HR",
                        description="Download maximum duration in hours")
     nice: bool = \
-        pydantic.Field(False, env="ULS_NICE",
+        pydantic.Field(False, validation_alias="ULS_NICE",
                        description="Run in lowered (nice) priority")
     verbose: bool = \
         pydantic.Field(False, description="Print debug info")
     run_once: bool = \
-        pydantic.Field(False, env="ULS_RUN_ONCE",
-                       description="Run", yes="Once", no="Indefinitely")
+        pydantic.Field(False, validation_alias="ULS_RUN_ONCE",
+                       description="Run", json_schema_extra={"yes": "Once", "no": "Indefinitely"})
     force: bool = \
-        pydantic.Field(False,
+        pydantic.Field(False, validation_alias="ULS_FORCE_UPDATE",
                        description="Force FS database update (even if not "
-                       "changed or found invalid)")
+                       "changed or found invalid). "
+                       "Local-dev override only — MUST NOT be set in "
+                       "production deployments.")
 
-    @pydantic.validator("check_ext_files", pre=True)
+    @pydantic.field_validator("check_ext_files", mode="before")
     @classmethod
     def check_ext_files_str_to_list(cls, v: Any) -> Any:
         """ Converts string value of 'check_ext_files' from environment from
         string to list (as it is list in argparse) """
         return [v] if v and isinstance(v, str) else v
 
-    @pydantic.validator("statsd_server", pre=False)
+    @pydantic.field_validator("statsd_server", mode="after")
     @classmethod
     def check_statsd_server(cls, v: Any) -> Any:
         """ Applies default StatsD port """
@@ -240,7 +268,7 @@ class Settings(pydantic.BaseSettings):
                 assert host
         return v
 
-    @pydantic.root_validator(pre=True)
+    @pydantic.model_validator(mode="before")
     @classmethod
     def remove_empty(cls, v: Any) -> Any:
         """ Prevalidator that removes empty values (presumably from environment
@@ -262,9 +290,11 @@ class ProcessingException(Exception):
 def print_args(settings: Settings) -> None:
     """ Print invocation parameters to log """
     logging.info("FS downloader started with the following parameters")
-    for name, model_field in settings.__fields__.items():
+    for name, field_info in Settings.model_fields.items():
         value = getattr(settings, name)
-        extra = getattr(model_field.field_info, "extra", {})
+        extra = field_info.json_schema_extra or {}
+        if not isinstance(extra, dict):
+            extra = {}
         value_repr: str
         if "convert" in extra:
             value_repr = extra["convert"](value)
@@ -272,11 +302,11 @@ def print_args(settings: Settings) -> None:
             value_repr = extra["yes"]
         elif (not value) and ("no" in extra):
             value_repr = extra["no"]
-        elif model_field.type_ == bool:
+        elif field_info.annotation is bool:
             value_repr = "Yes" if value else "No"
         else:
             value_repr = str(value)
-        logging.info(f"{model_field.field_info.description}: {value_repr}")
+        logging.info(f"{field_info.description}: {value_repr}")
 
 
 class LoggingExecutor:
@@ -289,14 +319,14 @@ class LoggingExecutor:
     def __init__(self) -> None:
         self._lines: List[str] = []
 
-    def execute(self, cmd: Union[str, List[str]], fail_on_error: bool,
+    def execute(self, cmd: List[str], fail_on_error: bool,
                 return_output: bool = False, cwd: Optional[str] = None,
                 timeout_sec: Optional[float] = None) -> \
             Union[bool, Optional[str]]:
         """ Execute command
 
         Arguments:
-        cmd           -- Command as string or list of strings
+        cmd           -- Command as list of strings
         fail_on_error -- True to raise exception on error, False to return
                          failure code on error
         return_output -- True to return output (None on failure), False to
@@ -314,6 +344,7 @@ class LoggingExecutor:
             """ Kills given process by process group id (rumors are that
             os.kill() only adequate if shell=False)
             """
+            nonlocal timed_out
             try:
                 os.killpg(pgid, signal.SIGTERM)
                 timed_out = True
@@ -321,19 +352,21 @@ class LoggingExecutor:
                 pass
 
         self._lines.append(
-            "> " +
-            (cmd if isinstance(cmd, str)
-             else ''.join(shlex.quote(arg) for arg in cmd)) +
-            "\n")
+            "> " + ' '.join(shlex.quote(arg) for arg in cmd) + "\n")
         try:
-            with subprocess.Popen(cmd, shell=isinstance(cmd, str), text=True,
+            # start_new_session=True puts the child in its own process group so
+            # the timeout watchdog's os.killpg() targets only the runaway child
+            # and not the uls_service daemon's own group.
+            with subprocess.Popen(cmd, shell=False, text=True,
                                   encoding="utf-8", stdout=subprocess.PIPE,
                                   stderr=subprocess.STDOUT, bufsize=0,
-                                  cwd=cwd) as p:
+                                  cwd=cwd, start_new_session=True) as p:
                 timer: Optional[threading.Timer] = \
                     threading.Timer(timeout_sec, killer_timer,
                                     kwargs={"pgid": os.getpgid(p.pid)}) \
                     if timeout_sec is not None else None
+                if timer is not None:
+                    timer.start()
                 assert p.stdout is not None
                 for line in p.stdout:
                     print(line, end="", flush=True)
@@ -363,6 +396,41 @@ class LoggingExecutor:
         ret = "".join(self._lines)
         self._lines = []
         return ret
+
+
+def _start_token_gated_prometheus(port: int) -> None:
+    """Start Prometheus metrics on *port* behind an X-AFC-Internal-Token gate
+    (parity with als_siphon / afc_server / rat_server /metrics)."""
+    file_path = os.getenv("AFC_INTERNAL_TOKEN_FILE")
+    expected: Optional[str]
+    if file_path:
+        try:
+            with open(file_path) as fh:
+                expected = fh.read().strip()
+        except OSError as exc:
+            logging.critical(
+                "FATAL: cannot read AFC_INTERNAL_TOKEN_FILE %s: %s",
+                file_path, exc)
+            sys.exit(1)
+    else:
+        expected = os.getenv("AFC_INTERNAL_TOKEN")
+
+    metrics_app = prometheus_client.make_wsgi_app()
+
+    def gated_app(environ: Any,
+                  start_response: Any) -> Iterable[bytes]:
+        supplied = environ.get("HTTP_X_AFC_INTERNAL_TOKEN", "")
+        if (not expected) or \
+                (not hmac.compare_digest(supplied, expected)):
+            start_response("403 Forbidden",
+                           [("Content-Type", "text/plain")])
+            return [b"Forbidden"]
+        return metrics_app(environ, start_response)
+
+    httpd = wsgiref.simple_server.make_server("", port, gated_app)
+    t = threading.Thread(target=httpd.serve_forever)
+    t.daemon = True
+    t.start()
 
 
 class StatusUpdater:
@@ -429,7 +497,7 @@ class StatusUpdater:
             Optional["StatusUpdater._StatsdLabeledMetricInfo"] = None
         if prometheus_port is not None:
             try:
-                prometheus_client.start_http_server(prometheus_port)
+                _start_token_gated_prometheus(prometheus_port)
             except OSError as ex:
                 logging.warning(f"Cant't start Prometheus client: {ex}. "
                                 f"Proceeding nevertheless")
@@ -546,11 +614,13 @@ def extract_fsid_table(uls_file: str, fsid_file: str,
     # Clean previous FSID files...
     fsid_name_parts = os.path.splitext(fsid_file)
     logging.info("Extracting FSID table")
-    if not executor.execute(f"rm -f {fsid_name_parts[0]}*{fsid_name_parts[1]}",
-                            fail_on_error=False):
-        logging.warning(f"Strangely can't remove "
-                        f"{fsid_name_parts[0]}*{fsid_name_parts[1]}. "
-                        f"Proceeding nevertheless")
+    fsid_glob = fsid_name_parts[0] + "*" + fsid_name_parts[1]
+    for old_fsid in glob.glob(fsid_glob):
+        try:
+            os.remove(old_fsid)
+        except OSError as ex:
+            logging.warning(f"Could not remove old FSID file '{old_fsid}': {ex}. "
+                            f"Proceeding nevertheless")
     # ... and extracting latest one from previous FS database
     if os.path.isfile(uls_file):
         if executor.execute([FSID_TOOL, "check", uls_file],
@@ -582,7 +652,7 @@ def get_uls_identity(uls_file: str) -> Optional[Dict[str, str]]:
                                                  DATA_IDS_ID_COLUMN)):
             return None
         ret: Dict[str, str] = {}
-        for row in conn.execute(sa.select(id_table)).fetchall():
+        for row in conn.execute(sa.select(id_table)).mappings().fetchall():
             ret[row[DATA_IDS_REG_COLUMN]] = row[DATA_IDS_ID_COLUMN]
         return ret
     finally:
@@ -717,7 +787,7 @@ class DbDiff:
             logging.error(
                 f"Output of '{FS_DB_DIFF}' has unrecognized structure")
             return
-        self.prev_len = int(cast(str, m.group("db2")))
+        self.prev_len = int(cast(str, m.group("db1")))
         self.new_len = int(cast(str, m.group("db2")))
         self.diff_len = int(cast(str, m.group("diff")))
         self.ras_diff_len = int(cast(str, m.group("ras_diff")))
@@ -767,6 +837,9 @@ class UlsFileChecker:
 
     Private attributes:
     _max_change_percent -- Optional percent of maximum difference
+    _hash_manifest_url  -- Optional HTTPS URL of SHA-256 hash manifest JSON
+    _hash_manifest_file -- Optional local path to SHA-256 hash manifest JSON
+    _hash_manifest_hmac_key -- Optional HMAC-SHA256 key for manifest authentication
     _afc_url            -- Optional AFC Service URL to test ULS database on
     _afc_parallel       -- Optional number of parallel AFC requests to make
                            during database verification
@@ -779,40 +852,129 @@ class UlsFileChecker:
     def __init__(self, executor: LoggingExecutor,
                  status_updater: StatusUpdater,
                  max_change_percent: Optional[float] = None,
+                 hash_manifest_url: Optional[str] = None,
+                 hash_manifest_file: Optional[str] = None,
+                 hash_manifest_hmac_key: Optional[str] = None,
                  afc_url: Optional[str] = None,
                  afc_parallel: Optional[int] = None,
                  regions: Optional[List[str]] = None) -> None:
         """ Constructor
 
         Arguments:
-        executor           -- LoggingExecutor object
-        status_updater     -- StatusUpdater object
-        max_change_percent -- Optional percent of maximum difference
-        afc_url            -- Optional AFC Service URL to test ULS database on
-        afc_parallel       -- Optional number of parallel AFC requests to make
-                              during database verification
-        regions            -- Optional list of regions to test database on. If
-                              empty or None - test on all regions
+        executor               -- LoggingExecutor object
+        status_updater         -- StatusUpdater object
+        max_change_percent     -- Optional percent of maximum difference
+        hash_manifest_url      -- Optional HTTPS URL to JSON manifest mapping DB
+                                  filenames to expected SHA-256 hex digests
+        hash_manifest_file     -- Optional local path to JSON manifest mapping DB
+                                  filenames to expected SHA-256 hex digests
+        hash_manifest_hmac_key -- Optional HMAC-SHA256 key for authenticating the
+                                  manifest. When set, a companion
+                                  '.hmac' file is required alongside the manifest.
+        afc_url                -- Optional AFC Service URL to test ULS database on
+        afc_parallel           -- Optional number of parallel AFC requests to make
+                                  during database verification
+        regions                -- Optional list of regions to test database on. If
+                                  empty or None - test on all regions
         """
         self._executor = executor
         self._status_updater = status_updater
         self._max_change_percent = max_change_percent
+        self._hash_manifest_url = hash_manifest_url
+        self._hash_manifest_file = hash_manifest_file
+        self._hash_manifest_hmac_key = hash_manifest_hmac_key
         self._afc_url = afc_url
         self._afc_parallel = afc_parallel
         self._regions: List[str] = regions or []
 
+    def hash_valid(self, filename: str,
+                   manifest_key: Optional[str] = None) -> bool:
+        """Run only the SHA-256/HMAC manifest gate (no SQLite parsing).
+
+        Use this before constructing DbDiff or calling get_uls_identity so
+        that no FCC-derived SQLite content is parsed prior to cryptographic
+        verification.  Returns True if the hash check passes; False otherwise.
+        Updates the HashVerification status entry.
+        """
+        hash_results: Dict[str, Optional[str]] = {}
+        hash_tested, hash_errmsg = self._check_hash(
+            filename, manifest_key or os.path.basename(filename))
+        if hash_tested:
+            if hash_errmsg is not None:
+                logging.error(hash_errmsg)
+            hash_results["SHA-256 hash"] = hash_errmsg
+        else:
+            hash_errmsg = (
+                "ULS_HASH_MANIFEST_URL/FILE not configured \u2014 refusing to "
+                "activate unverified ULS database (fail-closed)")
+            logging.error(hash_errmsg)
+            hash_results["SHA-256 hash"] = hash_errmsg
+        self._status_updater.status_check(CheckType.HashVerification,
+                                          hash_results)
+        return hash_errmsg is None
+
+    @property
+    def manifest_configured(self) -> bool:
+        """ True if a hash manifest source (URL or file) is configured """
+        return bool(self._hash_manifest_url or self._hash_manifest_file)
+
     def valid(self, base_dir: str, new_filename: str,
-              db_diff: Optional[DbDiff]) -> bool:
+              db_diff: Optional[DbDiff],
+              manifest_key: Optional[str] = None,
+              expected_digest: Optional[str] = None,
+              hash_only: bool = False,
+              hash_filename: Optional[str] = None) -> bool:
         """ Checks validity of given database
 
         Arguments:
         base_dir     -- Directory, containing database being checked. This
                         argument is currently unused
-        new_filename -- Database being checked. Should have exactly same path
+        new_filename -- Database being checked, in the engine-relative form
+                        required by _check_afc() (resolved against the AFC
+                        service's own root). Should have exactly same path
                         as required in AFC Config
         db_diff      -- None or difference from previous database
+        manifest_key -- Filename key to look up in the hash manifest (defaults
+                        to basename of new_filename)
+        expected_digest -- If set, verify SHA-256 against this digest (the
+                        post-embed continuity baseline) instead of the
+                        manifest entry
+        hash_only    -- If True run only the cryptographic hash gate and
+                        skip content (diff/AFC) checks
+        hash_filename -- Absolute, locally-openable path to the exact file
+                        object being activated. The hash gate must open this
+                        file, not a re-derived engine-relative form that may
+                        not resolve from the container's CWD. Defaults to
+                        new_filename when not given.
         Returns True if check passed
         """
+        hash_results: Dict[str, Optional[str]] = {}
+        hash_tested, hash_errmsg = self._check_hash(
+            hash_filename if hash_filename is not None else new_filename,
+            manifest_key or os.path.basename(new_filename),
+            expected_digest=expected_digest)
+        if hash_tested:
+            if hash_errmsg is not None:
+                logging.error(hash_errmsg)
+            hash_results["SHA-256 hash"] = hash_errmsg
+        else:
+            hash_errmsg = (
+                "ULS_HASH_MANIFEST_URL/FILE not configured \u2014 refusing to "
+                "activate unverified ULS database (fail-closed)")
+            logging.error(hash_errmsg)
+            hash_results["SHA-256 hash"] = hash_errmsg
+        self._status_updater.status_check(CheckType.HashVerification,
+                                          hash_results)
+        if hash_errmsg is not None:
+            # Cryptographic integrity gate failed — do NOT hand the
+            # unverified sqlite to _check_afc / afc-engine.
+            return False
+
+        if hash_only:
+            # ULS_FORCE_UPDATE: content (diff/AFC) checks may be skipped,
+            # the cryptographic gate above may not
+            return True
+
         check_results: Dict[str, Optional[str]] = {}
         for item, (tested, errmsg) in \
                 [("difference from previous", self._check_diff(db_diff)),
@@ -823,7 +985,188 @@ class UlsFileChecker:
                 logging.error(errmsg)
             check_results[item] = errmsg
         self._status_updater.status_check(CheckType.FsDatabase, check_results)
-        return all(errmsg is None for errmsg in check_results.values())
+        return all(errmsg is None
+                   for errmsg in list(hash_results.values()) +
+                   list(check_results.values()))
+
+    def _check_hash(self, new_filename: str,
+                    manifest_key: str,
+                    expected_digest: Optional[str] = None) \
+            -> Tuple[bool, Optional[str]]:
+        """ Verify SHA-256 of new_filename against a JSON hash manifest.
+
+        The manifest is a JSON object whose keys are bare database filenames
+        and whose values are lowercase SHA-256 hex digests, e.g.:
+          { "FS_2026-04-29T15_26_38_..._sorted_param.sqlite3": "abcd1234..." }
+
+        If neither hash_manifest_url nor hash_manifest_file is configured the
+        check fails closed (returns an error) so that valid() rejects the
+        database — a cryptographic integrity anchor is mandatory.
+
+        Returns (check_performed, error_message) tuple
+        """
+        if not (self._hash_manifest_url or self._hash_manifest_file):
+            return (True,
+                    "Neither ULS_HASH_MANIFEST_URL nor ULS_HASH_MANIFEST_FILE "
+                    "is configured — refusing to activate database without a "
+                    "cryptographic integrity anchor. Configure a hash manifest.")
+
+        # Compute SHA-256 of the candidate file in streaming chunks
+        sha256 = hashlib.sha256()
+        try:
+            with open(new_filename, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    sha256.update(chunk)
+        except OSError as ex:
+            return (True, f"Cannot read '{new_filename}' for hash check: {ex}")
+        computed_hash = sha256.hexdigest()
+
+        # Post-embed continuity check: the pre-embed file already passed
+        # the manifest gate this cycle; the activation copy must match the
+        # trusted local FSID embed's output byte-for-byte (the manifest
+        # entry can only match the pre-embed bytes)
+        if expected_digest is not None:
+            if computed_hash.lower() != expected_digest.lower():
+                return (True,
+                        f"SHA-256 mismatch for '{manifest_key}': computed "
+                        f"{computed_hash}, post-embed digest "
+                        f"{expected_digest}")
+            logging.info(f"SHA-256 verified against post-embed digest for "
+                         f"'{manifest_key}': {computed_hash}")
+            return (True, None)
+
+        # Load manifest: local file takes precedence over URL
+        manifest: Optional[Dict[str, str]] = None
+        manifest_raw_bytes: Optional[bytes] = None
+        try:
+            if self._hash_manifest_file and \
+                    os.path.isfile(self._hash_manifest_file):
+                with open(self._hash_manifest_file, "rb") as f:
+                    manifest_raw_bytes = f.read()
+                manifest = json.loads(manifest_raw_bytes.decode("utf-8"))
+            elif self._hash_manifest_url:
+                logging.info(
+                    f"Fetching hash manifest from '{self._hash_manifest_url}'")
+                if not self._hash_manifest_url.startswith("https://"):
+                    return (True, "Hash manifest URL must use https:// scheme (http:// is rejected to protect manifest integrity)")
+                req = urllib.request.Request(
+                    self._hash_manifest_url,
+                    headers={"User-Agent": "uls_service/1.0"})
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    if not resp.geturl().startswith("https://"):
+                        return (True,
+                                "Hash manifest URL redirected away from "
+                                "https:// — refusing downgraded transport")
+                    manifest_raw_bytes = resp.read((1 << 20) + 1)
+                if len(manifest_raw_bytes) > (1 << 20):
+                    return (True,
+                            "Hash manifest exceeds 1 MiB cap — refusing "
+                            "oversized response (possible DoS)")
+                manifest = json.loads(manifest_raw_bytes.decode("utf-8"))
+        except (OSError, urllib.error.URLError,
+                json.JSONDecodeError, ValueError) as ex:
+            return (True, f"Cannot load hash manifest: {ex}")
+
+        # Authenticate the manifest with HMAC-SHA256.
+        # Whatever the manifest transport (URL or file), the HMAC key MUST be
+        # set (fail closed): a file-mode manifest typically lives on the same
+        # writable share as the databases it attests, so without independent
+        # authentication an attacker who can replace a database can forge a
+        # matching manifest entry too (and skip the _iat replay binding).
+        if not self._hash_manifest_hmac_key:
+            return (True,
+                    "A hash manifest source is configured but "
+                    "ULS_HASH_MANIFEST_HMAC_KEY is not — refusing to use an "
+                    "unauthenticated manifest. Set ULS_HASH_MANIFEST_HMAC_KEY "
+                    "to an independent secret and publish the .hmac companion "
+                    "(update_uls_manifest.sh --hmac-key-file).")
+        if self._hash_manifest_hmac_key:
+            import hmac as _hmac_mod
+            if manifest_raw_bytes is None:
+                return (True, "Manifest bytes unavailable for HMAC verification")
+            # Fetch or load the companion signature
+            hmac_sig_bytes: Optional[bytes] = None
+            try:
+                if self._hash_manifest_file and \
+                        os.path.isfile(self._hash_manifest_file + ".hmac"):
+                    with open(self._hash_manifest_file + ".hmac", "rb") as f:
+                        hmac_sig_bytes = f.read().strip()
+                elif self._hash_manifest_url:
+                    hmac_url = self._hash_manifest_url + ".hmac"
+                    hmac_req = urllib.request.Request(
+                        hmac_url,
+                        headers={"User-Agent": "uls_service/1.0"})
+                    with urllib.request.urlopen(hmac_req, timeout=30) as hr:
+                        if not hr.geturl().startswith("https://"):
+                            return (True,
+                                    "Manifest HMAC URL redirected away from "
+                                    "https:// — refusing downgraded transport")
+                        hmac_sig_bytes = hr.read((1 << 20) + 1).strip()
+            except (OSError, urllib.error.URLError) as ex:
+                return (True,
+                        f"Cannot fetch manifest HMAC signature: {ex}")
+            if not hmac_sig_bytes:
+                return (True,
+                        "Manifest HMAC signature absent but "
+                        "ULS_HASH_MANIFEST_HMAC_KEY is configured — "
+                        "refusing to accept unauthenticated manifest")
+            expected_hmac = _hmac_mod.new(
+                self._hash_manifest_hmac_key.encode("utf-8"),
+                manifest_raw_bytes,
+                hashlib.sha256).hexdigest().encode("ascii")
+            if not _hmac_mod.compare_digest(hmac_sig_bytes, expected_hmac):
+                return (True,
+                        "Manifest HMAC-SHA256 mismatch — "
+                        "manifest integrity check failed; "
+                        "refusing to use this manifest")
+            logging.info("Manifest HMAC-SHA256 verified OK")
+
+        if manifest is None:
+            return (True, "Hash manifest not available")
+        if not isinstance(manifest, dict):
+            return (True, "Hash manifest is not a JSON object")
+
+        # Replay defence (CWE-294): the manifest must carry a monotonically
+        # non-decreasing '_iat' epoch bound under the HMAC. Reject any
+        # manifest older than the last one accepted; persist the high-water
+        # mark alongside the FS database directory.
+        if self._hash_manifest_hmac_key:
+            try:
+                manifest_iat = int(manifest.get("_iat", ""))
+            except (TypeError, ValueError):
+                return (True,
+                        "Hash manifest missing/invalid '_iat' freshness "
+                        "field — refusing manifest without replay binding")
+            iat_path = os.path.join(os.path.dirname(new_filename),
+                                    ".uls_manifest_iat")
+            last_iat = -1
+            try:
+                with open(iat_path, encoding="ascii") as iatf:
+                    last_iat = int(iatf.read().strip())
+            except (OSError, ValueError):
+                pass
+            if manifest_iat < last_iat:
+                return (True,
+                        f"Hash manifest _iat={manifest_iat} older than last "
+                        f"accepted {last_iat} — replay rejected")
+            if manifest_iat > last_iat:
+                try:
+                    with open(iat_path, "w", encoding="ascii") as iatf:
+                        iatf.write(str(manifest_iat))
+                except OSError as ex:
+                    logging.warning(f"Cannot persist manifest _iat: {ex}")
+
+        expected_hash = manifest.get(manifest_key)
+        if expected_hash is None:
+            return (True,
+                    f"No hash entry for '{manifest_key}' in manifest "
+                    f"(manifest contains {len(manifest)} entries)")
+        if computed_hash.lower() != expected_hash.lower():
+            return (True,
+                    f"SHA-256 mismatch for '{manifest_key}': "
+                    f"computed {computed_hash}, manifest says {expected_hash}")
+        logging.info(f"SHA-256 verified for '{manifest_key}': {computed_hash}")
+        return (True, None)
 
     def _check_diff(self, db_diff: Optional[DbDiff]) \
             -> Tuple[bool, Optional[str]]:
@@ -845,10 +1188,13 @@ class UlsFileChecker:
                  f"{len(db_diff.diff_tiles)} tiles")
         if self._max_change_percent is None:
             return (False, None)
+        # Use max(prev_len, new_len) as denominator so targeted deletion
+        # (shrinking the DB) is not diluted by new_len becoming smaller.
+        denominator = max(db_diff.prev_len, db_diff.new_len)
         diff_percent = \
             round(
-                100 if db_diff.new_len == 0 else
-                ((db_diff.diff_len * 100) / db_diff.new_len),
+                100 if denominator == 0 else
+                ((db_diff.diff_len * 100) / denominator),
                 3)
         if diff_percent > self._max_change_percent:
             return \
@@ -893,12 +1239,12 @@ class ExtParamFilesChecker:
     _ExtParamFiles = \
         NamedTuple("_ExtParamFiles",
                    [
-                        # Location in the internet
-                        ("base_url", str),
-                        # Downloader script subdirectory
-                        ("subdir", str),
-                        # List of files
-                        ("files", List[str])])
+                       # Location in the internet
+                       ("base_url", str),
+                       # Downloader script subdirectory
+                       ("subdir", str),
+                       # List of files
+                       ("files", List[str])])
 
     def __init__(self, status_updater: StatusUpdater,
                  ext_files_arg: Optional[List[str]] = None,
@@ -953,7 +1299,20 @@ class ExtParamFilesChecker:
                         try:
                             external_file_name = os.path.join(temp_dir,
                                                               filename)
-                            urllib.request.urlretrieve(url, external_file_name)
+                            if not url.startswith("https://"):
+                                raise ValueError(
+                                    f"URL '{url}' must use https://")
+
+                            def _cap(blocknum: int, blocksize: int,
+                                     totalsize: int) -> None:
+                                if blocknum * blocksize > (1 << 20):
+                                    raise urllib.error.URLError(
+                                        f"'{url}' exceeds 1 MiB cap — "
+                                        f"refusing oversized response")
+                            import socket
+                            socket.setdefaulttimeout(10.0)
+                            urllib.request.urlretrieve(
+                                url, external_file_name, reporthook=_cap)
                         except urllib.error.URLError as ex:
                             logging.warning(f"Error downloading '{url}': {ex}")
                             errmsg = f"Error downloading '{url}': {ex}, so " \
@@ -1119,6 +1478,17 @@ def main(argv: List[str]) -> None:
         help=f"Maximum allowed change since previous database in percents"
         f"{env_help(Settings, 'max_change_percent')}")
     argument_parser.add_argument(
+        "--hash_manifest_url", metavar="URL",
+        help=f"HTTPS URL of JSON manifest mapping DB filenames to expected "
+        f"SHA-256 hashes. Manifest format: "
+        f'{{ "FS_<timestamp>.sqlite3": "<sha256hex>", ... }}'
+        f"{env_help(Settings, 'hash_manifest_url')}")
+    argument_parser.add_argument(
+        "--hash_manifest_file", metavar="FILENAME",
+        help=f"Local path to JSON manifest mapping DB filenames to expected "
+        f"SHA-256 hashes (same format as hash_manifest_url)"
+        f"{env_help(Settings, 'hash_manifest_file')}")
+    argument_parser.add_argument(
         "--afc_url", metavar="URL",
         help=f"URL for making trial AFC Requests with new database"
         f"{env_help(Settings, 'afc_url')}")
@@ -1220,6 +1590,9 @@ def main(argv: List[str]) -> None:
                 afc_url=settings.afc_url, afc_parallel=settings.afc_parallel,
                 regions=None if settings.region is None
                 else settings.region.split(":"),
+                hash_manifest_url=settings.hash_manifest_url,
+                hash_manifest_file=settings.hash_manifest_file,
+                hash_manifest_hmac_key=settings.hash_manifest_hmac_key,
                 executor=executor, status_updater=status_updater)
 
         rcache_settings = \
@@ -1247,7 +1620,20 @@ def main(argv: List[str]) -> None:
         temp_uls_file_name: Optional[str] = None
 
         while True:
-            als_record = AlsRecord(settings=settings.dict())
+            # settings.model_dump() returns raw values; pydantic does
+            # NOT apply json_schema_extra["convert"] (safe_dsn) used by
+            # print_args().  Build the ALS dict manually so DSN fields have
+            # their passwords redacted before being published to Kafka/AFC_LOGS.
+            _settings_dict = {}
+            for _name, _field_info in Settings.model_fields.items():
+                _value = getattr(settings, _name)
+                _extra = _field_info.json_schema_extra or {}
+                if not isinstance(_extra, dict):
+                    _extra = {}
+                if "convert" in _extra:
+                    _value = _extra["convert"](_value)
+                _settings_dict[_name] = _value
+            als_record = AlsRecord(settings=_settings_dict)
             als_record.now(field_name="start_time")
             err_msg: Optional[str] = None
             completed = False
@@ -1268,8 +1654,18 @@ def main(argv: List[str]) -> None:
                 # downloads
                 for dir_to_clean in [settings.result_dir, settings.temp_dir]:
                     if dir_to_clean and os.path.isdir(dir_to_clean):
-                        executor.execute(f"rm -rf {dir_to_clean}/*",
-                                         timeout_sec=100, fail_on_error=True)
+                        for entry in os.listdir(dir_to_clean):
+                            entry_path = os.path.join(dir_to_clean, entry)
+                            try:
+                                if os.path.isdir(entry_path) and \
+                                        not os.path.islink(entry_path):
+                                    shutil.rmtree(entry_path)
+                                else:
+                                    os.remove(entry_path)
+                            except OSError as ex:
+                                raise RuntimeError(
+                                    f"Failed to clean '{entry_path}': {ex}"
+                                ) from ex
 
                 logging.info("Copying RAS database")
                 shutil.copyfile(settings.ext_ras_database,
@@ -1288,11 +1684,10 @@ def main(argv: List[str]) -> None:
                     cmdline_args += ["--region", settings.region]
                 cmdline_args += ["--save_dir", settings.save_dir]
                 if settings.download_script_args:
-                    cmdline_args.append(settings.download_script_args)
+                    cmdline_args += shlex.split(settings.download_script_args)
                 logging.info(f"Starting {' '.join(cmdline_args)}")
                 executor.execute(
-                    " ".join(cmdline_args) if settings.download_script_args
-                    else cmdline_args,
+                    cmdline_args,
                     cwd=os.path.dirname(settings.download_script),
                     timeout_sec=settings.timeout_hr * 3600,
                     fail_on_error=True)
@@ -1312,7 +1707,39 @@ def main(argv: List[str]) -> None:
                 new_uls_file = uls_files[0]
                 logging.info(f"ULS file '{new_uls_file}' created. It will "
                              f"undergo some inspection")
-                new_uls_identity = get_uls_identity(new_uls_file)
+
+                # Run SHA-256/HMAC manifest gate BEFORE
+                # constructing DbDiff or calling get_uls_identity so no
+                # FCC-derived SQLite content is parsed prior to
+                # cryptographic verification.
+                temp_uls_file_name = \
+                    os.path.join(full_ext_db_dir,
+                                 "temp_" + os.path.basename(new_uls_file))
+                logging.debug(
+                    f"Copying '{new_uls_file}' to '{temp_uls_file_name}'")
+                shutil.copy2(new_uls_file, temp_uls_file_name)
+                # ULS_FORCE_UPDATE may bypass the hash gate only when no
+                # manifest is configured (local dev): force must not
+                # silently disable the cryptographic integrity anchor.
+                # Open the absolute staged path (temp_uls_file_name), not a
+                # re-derived engine-relative form: the latter is resolved
+                # against the AFC service's root, not the container's CWD,
+                # and does not exist there — the engine-relative form is
+                # only correct for _check_afc() (see the valid() call below).
+                if not (uls_file_checker.hash_valid(
+                        filename=temp_uls_file_name,
+                        manifest_key=os.path.basename(new_uls_file))
+                        or (settings.force and
+                            not uls_file_checker.manifest_configured)):
+                    raise ProcessingException(
+                        "Hash verification failed; aborting ULS swap")
+
+                # Read the already-verified temp copy, not the original in
+                # the shared NFS result_dir: after the hash gate passes,
+                # every subsequent parse must target the exact attested
+                # bytes, not a path a concurrent writer to result_dir could
+                # still swap (TOCTOU).
+                new_uls_identity = get_uls_identity(temp_uls_file_name)
                 if new_uls_identity is None:
                     raise ProcessingException(
                         "Generated ULS file does not contain identity "
@@ -1335,19 +1762,28 @@ def main(argv: List[str]) -> None:
 
                 # If anything was updated - do the update routine
                 if updated_regions or settings.force:
-                    # Embed updated FSID table to the new database
+                    # Embed updated FSID table directly into the
+                    # already-verified temp copy, not the original in the
+                    # shared NFS result_dir: never touch the swappable
+                    # original again after the hash gate above passes
+                    # (closes the TOCTOU window between the copy at :1668
+                    # and any later read of the original path).
                     logging.info("Embedding FSID table")
                     executor.execute(
-                        [FSID_TOOL, "embed", new_uls_file, settings.fsid_file],
+                        [FSID_TOOL, "embed", temp_uls_file_name,
+                         settings.fsid_file],
                         fail_on_error=True)
 
-                    temp_uls_file_name = \
-                        os.path.join(full_ext_db_dir,
-                                     "temp_" + os.path.basename(new_uls_file))
-                    # Copy new ULS file to external directory
-                    logging.debug(
-                        f"Copying '{new_uls_file}' to '{temp_uls_file_name}'")
-                    shutil.copy2(new_uls_file, temp_uls_file_name)
+                    # Record the post-embed digest: the activation gate
+                    # verifies the staged copy against the exact output of
+                    # the trusted FSID embed of the manifest-verified file
+                    # (one manifest entry cannot match both pre- and
+                    # post-embed bytes)
+                    post_embed_sha256 = hashlib.sha256()
+                    with open(temp_uls_file_name, "rb") as f:
+                        for chunk in iter(lambda: f.read(65536), b""):
+                            post_embed_sha256.update(chunk)
+                    post_embed_digest = post_embed_sha256.hexdigest()
 
                     db_diff = DbDiff(prev_filename=current_uls_file,
                                      new_filename=temp_uls_file_name,
@@ -1355,14 +1791,43 @@ def main(argv: List[str]) -> None:
                                      allow_directional_invalidate=settings.
                                      rcache_directional_invalidate) \
                         if has_previous else None
+                    if not has_previous:
+                        # Cold-start or deleted symlink — fail-closed: require
+                        # the hash manifest to pass before first activation.
+                        # A cryptographic manifest is required to activate
+                        # a database when no prior baseline exists for diff checks.
+                        if not (settings.hash_manifest_url or
+                                settings.hash_manifest_file):
+                            logging.error(
+                                "Cold start: no previous ULS database and "
+                                "ULS_HASH_MANIFEST_URL/FILE not configured — "
+                                "refusing to activate unverified database. "
+                                "Configure a hash manifest for cold-start "
+                                "bootstrap integrity.")
+                            raise ProcessingException(
+                                "Cold-start activation requires hash manifest")
                     if db_diff:
                         als_record.db_difference = str(db_diff)
                     if uls_file_checker.valid(
                             base_dir=settings.ext_db_dir,
+                            # Engine-relative form: correct for _check_afc(),
+                            # which resolves it against the AFC service's
+                            # own root, not this container's CWD.
                             new_filename=os.path.join(
                                 os.path.dirname(settings.ext_db_symlink),
                                 os.path.basename(temp_uls_file_name)),
-                            db_diff=db_diff) or settings.force:
+                            db_diff=db_diff,
+                            manifest_key=os.path.basename(
+                                new_uls_file),
+                            expected_digest=post_embed_digest,
+                            hash_only=settings.force,
+                            # The hash gate must open the exact absolute
+                            # file object being activated, not the
+                            # engine-relative form above (which does not
+                            # resolve from this container's CWD).
+                            hash_filename=temp_uls_file_name) or \
+                            (settings.force and
+                             not uls_file_checker.manifest_configured):
                         if not settings.force:
                             als_record.now(field_name="validated_time")
                         if settings.force:
@@ -1373,14 +1838,9 @@ def main(argv: List[str]) -> None:
                             os.path.join(full_ext_db_dir,
                                          os.path.basename(new_uls_file))
                         os.rename(temp_uls_file_name, permanent_uls_file_name)
-                        # Retargeting symlink
-                        update_uls_file(
-                            uls_dir=full_ext_db_dir,
-                            uls_file=os.path.basename(new_uls_file),
-                            symlink=os.path.basename(settings.ext_db_symlink),
-                            executor=executor)
-                        als_record.fs_db_name = os.path.basename(new_uls_file)
-                        als_record.now(field_name="updated_time")
+                        # Invalidate rcache BEFORE retargeting the symlink;
+                        # if invalidation fails, abort the swap so stale
+                        # entries are not served from the newly-swapped DB.
                         if rcache and (db_diff is not None):
                             if db_diff.diff_beams:
                                 beam_list = \
@@ -1393,8 +1853,15 @@ def main(argv: List[str]) -> None:
                                 als_record.invalidation = \
                                     [beam.short_str() for beam in
                                      db_diff.diff_beams[: 1000]]
-                                rcache.rcache_directional_invalidate(
-                                    beams=db_diff.diff_beams)
+                                try:
+                                    rcache.rcache_directional_invalidate(
+                                        beams=db_diff.diff_beams)
+                                except Exception as rcache_ex:  # noqa: BLE001
+                                    raise ProcessingException(
+                                        f"rcache directional invalidation "
+                                        f"failed; aborting DB swap to prevent "
+                                        f"stale entries: {rcache_ex}") from \
+                                        rcache_ex
                             if db_diff.diff_tiles:
                                 tile_list = \
                                     "<" + \
@@ -1407,8 +1874,84 @@ def main(argv: List[str]) -> None:
                                     (als_record.invalidation or []) + \
                                     [tile.short_str() for tile in
                                      db_diff.diff_tiles[: 1000]]
-                                rcache.rcache_spatial_invalidate(
-                                    tiles=db_diff.diff_tiles)
+                                try:
+                                    rcache.rcache_spatial_invalidate(
+                                        tiles=db_diff.diff_tiles)
+                                except Exception as rcache_ex:  # noqa: BLE001
+                                    raise ProcessingException(
+                                        f"rcache spatial invalidation "
+                                        f"failed; aborting DB swap to prevent "
+                                        f"stale entries: {rcache_ex}") from \
+                                        rcache_ex
+                        # Retargeting symlink — only after rcache is clean
+                        update_uls_file(
+                            uls_dir=full_ext_db_dir,
+                            uls_file=os.path.basename(new_uls_file),
+                            symlink=os.path.basename(settings.ext_db_symlink),
+                            executor=executor)
+                        als_record.fs_db_name = os.path.basename(new_uls_file)
+                        als_record.now(field_name="updated_time")
+
+                        # drain in-flight afc-engine workers that
+                        # opened the *previous* ULS sqlite via the old
+                        # symlink target, then re-invalidate.  Without this
+                        # a worker that read the old DB can INSERT a stale
+                        # grant into rcache *after* the invalidation above
+                        # (the cache-miss path is a fresh INSERT and so
+                        # bypasses the on_conflict WHERE state != Invalid
+                        # guard).  Drain bound must be >= the Celery
+                        # soft_time_limit on afc.run (afc_worker.py) so
+                        # every old-DB task has completed or been killed
+                        # before re-invalidation.
+                        if rcache and (db_diff is not None) and \
+                                (db_diff.diff_beams or db_diff.diff_tiles):
+                            _drain_s = int(os.getenv(
+                                "ULS_WORKER_DRAIN_SECONDS", "1800"))
+                            logging.info(
+                                f"Draining in-flight workers for "
+                                f"{_drain_s}s before post-swap rcache "
+                                f"re-invalidation")
+                            time.sleep(_drain_s)
+                            # Post-swap re-invalidation is fail-closed:
+                            # retry with backoff up to ULS_WORKER_DRAIN_SECONDS
+                            # total, then raise ProcessingException so the
+                            # healthcheck alarm fires (mirrors the pre-swap
+                            # fail-closed behaviour above).
+                            _reinv_deadline = time.time() + _drain_s
+                            _reinv_delay = 5
+                            _reinv_exc: Optional[Exception] = None
+                            while True:
+                                try:
+                                    _reinv_exc = None
+                                    if db_diff.diff_beams:
+                                        rcache.rcache_directional_invalidate(
+                                            beams=db_diff.diff_beams)
+                                    if db_diff.diff_tiles:
+                                        rcache.rcache_spatial_invalidate(
+                                            tiles=db_diff.diff_tiles)
+                                    break
+                                except Exception as _ex:
+                                    _reinv_exc = _ex
+                                    if time.time() + _reinv_delay > \
+                                            _reinv_deadline:
+                                        break
+                                    logging.warning(
+                                        f"Post-swap rcache re-invalidation "
+                                        f"failed ({_ex}); retrying in "
+                                        f"{_reinv_delay}s")
+                                    time.sleep(_reinv_delay)
+                                    _reinv_delay = min(_reinv_delay * 2, 60)
+                            if _reinv_exc is not None:
+                                logging.error(
+                                    f"Post-swap rcache re-invalidation "
+                                    f"permanently failed: {_reinv_exc}")
+                                status_updater.status_check(
+                                    CheckType.FsDatabase,
+                                    {"rcache_reinvalidate":
+                                     str(_reinv_exc)})
+                                raise ProcessingException(
+                                    f"Post-swap rcache re-invalidation "
+                                    f"failed after retries: {_reinv_exc}")
 
                         # Upon success, save the new region files
                         if settings.force:
@@ -1429,12 +1972,12 @@ def main(argv: List[str]) -> None:
                 else:
                     logging.info("FS data is identical to previous. No update "
                                  "will be done")
-            except (OSError, subprocess.SubprocessError, ProcessingException) \
-                    as ex:
+            except (OSError, subprocess.SubprocessError, ProcessingException,
+                    sa.exc.SQLAlchemyError) as ex:
                 err_msg = str(ex)
                 logging.error(f"Download failed: {ex}")
             finally:
-                als.als_json_log(topic="fs_download", record=als_record.dict())
+                als.als_json_log(topic="fs_download", record=als_record.model_dump())
                 if settings.run_once:
                     flushed = als.als_flush()
                     if not flushed:

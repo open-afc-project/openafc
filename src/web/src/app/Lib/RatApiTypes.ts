@@ -3,6 +3,7 @@
  * author: Sam Smucny
  */
 
+// @ts-ignore
 import { string } from 'prop-types';
 
 /**
@@ -21,13 +22,23 @@ export interface GuiConfig {
   rat_api_analysis: string;
   uls_convert_url: string;
   login_url: string;
+  logout_url: string;
   admin_url: string;
+  /** Explicit URL for GET/PUT minimum EIRP limits (avoids fragile -1 substitution). */
+  admin_eirp_url?: string;
+  /** Explicit URL for allowed frequency band JSON. */
+  admin_frequency_range_url?: string;
   ap_deny_admin_url: string;
   dr_admin_url: string;
   mtls_admin_url: string;
   rat_afc: string;
   afc_kml: string;
   version: string;
+  app_name: string;
+  about_url: string;
+  about_login_url: string;
+  about_sitekey: string;
+  status_url: string;
   grafana_enabled?: boolean;
 }
 

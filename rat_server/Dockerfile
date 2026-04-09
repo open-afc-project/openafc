@@ -6,12 +6,15 @@
 #
 # Install required packages
 #
-FROM python:3.12-alpine3.21
+# Pin Alpine 3.21: rolling python:3.12-alpine can pick newer CMake that rejects
+# cmake_minimum_required() after project() in root CMakeLists.txt.
+FROM python:3.12-alpine3.21@sha256:d4f9227f21409479c7fe92288f2e40b1a56ae591c8ad3b5446dfeaef90f67857
 # This variable should be set to used Python version (major.minor only)
 ENV AFC_PYTHONVERSION=3.12
 
 ENV PYTHONUNBUFFERED=1
-RUN apk add --update --no-cache python3=~${AFC_PYTHONVERSION} postfix
+RUN apk upgrade --no-cache && \
+    apk add --update --no-cache python3=~${AFC_PYTHONVERSION} postfix
 
 # Setting up venv in /venv and 'activating' it
 RUN python3 -m venv /venv
@@ -21,10 +24,11 @@ ENV VIRTUAL_ENV=/venv
 # to alleviate various venv shortcomings
 ENV PYTHONPATH=/venv/lib/python${AFC_PYTHONVERSION}/site-packages:/usr/lib/python${AFC_PYTHONVERSION}/site-packages:${PYTHONPATH}
 
-# Configure pip and npm to use package registry proxies (optional)
-ARG PIP_INDEX_URL
+# Private PyPI mirror credential is passed via BuildKit secret
+# (--secret id=pip_config,src=<pip.conf>) so it is never baked into image
+# layers or build-arg history. Omit --secret to use public PyPI.
+# Configure npm to use package registry proxy (optional)
 ARG NPM_REGISTRY
-ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 ENV NPM_REGISTRY=${NPM_REGISTRY}
 
 # Installing Python libraries
@@ -32,10 +36,23 @@ ENV NPM_REGISTRY=${NPM_REGISTRY}
 #   version in requirements.txt may need to be updated on Alpine version change
 RUN apk add --update --no-cache librdkafka-dev libffi
 COPY rat_server/requirements.txt /wd/
-RUN apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base \
+# NOTE: requirements.txt is fully ==-pinned but not yet hash-locked
+# (--require-hashes, as objstorage/Dockerfile and cert_db/Dockerfile were
+# hardened to do per S0127-14) because generating a correct hash-locked
+# file for this dependency closure requires resolving the full transitive
+# dependency graph against a package registry, which is not available in
+# this build environment. Do not add --require-hashes without a properly
+# generated (pip-compile --generate-hashes) lockfile covering every
+# transitive dependency - a partially-hashed file would either fail the
+# build or silently omit hash checks for the un-hashed remainder.
+# The unconditional, unpinned pip/setuptools self-upgrade is dropped
+# (mirrors the hardened objstorage/cert_db Dockerfiles, which install
+# straight from the base image's bundled pip/setuptools) rather than left
+# floating.
+RUN --mount=type=secret,id=pip_config,target=/root/.config/pip/pip.conf \
+    apk add --update --no-cache python3-dev=~${AFC_PYTHONVERSION} build-base \
     expat expat-dev libffi-dev && \
-    pip3 install --upgrade pip setuptools && \
-    pip3 install --no-cache-dir -r /wd/requirements.txt && \
+    pip3 install --no-cache-dir --require-hashes -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base expat-dev libffi-dev && \
     rm -f /wd/requirements.txt
 
@@ -59,37 +76,49 @@ ARG NODE_OPTIONS=--openssl-legacy-provider
 #
 # Install Message Handler application
 #
-RUN apk list -I && \
+# NOTE: the NPM/registry auth token (if any) is provided via a BuildKit secret
+# mount rather than COPY .npmrc, so the credential never persists in an image
+# layer (a `rm` in a later RUN layer does not remove bytes committed by COPY).
+# Build with:
+#   DOCKER_BUILDKIT=1 docker build --secret id=npmrc,src=${HOME}/.npmrc ...
+# The mount is optional (required=false): builds without a private registry
+# simply have no /root/.npmrc.
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc,required=false \
+    apk list -I && \
     apk add --update --no-cache build-base cmake ninja yarn \
-        apr-util-dev python3-dev=~${AFC_PYTHONVERSION} && \
+        apr-util-dev python3-dev=~${AFC_PYTHONVERSION} py3-setuptools && \
+    yarn config set network-timeout 600000 && \
+    yarn config set network-concurrency 1 && \
+    yarn config set ignore-optional true && \
+    yarn config set ignore-scripts true && \
+    echo "network-timeout 600000" > /wd/src/web/.yarnrc && \
+    echo "network-concurrency 1" >> /wd/src/web/.yarnrc && \
+    echo "ignore-optional true" >> /wd/src/web/.yarnrc && \
+    echo "ignore-scripts true" >> /wd/src/web/.yarnrc && \
     (if [ -n "${NPM_REGISTRY}" ]; then \
         yarn config set registry ${NPM_REGISTRY} && \
-        # Network timeout set to 10 minutes (600000ms) to handle slow corporate proxies
-        # and large package downloads. Default is 60s which may be insufficient.
-        yarn config set network-timeout 600000 && \
-        # Limit concurrency to 1 to avoid overwhelming proxy servers
-        yarn config set network-concurrency 1 && \
-        echo "registry \"${NPM_REGISTRY}\"" > /wd/src/web/.yarnrc && \
-        echo "network-timeout 600000" >> /wd/src/web/.yarnrc && \
-        echo "network-concurrency 1" >> /wd/src/web/.yarnrc && \
+        echo "registry \"${NPM_REGISTRY}\"" >> /wd/src/web/.yarnrc && \
         if [ -f /wd/src/web/yarn.lock ]; then \
-            sed -i "s|https://registry\.yarnpkg\.com/|${NPM_REGISTRY}|g" /wd/src/web/yarn.lock; \
+            sed -i -E "s|https://(registry\.yarnpkg\.com\|registry\.npmjs\.org)/|${NPM_REGISTRY}|g" /wd/src/web/yarn.lock; \
         fi; \
     fi) && \
     cd /wd/build && \
     cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiWebDebug -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
+    mkdir -p /wd/build/src/web/pkg && \
+    cp -f /wd/src/web/.yarnrc /wd/build/src/web/pkg/.yarnrc && \
     (if [ -n "${NPM_REGISTRY}" ] && [ -f /wd/build/src/web/pkg/yarn.lock ]; then \
-        sed -i "s|https://registry\.yarnpkg\.com/|${NPM_REGISTRY}|g" /wd/build/src/web/pkg/yarn.lock; \
+        sed -i -E "s|https://(registry\.yarnpkg\.com\|registry\.npmjs\.org)/|${NPM_REGISTRY}|g" /wd/build/src/web/pkg/yarn.lock; \
     fi) && \
     env PYTHONPATH=${PYTHONPATH} \
         NPM_REGISTRY=${NPM_REGISTRY} \
         ninja -j$(nproc) install && \
     yarn cache clean && \
-    apk del --purge build-base cmake ninja yarn apr-util-dev python3-dev && \
+    apk del --purge build-base cmake ninja yarn apr-util-dev python3-dev py3-setuptools && \
     rm -rf /wd/cmake/ /wd/pkg/ /wd/src/ /wd/build
 
 COPY src/afc-packages /wd/afc-packages
-RUN pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
+RUN --mount=type=secret,id=pip_config,target=/root/.config/pip/pip.conf \
+    pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
         -r /wd/afc-packages/pkgs.rat_server \
     && rm -rf /wd/afc-packages
 #
@@ -103,11 +132,21 @@ LABEL revision="afc-rat_server"
 WORKDIR /wd
 EXPOSE 80
 
-RUN mkdir /wd/private
-COPY rat_server/copy-private.sh private* /wd/private/
-RUN chmod +x /wd/private/copy-private.sh
-RUN /wd/private/copy-private.sh
-RUN rm -rf /wd/private
+# Private branding assets (customer-specific images/templates) are injected
+# by copy-private.sh, which installs them into their final locations under
+# /usr/share/fbrat and site-packages. Previously the raw private* sources
+# were COPY'd into /wd/private (a committed layer) and only removed by a
+# later `RUN rm -rf /wd/private`: a `rm` in a later RUN layer does not
+# remove bytes committed by an earlier COPY (same pitfall documented above
+# for .npmrc/pip.conf), so any principal with pull access to the image could
+# `docker save` and recover the staged private* content from that
+# intermediate layer. Bind-mount the sources for the duration of this single
+# RUN instead: BuildKit bind mounts are never committed to an image layer,
+# so the raw staging content never reaches the shipped image at all, and no
+# compensating rm is needed.
+RUN --mount=type=bind,source=private,target=/wd/private \
+    --mount=type=bind,source=rat_server/copy-private.sh,target=/wd/copy-private.sh \
+    sh /wd/copy-private.sh
 
 # msghnd environment variables default values
 ENV AFC_WEBUI_PORT=${AFC_WEBUI_PORT:-"80"}
@@ -134,6 +173,11 @@ ENV FLASK_AFC_MSGHND_RATAFC_TOUT=${FLASK_AFC_MSGHND_RATAFC_TOUT:-600}
 ENV AFC_RATAPI_LOG_LEVEL=${AFC_RATAPI_LOG_LEVEL:-WARNING}
 COPY rat_server/entrypoint.sh /
 RUN chmod +x /entrypoint.sh
+# Drop to non-root fbrat after all setup steps that require
+# root (chown, pip install, etc.) are complete.  rat_server has no host
+# bind mounts that require root-level write access at runtime.
+RUN chown -R fbrat:fbrat /run/gunicorn /etc/xdg/fbrat
+USER fbrat
 ENTRYPOINT ["/entrypoint.sh"]
 HEALTHCHECK --start-interval=1m CMD wget --no-verbose --tries=1 --spider 127.0.0.1/fbrat/ratapi/v1/healthy || exit 1
 #

@@ -7,7 +7,8 @@
 
 # Grafana dockerfile (for future expansion)
 
-FROM grafana/grafana:11.4.0-ubuntu
+# Grafana 12.4.2 — upgraded from 11.6.14 for security and performance.
+FROM grafana/grafana:12.4.2-ubuntu@sha256:78839fe49e1425c02416fa8072591533a72bd9598e563b54a07d78f9e27fb5d3
 
 EXPOSE 3000/tcp
 
@@ -95,24 +96,20 @@ WORKDIR $WORKDIR
 ENV PYTHONPATH=$WORKDIR
 ENV PATH=$PATH:$WORKDIR
 
-RUN apt-get update
-RUN apt-get -y install python3-minimal wget unzip socat
-
-# Somehow python3-pip may refuses to install normally, so:
-RUN if ! apt-get -y install python3-pip ; then \
-    wget -O $WORKDIR/get-pip.py https://bootstrap.pypa.io/get-pip.py && \
-    python3 $WORKDIR/get-pip.py ; rm -f $WORKDIR/get-pip.py ; fi
-
-# Making socat setuid to redirect root-restricted Docker socket (if any) to
-# grafana-readable one
-RUN chmod u+s `which socat`
+RUN apt-get update && apt-get -y install --no-install-recommends \
+        python3-minimal python3-pip wget unzip && \
+    rm -rf /var/lib/apt/lists/*
 
 USER grafana
 
-# Install required python modules
-COPY grafana/requirements-grafana.txt $WORKDIR/
-RUN pip3 install -r $WORKDIR/requirements-grafana.txt && \
-    rm -f $WORKDIR/requirements-grafana.txt
+# Configure pip to use package registry proxy (optional)
+ARG PIP_INDEX_URL
+
+# Install required python modules (requirements.txt includes -r requirements-grafana.txt
+# so Renovate/lockfile tooling can track grafana Python deps from one entry point)
+COPY grafana/requirements.txt grafana/requirements-grafana.txt $WORKDIR/
+RUN pip3 install --no-cache-dir --require-hashes -r $WORKDIR/requirements.txt && \
+    rm -f $WORKDIR/requirements.txt $WORKDIR/requirements-grafana.txt
 
 # Install shared AFC packages
 COPY --chown=grafana src/afc-packages $WORKDIR/afc-packages/
@@ -131,7 +128,11 @@ COPY --chown=grafana grafana/templates $WORKDIR/templates/
 ENV GF_PATHS_PROVISIONING=$WORKDIR/provisioning
 
 # Provisioning directories (filled from templates in entrypoint-grafana.sh)
-RUN mkdir -p $GF_PATHS_PROVISIONING
+# alerting/ is required even when empty — Grafana logs an error if it is absent
+RUN mkdir -p $GF_PATHS_PROVISIONING/alerting \
+             $GF_PATHS_PROVISIONING/dashboards \
+             $GF_PATHS_PROVISIONING/datasources \
+             $GF_PATHS_PROVISIONING/plugins
 
 # Startup scripts
 COPY --chown=grafana grafana/entrypoint-grafana.sh grafana/grafana_tool.py \
@@ -145,9 +146,26 @@ RUN mkdir -p $GF_PATHS_PLUGINS
 
 # Manually installing plugins (doing it at runtime with 'grafana cli plugin'
 # somehow doesn't work in Kubernetes environment, doing it via environment
-# requires Grafana restart)
-RUN wget -qO plugin.zip 'https://grafana.com/api/plugins/yesoreyeram-infinity-datasource/versions/2.11.4/download?os=linux&arch=amd64' && \
+# requires Grafana restart). Version numbers are duplicated in comments in
+# templates/provisioning/plugins/pinned-plugins.yaml (keep in sync).
+RUN wget -qO plugin.zip 'https://grafana.com/api/plugins/yesoreyeram-infinity-datasource/versions/3.10.1/download?os=linux&arch=amd64' && \
+     echo '39d1cac9bcd2f7f2e46607319cb27afb8592ab0fcbc57968dc9fb86f3ef69a59  plugin.zip' | sha256sum -c - && \
      unzip plugin.zip -d $GF_PATHS_PLUGINS && \
      rm plugin.zip
+
+# Logs Drilldown (Drilldown > Logs). Plugin 1.0.38+ needs Grafana >=11.6.11 (logs-drilldown#1787).
+RUN wget -qO plugin-loki.zip 'https://grafana.com/api/plugins/grafana-lokiexplore-app/versions/1.0.39/download?os=linux&arch=amd64' && \
+     echo 'c108a1759d8e8f7ba474dbd93f58455b1e2f23cf3618b5838460aacc502e482d  plugin-loki.zip' | sha256sum -c - && \
+     unzip plugin-loki.zip -d $GF_PATHS_PLUGINS && \
+     rm plugin-loki.zip
+
+# Metrics Drilldown (Drilldown > Metrics).
+# Version 2.2.0 is the version Grafana 12.x expects; having the files on disk at
+# image-build time ensures the plugin is present when provisioning runs at startup
+# (provisioning checks for files on disk, not the async background-installer queue).
+RUN wget -qO plugin-metrics.zip 'https://grafana.com/api/plugins/grafana-metricsdrilldown-app/versions/2.2.0/download?os=linux&arch=amd64' && \
+     echo '34cb3868567540559b2d10c17064f390af5234721f040ede3b8050cde1db32e3  plugin-metrics.zip' | sha256sum -c - && \
+     unzip plugin-metrics.zip -d $GF_PATHS_PLUGINS && \
+     rm plugin-metrics.zip
 
 ENTRYPOINT $WORKDIR/entrypoint-grafana.sh

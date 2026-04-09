@@ -1,5 +1,31 @@
 import csv
 
+_CSV_FORMULA_LEAD = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_safe(v):
+    """CWE-1236: neutralise CSV formula injection by quoting leading =+-@."""
+    s = str(v)
+    if s and s[0] in _CSV_FORMULA_LEAD:
+        return "'" + s
+    return s
+
+
+def _csv_decode_float(v):
+    """Convert a CSV field to float, stripping any _csv_safe sentinel prefix."""
+    s = str(v).strip()
+    if s.startswith("'"):
+        s = s[1:].strip()
+    return float(s)
+
+
+def _csv_decode_int(v):
+    """Convert a CSV field to int, stripping any _csv_safe sentinel prefix."""
+    s = str(v).strip()
+    if s.startswith("'"):
+        s = s[1:].strip()
+    return int(s)
+
 
 def fixModelName(modelPrefix, modelName):
     ##########################################################################
@@ -225,8 +251,8 @@ def processAntFiles(
         antennaGain = antennaPatternGainList[ind]
         diameter = antennaPatternDiameterList[ind]
         type = antennaPatternTypeList[ind]
-        azimuth = float(antennaPatternAzimuthList[ind])
-        attenuation = float(antennaPatternAttenuationList[ind])
+        azimuth = _csv_decode_float(antennaPatternAzimuthList[ind])
+        attenuation = _csv_decode_float(antennaPatternAttenuationList[ind])
 
         if type == "HH":
 
@@ -276,9 +302,9 @@ def processAntFiles(
             ###################################################################
 
             if antennaModel in antpatternRaw:
-                antpatternRaw[antennaModel].append(tuple([aob, attenuation]))
+                antpatternRaw[antennaModel].append([aob, attenuation])
             else:
-                antpatternRaw[antennaModel] = [tuple([aob, attenuation])]
+                antpatternRaw[antennaModel] = [[aob, attenuation]]
 
     ##########################################################################
     # Write antennaListFile (antenna_model_list.csv)                           #
@@ -300,7 +326,7 @@ def processAntFiles(
 
         for antennaModel in sorted(antmap.keys()):
             row = antmap[antennaModel]
-            csvwriter.writerow(row)
+            csvwriter.writerow({k: _csv_safe(v) for k, v in row.items()})
     ##########################################################################
 
     ##########################################################################
@@ -318,13 +344,13 @@ def processAntFiles(
             row['Prefix'] = prefix
             row['Type'] = 'Ant'
             row['Category'] = 'B1'
-            csvwriter.writerow(row)
+            csvwriter.writerow({k: _csv_safe(v) for k, v in row.items()})
 
         for prefix in antennaModelPrefixHpList:
             row['Prefix'] = prefix
             row['Type'] = 'Ant'
             row['Category'] = 'HP'
-            csvwriter.writerow(row)
+            csvwriter.writerow({k: _csv_safe(v) for k, v in row.items()})
 
     ##########################################################################
 
@@ -350,7 +376,7 @@ def processAntFiles(
                         ' angle off boresight ' +
                         antpatternRaw[antennaModel][i][0] +
                         ' has multiple attenuations specified\n')
-                antpatternRaw[antennaModel][i][1] == min(
+                antpatternRaw[antennaModel][i][1] = min(
                     antpatternRaw[antennaModel][i][1], antpatternRaw[antennaModel][i + 1][1])
                 antpatternRaw[antennaModel].pop(i + 1)
             else:
@@ -421,4 +447,4 @@ def processAntFiles(
             for antennaModel in antModelList:
                 row[antennaModel] = str(-1.0 *
                                         antpatternInterp[antennaModel][i])
-            csvwriter.writerow(row)
+            csvwriter.writerow({k: _csv_safe(v) for k, v in row.items()})

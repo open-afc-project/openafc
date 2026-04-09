@@ -1,40 +1,82 @@
 # check .env file for env vars info and values
+#
+# Healthchecks and depends_on: after bumping images or changing a service entrypoint,
+# confirm its Dockerfile HEALTHCHECK or compose healthcheck still matches the process
+# and port the container actually exposes. If the check command changes, update any
+# services that use depends_on: condition: service_healthy for that dependency.
 
 services:
   ratdb:
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/ratdb-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/ratdb-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
+    # Supply the postgres superuser password via Docker secret rather than
+    # baking it into the image.
+    environment:
+      - POSTGRES_PASSWORD_FILE=/run/secrets/RATDB_PASSWORD
+    secrets:
+      - RATDB_PASSWORD
     # for persistent configuration
     # volumes:
     #   - ./pgdata:/var/lib/pgsql/data
     # environment:
-    #   POSTGRES_PASSWORD: <default password>
     #   PGDATA: /var/lib/pgsql/data
     #   POSTGRES_DB: fbrat
     dns_search: [.]
 
   rmq:
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/rmq-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/rmq-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     dns_search: [.]
+    volumes:
+      # Persist the Erlang cookie and RabbitMQ state across container restarts.
+      # Without this volume, a fresh container start may fail on the first boot
+      # because the official entrypoint's chown step races the prelaunch phase.
+      - rmq_data:/var/lib/rabbitmq
+    environment:
+      - BROKER_USER=${BROKER_USER}
+      - BROKER_PWD_FILE=${VOL_C_SECRETS}/BROKER_PWD
+      - RCACHE_RMQ_PWD_FILE=${VOL_C_SECRETS}/RCACHE_RMQ_PWD
+    secrets:
+      - BROKER_PWD
+      - RCACHE_RMQ_PWD
 
   dispatcher:
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/dispatcher-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/dispatcher-image:${TAG:?TAG must be set in .env}
     restart: always
-
+    # nginx master requires root to bind to ports 80/443; USER cannot be set.
+    # Limit blast radius: drop all capabilities except those nginx requires:
+    #   NET_BIND_SERVICE – bind to ports 80/443
+    #   CHOWN           – startup chown of cache dirs to the worker user
+    #   SETUID/SETGID   – master drops to the nginx worker user after binding
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+    security_opt:
+      - "no-new-privileges:true"
     ports:
       # Ports to be used externally
       - "${EXT_IP:-0.0.0.0}:80-180:80"
       - "${EXT_IP:-0.0.0.0}:443-543:443"
     volumes:
       - ./ssl/nginx:/certificates/servers
+      - ./dispatcher/certs/clients:/etc/nginx/certs
     # Uncomment and update if you plan to use mTLS
     #   - ./ssl:/usr/share/ca-certificates/certs
     environment:
       - AFC_SERVER_NAME=_
       - AFC_ENFORCE_HTTPS=TRUE
-      # set to true if required to enforce mTLS check
-      - AFC_ENFORCE_MTLS=false
+      # mTLS enforcement enabled by default; overlays may override for dev/test
+      - AFC_ENFORCE_MTLS=true
       - AFC_MSGHND_NAME=${AFC_REQ_SERVER}
       - AFC_MSGHND_PORT=${AFC_REQ_SERVER_PORT}
       - AFC_WEBUI_NAME=${AFC_WEBUI_NAME}
@@ -43,18 +85,55 @@ services:
       - AFC_OBJST_HOST=${AFC_OBJST_HOST}
       - AFC_OBJST_PORT=${AFC_OBJST_PORT}
       - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
+      # Broker params (for health check via acceptor.py):
+      - BROKER_FQDN=${BROKER_FQDN}
+      - BROKER_USER=${BROKER_USER}
+      - BROKER_PWD_FILE=${VOL_C_SECRETS}/BROKER_PWD
+      # Token file path so entrypoint.sh can export AFC_INTERNAL_TOKEN
+      # for nginx envsubst before docker-entrypoint.sh processes templates.
+      - AFC_INTERNAL_TOKEN_FILE=${VOL_C_SECRETS}/AFC_INTERNAL_TOKEN
+      # Dispatcher-only token injected by nginx for AP mTLS attestation headers.
+      - AFC_DISPATCHER_TOKEN_FILE=${VOL_C_SECRETS}/AFC_DISPATCHER_TOKEN
+      # Dedicated HMAC key for mTLS bundle signing (shared only with rat_server).
+      - DISPATCHER_BUNDLE_HMAC_KEY_FILE=${VOL_C_SECRETS}/DISPATCHER_BUNDLE_HMAC_KEY
+      # Route grafana proxy traffic through the grafana-proxy network so the
+      # nginx upstream originates from GRAFANA_PROXY_DISPATCHER_IP (192.168.128.2),
+      # matching Grafana auth.proxy whitelist instead of the default-network IP.
+      - AFC_GRAFANA_TARGET=${GRAFANA_PROXY_GRAFANA_IP:-192.168.128.3}:3000
+    secrets:
+      - BROKER_PWD
+      - AFC_INTERNAL_TOKEN
+      - AFC_DISPATCHER_TOKEN
+      - DISPATCHER_BUNDLE_HMAC_KEY
     depends_on:
-      - afcserver
-      - rat_server
+      afcserver:
+        condition: service_started
+      rat_server:
+        condition: service_started
+      rmq:
+        condition: service_healthy
     dns_search: [.]
+    # Dispatcher attached to grafana-proxy internal network for auth proxy isolation.
+    # Subnet and static IP defined per-overlay (local: 192.168.128.0/29,
+    # prod: 192.168.129.0/29) to allow both overlays to run simultaneously.
+    # Also on kafka-ui-proxy (a dedicated internal network) to reach kafka_ui
+    # without joining monitor-net — the WAN-facing container must never share an
+    # L3 segment with socket-proxy / the Docker socket.
+    networks:
+      default:
+      grafana-proxy:
+        ipv4_address: ${GRAFANA_PROXY_DISPATCHER_IP:-192.168.128.2}
+      kafka-ui-proxy:
 
   rat_server:
-    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/webui-image:${TAG:-latest}
+    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/webui-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
-      - ./pipe:/pipe
-      # In case you want to cinfigure OIDC
+      # In case you want to configure OIDC
       # - ./OIDC:/OIDC
     depends_on:
       ratdb:
@@ -74,6 +153,7 @@ services:
     secrets:
       - RATDB_PASSWORD
       - FLASK_SECRET_KEY
+      - SECURITY_PASSWORD_SALT
       - GOOGLE_APIKEY
       - CAPTCHA_SECRET
       - CAPTCHA_SITEKEY
@@ -81,12 +161,21 @@ services:
       - OIDC_CLIENT_ID
       - OIDC_CLIENT_SECRET
       - RCACHE_DB_PASSWORD
+      - RCACHE_API_KEY
       - DB_CREATOR_PASSWORD_RATDB
       - DB_CREATOR_PASSWORD_BULK_POSTGRES
+      - OBJST_API_KEY
+      - BROKER_PWD
+      - AFC_INTERNAL_TOKEN
+      - AFC_DISPATCHER_TOKEN
+      - RCACHE_RMQ_PWD
+      - DISPATCHER_BUNDLE_HMAC_KEY
+      - BULK_POSTGRES_RW_PASSWORD
     dns_search: [.]
     environment:
       - FLASKFILE_SQLALCHEMY_DATABASE_PASSWORD=${VOL_C_SECRETS}/RATDB_PASSWORD
       - FLASKFILE_SECRET_KEY=${VOL_C_SECRETS}/FLASK_SECRET_KEY
+      - FLASKFILE_SECURITY_PASSWORD_SALT=${VOL_C_SECRETS}/SECURITY_PASSWORD_SALT
       - FLASKFILE_GOOGLE_APIKEY=${VOL_C_SECRETS}/GOOGLE_APIKEY
       - RATAPIFILE_CAPTCHA_SECRET=${VOL_C_SECRETS}/CAPTCHA_SECRET
       - RATAPIFILE_CAPTCHA_SITEKEY=${VOL_C_SECRETS}/CAPTCHA_SITEKEY
@@ -94,12 +183,20 @@ services:
       - OIDCFILE_OIDC_CLIENT_ID=${VOL_C_SECRETS}/OIDC_CLIENT_ID
       - OIDCFILE_OIDC_CLIENT_SECRET=${VOL_C_SECRETS}/OIDC_CLIENT_SECRET
       # RabbitMQ server name:
+      - AFC_INTERNAL_TOKEN_FILE=${VOL_C_SECRETS}/AFC_INTERNAL_TOKEN
+      # Dispatcher-only token used to verify AP-route mTLS attestation headers.
+      - AFC_DISPATCHER_TOKEN_FILE=${VOL_C_SECRETS}/AFC_DISPATCHER_TOKEN
       - BROKER_TYPE=${BROKER_TYPE}
+      # Dedicated HMAC key for mTLS bundle signing (shared only with dispatcher).
+      - DISPATCHER_BUNDLE_HMAC_KEY_FILE=${VOL_C_SECRETS}/DISPATCHER_BUNDLE_HMAC_KEY
       - BROKER_FQDN=${BROKER_FQDN}
+      - BROKER_USER=${BROKER_USER}
+      - BROKER_PWD_FILE=${VOL_C_SECRETS}/BROKER_PWD
       # Filestorage params:
       - AFC_OBJST_HOST=${AFC_OBJST_HOST}
       - AFC_OBJST_PORT=${AFC_OBJST_PORT}
       - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
+      - AFC_OBJST_API_KEY_FILE=${VOL_C_SECRETS}/OBJST_API_KEY
       # ALS params
       - ALS_KAFKA_SERVER_ID=${AFC_WEBUI_NAME}
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER}:${ALS_KAFKA_CLIENT_PORT}
@@ -111,24 +208,43 @@ services:
       - RCACHE_POSTGRES_DSN=${RCACHE_POSTGRES_DSN}
       - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
+      - RCACHE_API_KEY_FILE=${VOL_C_SECRETS}/RCACHE_API_KEY
       - RCACHE_RMQ_DSN=${RCACHE_RMQ_DSN}
+      - RCACHE_RMQ_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_RMQ_PWD
       - AFC_STATE_VENDOR_EXTENSIONS=${AFC_STATE_VENDOR_EXTENSIONS}
       # Database Creator parameters and endpoint
-      - AFC_DB_CREATOR_DSN_RATDB=postgresql://postgres:postgres@ratdb/postgres
+      - AFC_DB_CREATOR_DSN_RATDB=postgresql://postgres@ratdb/postgres
       - AFC_DB_CREATOR_PASSWORD_FILE_RATDB=${VOL_C_SECRETS}/DB_CREATOR_PASSWORD_RATDB
-      - AFC_DB_CREATOR_DSN_BULK_POSTGRES=postgresql://postgres:postgres@bulk_postgres/postgres
+      - AFC_DB_CREATOR_DSN_BULK_POSTGRES=postgresql://postgres@bulk_postgres/postgres
       - AFC_DB_CREATOR_PASSWORD_FILE_BULK_POSTGRES=${VOL_C_SECRETS}/DB_CREATOR_PASSWORD_BULK_POSTGRES
+      - AFC_DB_CREATOR_SERVICE_DSN_RCACHE=postgresql://bulk_rw@bulk_postgres/rcache
+      - AFC_DB_CREATOR_SERVICE_DSN_ALS=postgresql://bulk_rw@bulk_postgres/ALS
+      - AFC_DB_CREATOR_SERVICE_DSN_LOGS=postgresql://bulk_rw@bulk_postgres/AFC_LOGS
+      - AFC_DB_CREATOR_SERVICE_DSN_FS_STATE=postgresql://bulk_rw@bulk_postgres/fs_state
+      - AFC_DB_CREATOR_SERVICE_DSN_GRAFANA=postgresql://bulk_rw@bulk_postgres/grafana
+      - AFC_DB_CREATOR_SERVICE_PASSWORD_FILE_RCACHE=/run/secrets/BULK_POSTGRES_RW_PASSWORD
+      - AFC_DB_CREATOR_SERVICE_PASSWORD_FILE_ALS=/run/secrets/BULK_POSTGRES_RW_PASSWORD
+      - AFC_DB_CREATOR_SERVICE_PASSWORD_FILE_LOGS=/run/secrets/BULK_POSTGRES_RW_PASSWORD
+      - AFC_DB_CREATOR_SERVICE_PASSWORD_FILE_FS_STATE=/run/secrets/BULK_POSTGRES_RW_PASSWORD
+      - AFC_DB_CREATOR_SERVICE_PASSWORD_FILE_GRAFANA=/run/secrets/BULK_POSTGRES_RW_PASSWORD
+      - AFC_DB_CREATOR_READONLY_ROLE=bulk_ro
       - AFC_GRAFANA_ENABLED=${AFC_GRAFANA_ENABLED:-false}
+      - AFC_RATAPI_LOG_LEVEL=INFO
+      - AFC_WEBUI_ACCESS_LOG=-
       # OIDC and Captcha conf can be added here:
       # - OIDC_ARG=/OIDC/oidc_env.cfg
       # - RATAPI_ARG=/OIDC/ratapi_env.cfg
 
   msghnd:
     profiles: ["msghnd"]
-    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-msghnd:${TAG:-latest}
+    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-msghnd:${TAG:?TAG must be set in .env}
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     environment:
       - FLASKFILE_SQLALCHEMY_DATABASE_PASSWORD=${VOL_C_SECRETS}/RATDB_PASSWORD
       - FLASKFILE_SECRET_KEY=${VOL_C_SECRETS}/FLASK_SECRET_KEY
+      - FLASKFILE_SECURITY_PASSWORD_SALT=${VOL_C_SECRETS}/SECURITY_PASSWORD_SALT
       - FLASKFILE_GOOGLE_APIKEY=${VOL_C_SECRETS}/GOOGLE_APIKEY
       - RATAPIFILE_CAPTCHA_SECRET=${VOL_C_SECRETS}/CAPTCHA_SECRET
       - RATAPIFILE_CAPTCHA_SITEKEY=${VOL_C_SECRETS}/CAPTCHA_SITEKEY
@@ -136,12 +252,18 @@ services:
       - OIDCFILE_OIDC_CLIENT_ID=${VOL_C_SECRETS}/OIDC_CLIENT_ID
       - OIDCFILE_OIDC_CLIENT_SECRET=${VOL_C_SECRETS}/OIDC_CLIENT_SECRET
       # RabbitMQ server name:
+      - AFC_INTERNAL_TOKEN_FILE=${VOL_C_SECRETS}/AFC_INTERNAL_TOKEN
+      # Dispatcher-only token used to verify AP-route mTLS attestation headers.
+      - AFC_DISPATCHER_TOKEN_FILE=${VOL_C_SECRETS}/AFC_DISPATCHER_TOKEN
       - BROKER_TYPE=${BROKER_TYPE}
       - BROKER_FQDN=${BROKER_FQDN}
+      - BROKER_USER=${BROKER_USER}
+      - BROKER_PWD_FILE=${VOL_C_SECRETS}/BROKER_PWD
       # Filestorage params:
       - AFC_OBJST_HOST=${AFC_OBJST_HOST}
       - AFC_OBJST_PORT=${AFC_OBJST_PORT}
       - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
+      - AFC_OBJST_API_KEY_FILE=${VOL_C_SECRETS}/OBJST_API_KEY
       # ALS params
       - ALS_KAFKA_SERVER_ID=msghnd
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER}:${ALS_KAFKA_CLIENT_PORT}
@@ -153,12 +275,15 @@ services:
       - RCACHE_POSTGRES_DSN=${RCACHE_POSTGRES_DSN}
       - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
+      - RCACHE_API_KEY_FILE=${VOL_C_SECRETS}/RCACHE_API_KEY
       - RCACHE_RMQ_DSN=${RCACHE_RMQ_DSN}
+      - RCACHE_RMQ_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_RMQ_PWD
       - AFC_STATE_VENDOR_EXTENSIONS=${AFC_STATE_VENDOR_EXTENSIONS}
     dns_search: [.]
     secrets:
       - RATDB_PASSWORD
       - FLASK_SECRET_KEY
+      - SECURITY_PASSWORD_SALT
       - GOOGLE_APIKEY
       - CAPTCHA_SECRET
       - CAPTCHA_SITEKEY
@@ -166,6 +291,13 @@ services:
       - OIDC_CLIENT_ID
       - OIDC_CLIENT_SECRET
       - RCACHE_DB_PASSWORD
+      - RCACHE_API_KEY
+      - OBJST_API_KEY
+      - BROKER_PWD
+      - AFC_INTERNAL_TOKEN
+      - AFC_DISPATCHER_TOKEN
+      - RCACHE_RMQ_PWD
+      - BULK_POSTGRES_RW_PASSWORD
     depends_on:
       ratdb:
         condition: service_started
@@ -183,17 +315,24 @@ services:
         condition: service_started
 
   afcserver:
-    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afcserver-image:${TAG:-latest}
+    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afcserver-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     environment:
       - AFC_SERVER_PORT=${AFC_REQ_SERVER_PORT}
-      - AFC_SERVER_RATDB_DSN=postgresql://postgres:postgres@ratdb/fbrat
+      - AFC_INTERNAL_TOKEN_FILE=${VOL_C_SECRETS}/AFC_INTERNAL_TOKEN
+      # Dispatcher-only token used to verify AP-route mTLS attestation headers.
+      - AFC_DISPATCHER_TOKEN_FILE=${VOL_C_SECRETS}/AFC_DISPATCHER_TOKEN
+      - AFC_SERVER_RATDB_DSN=postgresql://postgres@ratdb/fbrat
       - AFC_SERVER_RATDB_PASSWORD_FILE=${VOL_C_SECRETS}/RATDB_PASSWORD
       - AFC_SERVER_REQUEST_TIMEOUT=180
       - AFC_SERVER_CONFIG_REFRESH=5
       - RCACHE_POSTGRES_DSN=${RCACHE_POSTGRES_DSN}
       - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
       - RCACHE_RMQ_DSN=${RCACHE_RMQ_DSN}
+      - RCACHE_RMQ_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_RMQ_PWD
       - AFC_STATE_VENDOR_EXTENSIONS=${AFC_STATE_VENDOR_EXTENSIONS}
       # ALS params
       - ALS_KAFKA_SERVER_ID=${AFC_REQ_SERVER}
@@ -205,13 +344,25 @@ services:
       - AFC_OBJST_HOST=${AFC_OBJST_HOST}
       - AFC_OBJST_PORT=${AFC_OBJST_PORT}
       - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
+      - AFC_OBJST_API_KEY_FILE=${VOL_C_SECRETS}/OBJST_API_KEY
+      # mTLS enforcement — must match the dispatcher's AFC_ENFORCE_MTLS setting.
+      # Set to true by default; overlays may override for dev/test.
+      - AFC_ENFORCE_MTLS=${AFC_ENFORCE_MTLS:-true}
       # RabbitMQ server name:
       - BROKER_TYPE=${BROKER_TYPE}
       - BROKER_FQDN=${BROKER_FQDN}
+      - BROKER_USER=${BROKER_USER}
+      - BROKER_PWD_FILE=${VOL_C_SECRETS}/BROKER_PWD
     dns_search: [.]
     secrets:
       - RATDB_PASSWORD
       - RCACHE_DB_PASSWORD
+      - RCACHE_API_KEY
+      - OBJST_API_KEY
+      - BROKER_PWD
+      - AFC_INTERNAL_TOKEN
+      - AFC_DISPATCHER_TOKEN
+      - RCACHE_RMQ_PWD
     depends_on:
       ratdb:
         condition: service_started
@@ -225,32 +376,29 @@ services:
         condition: service_started
 
   objst:
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/objstorage-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/objstorage-image:${TAG:?TAG must be set in .env}
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
+    volumes:
+      - objst_storage:/storage
     environment:
       - AFC_OBJST_PORT=${AFC_OBJST_PORT}
       - AFC_OBJST_HIST_PORT=4999
       - AFC_OBJST_LOCAL_DIR=/storage
-      - FLASKFILE_SQLALCHEMY_DATABASE_PASSWORD=${VOL_C_SECRETS}/RATDB_PASSWORD
-      - FLASKFILE_SECRET_KEY=${VOL_C_SECRETS}/FLASK_SECRET_KEY
-      - FLASKFILE_GOOGLE_APIKEY=${VOL_C_SECRETS}/GOOGLE_APIKEY
-      - RATAPIFILE_CAPTCHA_SECRET=${VOL_C_SECRETS}/CAPTCHA_SECRET
-      - RATAPIFILE_CAPTCHA_SITEKEY=${VOL_C_SECRETS}/CAPTCHA_SITEKEY
-      - RATAPIFILE_MAIL_PASSWORD=${VOL_C_SECRETS}/MAIL_PASSWORD
-      - OIDCFILE_OIDC_CLIENT_ID=${VOL_C_SECRETS}/OIDC_CLIENT_ID
-      - OIDCFILE_OIDC_CLIENT_SECRET=${VOL_C_SECRETS}/OIDC_CLIENT_SECRET
+      - AFC_OBJST_API_KEY_FILE=${VOL_C_SECRETS}/OBJST_API_KEY
+      # Remove oldest task dirs when storage volume exceeds this % full. Default: 70%.
+      - AFC_OBJST_MAX_DISK_PCT=${AFC_OBJST_MAX_DISK_PCT:-70}
     secrets:
-      - RATDB_PASSWORD
-      - FLASK_SECRET_KEY
-      - GOOGLE_APIKEY
-      - CAPTCHA_SECRET
-      - CAPTCHA_SITEKEY
-      - MAIL_PASSWORD
-      - OIDC_CLIENT_ID
-      - OIDC_CLIENT_SECRET
+      - OBJST_API_KEY
     dns_search: [.]
 
   worker:
-    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-worker:${TAG:-latest}
+    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-worker:${TAG:?TAG must be set in .env}
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
       # used for testing mainly
@@ -260,11 +408,19 @@ services:
       - AFC_OBJST_HOST=${AFC_OBJST_HOST}
       - AFC_OBJST_PORT=${AFC_OBJST_PORT}
       - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
+      - AFC_OBJST_API_KEY_FILE=${VOL_C_SECRETS}/OBJST_API_KEY
       # worker params
       - AFC_WORKER_CELERY_WORKERS=rat_1 rat_2
+      # rat_1 serves the GUI queue; rat_2 serves the AP queue.
+      # Both consume celery_gui,celery so rat_1 can absorb AP overflow when idle.
+      - AFC_WORKER_CELERY_QUEUES=celery_gui,celery
+      # NFS mount path — authoritative geodata root; overrides broker-supplied mntroot.
+      - NFS_MOUNT_PATH=/mnt/nfs
       # RabbitMQ server name:
       - BROKER_TYPE=${BROKER_TYPE}
       - BROKER_FQDN=${BROKER_FQDN}
+      - BROKER_USER=${BROKER_USER}
+      - BROKER_PWD_FILE=${VOL_C_SECRETS}/BROKER_PWD
       # afc-engine preload lib params
       - AFC_AEP_ENABLE=1
       - AFC_AEP_DEBUG=1
@@ -272,7 +428,9 @@ services:
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
+      - RCACHE_API_KEY_FILE=${VOL_C_SECRETS}/RCACHE_API_KEY
       - RCACHE_RMQ_DSN=${RCACHE_RMQ_DSN}
+      - RCACHE_RMQ_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_RMQ_PWD
       # ALS params
       - ALS_KAFKA_SERVER_ID=worker
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER}:${ALS_KAFKA_CLIENT_PORT}
@@ -281,6 +439,15 @@ services:
       - AFC_JSON_TOPIC_PREFIX=${AFC_JSON_TOPIC_PREFIX}
       # TIMEOUT
       - AFC_WORKER_ENG_TOUT=300
+      # afc-engine per-subprocess RLIMIT_DATA cap (bytes).
+      # The engine's VmData peaks ~10-11 GiB; 32 GiB gives headroom.
+      # Set to 0 to disable when cgroup memory.max is already enforced.
+      - AFC_ENGINE_MEM_LIMIT_BYTES=34359738368
+    secrets:
+      - RCACHE_API_KEY
+      - OBJST_API_KEY
+      - BROKER_PWD
+      - RCACHE_RMQ_PWD
     depends_on:
       ratdb:
         condition: service_started
@@ -295,8 +462,11 @@ services:
     dns_search: [.]
 
   als_kafka:
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/als-kafka-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/als-kafka-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     healthcheck:
       test: /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:${KAFKA_CLIENT_PORT:-9092} > /dev/null 2>&1
       interval: 5s
@@ -309,25 +479,46 @@ services:
       - KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE}
       - AFC_ALS_TOPIC_NAME=${AFC_ALS_TOPIC_NAME}
       - AFC_JSON_TOPIC_PREFIX=${AFC_JSON_TOPIC_PREFIX}
+      # Explicit opt-in to PLAINTEXT transport (compose-internal network only).
+      # kafka-entrypoint.sh will exit 1 if this is absent and no encrypted
+      # KAFKA_CLIENT_SECURITY_PROTOCOL is set — mirrors ALS_SIPHON_ALLOW_PLAINTEXT_KAFKA.
+      - ALS_KAFKA_ALLOW_PLAINTEXT=true
     dns_search: [.]
+    # Dual-homed: default network for application producers/consumers;
+    # kafka-broker-ui for kafka_ui (which is isolated from the default network).
+    # NOT on monitor-net: application-plane containers must never share a
+    # segment with socket-proxy or Loki (see monitor-net comment below).
+    networks:
+      default:
+      kafka-broker-ui:
 
   als_siphon:
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/als-siphon-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/als-siphon-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     environment:
       - KAFKA_SERVERS=${ALS_KAFKA_SERVER}:${ALS_KAFKA_CLIENT_PORT}
-      - POSTGRES_ALS_CONN_STR=bulk_postgres
-      - POSTGRES_LOG_CONN_STR=bulk_postgres
+      # Use bulk_rw non-superuser role; DSN default user = bulk_rw
+      - POSTGRES_ALS_CONN_STR=postgresql://bulk_rw@bulk_postgres
+      - POSTGRES_LOG_CONN_STR=postgresql://bulk_rw@bulk_postgres
       - POSTGRES_ALS_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_DB_PASSWORD
       - POSTGRES_LOG_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_JSON_LOG_DB_PASSWORD
       - AFC_DB_CREATOR_URL=http://${AFC_WEBUI_NAME}/fbrat/admin/CreateDb
+      - AFC_DB_CREATOR_DSN_ALLOWLIST=postgresql://postgres@bulk_postgres/postgres
+      - AFC_INTERNAL_TOKEN_FILE=${VOL_C_SECRETS}/AFC_INTERNAL_TOKEN
       - KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE}
       - AFC_ALS_TOPIC_NAME=${AFC_ALS_TOPIC_NAME}
       - AFC_JSON_TOPIC_PREFIX=${AFC_JSON_TOPIC_PREFIX}
       - AFC_ALS_MONTH_PARTITIONS_AHEAD=6
+      # Grant SELECT to bulk_ro on newly-created ALS/AFC_LOGS DBs
+      - AFC_BULK_DB_READONLY_ROLE=bulk_ro
+      - ALS_SIPHON_ALLOW_PLAINTEXT_KAFKA=1
     secrets:
       - ALS_DB_PASSWORD
       - ALS_JSON_LOG_DB_PASSWORD
+      - AFC_INTERNAL_TOKEN
     depends_on:
       als_kafka:
         condition: service_healthy
@@ -337,31 +528,101 @@ services:
 
   kafka_ui:
     profiles: ["monitor"]
-    image: provectuslabs/kafka-ui:latest
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/kafka-ui-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     environment:
-      - KAFKA_CLUSTERS_0_NAME=afc-kafka
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=${ALS_KAFKA_SERVER}:${ALS_KAFKA_CLIENT_PORT}
-      - SERVER_SERVLET_CONTEXT_PATH=/fbrat/kafka-ui
+      # AUTH_TYPE=DISABLED: nginx /fbrat/kafka-ui already gates access via
+      # auth_request _super_check (Super users only), and kafka_ui is isolated
+      # on monitor-net so application containers cannot reach it directly.
+      # No Spring Security SESSION cookie is issued — eliminates the double-login.
     depends_on:
       als_kafka:
         condition: service_healthy
     dns_search: [.]
+    # Isolated to monitor-net so application containers (rat_server, afc_server,
+    # worker, etc.) on the default bridge cannot reach the Kafka broker UI directly.
+    # Dispatcher reaches kafka_ui via the dedicated kafka-ui-proxy network (NOT
+    # monitor-net, so dispatcher never shares a segment with socket-proxy);
+    # kafka_ui bootstraps to the als_kafka broker over the dedicated
+    # kafka-broker-ui network (als_kafka is application-plane and must not
+    # join monitor-net); application services reach als_kafka on default.
+    networks:
+      - monitor-net
+      - kafka-ui-proxy
+      - kafka-broker-ui
 
   bulk_postgres:
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/bulk-postgres-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/bulk-postgres-image:${TAG:?TAG must be set in .env}
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     dns_search: [.]
+    environment:
+      # postgres superuser credential used only by db_creator.
+      # Application services use the non-superuser bulk_rw/bulk_ro roles.
+      - POSTGRES_PASSWORD_FILE=/run/secrets/BULK_POSTGRES_PASSWORD
+      # Paths for the initdb.d/01_create_bulk_roles.sh init script
+      - BULK_POSTGRES_RW_PASSWORD_FILE=/run/secrets/BULK_POSTGRES_RW_PASSWORD
+      - BULK_POSTGRES_RO_PASSWORD_FILE=/run/secrets/BULK_POSTGRES_RO_PASSWORD
+    secrets:
+      - BULK_POSTGRES_PASSWORD
+      - BULK_POSTGRES_RW_PASSWORD
+      - BULK_POSTGRES_RO_PASSWORD
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
     # add for bulk_postgres persistence
     # volumes:
     #   - ./bulk_pgdata:/var/lib/postgresql/data
 
+  # One-shot: upgrade PostGIS extension SQL in each DB after the server is ready
+  # (safe when already current). Rebuild bulk-postgres-image after changing postgis-upgrade.sh.
+  bulk_postgis_upgrade:
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/bulk-postgres-image:${TAG:?TAG must be set in .env}
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
+    depends_on:
+      bulk_postgres:
+        condition: service_healthy
+    entrypoint: ["sh", "-c", "export PGPASSWORD=$(cat /run/secrets/BULK_POSTGRES_PASSWORD) && /usr/local/bin/postgis-upgrade.sh"]
+    secrets:
+      - BULK_POSTGRES_PASSWORD
+    restart: "no"
+    dns_search: [.]
+
   uls_downloader:
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/uls-downloader:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/uls-downloader:${TAG:?TAG must be set in .env}
     restart: always
+    # Defence in depth: block privilege escalation and drop unneeded capabilities.
+    # Runs as non-root fbrat (uid 1003) — the bind-mounted /rat_transfer
+    # directories must grant write access to uid 1003 (e.g. chmod o+w).
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
     environment:
-      - ULS_AFC_URL=http://${AFC_REQ_SERVER}:${AFC_REQ_SERVER_PORT}/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
+      - ULS_AFC_URL=http://${AFC_REQ_SERVER}:${AFC_REQ_SERVER_PORT}/fbrat/ap-afc/availableSpectrumInquiryInternal
       - ULS_DELAY_HR=1
-      - ULS_SERVICE_STATE_DB_DSN=postgresql://postgres:postgres@bulk_postgres/fs_state
+      - AFC_INTERNAL_TOKEN_FILE=${VOL_C_SECRETS}/AFC_INTERNAL_TOKEN
+      - AFC_DISPATCHER_TOKEN_FILE=${VOL_C_SECRETS}/AFC_DISPATCHER_TOKEN
+      - ULS_MAX_CHANGE_PERCENT=${ULS_MAX_CHANGE_PERCENT:-10}
+      # REQUIRED for production: set ULS_HASH_MANIFEST_URL to a trusted HTTPS
+      # endpoint serving a JSON dict { "FS_<timestamp>.sqlite3": "<sha256hex>" }
+      # so each DB swap is gated on cryptographic integrity. When unset the
+      # first download on a fresh deploy will be rejected by uls_service (fail-
+      # closed cold-start). Provide ULS_HASH_MANIFEST_HMAC_KEY as a compose
+      # secret to authenticate the manifest itself.
+      #- ULS_HASH_MANIFEST_URL=https://your-trusted-host/uls-hash-manifest.json
+      # Use bulk_rw non-superuser for fs_state DB
+      - ULS_SERVICE_STATE_DB_DSN=postgresql://bulk_rw@bulk_postgres/fs_state
       - ULS_SERVICE_STATE_DB_PASSWORD_FILE=${VOL_C_SECRETS}/ULS_STATE_DB_PASSWORD
       - ULS_PROMETHEUS_PORT=8000
       # ULS_SMTP_SERVER, ULS_SMTP_USERNAME and, maybe, ULS_SMTP_PORT,
@@ -377,11 +638,15 @@ services:
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
+      - RCACHE_API_KEY_FILE=${VOL_C_SECRETS}/RCACHE_API_KEY
       # ALS params
       - ALS_KAFKA_SERVER_ID=fs_downloader
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER}:${ALS_KAFKA_CLIENT_PORT}
       # DB Creator API
       - AFC_DB_CREATOR_URL=http://${AFC_WEBUI_NAME}/fbrat/admin/CreateDb
+      - AFC_DB_CREATOR_DSN_ALLOWLIST=postgresql://postgres@bulk_postgres/postgres
+      # Grant SELECT to bulk_ro on newly-created fs_state DB
+      - AFC_BULK_DB_READONLY_ROLE=bulk_ro
     volumes:
       - ${VOL_H_DB}:/rat_transfer
       # May be useful in prod deployment
@@ -389,6 +654,18 @@ services:
     secrets:
       - MAIL_PASSWORD
       - ULS_STATE_DB_PASSWORD
+      - RCACHE_API_KEY
+      - AFC_INTERNAL_TOKEN
+      - AFC_DISPATCHER_TOKEN
+    healthcheck:
+      # Override the Dockerfile's 2h interval: a 2-minute check means problems
+      # are caught within ~6 minutes (retries × interval) rather than ~6 hours.
+      # The script is lightweight (one Postgres query) so the overhead is minimal.
+      test: ["CMD", "/wd/uls_service_healthcheck.py"]
+      interval: 2m
+      timeout: 2m
+      retries: 3
+      start_period: 30s
     depends_on:
       bulk_postgres:
         condition: service_started
@@ -397,48 +674,52 @@ services:
     dns_search: [.]
 
   cert_db:
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/cert_db:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/cert_db:${TAG:?TAG must be set in .env}
+    user: fbrat
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
     depends_on:
       ratdb:
         condition: service_started
       als_kafka:
         condition: service_healthy
-    links:
-      - ratdb
-      - als_kafka
     environment:
+      - AFC_DB_CREATOR_DSN_RATDB=postgresql://postgres@ratdb/postgres
+      - AFC_DB_CREATOR_PASSWORD_FILE_RATDB=${VOL_C_SECRETS}/RATDB_PASSWORD
+      - BROKER_PWD_FILE=${VOL_C_SECRETS}/BROKER_PWD
+      # Flask SECRET_KEY and DB password required by ratapi's create_app() even
+      # in CLI contexts.
+      - FLASKFILE_SECRET_KEY=${VOL_C_SECRETS}/FLASK_SECRET_KEY
+      - FLASKFILE_SECURITY_PASSWORD_SALT=${VOL_C_SECRETS}/SECURITY_PASSWORD_SALT
+      - FLASKFILE_SQLALCHEMY_DATABASE_PASSWORD=${VOL_C_SECRETS}/RATDB_PASSWORD
       - ALS_KAFKA_SERVER_ID=cert_db
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER}:${ALS_KAFKA_CLIENT_PORT}
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE}
       - AFC_ALS_TOPIC_NAME=${AFC_ALS_TOPIC_NAME}
       - AFC_JSON_TOPIC_PREFIX=${AFC_JSON_TOPIC_PREFIX}
-      - FLASKFILE_SQLALCHEMY_DATABASE_PASSWORD=${VOL_C_SECRETS}/RATDB_PASSWORD
-      - FLASKFILE_SECRET_KEY=${VOL_C_SECRETS}/FLASK_SECRET_KEY
-      - FLASKFILE_GOOGLE_APIKEY=${VOL_C_SECRETS}/GOOGLE_APIKEY
-      - RATAPIFILE_CAPTCHA_SECRET=${VOL_C_SECRETS}/CAPTCHA_SECRET
-      - RATAPIFILE_CAPTCHA_SITEKEY=${VOL_C_SECRETS}/CAPTCHA_SITEKEY
-      - RATAPIFILE_MAIL_PASSWORD=${VOL_C_SECRETS}/MAIL_PASSWORD
-      - OIDCFILE_OIDC_CLIENT_ID=${VOL_C_SECRETS}/OIDC_CLIENT_ID
-      - OIDCFILE_OIDC_CLIENT_SECRET=${VOL_C_SECRETS}/OIDC_CLIENT_SECRET
     secrets:
       - RATDB_PASSWORD
+      - BROKER_PWD
       - FLASK_SECRET_KEY
-      - GOOGLE_APIKEY
-      - CAPTCHA_SECRET
-      - CAPTCHA_SITEKEY
-      - MAIL_PASSWORD
-      - OIDC_CLIENT_ID
-      - OIDC_CLIENT_SECRET
+      - SECURITY_PASSWORD_SALT
 
   rcache:
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/rcache-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/rcache-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     environment:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_CLIENT_PORT=${RCACHE_CLIENT_PORT}
       - RCACHE_POSTGRES_DSN=${RCACHE_POSTGRES_DSN}
       - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
-      - RCACHE_AFC_REQ_URL=http://${AFC_REQ_SERVER}:${AFC_REQ_SERVER_PORT}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
+      - RCACHE_API_KEY_FILE=${VOL_C_SECRETS}/RCACHE_API_KEY
+      - RCACHE_RMQ_DSN=${RCACHE_RMQ_DSN}
+      - RCACHE_RMQ_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_RMQ_PWD
+      - RCACHE_AFC_REQ_URL=http://${AFC_REQ_SERVER}:${AFC_REQ_SERVER_PORT}/fbrat/ap-afc/availableSpectrumInquiry
       - RCACHE_RULESETS_URL=http://${AFC_WEBUI_NAME}/fbrat/ratapi/v1/GetRulesetIDs
       - RCACHE_CONFIG_RETRIEVAL_URL=http://${AFC_WEBUI_NAME}/fbrat/ratapi/v1/GetAfcConfigByRulesetID
       # ALS params
@@ -447,10 +728,15 @@ services:
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE}
       - AFC_ALS_TOPIC_NAME=${AFC_ALS_TOPIC_NAME}
       - AFC_JSON_TOPIC_PREFIX=${AFC_JSON_TOPIC_PREFIX}
-      # DB Creator API
+      # DB Creator API — token required to authenticate against rat_server's CreateDb endpoint
       - AFC_DB_CREATOR_URL=http://${AFC_WEBUI_NAME}/fbrat/admin/CreateDb
+      - AFC_DB_CREATOR_DSN_ALLOWLIST=postgresql://postgres@bulk_postgres/postgres
+      - AFC_INTERNAL_TOKEN_FILE=${VOL_C_SECRETS}/AFC_INTERNAL_TOKEN
     secrets:
       - RCACHE_DB_PASSWORD
+      - RCACHE_API_KEY
+      - AFC_INTERNAL_TOKEN
+      - RCACHE_RMQ_PWD
     depends_on:
       bulk_postgres:
         condition: service_started
@@ -460,87 +746,202 @@ services:
 
   grafana:
     profiles: ["monitor"]
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/grafana-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/grafana-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount templates from source so config changes take effect without rebuild.
+      # docker.sock is intentionally NOT mounted here; grafana talks to socket-proxy via TCP.
+      - ./grafana/templates:/wd/templates:ro
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GRAFANA_ADMIN_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_ADMIN_PASSWORD
-      - GRAFANA_DATABASE_URL=postgres://postgres:postgres@bulk_postgres/grafana
+      # Grafana own DB uses bulk_rw; read-only datasources use bulk_ro
+      - GRAFANA_DATABASE_URL=postgres://bulk_rw@bulk_postgres/grafana
       - GRAFANA_DATABASE_PASSWORD_FILE=${VOL_C_SECRETS}/GRAFANA_DB_PASSWORD
-      - GRAFANA_DS_ALS_RO_DSN=postgresql://postgres:postgres@bulk_postgres/ALS
+      - GRAFANA_DS_ALS_RO_DSN=postgresql://bulk_ro@bulk_postgres/ALS
       - GRAFANA_DS_ALS_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_RO_DB_PASSWORD
-      - GRAFANA_DS_JSON_LOG_RO_DSN=postgresql://postgres:postgres@bulk_postgres/AFC_LOGS
+      - GRAFANA_DS_JSON_LOG_RO_DSN=postgresql://bulk_ro@bulk_postgres/AFC_LOGS
       - GRAFANA_DS_JSON_LOG_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_JSON_LOG_RO_DB_PASSWORD
-      - GRAFANA_DS_FS_STATE_RO_DSN=postgresql://postgres:postgres@bulk_postgres/fs_state
+      - GRAFANA_DS_FS_STATE_RO_DSN=postgresql://bulk_ro@bulk_postgres/fs_state
       - GRAFANA_DS_FS_STATE_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ULS_STATE_RO_DB_PASSWORD
       - GRAFANA_DS_PROMETHEUS_URL=http://prometheus:9090/fbrat/prometheus
       - GRAFANA_DS_RCACHE_URL=http://rcache:8000
       - GRAFANA_DS_LOKI_URL=http://loki:3100
       - GRAFANA_COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
-      # DB Creator API
+      - AFC_DB_CREATOR_DSN_ALLOWLIST=postgresql://postgres@bulk_postgres/postgres
+      # DB Creator API — token required to authenticate against rat_server's CreateDb endpoint
       - AFC_DB_CREATOR_URL=http://${AFC_WEBUI_NAME}/fbrat/admin/CreateDb
+      - AFC_INTERNAL_TOKEN_FILE=${VOL_C_SECRETS}/AFC_INTERNAL_TOKEN
+      # Docker datasource uses socket-proxy via TCP (no docker.sock mount needed)
+      - GRAFANA_DOCKER_PROXY_HOST=socket-proxy:2375
+      # Restrict auth.proxy to dispatcher /32 on the dedicated
+      # grafana-proxy network so only the designated proxy container can set X-WEBAUTH-USER
+      - GRAFANA_AUTH_PROXY_WHITELIST=${GRAFANA_PROXY_DISPATCHER_IP:-192.168.128.2}/32
     depends_on:
-      - prometheus
-      - bulk_postgres
+      rat_server:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
+      bulk_postgres:
+        condition: service_started
+      socket-proxy:
+        condition: service_started
     secrets:
       - GRAFANA_DB_PASSWORD
       - ALS_RO_DB_PASSWORD
       - ALS_JSON_LOG_RO_DB_PASSWORD
       - ULS_STATE_RO_DB_PASSWORD
       - GRAFANA_ADMIN_PASSWORD
+      - AFC_INTERNAL_TOKEN
     dns_search: [.]
+    # Grafana attached to grafana-proxy internal network.
+    # Subnet and static IP defined per-overlay to avoid subnet conflicts.
+    # Also on monitor-net to reach socket-proxy.
+    networks:
+      default:
+      grafana-proxy:
+        ipv4_address: ${GRAFANA_PROXY_GRAFANA_IP:-192.168.128.3}
+      monitor-net:
 
   loki:
     profiles: ["monitor"]
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/loki-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/loki-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
+    # Isolated to monitor-net so application containers cannot reach the unauthenticated Loki API.
+    networks:
+      - monitor-net
     dns_search: [.]
 
-  promtail:
+  alloy:
     profiles: ["monitor"]
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/promtail-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/alloy-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/lib/docker/containers:/var/lib/docker/containers
+      # Mount alloy config from source so changes take effect without rebuild.
+      # docker.sock is intentionally NOT mounted here; alloy uses socket-proxy via TCP.
+      - ./grafana/alloy-config.alloy:/etc/alloy/config.alloy:ro
     environment:
       - GRAFANA_DS_LOKI_URL=http://loki:3100
       - GRAFANA_COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
+      # Socket proxy URL replaces direct unix socket access
+      - GRAFANA_DOCKER_HOST=tcp://socket-proxy:2375
+    depends_on:
+      - socket-proxy
+    networks:
+      - default
+      - monitor-net
+    dns_search: [.]
+
+  socket-proxy:
+    profiles: ["monitor"]
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/socket-proxy:${TAG:?TAG must be set in .env}
+    restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # Read-only Docker API endpoints for monitoring. Filesystem-read
+      # /archive, /export, /attach are denied unconditionally.
+      # /logs is allowed when LOGS=1 (required by Alloy loki.source.docker).
+      # /containers/{id}/json inspect is allowed when INSPECT=1 (required by
+      # loki.source.docker for container label discovery). Disabled by default;
+      # safe here because socket-proxy is isolated to monitor-net.
+      CONTAINERS: 1
+      EVENTS: 1
+      NETWORKS: 1
+      SERVICES: 1
+      TASKS: 1
+      VOLUMES: 1
+      INFO: 1
+      VERSION: 1
+      IMAGES: 1
+      LOGS: 1
+      INSPECT: 1
+      # Deny all write operations
+      POST: 0
+      AUTH: 0
+      BUILD: 0
+      COMMIT: 0
+      CONFIGS: 0
+      EXEC: 0
+      PLUGINS: 0
+      SECRETS: 0
+      SWARM: 0
+    # Isolated to monitor-net so only monitoring containers can reach the proxy.
+    networks:
+      - monitor-net
     dns_search: [.]
 
   prometheus:
     profiles: ["monitor"]
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/prometheus-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/prometheus-image:${TAG:?TAG must be set in .env}
     restart: always
-    entrypoint: ["/bin/sh", "-c", "prometheus --web.enable-lifecycle --storage.tsdb.path=$$PROMETHEUS_DATA --web.external-url=/fbrat/prometheus"]
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
+    entrypoint: ["/bin/sh", "-c", "prometheus --storage.tsdb.path=$$PROMETHEUS_DATA --web.external-url=/fbrat/prometheus"]
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:9090/fbrat/prometheus/-/healthy"]
     depends_on:
       - cadvisor
+    secrets:
+      - AFC_INTERNAL_TOKEN
+    networks:
+      - default
+      - monitor-net
     dns_search: [.]
 
   cadvisor:
     profiles: ["monitor"]
-    image:  ${PUB_REPO:-ghcr.io/open-afc-project}/cadvisor-image:${TAG:-latest}
+    image:  ${PUB_REPO:-ghcr.io/open-afc-project}/cadvisor-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Container metadata comes via the read-only Docker API on socket-proxy
+    # (monitor-net) with -docker_only. Only the overlay2 layerdb sub-tree
+    # (mount-id metadata) is mounted for container discovery; the overlay2
+    # merged directory is not mounted. Unnecessary capabilities are dropped.
+    # Set DOCKER_DATA_ROOT if the Docker daemon uses a non-default data-root.
+    cap_add:
+      - SYS_PTRACE
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    devices:
+      - /dev/kmsg
     volumes:
-    - /:/rootfs:ro
-    - /var/run:/var/run:rw
     - /sys:/sys:ro
-    - /var/lib/docker/:/var/lib/docker:ro
     - /dev/disk/:/dev/disk:ro
+    - type: bind
+      source: "${DOCKER_DATA_ROOT:-/var/lib/docker}/image/overlay2/layerdb"
+      target: "${DOCKER_DATA_ROOT:-/var/lib/docker}/image/overlay2/layerdb"
+      read_only: true
     environment:
-      - CADVISOR_ADDITIONAL_ARGS=-url_base_prefix=/fbrat/cadvisor
+      - CADVISOR_ADDITIONAL_ARGS=-url_base_prefix=/fbrat/cadvisor -docker tcp://socket-proxy:2375 -docker_only -disable_metrics=disk,diskIO
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/fbrat/cadvisor/healthz"]
+    networks:
+      - default
+      - monitor-net
     dns_search: [.]
 
   nginxexporter:
     profiles: ["monitor"]
-    image: ${PUB_REPO:-ghcr.io/open-afc-project}/nginxexporter-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/nginxexporter-image:${TAG:?TAG must be set in .env}
     restart: always
+    # Prevent privilege escalation at runtime.
+    security_opt:
+      - "no-new-privileges:true"
     depends_on:
       dispatcher:
         condition: service_healthy
@@ -550,17 +951,61 @@ services:
 # volumes:
 #   uls_downloader_state:
 
+volumes:
+  # Named volume for RabbitMQ state (Erlang cookie, message store, mnesia db).
+  # Prevents the one-time prelaunch cookie-creation failure that occurs on
+  # fresh containers and keeps message state across container restarts.
+  rmq_data:
+  # Named volume for objst task/config/history data.
+  # Persists across container restarts and prevents host-disk exhaustion
+  # from data written to the container's ephemeral writable layer.
+  # In production, override this with a bind-mount to a large partition:
+  #   objst_storage:
+  #     driver: local
+  #     driver_opts: {type: none, o: bind, device: /data/afc/objstorage}
+  objst_storage:
+
+# Dedicated internal network shared between dispatcher and grafana,
+# scoped to restrict which containers can set the X-WEBAUTH-USER auth header.
+networks:
+  grafana-proxy:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${GRAFANA_PROXY_SUBNET:-192.168.128.0/29}
+  # Dedicated internal network for monitoring containers and socket-proxy.
+  # Application containers are NOT on this network, preventing them from
+  # reaching the Docker socket proxy.
+  monitor-net:
+    internal: true
+  # Dedicated internal network shared only between dispatcher and kafka_ui,
+  # so the WAN-facing dispatcher can proxy /fbrat/kafka-ui without joining
+  # monitor-net (and thus without L3 reach to socket-proxy / the Docker socket).
+  kafka-ui-proxy:
+    internal: true
+  # Dedicated internal network shared only between als_kafka and kafka_ui,
+  # so kafka_ui can reach the broker without als_kafka joining monitor-net
+  # (application containers must never reach socket-proxy or the
+  # unauthenticated Loki API).
+  kafka-broker-ui:
+    internal: true
+
 secrets:
+  # Application services use bulk_rw (non-superuser) or bulk_ro
+  # (read-only) instead of the postgres superuser.  The postgres superuser
+  # credential (BULK_POSTGRES_PASSWORD) is retained solely for db_creator.
   ALS_DB_PASSWORD:
-    file: ${VOL_H_SECRETS}/ALS_DB_PASSWORD
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_RW_PASSWORD
   ALS_JSON_LOG_DB_PASSWORD:
-    file: ${VOL_H_SECRETS}/ALS_JSON_LOG_DB_PASSWORD
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_RW_PASSWORD
   CAPTCHA_SECRET:
     file: ${VOL_H_SECRETS}/CAPTCHA_SECRET
   CAPTCHA_SITEKEY:
     file: ${VOL_H_SECRETS}/CAPTCHA_SITEKEY
   FLASK_SECRET_KEY:
     file: ${VOL_H_SECRETS}/FLASK_SECRET_KEY
+  SECURITY_PASSWORD_SALT:
+    file: ${VOL_H_SECRETS}/SECURITY_PASSWORD_SALT
   GOOGLE_APIKEY:
     file: ${VOL_H_SECRETS}/GOOGLE_APIKEY
   MAIL_PASSWORD:
@@ -572,20 +1017,40 @@ secrets:
   RATDB_PASSWORD:
     file: ${VOL_H_SECRETS}/RATDB_PASSWORD
   DB_CREATOR_PASSWORD_RATDB:
-    file: ${VOL_H_SECRETS}/DB_CREATOR_PASSWORD_RATDB
+    file: ${VOL_H_SECRETS}/RATDB_PASSWORD
   DB_CREATOR_PASSWORD_BULK_POSTGRES:
-    file: ${VOL_H_SECRETS}/DB_CREATOR_PASSWORD_BULK_POSTGRES
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_PASSWORD
   RCACHE_DB_PASSWORD:
-    file: ${VOL_H_SECRETS}/RCACHE_DB_PASSWORD
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_RW_PASSWORD
+  RCACHE_API_KEY:
+    file: ${VOL_H_SECRETS}/RCACHE_API_KEY
+  OBJST_API_KEY:
+    file: ${VOL_H_SECRETS}/OBJST_API_KEY
   ULS_STATE_DB_PASSWORD:
-    file: ${VOL_H_SECRETS}/ULS_STATE_DB_PASSWORD
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_RW_PASSWORD
   GRAFANA_DB_PASSWORD:
-    file: ${VOL_H_SECRETS}/GRAFANA_DB_PASSWORD
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_RW_PASSWORD
   ALS_RO_DB_PASSWORD:
-    file: ${VOL_H_SECRETS}/ALS_RO_DB_PASSWORD
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_RO_PASSWORD
   ALS_JSON_LOG_RO_DB_PASSWORD:
-    file: ${VOL_H_SECRETS}/ALS_JSON_LOG_RO_DB_PASSWORD
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_RO_PASSWORD
   ULS_STATE_RO_DB_PASSWORD:
-    file: ${VOL_H_SECRETS}/ULS_STATE_RO_DB_PASSWORD
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_RO_PASSWORD
+  BULK_POSTGRES_PASSWORD:
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_PASSWORD
+  BULK_POSTGRES_RW_PASSWORD:
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_RW_PASSWORD
+  BULK_POSTGRES_RO_PASSWORD:
+    file: ${VOL_H_SECRETS}/BULK_POSTGRES_RO_PASSWORD
   GRAFANA_ADMIN_PASSWORD:
     file: ${VOL_H_SECRETS}/GRAFANA_ADMIN_PASSWORD
+  BROKER_PWD:
+    file: ${VOL_H_SECRETS}/BROKER_PWD
+  RCACHE_RMQ_PWD:
+    file: ${VOL_H_SECRETS}/RCACHE_RMQ_PWD
+  AFC_INTERNAL_TOKEN:
+    file: ${VOL_H_SECRETS}/AFC_INTERNAL_TOKEN
+  AFC_DISPATCHER_TOKEN:
+    file: ${VOL_H_SECRETS}/AFC_DISPATCHER_TOKEN
+  DISPATCHER_BUNDLE_HMAC_KEY:
+    file: ${VOL_H_SECRETS}/DISPATCHER_BUNDLE_HMAC_KEY

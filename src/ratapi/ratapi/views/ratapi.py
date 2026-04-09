@@ -13,6 +13,7 @@
 import logging
 import os
 import sys
+import traceback
 import importlib.metadata
 import flask
 import json
@@ -25,21 +26,26 @@ import requests
 import appcfg
 import threading
 import time
+from typing import Any, Optional
 from flask.views import MethodView
+from ratapi.views.auth import public_route
 import werkzeug.exceptions
-from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
+import uuid
+import hashlib
+from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO
 from afc_worker import run
+import afc_worker
 from fst import DataIf
+import afctask
 from ncli import MsgPublisher
 from hchecks import RmqHealthcheck, ObjstHealthcheck
 from ..util import AFCEngineException, require_default_uls, \
-    getQueueDirectory, als_log_afc_config_change
+    als_log_afc_config_change
 
-from afcmodels.aaa import User, AccessPointDeny, AFCConfig, MTLS
+from afcmodels.aaa import User, AFCConfig, MTLS
 from afcmodels.base import db
 from afcmodels.hardcoded_relations import RulesetVsRegion
 from .auth import auth
-from appcfg import ObjstConfig
 import urllib.parse
 
 #: Logger for this module
@@ -48,6 +54,30 @@ LOGGER.setLevel(appcfg.AFC_RATAPI_LOG_LEVEL)
 
 #: All views under this API blueprint
 module = flask.Blueprint('ratapi-v1', 'ratapi')
+
+
+def _admin_may_access_task(task_owner_id: Optional[int], caller_user: Any) \
+        -> bool:
+    """Check if caller may bypass per-task ownership as Admin/Super.
+
+    Super callers have unrestricted access. Admin callers may only access
+    tasks submitted by users in the same org (org-scoped bypass).
+    """
+    if caller_user is None or not caller_user.is_authenticated:
+        return False
+    roles = {r.name for r in (caller_user.roles or [])}
+    if 'Super' in roles:
+        return True
+    if 'Admin' not in roles:
+        return False
+    if task_owner_id is None:
+        # Fail closed: ownerless (legacy/AP-originated) tasks are
+        # Super-only; a null owner must not make the task world-accessible
+        # to every Admin across every org.
+        return False
+    owner = User.query.get(task_owner_id)
+    return (owner is not None and
+            getattr(owner, 'org', None) == getattr(caller_user, 'org', None))
 
 
 def build_task(
@@ -62,12 +92,20 @@ def build_task(
         request_str=None,
         original_request_str=None,
         config_str=None,
-        timeout_sec=600):
+        timeout_sec=600,
+        priority: int = afc_worker.CELERY_PRIORITY_NORMAL,
+        queue: str = afc_worker.CELERY_QUEUE,
+        owner_id=None):
     """
     Shared logic between PAWS and All other analysis for constructing and async call to run task
     """
 
     prot, host, port = dataif.getProtocol()
+    # Write an initial status.json that records the submitting user's id so
+    # that AnalysisStatus.get/delete can enforce per-user task ownership.
+    task_obj = afctask.Task(task_id, dataif, hash_val=hash_val,
+                            history_dir=history_dir, owner_id=owner_id)
+    task_obj.toJson(afctask.Task.STAT_PENDING, runtime_opts=runtime_opts)
     kwargs = {
         "prot": prot,
         "host": host,
@@ -86,9 +124,10 @@ def build_task(
         "deadline": time.time() + timeout_sec
     }
     LOGGER.debug(f"build_task({kwargs})")
-    run.apply_async(kwargs=kwargs)
+    run.apply_async(kwargs=kwargs, priority=priority, queue=queue)
 
 
+@public_route
 class GuiConfig(MethodView):
     ''' Allow the web UI to obtain configuration, including resolved URLs.
     '''
@@ -98,7 +137,7 @@ class GuiConfig(MethodView):
         '''
         LOGGER.debug(f"({threading.get_native_id()})"
                      f" {self.__class__.__name__}::{inspect.stack()[0][3]}()"
-                     f" {flask.request.cookies}")
+                     f" cookies={list(flask.request.cookies.keys())}")
 
         # Figure out the current server version
         try:
@@ -109,8 +148,6 @@ class GuiConfig(MethodView):
         except Exception as err:
             LOGGER.error('Failed to fetch server version: {0}'.format(err))
             serververs = 'unknown'
-
-        u = urllib.parse.urlparse(flask.request.url)
 
         if 'USE_CAPTCHA' in flask.current_app.config and \
                 flask.current_app.config['USE_CAPTCHA']:
@@ -147,6 +184,8 @@ class GuiConfig(MethodView):
             login_url=login_url,
             logout_url=logout_url,
             admin_url=flask.url_for('admin.User', user_id=-1),
+            admin_eirp_url=flask.url_for('admin.Eirp'),
+            admin_frequency_range_url=flask.url_for('admin.Frequency'),
             ap_deny_admin_url=flask.url_for('admin.AccessPointDeny', id=-1),
             cert_id_admin_url=flask.url_for('admin.CertId', id=-1),
             mtls_admin_url=flask.url_for('admin.MTLS', id=-1),
@@ -163,38 +202,11 @@ class GuiConfig(MethodView):
         return resp
 
 
+@public_route
 class HealthCheck(MethodView):
 
     def get(self):
         '''GET method for HealthCheck'''
-        cert_bdl_name = 'certificate/client.bundle.pem'
-        bundle_data = ''
-        try:
-            with DataIf().open(cert_bdl_name) as hfile:
-                if hfile.head():
-                    LOGGER.debug(f"Cert bundle already exists.")
-                    raise
-                # create client bundle certificate file if not exists
-                for certs in db.session.query(MTLS).all():
-                    LOGGER.info(f"{certs.id}")
-                    bundle_data += certs.cert
-                db.session.commit()  # pylint: disable=no-member
-                if len(bundle_data) == 0:
-                    LOGGER.debug(f"No certificates stored.")
-                    raise
-                # write certificates bundle for clients to objst cache.
-                hfile.write(bundle_data)
-
-                # note relevant listen peers
-                cmd = 'cmd_restart'
-                publisher = MsgPublisher(
-                    flask.current_app.config['BROKER_URL'],
-                    flask.current_app.config['BROKER_EXCH_DISPAT'])
-                publisher.publish(cmd)
-                publisher.close()
-        except BaseException:
-            pass
-
         msg = 'The ' + flask.current_app.config['AFC_APP_TYPE'] + ' is healthy'
         LOGGER.info(f"{msg}")
         return flask.make_response(msg, 200)
@@ -202,19 +214,20 @@ class HealthCheck(MethodView):
 
 def check_rmq(cfg):
     LOGGER.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
-                 f" {cfg['BROKER_URL']}")
+                 f" {re.sub(r':[^:@/]+@', ':***@', cfg['BROKER_URL'])}")
     hconn = RmqHealthcheck(cfg['BROKER_URL'])
     if hconn.healthcheck():
         return 1
     return 0
 
 
+@public_route
 class ReadinessCheck(MethodView):
 
     def get(self):
         '''GET method for Readiness Check'''
         LOGGER.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
-                     f" cfg: {flask.current_app.config}")
+                     f" cfg: {flask.current_app.config.get('AFC_APP_TYPE')}")
         msg = 'The ' + flask.current_app.config['AFC_APP_TYPE'] + ' is'
         objst_chk = ObjstHealthcheck(flask.current_app.config)
         checks = [gevent.spawn(objst_chk.healthcheck),
@@ -270,14 +283,8 @@ class ReloadAnalysis(MethodView):
             os.mkdir(os.path.join(
                 flask.current_app.config['HISTORY_DIR'], fileName))
 
-        config_path = ''
-        if user is not None and os.path.exists(os.path.join(
-                flask.current_app.config['HISTORY_DIR'], fileName)):
-            config_path = os.path.join(
-                flask.current_app.config['HISTORY_DIR'], fileName)
-        else:
-            config_path = os.path.join(
-                flask.current_app.config['HISTORY_DIR'], fileName)
+        config_path = os.path.join(
+            flask.current_app.config['HISTORY_DIR'], fileName)
         if not os.path.exists(config_path):
             os.makedirs(config_path)
 
@@ -289,7 +296,7 @@ class ReloadAnalysis(MethodView):
         handle = open(file_path, mode)
 
         if mode == 'wb':
-            os.chmod(file_path, 0o666)
+            os.chmod(file_path, 0o644)
 
         return handle
 
@@ -301,18 +308,6 @@ class ReloadAnalysis(MethodView):
         LOGGER.debug('getting analysisRequest')
         user_id = auth(roles=['AP', 'Analysis', 'Admin'])
         user = User.query.filter_by(id=user_id).first()
-        responseObject = {
-            'status': 'success',
-            'data': {
-                'userId': user.id,
-                'email': user.email,
-                'roles': user.roles,
-                'email_confirmed_at': user.email_confirmed_at,
-                'active': user.active,
-                'firstName': user.first_name,
-                'lastName': user.last_name,
-            }
-        }
         # ensure that webdav is populated with default files
         require_default_uls()
         filename = 'analysisRequest.json.gz'
@@ -344,8 +339,8 @@ class ReloadAnalysis(MethodView):
             resp.headers['AnalysisType'] = 'ExclusionZone'
         else:
             resp.headers['AnalysisType'] = 'None'
-        LOGGER.debug(json_resp['deviceDesc']['serialNumber'])
-        LOGGER.debug(resp.headers['AnalysisType'])
+        LOGGER.debug(json_resp.get('deviceDesc', {}).get('serialNumber'))
+        LOGGER.debug(resp.headers.get('AnalysisType'))
         # json.dumps(json_resp, resp.data)
         # LOGGER.debug(resp.data)
         resp.content_type = filedesc['content_type']
@@ -361,7 +356,7 @@ class AfcConfigFile(MethodView):
         '''
         filename = filename.upper()
         LOGGER.debug('AfcConfigFile.get({})'.format(filename))
-        user_id = auth(roles=['AP', 'Analysis', 'Super'])
+        auth(roles=['AP', 'Analysis', 'Super'])
         # ensure that webdav is populated with default files
         require_default_uls()
 
@@ -378,7 +373,6 @@ class AfcConfigFile(MethodView):
     def put(self, filename):
         ''' PUT method for afc config
         '''
-        import als
         from flask_login import current_user
 
         user_id = auth(roles=['Super'])
@@ -433,6 +427,7 @@ class AfcRegions(MethodView):
         return resp
 
 
+@public_route
 class About(MethodView):
     ''' Allow the web UI to manipulate configuration directly.
     '''
@@ -451,8 +446,39 @@ class About(MethodView):
         ''' POST method for About
         '''
 
-        from flask import request
         from flask_mail import Mail, Message
+
+        # Simple per-IP rate limit: allow at most 5 registration requests per
+        # hour without captcha to mitigate mailbox-flooding of the operator
+        # approval queue.
+        _ABOUT_MAX_REQUESTS_PER_HOUR = 5
+        # Key the rate-limit bucket on (WSGI peer address, X-Real-IP). Behind
+        # the dispatcher nginx every client shares the same remote_addr, so
+        # the nginx-supplied X-Real-IP distinguishes proxied clients; keeping
+        # remote_addr in the key means a direct-to-rat_server caller cannot
+        # forge X-Real-IP to collide with a proxied client's bucket.
+        remote_ip = flask.request.remote_addr or "unknown"
+        real_ip = flask.request.headers.get("X-Real-IP", "") or "-"
+        cache_key = f"about_post_{remote_ip}_{real_ip}"
+        # Use a simple in-process counter stored in app.extensions (falls back
+        # to a no-limit passthrough when the app has no cache configured).
+        _rate_counter = flask.current_app.extensions.get("about_rate_counter")
+        if _rate_counter is None:
+            import threading
+            _rate_counter = {}
+            flask.current_app.extensions["about_rate_counter"] = _rate_counter
+            flask.current_app.extensions["about_rate_lock"] = threading.Lock()
+        _rate_lock = flask.current_app.extensions["about_rate_lock"]
+        import time as _time
+        now = _time.time()
+        with _rate_lock:
+            entry = _rate_counter.get(cache_key, (0, now))
+            count, window_start = entry
+            if now - window_start > 3600:
+                count, window_start = 0, now
+            count += 1
+            _rate_counter[cache_key] = (count, window_start)
+            rate_exceeded = count > _ABOUT_MAX_REQUESTS_PER_HOUR
 
         try:
             dest_email = flask.current_app.config['REGISTRATION_DEST_EMAIL']
@@ -467,23 +493,29 @@ class About(MethodView):
             else:
                 captcha_secret = None
 
+            # Apply rate limit when captcha is not configured.
+            if not captcha_secret and rate_exceeded:
+                LOGGER.warning("About.post: rate limit exceeded for %s", remote_ip)
+                return flask.make_response("Too Many Requests", 429)
+
             bytes = flask.request.stream.read()
             rcrd = json.loads(bytes)
-            name = rcrd['name']
-            email = rcrd['email']
-            org = rcrd['org']
+            name = re.sub(r'[\r\n]', ' ', rcrd['name'])
+            email = re.sub(r'[\r\n]', ' ', rcrd['email'])
+            org = re.sub(r'[\r\n]', ' ', rcrd['org'])
 
             # verify captcha
             if captcha_secret:
                 token = rcrd['token']
                 dictToSend = {'secret': captcha_secret,
                               'response': token}
-                res = requests.post(captcha_verify, data=dictToSend)
+                res = requests.post(captcha_verify, data=dictToSend, timeout=30)
 
                 LOGGER.debug("Got verify response " +
                              str(res.json()["success"]))
 
                 if not res.json()["success"]:
+
                     return flask.make_response("No valid captcha", 400)
 
             recipients = [dest_email]
@@ -626,8 +658,7 @@ class Phase1Analysis(MethodView):
         LOGGER.debug(f"({threading.get_native_id()})"
                      f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
-        user_id = auth(roles=['Analysis'])
-        user = User.query.filter_by(id=user_id).first()
+        auth(roles=['Analysis'])
 
         args = flask.request.data
         LOGGER.debug("Running phase 1 analysis with params: %s", args)
@@ -636,36 +667,83 @@ class Phase1Analysis(MethodView):
                           'ExclusionZoneAnalysis', 'HeatmapAnalysis']
         if request_type not in valid_requests:
             raise werkzeug.exceptions.BadRequest('Invalid request type')
-        temp_dir = getQueueDirectory(
-            flask.current_app.config['TASK_QUEUE'], request_type)
-        request_file_path = os.path.join(temp_dir, 'analysisRequest.json.gz')
 
-        response_file_path = os.path.join(
-            temp_dir, 'analysisResponse.json.gz')
+        # Decode request body
+        request_str = args.decode('utf-8') if isinstance(args, bytes) else args
 
-        LOGGER.debug("Writing request file: %s", request_file_path)
-        with open(request_file_path, "wb") as fle:
-            fle.write(args)
-        LOGGER.debug("Request file written")
+        # Apply the same input filters as RatAfc.post() so both ingress paths
+        # into afc_worker.run() funnel through identical validation.
+        from .ratafc import drop_unwanted_extensions, \
+            _validate_request_location_geo
+        try:
+            request_json = json.loads(request_str)
+            from afcmodels import afc_server_models
+            try:
+                afc_server_models.Rest_ReqMsg_1_4.model_validate(request_json)
+            except Exception as exc:
+                LOGGER.warning("Pydantic validation failed: %s", exc)
+                raise werkzeug.exceptions.BadRequest(f"Invalid request format: {exc}")
 
-        task = build_task(request_file_path, response_file_path,
-                          request_type, user_id, user, temp_dir)
+            MAX_REQUESTS_PER_MSG = 16
+            _raw_reqs = request_json.get(
+                'availableSpectrumInquiryRequests', []) or []
+            if len(_raw_reqs) > MAX_REQUESTS_PER_MSG:
+                raise werkzeug.exceptions.BadRequest(
+                    f"Too many requests in one message: {len(_raw_reqs)} "
+                    f"(max {MAX_REQUESTS_PER_MSG})")
+            drop_unwanted_extensions(json_dict=request_json, is_input=True,
+                                     is_gui=True, is_internal=False)
+            for _req in request_json.get(
+                    'availableSpectrumInquiryRequests', []) or []:
+                _validate_request_location_geo(_req)
+        except werkzeug.exceptions.HTTPException:
+            raise
+        except Exception as ex:
+            raise werkzeug.exceptions.BadRequest(str(ex))
+        request_str = json.dumps(request_json)
 
-        if task.state == 'FAILURE':
+        # Retrieve AFC config from DB (use first available)
+        config = AFCConfig.query.first()
+        if config is None:
             raise werkzeug.exceptions.InternalServerError(
-                'Task was unable to be started', dict(
-                    id=task.id, info=str(
-                        task.info)))
+                'No AFC configuration found in database')
+        config_str = json.dumps(config.config)
+
+        # Generate unique task ID and request/config hash
+        task_id = str(uuid.uuid4())
+        hash_val = hashlib.md5(
+            (request_str + config_str).encode('utf-8'), usedforsecurity=False).hexdigest()
+        config_path = os.path.join("/afc_config", hash_val, "afc_config.json")
+
+        dataif = DataIf()
+
+        # Write request and config to object storage
+        with dataif.open(
+                os.path.join("/responses", hash_val,
+                             "analysisRequest.json")) as hfile:
+            hfile.write(request_str)
+        with dataif.open(config_path) as hfile:
+            hfile.write(config_str)
+
+        # RNTM_OPT_GUI enables KMZ/progress files; exclude RNTM_OPT_DBG because
+        # history_dir=None causes the worker to crash when debug mode is on
+        runtime_opts = RNTM_OPT_GUI | RNTM_OPT_AFCENGINE_HTTP_IO
+        from flask_login import current_user as _cu
+        owner_id = _cu.id if _cu and _cu.is_authenticated else None
+        build_task(dataif=dataif, request_type=request_type,
+                   task_id=task_id, hash_val=hash_val,
+                   config_path=config_path, history_dir=None,
+                   runtime_opts=runtime_opts, owner_id=owner_id)
 
         include_kml = request_type in [
             'ExclusionZoneAnalysis', 'PointAnalysis']
 
         return flask.jsonify(
-            taskId=task.id,
+            taskId=task_id,
             statusUrl=flask.url_for(
-                'ratapi-v1.AnalysisStatus', task_id=task.id),
+                'ratapi-v1.AnalysisStatus', task_id=task_id),
             kmlUrl=(flask.url_for('ratapi-v1.AnalysisKmlResult',
-                                  task_id=task.id) if include_kml else None)
+                                  task_id=task_id) if include_kml else None)
         )
 
 
@@ -693,26 +771,37 @@ class AnalysisKmlResult(MethodView):
         ''' GET method for KML Result '''
         LOGGER.debug(f"({threading.get_native_id()})"
                      f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
+        from .admin import auth
+        from flask_login import current_user as _cu
+        user_id = auth(roles=['Analysis', 'Admin', 'Super'])
 
-        task = run.AsyncResult(task_id)
-        LOGGER.debug('state: %s', task.state)
+        dataif = DataIf()
+        task = afctask.Task(task_id, dataif)
+        stat = task.get()
 
-        if task.successful() and task.result['status'] == 'DONE':
-            if not os.path.exists(task.result['result_path']):
-                return flask.make_response(flask.json.dumps(
-                    dict(message='Resource already deleted')), 410)
-            if 'kml_path' not in task.result or not os.path.exists(
-                    task.result['kml_path']):
-                return werkzeug.exceptions.NotFound(
-                    'This task did not produce a KML')
-            resp = flask.make_response()
-            LOGGER.debug("Reading kml file: %s", task.result['kml_path'])
-            with self._open(task.result['kml_path'], 'rb') as resp_file:
-                resp.data = resp_file.read()
-            resp.content_type = 'application/octet-stream'
-            return resp
+        # Ownership check: only the submitting user or a Super/Admin may read.
+        task_owner = stat.get('owner_id')
+        if task_owner is None or user_id != task_owner:
+            if not _admin_may_access_task(task_owner, _cu):
+                raise werkzeug.exceptions.Forbidden(
+                    'You do not have access to this task')
 
-        raise werkzeug.exceptions.NotFound('KML not found')
+        if stat['status'] != afctask.Task.STAT_SUCCESS:
+            raise werkzeug.exceptions.NotFound('KML not found')
+
+        try:
+            with dataif.open(
+                    os.path.join("/responses", task_id, "results.kmz")) \
+                    as hfile:
+                kml_data = hfile.read()
+        except Exception:
+            raise werkzeug.exceptions.NotFound(
+                'This task did not produce a KML')
+
+        resp = flask.make_response()
+        resp.data = kml_data
+        resp.content_type = 'application/octet-stream'
+        return resp
 
 
 class AnalysisStatus(MethodView):
@@ -738,117 +827,79 @@ class AnalysisStatus(MethodView):
         ''' GET method for Analysis Status '''
         LOGGER.debug(f"({threading.get_native_id()})"
                      f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
+        from .admin import auth
+        from flask_login import current_user as _cu
+        user_id = auth(roles=['Analysis', 'Admin', 'Super'])
 
-        task = run.AsyncResult(task_id)
+        dataif = DataIf()
+        task = afctask.Task(task_id, dataif)
+        stat = task.get()
+        status = stat['status']
 
-        LOGGER.debug('state: %s', task.state)
+        # Ownership check: only the submitting user or a Super/Admin may read.
+        task_owner = stat.get('owner_id')
+        if task_owner is None or user_id != task_owner:
+            # Verify caller has Admin/Super (auth already checked roles, but
+            # need to distinguish Analysis-only from Admin/Super).
+            if not _admin_may_access_task(task_owner, _cu):
+                raise werkzeug.exceptions.Forbidden(
+                    'You do not have access to this task')
 
-        if task.info and task.info.get('progress_file') is not None and \
-                not os.path.exists(os.path.dirname(task.info['progress_file'])):
-            return flask.make_response(flask.json.dumps(
-                dict(percent=0, message="Try Again")), 503)
+        LOGGER.debug('task status: %s', status)
 
-        if task.state == 'PROGRESS':
-            auth(is_user=task.info['user_id'])
-            # get progress and ETA
-            if not os.path.exists(task.info['progress_file']):
-                return flask.jsonify(
-                    percent=0,
-                    message='Initializing...'
-                ), 202
-            progress_file = task.info['progress_file']
-            with open(progress_file, 'r') as prog:
-                lines = prog.readlines()
-                if len(lines) <= 0:
-                    return flask.make_response(flask.json.dumps(
-                        dict(percent=0, message="Try Again")), 503)
-                LOGGER.debug(lines)
-                return flask.jsonify(
-                    percent=float(lines[0]),
-                    message=lines[1],
-                ), 202
+        if status in (afctask.Task.STAT_PENDING, afctask.Task.STAT_PROGRESS):
+            return flask.jsonify(percent=0, message='In progress...'), 202
 
-        if not task.ready():
-            return flask.make_response(flask.json.dumps(
-                dict(percent=0, message='Pending...')), 202)
+        if status == afctask.Task.STAT_FAILURE:
+            error_data = None
+            try:
+                with dataif.open(
+                        os.path.join("/responses", task_id,
+                                     "engine-error.txt")) as hfile:
+                    error_data = hfile.read().decode("utf-8", errors="replace")
+            except Exception:
+                pass
+            raise AFCEngineException(
+                description=error_data or 'Task execution failed',
+                exit_code=stat.get('exit_code', -1))
 
-        if task.failed():
-            raise werkzeug.exceptions.InternalServerError(
-                'Task execution failed')
-
-        if task.successful() and task.result['status'] == 'DONE':
-            auth(is_user=task.result['user_id'])
-            if not os.path.exists(task.result['result_path']):
-                return flask.make_response(flask.json.dumps(
-                    dict(message='Resource already deleted')), 410)
-            # read temporary file generated by afc-engine
+        if status == afctask.Task.STAT_SUCCESS:
+            hash_val = stat.get('hash')
+            if not hash_val:
+                raise werkzeug.exceptions.InternalServerError(
+                    'No result hash in task status')
             resp = flask.make_response()
-            LOGGER.debug("Reading result file: %s", task.result['result_path'])
-            with self._open(task.result['result_path'], 'rb') as resp_file:
-                resp.data = resp_file.read()
+            with dataif.open(
+                    os.path.join("/responses", hash_val,
+                                 "analysisResponse.json.gz")) as hfile:
+                resp.data = hfile.read()
             resp.content_type = 'application/json'
             resp.content_encoding = "gzip"
             return resp
 
-        elif task.successful() and task.result['status'] == 'ERROR':
-            auth(is_user=task.result['user_id'])
-            if not os.path.exists(task.result['error_path']):
-                return flask.make_response(flask.json.dumps(
-                    dict(message='Resource already deleted')), 410)
-            # read temporary file generated by afc-engine
-            LOGGER.debug("Reading error file: %s", task.result['error_path'])
-            with self._open(task.result['error_path'], 'rb') as error_file:
-                raise AFCEngineException(
-                    description=error_file.read(),
-                    exit_code=task.result['exit_code'])
-
-        else:
-            raise werkzeug.exceptions.NotFound('Task not found')
+        raise werkzeug.exceptions.NotFound('Task not found')
 
     def delete(self, task_id):
         ''' DELETE method for Analysis Status '''
+        from .admin import auth
+        from flask_login import current_user as _cu
+        user_id = auth(roles=['Analysis', 'Admin', 'Super'])
 
-        task = run.AsyncResult(task_id)
+        dataif = DataIf()
+        task = afctask.Task(task_id, dataif)
 
-        if not task.ready():
-            # task is still running, terminate it
-            LOGGER.debug('Terminating %s', task_id)
-            task.revoke(terminate=True)
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
-
-        if task.failed():
+        # Verify ownership before allowing deletion.
+        stat = task.get()
+        task_owner = stat.get('owner_id')
+        if task_owner is None or user_id != task_owner:
+            if not _admin_may_access_task(task_owner, _cu):
+                raise werkzeug.exceptions.Forbidden(
+                    'You do not have access to this task')
+        try:
             task.forget()
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
-
-        if task.successful() and task.result['status'] == 'DONE':
-            auth(is_user=task.result['user_id'])
-            if not os.path.exists(task.info['result_path']):
-                return flask.make_response(flask.json.dumps(
-                    dict(message='Resource already deleted')), 410)
-            LOGGER.debug('Deleting %s', task.info.get('result_path'))
-            os.remove(task.info['result_path'])
-            if 'kml_path' in task.info and os.path.exists(
-                    task.info['kml_path']):
-                os.remove(task.info['kml_path'])
-            task.forget()
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
-
-        elif task.successful() and task.result['status'] == 'ERROR':
-            auth(is_user=task.result['user_id'])
-            if not os.path.exists(task.info['error_path']):
-                return flask.make_response(flask.json.dumps(
-                    dict(message='Resource already deleted')), 410)
-            LOGGER.debug('Deleting %s', task.info.get('result_path'))
-            os.remove(task.info['error_path'])
-            task.forget()
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
-
-        else:
-            raise werkzeug.exceptions.NotFound('Task not found')
+        except Exception:
+            pass
+        return flask.jsonify(message='Task deleted'), 200
 
 
 class UlsDb(MethodView):
@@ -898,7 +949,7 @@ class UlsParse(MethodView):
         ''' GET method for last successful runtime of uls parse
         '''
         LOGGER.debug('getting last successful runtime of uls parse')
-        user_id = auth(roles=['Admin'])
+        auth(roles=['Admin'])
 
         try:
             datapath = flask.current_app.config["STATE_ROOT_PATH"] + \
@@ -986,6 +1037,7 @@ class DailyULSStatus(MethodView):
 
     def get(self, task_id):
         ''' GET method for uls parse Status '''
+        auth(roles=['Super'])
         LOGGER.debug("Getting ULS Parse status with task id: " + task_id)
         task = parseULS.AsyncResult(task_id)
         # LOGGER.debug('state: %s', task.state)
@@ -998,8 +1050,7 @@ class DailyULSStatus(MethodView):
             ), 202
         if not task.ready():
             LOGGER.debug("Found Task pending")
-            return flask.make_response(flask.json.dumps(
-                dict(percent=0, message='Pending...')), 202)
+            return flask.jsonify(percent=0, message='Pending...'), 202
         if task.state == 'REVOKED':
             LOGGER.debug("Found task already in progress")
             # LOGGER.debug("task info %s", task.info)
@@ -1026,30 +1077,27 @@ class DailyULSStatus(MethodView):
     def delete(self, task_id):
         ''' DELETE method for ULS Status '''
 
+        auth(roles=['Super'])
         task = parseULS.AsyncResult(task_id)
 
         if not task.ready():
             # task is still running, terminate it
             LOGGER.debug('Terminating %s', task_id)
             task.revoke(terminate=True)
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
+            return flask.jsonify(message='Task deleted'), 200
         if task.failed():
             task.forget()
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
+            return flask.jsonify(message='Task deleted'), 200
 
         if task.successful() and task.result['status'] == 'DONE':
             auth(is_user=task.result['user_id'])
             task.forget()
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
+            return flask.jsonify(message='Task deleted'), 200
 
         elif task.successful() and task.result['status'] == 'ERROR':
             auth(is_user=task.result['user_id'])
             task.forget()
-            return flask.make_response(flask.json.dumps(
-                dict(message='Task deleted')), 200)
+            return flask.jsonify(message='Task deleted'), 200
 
         else:
             raise werkzeug.exceptions.NotFound('Task not found')
@@ -1070,7 +1118,7 @@ class BackendFiles():
             'content-type': 'application/x-www-form-urlencoded',
             'user-agent': 'rat_server/1.0'
         }
-        resp = requests.get(url, headers)
+        resp = requests.get(url, headers, timeout=30)
         response = flask.make_response()
         response.content_type = 'text/html'
         response.data = resp.content
@@ -1084,7 +1132,7 @@ class UlsFiles(MethodView):
     def get(self):
         ''' GET method for uls
         '''
-        user_id = auth(roles=['AP', 'Analysis', 'Admin'])
+        auth(roles=['AP', 'Analysis', 'Admin'])
         url = "http://localhost/" + flask.url_for('files.uls_db')
         be = BackendFiles()
         return be.get(url)
@@ -1097,7 +1145,7 @@ class AntennaFiles(MethodView):
     def get(self):
         ''' GET method for uls
         '''
-        user_id = auth(roles=['AP', 'Analysis', 'Admin'])
+        auth(roles=['AP', 'Analysis', 'Admin'])
         url = "http://localhost/" + flask.url_for('files.antenna_pattern')
         be = BackendFiles()
         return be.get(url)
@@ -1118,10 +1166,25 @@ class AfcRulesetIds(MethodView):
         return resp
 
 
+def _load_objst_api_key():
+    """ Return the objst/hist bearer token from AFC_OBJST_API_KEY_FILE. """
+    key_file = os.environ.get("AFC_OBJST_API_KEY_FILE")
+    if key_file and os.path.isfile(key_file):
+        with open(key_file) as f:
+            return f.read().strip() or None
+    return None
+
+
 class History(MethodView):
     def get(self, path=None):
         LOGGER.debug(f"History::get({path})")
-        auth(roles=['Analysis', 'Trial', 'Admin'])
+        try:
+            auth(roles=['Super'])
+        except Exception as auth_exc:
+            LOGGER.error(
+                f"History auth failed: {type(auth_exc).__name__}: {auth_exc}\n"
+                f"{traceback.format_exc()}")
+            raise
         conf = appcfg.ObjstConfig()
         fwd_proto = \
             flask.request.headers.get('X-Forwarded-Proto') or \
@@ -1131,25 +1194,48 @@ class History(MethodView):
             if path is not None:
                 path_len = len(path)
                 rurl = flask.request.base_url[:-path_len]
+            # Authenticate to the history service with the objst bearer token.
+            # hist_app rejects unauthenticated requests.
+            # Pass Host so the hist service same-origin check compares against
+            # the external hostname, not the internal container address.
+            hist_headers = {
+                'X-Forwarded-Proto': fwd_proto,
+                'Host': flask.request.host,
+            }
+            objst_key = _load_objst_api_key()
+            if objst_key:
+                hist_headers['Authorization'] = f'Bearer {objst_key}'
+            objst_url = urllib.parse.urlunparse(
+                (conf.AFC_OBJST_SCHEME,
+                 f'{conf.AFC_OBJST_HOST}:{conf.AFC_OBJST_HIST_PORT}',
+                 f'/{path or ""}', '', '', ''))
+            LOGGER.debug(
+                f"History proxying to {objst_url}?url={rurl}")
             response = requests.request(
                 method=flask.request.method,
-                url=urllib.parse.urlunparse(
-                    (conf.AFC_OBJST_SCHEME,
-                     f'{conf.AFC_OBJST_HOST}:{conf.AFC_OBJST_HIST_PORT}',
-                     f'/{path or ""}', '', '', '')),
+                url=objst_url,
                 params={'url': rurl},
-                headers={'X-Forwarded-Proto': fwd_proto}, stream=True,
-                allow_redirects=False)
-            if response.headers['Content-Type'].startswith("application/octet-stream") \
+                headers=hist_headers, stream=True,
+                allow_redirects=False,
+                timeout=(10, 60))
+            LOGGER.debug(
+                f"History objst response: {response.status_code} "
+                f"content-type={response.headers.get('Content-Type')}")
+            if response.headers.get('Content-Type', '').startswith("application/octet-stream") \
                     and "Content-Encoding" not in response.headers:
                 # results.kmz case. Apache can't decompress it.
-                resp = flask.make_response()
-                resp.data = response.raw.read()
+                # Content-Type guard above ensures this is only reached for
+                # application/octet-stream binary data, not HTML.
+                resp = flask.make_response(
+                    response.raw.read(), response.status_code)
                 return resp
             else:
-                return flask.render_template_string(response.text)
+                return flask.Response(response.content, status=response.status_code,
+                                      content_type=response.headers.get('Content-Type'))
         except Exception as exc:
-            LOGGER.error(f"Unreachable history host. {exc}")
+            LOGGER.error(
+                f"History request failed: {type(exc).__name__}: {exc}\n"
+                f"{traceback.format_exc()}")
             return f"Unreachable history host. {exc}"
 
 
@@ -1157,6 +1243,7 @@ class History0(History):
     pass
 
 
+@public_route
 class GetRuleset(MethodView):
     """ Get all active rulesets """
 
@@ -1170,6 +1257,7 @@ class GetRuleset(MethodView):
                         config.config['regionStr'],
                         exc=werkzeug.exceptions.NotFound))
         except BaseException:
+
             return flask.make_response('DB error', 404)
         resp = flask.make_response()
         resp.data = "{ \n\t\"rulesetId\": [" + ", ".join(
@@ -1178,10 +1266,13 @@ class GetRuleset(MethodView):
         return resp
 
 
+@public_route
 class GetAfcConfigByRuleset(MethodView):
     """ Get afc_config by rulesets """
 
     def get(self, ruleset):
+        # Ungated: returns non-sensitive regulatory config; rcache-service
+        # calls this without a session (sibling GetRulesetIDs is also ungated).
         regionStr = \
             RulesetVsRegion.ruleset_to_region(ruleset,
                                               exc=werkzeug.exceptions.NotFound)
@@ -1189,8 +1280,10 @@ class GetAfcConfigByRuleset(MethodView):
             config = AFCConfig.query.filter(
                 AFCConfig.config['regionStr'].astext == regionStr).first()
         except BaseException:
+
             return flask.make_response('DB error', 404)
         if config is None:
+
             return flask.make_response("Ruleset unactive", 404)
         resp = flask.make_response()
         resp.data = json.dumps(config.config, sort_keys=True, indent=4) + "\n"

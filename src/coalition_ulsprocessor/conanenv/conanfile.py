@@ -2,15 +2,11 @@
 # When 'install'ed this conanfile produces a 'cpodeps-runtime.zip' file in
 # the current directory
 
-import contextlib
 import os.path
 import shutil
 import subprocess
-import tempfile
 import zipfile
-from conans import ConanFile, CMake
-from conans.errors import ConanException
-from conans.client import tools
+from conans import ConanFile
 
 
 def path_append(paths, suffix):

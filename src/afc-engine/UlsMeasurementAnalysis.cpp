@@ -475,7 +475,7 @@ double *computeElevationVector(const TerrainClass *terrain,
 		if (numpts < 3) {
 			*cdsmFracPtr = 0.0;
 		} else {
-			*cdsmFracPtr = cdsmCount / (numpts - 2);
+			*cdsmFracPtr = static_cast<double>(cdsmCount) / (numpts - 2);
 		}
 	}
 
@@ -640,6 +640,13 @@ bool isLOS(const TerrainClass *terrain,
 							   numpts,
 							   cdsmFracPtr);
 	}
+
+	// The profile may be cached from an earlier call that computed it with a
+	// different point count (the caller recomputes numpts per path). Bind the
+	// index bounds to the buffer's self-describing header (ret[0] = numpts - 1,
+	// see computeElevationVector), as point_to_point does, so a larger
+	// recomputed numpts cannot index past the allocation.
+	numpts = (int)((*heightProfilePtr)[0]) + 1;
 
 	double txHeightAMSL = (*heightProfilePtr)[2] + transHt;
 	double rxHeightAMSL = (*heightProfilePtr)[2 + numpts - 1] + receiveHt;

@@ -1,0 +1,33 @@
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+# Plugin versions are pinned at image build time (see Dockerfile-grafana wget URLs).
+# This file provisions Grafana so the plugins stay enabled for org 1.
+# When bumping a plugin, update both this comment and the Dockerfile URLs together.
+#
+#   yesoreyeram-infinity-datasource  3.10.1
+#   grafana-lokiexplore-app          1.0.39
+#   grafana-metricsdrilldown-app     2.2.0  (Grafana 12.4.2 background installer version;
+#       must have plugin files on disk at startup for provisioning to succeed — see
+#       Dockerfile-grafana for the wget download).
+#   grafana-exploretraces-app        bundled with Grafana 12.x.  Not provisioned here
+#       (no Tempo in this stack) so the Traces menu is hidden, but the plugin remains
+#       loaded — disabling it entirely via disable_plugins breaks the whole Drilldown
+#       navigation group.  Tempo probe errors are benign; see build_test.md noise table.
+---
+apiVersion: 1
+
+apps:
+  - type: yesoreyeram-infinity-datasource
+    org_id: 1
+    disabled: false
+
+  - type: grafana-lokiexplore-app
+    org_id: 1
+    disabled: false
+
+  - type: grafana-metricsdrilldown-app
+    org_id: 1
+    disabled: false

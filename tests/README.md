@@ -4,6 +4,10 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 <br />
 
 ## Table of Contents
+- [**Deployment Validation**](#deployment-validation)
+  - [Quick validation (cache-served, ~45 seconds)](#quick-validation-cache-served-~45-seconds)
+  - [Full engine validation (~30 minutes)](#full-engine-validation-~30-minutes)
+  - [WebUI mode validation](#webui-mode-validation)
 - [**Introduction**](#introduction)
 - [**Description**](#description)
 - [**Basic functionality**](#basic-functionality)
@@ -25,6 +29,79 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [How to run HTTPs access test](#how-to-run-https-access-test)
 - [**Testing setup**](#testing-setup)
 - [**Change testing database manually**](#change-testing-database-manually)
+
+---
+
+# **Deployment Validation**
+
+After starting the OpenAFC stack, run the 193-test regression suite to confirm
+the deployment is correct end-to-end. There are two modes:
+
+| Mode | When to use | Duration |
+|---|---|---|
+| Quick (cache-served) | First-pass connectivity check; fast and safe to run repeatedly | ~45 seconds |
+| Full (engine computation) | Before going live; confirms databases are correctly mounted and the AFC engine produces expected results | ~30 minutes |
+
+For the full step-by-step guide, see [DEPLOYMENT.md — Step 9](../DEPLOYMENT.md#9-validate-the-deployment).
+
+## Quick validation (cache-served, ~45 seconds)
+
+Sends all 193 test vectors through the full network path (Nginx → rat_server →
+afcserver → rcache). Responses are served from the response cache after the
+first run.
+
+```bash
+cd tests
+python3 afc_tests.py \
+    --cmd run --addr localhost --port 5443 --prot https \
+    --outfile /tmp/afc_results.csv
+```
+
+All 193 tests should report `status Ok`.
+
+## Full engine validation (~30 minutes)
+
+Clears the response cache first; the rcache background precomputer then
+re-runs all requests through the full AFC engine in parallel. Use this mode to
+confirm that the static databases (terrain, ULS, ITU) are correctly mounted and
+the engine produces the expected authorised frequencies.
+
+```bash
+# Step 1: clear the cache — triggers engine recomputation in the background
+../scripts/clear_rcache.sh
+
+# Step 2: run all 193 tests
+python3 afc_tests.py \
+    --cmd run --addr localhost --port 5443 --prot https \
+    --outfile /tmp/afc_results_full.csv
+```
+
+All 193 tests should report `status Ok`.  Total runtime is 1–2 minutes
+(parallel engine computation).  A second run without clearing the cache
+finishes in ~45 seconds (cache-served).
+
+All 193 tests should report `status Ok`.
+
+## WebUI mode validation
+
+Validates the WebUI request path through `rat_server`. A session cookie from
+an authenticated Super-role user is required.
+
+**Get the session cookie from the browser:**
+
+1. Log in to the WebUI as a Super-role user.
+2. Open browser DevTools → **Application** → **Cookies** → select the site.
+3. Copy the value of the `session` cookie.
+
+```bash
+SESSION=<paste session cookie value here>
+python3 afc_tests.py \
+    --cmd run --addr localhost --port 5443 --prot https \
+    --webui --session_cookie "$SESSION" \
+    --outfile /tmp/afc_webui_results.csv
+```
+
+---
 
 # **Introduction**
 

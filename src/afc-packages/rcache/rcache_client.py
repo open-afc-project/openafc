@@ -78,7 +78,7 @@ class RcacheClient:
             assert "rcache_db" in sys.modules
             self._rcache_db = \
                 RcacheDb(
-                    rcache_db_dsn=client_settings.postgres_dsn,
+                    rcache_db_dsn=str(client_settings.postgres_dsn),
                     rcache_db_password_file=client_settings.
                     postgres_password_file)
 
@@ -88,14 +88,17 @@ class RcacheClient:
             assert "rcache_rmq" in sys.modules
             error_if(rmq_receiver is None,
                      "'rmq_receiver' parameter should be specified")
-            self._rcache_rmq = RcacheRmq(client_settings.rmq_dsn)
+            self._rcache_rmq = RcacheRmq(
+                str(client_settings.rmq_dsn),
+                password_file=getattr(client_settings, 'rmq_password_file',
+                                      None))
             self._rmq_receiver = rmq_receiver
 
         self._rcache_rcache: Optional["RcacheRcache"] = None
         if client_settings.enabled and \
                 (client_settings.service_url is not None):
             assert "rcache_rcache" in sys.modules
-            self._rcache_rcache = RcacheRcache(client_settings.service_url)
+            self._rcache_rcache = RcacheRcache(str(client_settings.service_url), client_settings.api_key_file)
         self._afc_state_vendor_extensions: Set[str] = \
             set(client_settings.afc_state_vendor_extensions or [])
 
@@ -115,7 +118,8 @@ class RcacheClient:
                 return_invalidated=bool(self._afc_state_vendor_extensions))
 
     def rmq_send_response(self, queue_name: str, req_cfg_digest: str,
-                          request: str, response: Optional[str]) \
+                          request: str, response: Optional[str],
+                          update_cache: bool = True) \
             -> None:
         """ Send AFC response to RabbitMQ
 
@@ -124,13 +128,17 @@ class RcacheClient:
         req_cfg_digest -- Request/Config digest (request identifiers)
         request        -- Request as string
         response       -- Response as string. None on failure
+        update_cache   -- True to store result in rcache DB (default), False
+                          to only deliver the response to the caller without
+                          caching (used for nocache requests to prevent stale
+                          results from contaminating the cache)
         """
         assert self._rcache_rmq is not None
         with self._rcache_rmq.create_connection(tx_queue_name=queue_name) \
                 as rmq_conn:
             rmq_conn.send_response(req_cfg_digest=req_cfg_digest,
                                    response=response)
-        if response:
+        if response and update_cache:
             assert self._rcache_rcache is not None
             try:
                 self._rcache_rcache.update_cache(

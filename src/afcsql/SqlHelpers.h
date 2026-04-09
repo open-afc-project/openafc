@@ -3,7 +3,7 @@
 #ifndef SQL_HELPERS_H
 #define SQL_HELPERS_H
 
-//#include "cposql_export.h"
+// #include "cposql_export.h"
 #include "ratcommon/EnvironmentFlag.h"
 #include <QSqlDriver>
 #include <QSqlQuery>

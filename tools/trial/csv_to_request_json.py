@@ -2,6 +2,7 @@ import sys
 import csv
 import json
 import os.path
+import re
 from enum import Enum
 
 version = '1.4'
@@ -47,7 +48,11 @@ def return_int_or_float(str):
     if str.isdigit():
         num = int(str)
     else:
-        num = float(str)
+        try:
+            num = float(str)
+        except ValueError:
+            raise ValueError(
+                'Bad numeric value in trial submission: {!r}'.format(str))
     return num
 
 
@@ -62,6 +67,9 @@ def get_outerboundary_list(str):
     for i in ob_split:
         i = i.strip("()\n\t")
         entry = i.split(",")
+        if len(entry) != 2:
+            raise ValueError(
+                'Bad polygon vertex in trial submission: {!r}'.format(i))
         ob_list.append([entry[0], entry[1]])
         # print(i)
     # print(ob_list)
@@ -196,15 +204,26 @@ def csv_to_json(csv_file_path, cert_id):
         csv_reader = csv.DictReader(csv_file_handler)
         i = 2
         for rows in csv_reader:
+            if not re.match(r'^[A-Za-z0-9_-]{1,64}$', rows['Unique request ID']):
+                print('Skipping row {}: invalid Unique request ID'.format(i))
+                i = i + 1
+                continue
             file_index = f'UID_' + rows['Unique request ID'] + f'_R{i}'
             i = i + 1
-            req_json = generate_request_json(rows, file_index, cert_id)
+            # A single malformed public-form row (bad numeric field, malformed
+            # polygon vertex, etc.) must not abort the whole batch and block
+            # every subsequent requester: log and skip just this row.
+            try:
+                req_json = generate_request_json(rows, file_index, cert_id)
 
-            json_file_path = '{}/{}.json'.format(dir, file_index)
-            with open(json_file_path, 'w', encoding='utf-8') as json_file_handler:
-                json_file_handler.write(json.dumps(req_json, indent=4))
-                print('Converted row {} to {}'.format(
-                    file_index, json_file_path))
+                json_file_path = '{}/{}.json'.format(dir, file_index)
+                with open(json_file_path, 'w', encoding='utf-8') as json_file_handler:
+                    json_file_handler.write(json.dumps(req_json, indent=4))
+                    print('Converted row {} to {}'.format(
+                        file_index, json_file_path))
+            except Exception as exc:
+                print('Skipping row {}: {}'.format(file_index, exc))
+                continue
 
     print('Finished converting the CSV file to request JSON')
 

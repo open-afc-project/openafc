@@ -6,31 +6,28 @@
  * of which is included with this software program.
  */
 
-import * as React from 'react';
+import React from 'react';
 import {
   Card,
-  CardHead,
-  CardHeader,
   CardBody,
   PageSection,
   FormGroup,
   TextInput,
   Title,
-  ActionGroup,
   Button,
   Alert,
   AlertActionCloseButton,
-  InputGroupText,
   InputGroup,
+  InputGroupItem,
   Checkbox,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
 } from '@patternfly/react-core';
 import { error, success } from '../Lib/RatApiTypes';
 import { getUser, updateUser } from '../Lib/Admin';
 import { logger } from '../Lib/Logger';
 import { UserContext, UserState, isAdmin, isEditCredential } from '../Lib/User';
-
-// UserAccount.tsx: Page where user properties can be modified
-// author: Sam Smucny
 
 interface UserAccountProps {
   userId: number;
@@ -101,6 +98,9 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
     return p === this.state.password;
   };
 
+  /** Show Update when local credentials are editable or Admin may change Active. */
+  private canSubmitProfile = () => this.state.editCredential || isAdmin();
+
   private updateUser = () => {
     if (this.state.editCredential) {
       if (!this.validEmail(this.state.email)) {
@@ -127,6 +127,7 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
       email: this.state.email!,
       active: this.state.active,
       password: this.state.password!,
+      // @ts-ignore
       editCredential: this.state.editCredential,
     }).then((res) => {
       if (res.kind === 'Success') {
@@ -150,7 +151,7 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
               <Alert
                 variant={this.state.messageType}
                 title={this.state.messageValue || ''}
-                action={<AlertActionCloseButton onClose={() => this.setState({ messageType: undefined })} />}
+                actionClose={<AlertActionCloseButton onClose={() => this.setState({ messageType: undefined })} />}
               />
               <br />
             </>
@@ -158,34 +159,54 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
           {this.state.editCredential ? (
             <FormGroup label="Email" fieldId="form-email">
               <InputGroup>
-                <TextInput
-                  value={this.state.email}
-                  onChange={(x) => this.setState({ email: x })}
-                  type="email"
-                  id="form-email"
-                  name="form-email"
-                  isValid={this.validEmail(this.state.email)}
-                />
+                <InputGroupItem isFill>
+                  <TextInput
+                    value={this.state.email}
+                    onChange={(_event, x) => this.setState({ email: x })}
+                    type="email"
+                    id="form-email"
+                    name="form-email"
+                    validated={this.validEmail(this.state.email) ? 'default' : 'error'}
+                  />
+                </InputGroupItem>
               </InputGroup>
             </FormGroup>
           ) : (
             <FormGroup label="Email" fieldId="form-email">
               <InputGroup>
-                <TextInput isReadOnly value={this.state.email} type="email" id="form-email" name="form-email" />
+                <InputGroupItem isFill>
+                  <TextInput
+                    isDisabled
+                    value={this.state.email ?? ''}
+                    type="email"
+                    id="form-email"
+                    name="form-email"
+                    aria-label="Email (managed by identity provider)"
+                  />
+                </InputGroupItem>
               </InputGroup>
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>
+                    This account uses an external identity provider. Email cannot be changed here.
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
           )}
           {this.state.editCredential && (
             <FormGroup label="Password" fieldId="form-pass">
               <InputGroup>
-                <TextInput
-                  value={this.state.password}
-                  onChange={(x) => this.setState({ password: x })}
-                  type="password"
-                  id="form-pass"
-                  name="form-pass"
-                  isValid={this.validPass(this.state.password)}
-                />
+                <InputGroupItem isFill>
+                  <TextInput
+                    value={this.state.password}
+                    onChange={(_event, x) => this.setState({ password: x })}
+                    type="password"
+                    id="form-pass"
+                    name="form-pass"
+                    validated={this.validPass(this.state.password) ? 'default' : 'error'}
+                  />
+                </InputGroupItem>
               </InputGroup>
             </FormGroup>
           )}
@@ -193,14 +214,16 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
           {this.state.editCredential && (
             <FormGroup label="Confirm Password" fieldId="form-pass-c">
               <InputGroup>
-                <TextInput
-                  value={this.state.passwordConf}
-                  onChange={(x) => this.setState({ passwordConf: x })}
-                  type="password"
-                  id="form-pass-c"
-                  name="form-pass-c"
-                  isValid={this.validPassConf(this.state.passwordConf)}
-                />
+                <InputGroupItem isFill>
+                  <TextInput
+                    value={this.state.passwordConf}
+                    onChange={(_event, x) => this.setState({ passwordConf: x })}
+                    type="password"
+                    id="form-pass-c"
+                    name="form-pass-c"
+                    validated={this.validPassConf(this.state.passwordConf) ? 'default' : 'error'}
+                  />
+                </InputGroupItem>
               </InputGroup>
             </FormGroup>
           )}
@@ -216,28 +239,27 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
                     id="user-active-check"
                     name="user-active-check"
                     isChecked={this.state.active}
-                    onChange={(c: boolean) => this.setState({ active: c })}
+                    onChange={(_event, c: boolean) => this.setState({ active: c })}
                   />
                   <br />
                 </>
               )
             }
           </UserContext.Consumer>
-          <Button key="submit" variant="primary" onClick={() => this.updateUser()}>
-            Update
-          </Button>
+          {this.canSubmitProfile() && (
+            <Button key="submit" variant="primary" onClick={() => this.updateUser()}>
+              Update
+            </Button>
+          )}
         </CardBody>
       </Card>
     );
   };
 }
 
-/**
- * wrapper for ap list when it is not embedded in another page
- */
 export const UserAccountPage = () => (
   <PageSection id="ap-list-page">
-    <Title size="3xl">Edit User</Title>
+    <Title headingLevel="h1">Edit User</Title>
     <UserContext.Consumer>
       {(u: UserState) => u.data.loggedIn && <UserAccount userId={u.data.userId} />}
     </UserContext.Consumer>

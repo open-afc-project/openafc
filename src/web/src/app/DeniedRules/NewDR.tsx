@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   AccessPointModel,
   DeniedRegion,
@@ -12,6 +12,9 @@ import {
   Gallery,
   GalleryItem,
   FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
   TextInput,
   Button,
   Alert,
@@ -24,6 +27,7 @@ import { PlusCircleIcon } from '@patternfly/react-icons';
 import { UserModel } from '../Lib/RatApiTypes';
 import { hasRole } from '../Lib/User';
 import { BlankDeniedRegion } from '../Lib/Admin';
+// @ts-ignore
 import { number } from 'prop-types';
 
 /**
@@ -75,7 +79,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
   constructor(props: NewDRProps) {
     super(props);
     if (props.drToEdit !== undefined) {
-      let preState: NewDRState = {
+      const preState: NewDRState = {
         isEdit: true,
         prevName: props.drToEdit.name,
         prevZoneType: props.drToEdit.zoneType,
@@ -88,20 +92,20 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
       };
       switch (props.drToEdit.zoneType) {
         case 'Circle':
-          let circ = props.drToEdit.exclusionZone as ExclusionCircle;
+          const circ = props.drToEdit.exclusionZone as ExclusionCircle;
           preState.circleLat = circ.latitude;
           preState.circleLong = circ.longitude;
           preState.radiusHeight = circ.radiusKm;
           break;
         case 'One Rectangle':
-          let rect = props.drToEdit.exclusionZone as ExclusionRect;
+          const rect = props.drToEdit.exclusionZone as ExclusionRect;
           preState.rect1topLat = rect.topLat;
           preState.rect1leftLong = rect.leftLong;
           preState.rect1bottomLat = rect.bottomLat;
           preState.rect1rightLong = rect.rightLong;
           break;
         case 'Two Rectangles':
-          let rect2 = props.drToEdit.exclusionZone as ExclusionTwoRect;
+          const rect2 = props.drToEdit.exclusionZone as ExclusionTwoRect;
           preState.rect1topLat = rect2.rectangleOne.topLat;
           preState.rect1leftLong = rect2.rectangleOne.leftLong;
           preState.rect1bottomLat = rect2.rectangleOne.bottomLat;
@@ -112,7 +116,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
           preState.rect2rightLong = rect2.rectangleTwo.rightLong;
           break;
         case 'Horizon Distance':
-          let horz = props.drToEdit.exclusionZone as ExclusionHorizon;
+          const horz = props.drToEdit.exclusionZone as ExclusionHorizon;
           preState.circleLat = horz.latitude;
           preState.circleLong = horz.longitude;
           preState.radiusHeight = horz.aglHeightM;
@@ -151,7 +155,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
     let ez;
     switch (this.state.zoneType) {
       case 'Circle':
-        let rc: ExclusionCircle = {
+        const rc: ExclusionCircle = {
           latitude: this.state.circleLat!,
           longitude: this.state.circleLong!,
           radiusKm: this.state.radiusHeight!,
@@ -159,7 +163,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
         ez = rc;
         break;
       case 'One Rectangle':
-        let er: ExclusionRect = {
+        const er: ExclusionRect = {
           topLat: this.state.rect1topLat!,
           leftLong: this.state.rect1leftLong!,
           bottomLat: this.state.rect1bottomLat!,
@@ -168,7 +172,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
         ez = er;
         break;
       case 'Two Rectangles':
-        let er2: ExclusionTwoRect = {
+        const er2: ExclusionTwoRect = {
           rectangleOne: {
             topLat: this.state.rect1topLat!,
             leftLong: this.state.rect1leftLong!,
@@ -185,7 +189,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
         ez = er2;
         break;
       case 'Horizon Distance':
-        let eh: ExclusionHorizon = {
+        const eh: ExclusionHorizon = {
           latitude: this.state.circleLat!,
           longitude: this.state.circleLong!,
           aglHeightM: this.state.radiusHeight!,
@@ -196,12 +200,13 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
         break;
     }
 
-    let dr: DeniedRegion = {
+    const dr: DeniedRegion = {
       regionStr: this.state.regionStr!,
       name: this.state.name!,
       endFreq: this.state.endFreq!,
       startFreq: this.state.startFreq!,
       zoneType: this.state.zoneType!,
+      // @ts-ignore
       exclusionZone: ez,
     };
 
@@ -209,7 +214,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
   }
 
   private submit() {
-    let newDr = this.stateToDeniedRegion();
+    const newDr = this.stateToDeniedRegion();
     if (this.state.isEdit) {
       this.props.onCloseEdit(newDr, this.state.prevName, this.state.prevZoneType);
     } else {
@@ -236,6 +241,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
 
   private setZoneType(n: string) {
     if (n != this.state.zoneType && zoneTypes.includes(n)) {
+      // @ts-ignore
       this.setState({ zoneType: n, needsSave: true });
     }
   }
@@ -309,7 +315,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
     return (
       <>
         <br />
-        <Gallery gutter="sm">
+        <Gallery hasGutter>
           <GalleryItem>
             <FormGroup label="Location Name" isRequired={true} fieldId="location-name-form">
               <TextInput
@@ -318,8 +324,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                 name="location-name-form"
                 aria-describedby="location-name-form-helper"
                 value={this.state.name}
-                onChange={(x) => this.setName(x)}
-                isValid={!!this.state.name && this.state.name.length > 0}
+                onChange={(_event, x) => this.setName(x)}
+                validated={!!this.state.name && this.state.name.length > 0 ? 'default' : 'error'}
               />
             </FormGroup>
           </GalleryItem>
@@ -331,29 +337,41 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                 name="start-freq-form"
                 aria-describedby="start-freq-form-helper"
                 value={this.state.startFreq}
-                onChange={(x) => this.setStartFreq(Number(x))}
-                isValid={!!this.state.startFreq && this.state.startFreq > 0}
+                onChange={(_event, x) => this.setStartFreq(Number(x))}
+                validated={!!this.state.startFreq && this.state.startFreq > 0 ? 'default' : 'error'}
               />
             </FormGroup>
           </GalleryItem>
           <GalleryItem>
-            <FormGroup
-              label="End Frequency (MHz)"
-              isRequired={true}
-              fieldId="end-freq-form"
-              helperTextInvalid="End frequency must be provided and be larger than Start Frequency"
-            >
+            <FormGroup label="End Frequency (MHz)" isRequired={true} fieldId="end-freq-form">
               <TextInput
                 type="number"
                 id="end-freq-form"
                 name="end-freq-form"
                 aria-describedby="end-freq-form-helper"
                 value={this.state.endFreq}
-                onChange={(x) => this.setEndFreq(Number(x))}
-                isValid={
+                onChange={(_event, x) => this.setEndFreq(Number(x))}
+                validated={
                   !!this.state.endFreq && this.state.endFreq > 0 && (this.state.startFreq ?? 0) <= this.state.endFreq
+                    ? 'default'
+                    : 'error'
                 }
               />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem
+                    variant={
+                      !!this.state.endFreq &&
+                      this.state.endFreq > 0 &&
+                      (this.state.startFreq ?? 0) <= this.state.endFreq
+                        ? 'default'
+                        : 'error'
+                    }
+                  >
+                    End frequency must be provided and be larger than Start Frequency
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
           </GalleryItem>
 
@@ -365,8 +383,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                 name="zone-type-form"
                 aria-describedby="zone-type-form-helper"
                 value={this.state.zoneType}
-                onChange={(x) => this.setZoneType(x)}
-                isValid={!!this.state.zoneType}
+                onChange={(_event, x) => this.setZoneType(x)}
+                validated={!!this.state.zoneType ? 'default' : 'error'}
               >
                 <FormSelectOption label="Circle" key="Circle" value="Circle" />
                 <FormSelectOption label="One Rectangle" key="One Rectangle" value="One Rectangle" />
@@ -378,7 +396,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
 
           {this.state.zoneType == 'Circle' && (
             <>
-              <FormGroup fieldId="circle-group">
+              <FormGroup>
                 <GalleryItem>
                   <FormGroup label="Circle Center Latitude" isRequired={true} fieldId="circ-lat-form">
                     <TextInput
@@ -387,8 +405,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-lat-form"
                       aria-describedby="circ-lat-form-helper"
                       value={this.state.circleLat}
-                      onChange={(x) => this.setCircleLat(Number(x))}
-                      isValid={this.state.circleLat !== undefined}
+                      onChange={(_event, x) => this.setCircleLat(Number(x))}
+                      validated={this.state.circleLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -400,8 +418,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-long-form"
                       aria-describedby="circ-long-form-helper"
                       value={this.state.circleLong}
-                      onChange={(x) => this.setCircleLong(Number(x))}
-                      isValid={this.state.circleLong !== undefined}
+                      onChange={(_event, x) => this.setCircleLong(Number(x))}
+                      validated={this.state.circleLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -413,8 +431,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-radius-form"
                       aria-describedby="circ-radius-form-helper"
                       value={this.state.radiusHeight}
-                      onChange={(x) => this.setCircleRadius(Number(x))}
-                      isValid={this.state.radiusHeight !== undefined}
+                      onChange={(_event, x) => this.setCircleRadius(Number(x))}
+                      validated={this.state.radiusHeight !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -423,7 +441,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
           )}
           {this.state.zoneType == 'One Rectangle' && (
             <>
-              <FormGroup fieldId="one-rect-group">
+              <FormGroup>
                 <GalleryItem>
                   <FormGroup label="Top Latitude" isRequired={true} fieldId="rect-toplat-form">
                     <TextInput
@@ -432,8 +450,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-toplat-form"
                       aria-describedby="rect-toplat-form-helper"
                       value={this.state.rect1topLat}
-                      onChange={(x) => this.setRectTopLat(Number(x), 1)}
-                      isValid={this.state.circleLat !== undefined}
+                      onChange={(_event, x) => this.setRectTopLat(Number(x), 1)}
+                      validated={this.state.circleLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -445,8 +463,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-toplong-form"
                       aria-describedby="rect-toplong-form-helper"
                       value={this.state.rect1leftLong}
-                      onChange={(x) => this.setRectLeftLong(Number(x), 1)}
-                      isValid={this.state.rect1leftLong !== undefined}
+                      onChange={(_event, x) => this.setRectLeftLong(Number(x), 1)}
+                      validated={this.state.rect1leftLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -458,8 +476,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-botlat-form"
                       aria-describedby="rect-botlat-form-helper"
                       value={this.state.rect1bottomLat}
-                      onChange={(x) => this.setRectBottomLat(Number(x), 1)}
-                      isValid={this.state.rect1bottomLat !== undefined}
+                      onChange={(_event, x) => this.setRectBottomLat(Number(x), 1)}
+                      validated={this.state.rect1bottomLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -468,11 +486,11 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                     <TextInput
                       type="number"
                       id="rect-rgtlon-form"
-                      name="rect-rgtlon-formm"
+                      name="rect-rgtlon-form"
                       aria-describedby="rect-rgtlon-form-helper"
                       value={this.state.rect1rightLong}
-                      onChange={(x) => this.setRectRightLong(Number(x), 1)}
-                      isValid={this.state.rect1rightLong !== undefined}
+                      onChange={(_event, x) => this.setRectRightLong(Number(x), 1)}
+                      validated={this.state.rect1rightLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -481,7 +499,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
           )}
           {this.state.zoneType == 'Two Rectangles' && (
             <>
-              <FormGroup label="Rectangle One" fieldId="rect-one">
+              <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+                <legend>Rectangle One</legend>
                 <GalleryItem>
                   <FormGroup label="Top Latitude" isRequired={true} fieldId="rect-toplat-form">
                     <TextInput
@@ -490,21 +509,21 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-toplat-form"
                       aria-describedby="rect-toplat-form-helper"
                       value={this.state.rect1topLat}
-                      onChange={(x) => this.setRectTopLat(Number(x), 1)}
-                      isValid={this.state.rect1topLat !== undefined}
+                      onChange={(_event, x) => this.setRectTopLat(Number(x), 1)}
+                      validated={this.state.rect1topLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
                 <GalleryItem>
-                  <FormGroup label="Left Longitude" isRequired={true} fieldId="circ-long-form">
+                  <FormGroup label="Left Longitude" isRequired={true} fieldId="rect-long-form">
                     <TextInput
                       type="number"
                       id="rect-long-form"
                       name="rect-long-form"
                       aria-describedby="rect-long-form-helper"
                       value={this.state.rect1leftLong}
-                      onChange={(x) => this.setRectLeftLong(Number(x), 1)}
-                      isValid={this.state.rect1leftLong !== undefined}
+                      onChange={(_event, x) => this.setRectLeftLong(Number(x), 1)}
+                      validated={this.state.rect1leftLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -516,8 +535,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect-botlat-form"
                       aria-describedby="rect-botlat-form-helper"
                       value={this.state.rect1bottomLat}
-                      onChange={(x) => this.setRectBottomLat(Number(x), 1)}
-                      isValid={this.state.rect1bottomLat !== undefined}
+                      onChange={(_event, x) => this.setRectBottomLat(Number(x), 1)}
+                      validated={this.state.rect1bottomLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -526,16 +545,17 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                     <TextInput
                       type="number"
                       id="rect-rgtlon-form"
-                      name="rect-rgtlon-formm"
+                      name="rect-rgtlon-form"
                       aria-describedby="rect-rgtlon-form-helper"
                       value={this.state.rect1rightLong}
-                      onChange={(x) => this.setRectRightLong(Number(x), 1)}
-                      isValid={this.state.rect1rightLong !== undefined}
+                      onChange={(_event, x) => this.setRectRightLong(Number(x), 1)}
+                      validated={this.state.rect1rightLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
-              </FormGroup>
-              <FormGroup label="Rectangle Two" fieldId="rect-two">
+              </fieldset>
+              <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+                <legend>Rectangle Two</legend>
                 <GalleryItem>
                   <FormGroup label="Top Latitude" isRequired={true} fieldId="rect2-toplat-form">
                     <TextInput
@@ -544,8 +564,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect2-toplat-form"
                       aria-describedby="rect2-toplat-form-helper"
                       value={this.state.rect2topLat}
-                      onChange={(x) => this.setRectTopLat(Number(x), 2)}
-                      isValid={this.state.rect2topLat !== undefined}
+                      onChange={(_event, x) => this.setRectTopLat(Number(x), 2)}
+                      validated={this.state.rect2topLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -557,8 +577,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect2-leftlong-form"
                       aria-describedby="rect2-leftlong-form-helper"
                       value={this.state.rect2leftLong}
-                      onChange={(x) => this.setRectLeftLong(Number(x), 2)}
-                      isValid={this.state.rect2leftLong !== undefined}
+                      onChange={(_event, x) => this.setRectLeftLong(Number(x), 2)}
+                      validated={this.state.rect2leftLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -570,8 +590,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect2-botlat-form"
                       aria-describedby="rect2-botlat-form-helper"
                       value={this.state.rect2bottomLat}
-                      onChange={(x) => this.setRectBottomLat(Number(x), 2)}
-                      isValid={this.state.rect2bottomLat !== undefined}
+                      onChange={(_event, x) => this.setRectBottomLat(Number(x), 2)}
+                      validated={this.state.rect2bottomLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -583,17 +603,17 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="rect2-rgtlon-formm"
                       aria-describedby="rect2-rgtlon-form-helper"
                       value={this.state.rect2rightLong}
-                      onChange={(x) => this.setRectRightLong(Number(x), 2)}
-                      isValid={this.state.rect2rightLong !== undefined}
+                      onChange={(_event, x) => this.setRectRightLong(Number(x), 2)}
+                      validated={this.state.rect2rightLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
-              </FormGroup>
+              </fieldset>
             </>
           )}
           {this.state.zoneType == 'Horizon Distance' && (
             <>
-              <FormGroup fieldId="horz-group">
+              <FormGroup>
                 <GalleryItem>
                   <FormGroup label="Latitude" isRequired={true} fieldId="circ-lat-form">
                     <TextInput
@@ -602,8 +622,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-lat-form"
                       aria-describedby="circ-lat-form-helper"
                       value={this.state.circleLat}
-                      onChange={(x) => this.setCircleLat(Number(x))}
-                      isValid={this.state.circleLat !== undefined}
+                      onChange={(_event, x) => this.setCircleLat(Number(x))}
+                      validated={this.state.circleLat !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -615,8 +635,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-long-form"
                       aria-describedby="circ-long-form-helper"
                       value={this.state.circleLong}
-                      onChange={(x) => this.setCircleLong(Number(x))}
-                      isValid={this.state.circleLong !== undefined}
+                      onChange={(_event, x) => this.setCircleLong(Number(x))}
+                      validated={this.state.circleLong !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>
@@ -628,8 +648,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                       name="circ-radius-form"
                       aria-describedby="circ-radius-form-helper"
                       value={this.state.radiusHeight}
-                      onChange={(x) => this.setCircleRadius(Number(x))}
-                      isValid={this.state.radiusHeight !== undefined}
+                      onChange={(_event, x) => this.setCircleRadius(Number(x))}
+                      validated={this.state.radiusHeight !== undefined ? 'default' : 'error'}
                     />
                   </FormGroup>
                 </GalleryItem>

@@ -158,8 +158,8 @@ class RcacheService:
             if config_retrieval_url else None
         self._invalidation_queue: \
             Queue[Union[RcacheInvalidateReq, RcacheSpatialInvalidateReq]] = \
-            asyncio.Queue()
-        self._update_queue: Queue[AfcReqRespKey] = asyncio.Queue()
+            asyncio.Queue(maxsize=3000)
+        self._update_queue: Queue[AfcReqRespKey] = asyncio.Queue(maxsize=3000)
         self._precompute_event = asyncio.Event()
         self._precompute_event.set()
         self._precompute_quota = 0
@@ -328,7 +328,7 @@ class RcacheService:
                             f"Invalid format of cache update data: {ex}")
                     else:
                         if dr is not None:
-                            row_dict = dr.dict()
+                            row_dict = dr.model_dump()
                             update_bulk[self._db.get_ap_pk(row_dict)] = \
                                 row_dict
                     if (len(update_bulk) == self._db.max_update_records()) or \
@@ -382,14 +382,48 @@ class RcacheService:
                                 math.radians(
                                     (rect.min_lat + rect.max_lat) / 2)),
                                 1 / 180)
-                        await self._db.spatial_invalidate(
-                            LatLonRect(
-                                min_lat=rect.min_lat - max_link_distance_deg,
-                                max_lat=rect.max_lat + max_link_distance_deg,
-                                min_lon=rect.min_lon -
-                                max_link_distance_deg / lon_reduction,
-                                max_lon=rect.max_lon +
-                                max_link_distance_deg / lon_reduction))
+                        lon_clearance = \
+                            max_link_distance_deg / lon_reduction
+                        min_lat = max(
+                            -90.0, rect.min_lat - max_link_distance_deg)
+                        max_lat = min(
+                            90.0, rect.max_lat + max_link_distance_deg)
+                        min_lon = rect.min_lon - lon_clearance
+                        max_lon = rect.max_lon + lon_clearance
+                        # The longitude clearance may cross the
+                        # antimeridian. LatLonRect hard-bounds lon to
+                        # [-180,180] so a single wrapped rectangle can't be
+                        # expressed - clamping (instead of wrapping) would
+                        # silently drop the neighbors on the other side of
+                        # +-180. Split the overflow into a second (and, for
+                        # a huge clearance, a full-globe) rectangle instead.
+                        expanded_rects = []
+                        if (max_lon - min_lon) >= 360:
+                            expanded_rects.append(
+                                LatLonRect(
+                                    min_lat=min_lat, max_lat=max_lat,
+                                    min_lon=-180.0, max_lon=180.0))
+                        else:
+                            if min_lon < -180.0:
+                                expanded_rects.append(
+                                    LatLonRect(
+                                        min_lat=min_lat, max_lat=max_lat,
+                                        min_lon=min_lon + 360.0,
+                                        max_lon=180.0))
+                                min_lon = -180.0
+                            if max_lon > 180.0:
+                                expanded_rects.append(
+                                    LatLonRect(
+                                        min_lat=min_lat, max_lat=max_lat,
+                                        min_lon=-180.0,
+                                        max_lon=max_lon - 360.0))
+                                max_lon = 180.0
+                            expanded_rects.append(
+                                LatLonRect(
+                                    min_lat=min_lat, max_lat=max_lat,
+                                    min_lon=min_lon, max_lon=max_lon))
+                        for expanded_rect in expanded_rects:
+                            await self._db.spatial_invalidate(expanded_rect)
                         invalid_before = \
                             await self._report_invalidation(
                                 f"Spatial invalidation for tile "
@@ -399,7 +433,18 @@ class RcacheService:
                 else:
                     assert isinstance(req, RcacheDirectionalInvalidateReq)
                     for beam in req.beams:
-                        await self._db.directional_invalidate(beam)
+                        try:
+                            await self._db.directional_invalidate(beam)
+                        except (Exception, SystemExit) as ex:
+                            # A single malformed/unbounded beam must not
+                            # take down the invalidator task for good -
+                            # log_utils.error() (called on DB errors) raises
+                            # SystemExit by default, so it is caught here as
+                            # well as Exception.
+                            LOGGER.error(
+                                f"Directional invalidation for beam "
+                                f"<{beam.short_str()}> failed:\n"
+                                f"{''.join(traceback.format_exception(ex))}")
                 self._precompute_event.set()
         except asyncio.CancelledError:
             return
@@ -432,8 +477,10 @@ class RcacheService:
         try:
             async with aiohttp.ClientSession() as session:
                 assert self._afc_req_url is not None
-                async with session.post(self._afc_req_url,
-                                        json=json.loads(req)) as resp:
+                async with session.post(
+                        self._afc_req_url,
+                        json=json.loads(req),
+                        headers={"X-AFC-Precompute": "1"}) as resp:
                     if resp.ok:
                         return
             await self._db.delete(ApDbPk.from_req(req_str=req))
@@ -495,15 +542,19 @@ class RcacheService:
                             raise aiohttp.ClientError(
                                 "Can't receive list of active configurations")
                         rulesets = \
-                            RatapiRulesetIds.parse_obj(await resp.json())
+                            RatapiRulesetIds.model_validate(await resp.json())
                     for ruleset in rulesets.rulesetId:
                         async with session.get(
                                 f"{self._config_retrieval_url}/{ruleset}") \
                                 as resp:
                             if resp.status != http.HTTPStatus.OK.value:
+                                LOGGER.error(
+                                    f"Config retrieval for ruleset "
+                                    f"'{ruleset}' returned HTTP "
+                                    f"{resp.status}")
                                 continue
                             maxLinkDistance = \
-                                RatapiAfcConfig.parse_obj(
+                                RatapiAfcConfig.model_validate(
                                     await resp.json()).maxLinkDistance
                         if (ret is None) or (maxLinkDistance > ret):
                             ret = maxLinkDistance

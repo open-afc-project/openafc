@@ -70,6 +70,19 @@ void CsvWriter::writeRecord(const QString &rec)
 	// Escape the text if necessary
 	QString text = rec;
 
+	// Neutralise CSV formula injection: fields that begin with =, +, -, @,
+	// TAB or CR would be auto-evaluated as formulas by spreadsheet
+	// applications.  Prefix such fields with a TAB so the leading character
+	// is no longer a formula trigger (RFC 4180 / OWASP CSV injection guidance).
+	if (!text.isEmpty()) {
+		const QChar first = text.at(0);
+		if (first == QLatin1Char('=') || first == QLatin1Char('+') ||
+		    first == QLatin1Char('-') || first == QLatin1Char('@') ||
+		    first == QLatin1Char('\t') || first == QLatin1Char('\r')) {
+			text.prepend(QLatin1Char('\t'));
+		}
+	}
+
 	bool doQuote = false;
 	if (_quotedCols.contains(_colI)) {
 		doQuote = true;

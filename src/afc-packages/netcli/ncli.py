@@ -13,9 +13,7 @@ test
 """
 
 import os
-import inspect
 import logging
-import sys
 import uuid
 from kombu.mixins import ConsumerMixin
 from kombu import Queue, Exchange, Connection, Producer

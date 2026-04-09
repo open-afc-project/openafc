@@ -1,6 +1,9 @@
-import * as React from 'react';
+import React from 'react';
 import {
   FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
   TextInput,
   FormSelectOption,
   FormSelect,
@@ -13,8 +16,8 @@ import {
   Gallery,
   GalleryItem,
   Tooltip,
-  Chip,
-  ChipGroup,
+  Label,
+  LabelGroup,
   TooltipPosition,
   Radio,
 } from '@patternfly/react-core';
@@ -84,6 +87,7 @@ export class HeatMapForm extends React.Component<
     rulesetIds: string[];
     onSubmit: (a: HeatMapFormData) => Promise<RatResponse<string>>;
     onCopyPaste?: (formData: HeatMapFormData, updateCallback: (v: HeatMapFormData) => void) => void;
+    footerActions?: React.ReactNode;
   },
   {
     height: { kind: 's'; val?: number } | { kind: 'b'; in?: number; out?: number };
@@ -396,7 +400,7 @@ export class HeatMapForm extends React.Component<
     );
 
   private setParams = (v: HeatMapFormData) => {
-    let newState = {
+    const newState = {
       analysisType: v.analysis,
       certificationId: v.certificationId,
       fsIdType: v.fsIdType,
@@ -404,6 +408,7 @@ export class HeatMapForm extends React.Component<
       serialNumber: v.serialNumber,
     };
     if (v.fsIdType === HeatMapFsIdType.Single) {
+      // @ts-ignore
       newState['fsId'] = v.fsId;
     }
     this.setState(newState);
@@ -461,7 +466,7 @@ export class HeatMapForm extends React.Component<
     x: { num: number; include: OperatingClassIncludeType; channels?: number[] | undefined },
     i: number,
   ): void {
-    let ocs = this.state.operatingClasses.map((oc) => {
+    const ocs = this.state.operatingClasses.map((oc) => {
       if (oc.num == x.num) {
         return { num: x.num, include: OperatingClassIncludeType.Some, channels: x.channels };
       } else {
@@ -481,9 +486,9 @@ export class HeatMapForm extends React.Component<
   render() {
     return (
       <>
-        <Gallery gutter="sm">
+        <Gallery hasGutter>
           <GalleryItem>
-            <FormGroup label="Serial Number" fieldId="horizontal-form-name" helperText="Must be unique for every AP">
+            <FormGroup label="Serial Number" fieldId="horizontal-form-name">
               {' '}
               <Tooltip
                 position={TooltipPosition.top}
@@ -509,20 +514,19 @@ export class HeatMapForm extends React.Component<
                 id="horizontal-form-name"
                 aria-describedby="horizontal-form-name-helper"
                 name="horizontal-form-name"
-                onChange={(x) => this.setState({ serialNumber: x })}
-                isValid={!!this.state.serialNumber}
+                onChange={(_event, x) => this.setState({ serialNumber: x })}
+                validated={!!this.state.serialNumber ? 'default' : 'error'}
                 style={{ textAlign: 'right' }}
               />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>Must be unique for every AP</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
           </GalleryItem>
           <GalleryItem>
-            <FormGroup
-              label="Certification Id"
-              fieldId="horizontal-form-certification-id"
-              helperTextInvalid="Provide at least one Certification Id"
-              // helperTextInvalidIcon={<ExclamationCircleIcon />} //This is not supported in our version of Patternfly
-              validated={this.state.certificationId.length > 0 ? 'success' : 'error'}
-            >
+            <FormGroup label="Certification Id" fieldId="horizontal-form-certification-list">
               {' '}
               <Tooltip
                 position={TooltipPosition.top}
@@ -542,13 +546,13 @@ export class HeatMapForm extends React.Component<
               >
                 <OutlinedQuestionCircleIcon />
               </Tooltip>
-              <ChipGroup aria-orientation="vertical">
+              <LabelGroup>
                 {this.state.certificationId.map((currentCid) => (
-                  <Chip width="100%" key={currentCid.id} onClick={() => this.deleteCertificationId(currentCid.id)}>
+                  <Label key={currentCid.id} onClose={() => this.deleteCertificationId(currentCid.id)}>
                     {currentCid.rulesetId + ' ' + currentCid.id}
-                  </Chip>
+                  </Label>
                 ))}
-              </ChipGroup>
+              </LabelGroup>
               <div>
                 {' '}
                 <Button
@@ -568,7 +572,7 @@ export class HeatMapForm extends React.Component<
                 <FormSelect
                   label="Ruleset"
                   value={this.state.newCertificationRulesetId}
-                  onChange={(x) => this.setState({ newCertificationRulesetId: x })}
+                  onChange={(_event, x) => this.setState({ newCertificationRulesetId: x })}
                   type="text"
                   step="any"
                   id="horizontal-form-certification-nra"
@@ -585,7 +589,7 @@ export class HeatMapForm extends React.Component<
                 <TextInput
                   label="Id"
                   value={this.state.newCertificationId}
-                  onChange={(x) => this.setState({ newCertificationId: x })}
+                  onChange={(_event, x) => this.setState({ newCertificationId: x })}
                   type="text"
                   step="any"
                   id="horizontal-form-certification-list"
@@ -594,6 +598,13 @@ export class HeatMapForm extends React.Component<
                   placeholder="Id"
                 />
               </div>
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant={this.state.certificationId.length > 0 ? 'default' : 'error'}>
+                    Provide at least one Certification Id
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
           </GalleryItem>
           <GalleryItem>
@@ -602,10 +613,10 @@ export class HeatMapForm extends React.Component<
                 <FormSelect
                   value={this.state.insideOutside}
                   // @ts-ignore
-                  onChange={(x) => this.setState(this.defaultInOut(x))}
-                  id="horzontal-form-indoor-outdoor"
+                  onChange={(_event, x) => this.setState(this.defaultInOut(x))}
+                  id="horizontal-form-indoor-outdoor"
                   name="horizontal-form-indoor-outdoor"
-                  isValid={this.validInOut(this.state.insideOutside)}
+                  validated={this.validInOut(this.state.insideOutside) ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 >
                   <FormSelectOption
@@ -642,12 +653,13 @@ export class HeatMapForm extends React.Component<
                 <InputGroup>
                   <TextInput
                     value={this.state.height.val}
-                    onChange={(x) => this.setState({ height: { kind: 's', val: Number(x) } })}
+                    onChange={(_event, x) => this.setState({ height: { kind: 's', val: Number(x) } })}
                     type="number"
                     step="any"
                     id="horizontal-form-height"
                     name="horizontal-form-height"
-                    isValid={this.validHeight(this.state.height)[0]}
+                    // @ts-ignore
+                    validated={this.validHeight(this.state.height)[0] ? 'default' : 'error'}
                     style={{ textAlign: 'right' }}
                   />
                   <InputGroupText>meters</InputGroupText>
@@ -660,14 +672,16 @@ export class HeatMapForm extends React.Component<
                     <TextInput
                       value={this.state.height.in}
                       // @ts-ignore
-                      onChange={(x) =>
+                      onChange={(_event, x) =>
+                        // @ts-ignore
                         this.setState((st) => ({ height: { kind: 'b', out: st.height.out, in: Number(x) } }))
                       }
                       type="number"
                       step="any"
                       id="horizontal-form-height-in"
                       name="horizontal-form-height-in"
-                      isValid={this.validHeight(this.state.height)[0]}
+                      // @ts-ignore
+                      validated={this.validHeight(this.state.height)[0] ? 'default' : 'error'}
                       style={{ textAlign: 'right' }}
                     />
                     <InputGroupText>meters</InputGroupText>
@@ -678,14 +692,16 @@ export class HeatMapForm extends React.Component<
                     <TextInput
                       value={this.state.height.out}
                       // @ts-ignore
-                      onChange={(x) =>
+                      onChange={(_event, x) =>
+                        // @ts-ignore
                         this.setState((st) => ({ height: { kind: 'b', in: st.height.in, out: Number(x) } }))
                       }
                       type="number"
                       step="any"
                       id="horizontal-form-height-out"
                       name="horizontal-form-height-out"
-                      isValid={this.validHeight(this.state.height)[1]}
+                      // @ts-ignore
+                      validated={this.validHeight(this.state.height)[1] ? 'default' : 'error'}
                       style={{ textAlign: 'right' }}
                     />
                     <InputGroupText>meters</InputGroupText>
@@ -701,10 +717,11 @@ export class HeatMapForm extends React.Component<
                   <FormSelect
                     value={this.state.heightType.val}
                     // @ts-ignore
-                    onChange={(x) => this.setState({ heightType: { kind: 's', val: HeightType[x] } })}
-                    id="horzontal-form-height-type"
+                    onChange={(_event, x) => this.setState({ heightType: { kind: 's', val: HeightType[x] } })}
+                    id="horizontal-form-height-type"
                     name="horizontal-form-height-type"
-                    isValid={this.validHeightType(this.state.heightType)[0]}
+                    // @ts-ignore
+                    validated={this.validHeightType(this.state.heightType)[0] ? 'default' : 'error'}
                     style={{ textAlign: 'right' }}
                   >
                     <FormSelectOption
@@ -726,12 +743,14 @@ export class HeatMapForm extends React.Component<
                     <FormSelect
                       value={this.state.heightType.in}
                       // @ts-ignore
-                      onChange={(x) =>
+                      onChange={(_event, x) =>
+                        // @ts-ignore
                         this.setState({ heightType: { kind: 'b', in: HeightType[x], out: this.state.heightType.out } })
                       }
-                      id="horzontal-form-height-type-in"
+                      id="horizontal-form-height-type-in"
                       name="horizontal-form-height-type-in"
-                      isValid={this.validHeightType(this.state.heightType)[0]}
+                      // @ts-ignore
+                      validated={this.validHeightType(this.state.heightType)[0] ? 'default' : 'error'}
                       style={{ textAlign: 'right' }}
                     >
                       <FormSelectOption
@@ -751,12 +770,14 @@ export class HeatMapForm extends React.Component<
                     <FormSelect
                       value={this.state.heightType.out}
                       // @ts-ignore
-                      onChange={(x) =>
+                      onChange={(_event, x) =>
+                        // @ts-ignore
                         this.setState({ heightType: { kind: 'b', out: HeightType[x], in: this.state.heightType.in } })
                       }
-                      id="horzontal-form-height-type-out"
+                      id="horizontal-form-height-type-out"
                       name="horizontal-form-height-type-out"
-                      isValid={this.validHeightType(this.state.heightType)[1]}
+                      // @ts-ignore
+                      validated={this.validHeightType(this.state.heightType)[1] ? 'default' : 'error'}
                       style={{ textAlign: 'right' }}
                     >
                       <FormSelectOption
@@ -780,12 +801,13 @@ export class HeatMapForm extends React.Component<
                 <InputGroup>
                   <TextInput
                     value={this.state.heightCert.val}
-                    onChange={(x) => this.setState({ heightCert: { kind: 's', val: Number(x) } })}
+                    onChange={(_event, x) => this.setState({ heightCert: { kind: 's', val: Number(x) } })}
                     type="number"
                     step="any"
                     id="horizontal-form-height-cert"
                     name="horizontal-form-height-cert"
-                    isValid={this.validHeightCert(this.state.heightCert)[0]}
+                    // @ts-ignore
+                    validated={this.validHeightCert(this.state.heightCert)[0] ? 'default' : 'error'}
                     style={{ textAlign: 'right' }}
                   />
                   <InputGroupText>meters</InputGroupText>
@@ -798,14 +820,16 @@ export class HeatMapForm extends React.Component<
                     <TextInput
                       value={this.state.heightCert.in}
                       // @ts-ignore
-                      onChange={(x) =>
+                      onChange={(_event, x) =>
+                        // @ts-ignore
                         this.setState({ heightCert: { kind: 'b', in: Number(x), out: this.state.heightCert.out } })
                       }
                       type="number"
                       step="any"
                       id="horizontal-form-height-cert-in"
                       name="horizontal-form-height-cert-in"
-                      isValid={this.validHeightCert(this.state.heightCert)[0]}
+                      // @ts-ignore
+                      validated={this.validHeightCert(this.state.heightCert)[0] ? 'default' : 'error'}
                       style={{ textAlign: 'right' }}
                     />
                     <InputGroupText>meters</InputGroupText>
@@ -816,14 +840,16 @@ export class HeatMapForm extends React.Component<
                     <TextInput
                       value={this.state.heightCert.out}
                       // @ts-ignore
-                      onChange={(x) =>
+                      onChange={(_event, x) =>
+                        // @ts-ignore
                         this.setState({ heightCert: { kind: 'b', out: Number(x), in: this.state.heightCert.in } })
                       }
                       type="number"
                       step="any"
                       id="horizontal-form-height-cert-out"
                       name="horizontal-form-height-cert-out"
-                      isValid={this.validHeightCert(this.state.heightCert)[1]}
+                      // @ts-ignore
+                      validated={this.validHeightCert(this.state.heightCert)[1] ? 'default' : 'error'}
                       style={{ textAlign: 'right' }}
                     />
                     <InputGroupText>meters</InputGroupText>
@@ -846,12 +872,13 @@ export class HeatMapForm extends React.Component<
                   <InputGroup>
                     <TextInput
                       value={this.state.eirp.val}
-                      onChange={(x) => this.setState({ eirp: { kind: 's', val: Number(x) } })}
+                      onChange={(_event, x) => this.setState({ eirp: { kind: 's', val: Number(x) } })}
                       type="number"
                       step="any"
                       id="horizontal-form-eirp"
                       name="horizontal-form-eirp"
-                      isValid={this.validEirp(this.state.eirp)[0]}
+                      // @ts-ignore
+                      validated={this.validEirp(this.state.eirp)[0] ? 'default' : 'error'}
                       style={{ textAlign: 'right' }}
                     />
                     <InputGroupText>dBm</InputGroupText>
@@ -871,14 +898,16 @@ export class HeatMapForm extends React.Component<
                       <TextInput
                         value={this.state.eirp.in}
                         // @ts-ignore
-                        onChange={(x) =>
+                        onChange={(_event, x) =>
+                          // @ts-ignore
                           this.setState({ eirp: { kind: 'b', in: Number(x), out: this.state.eirp.out } })
                         }
                         type="number"
                         step="any"
                         id="horizontal-form-eirp-in"
                         name="horizontal-form-eirp-in"
-                        isValid={this.validEirp(this.state.eirp)[0]}
+                        // @ts-ignore
+                        validated={this.validEirp(this.state.eirp)[0] ? 'default' : 'error'}
                         style={{ textAlign: 'right' }}
                       />
                       <InputGroupText>dBm</InputGroupText>
@@ -896,12 +925,21 @@ export class HeatMapForm extends React.Component<
                       <TextInput
                         value={this.state.eirp.out}
                         // @ts-ignore
-                        onChange={(x) => this.setState({ eirp: { kind: 'b', out: Number(x), in: this.state.eirp.in } })}
+                        onChange={(_event, x) =>
+                          this.setState({
+                            eirp: {
+                              kind: 'b',
+                              out: Number(x),
+                              in: this.state.eirp.kind === 'b' ? this.state.eirp.in : undefined,
+                            },
+                          })
+                        }
                         type="number"
                         step="any"
                         id="horizontal-form-eirp-out"
                         name="horizontal-form-eirp-out"
-                        isValid={this.validEirp(this.state.eirp)[1]}
+                        // @ts-ignore
+                        validated={this.validEirp(this.state.eirp)[1] ? 'default' : 'error'}
                         style={{ textAlign: 'right' }}
                       />
                       <InputGroupText>dBm</InputGroupText>
@@ -917,7 +955,7 @@ export class HeatMapForm extends React.Component<
                 <FormSelect
                   value={this.state.analysisType}
                   // @ts-ignore
-                  onChange={(x) => this.setState({ analysisType: x })}
+                  onChange={(_event, x) => this.setState({ analysisType: x })}
                   id="horizontal-form-analysis-type"
                   name="horizontal-form-analysis-type"
                   style={{ textAlign: 'right' }}
@@ -934,7 +972,8 @@ export class HeatMapForm extends React.Component<
             </FormGroup>
           </GalleryItem>
           <GalleryItem>
-            <FormGroup label="FS Ids" fieldId="horizontal-form-fs-id">
+            <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+              <legend>FS Ids</legend>
               <Radio
                 id="radio-fs-all"
                 key="radio-fs-all"
@@ -942,7 +981,7 @@ export class HeatMapForm extends React.Component<
                 label="All FS Ids"
                 value={HeatMapFsIdType.All}
                 isChecked={this.state.fsIdType === HeatMapFsIdType.All}
-                onChange={(isChecked, e) => {
+                onChange={(_event, isChecked) => {
                   if (isChecked) {
                     this.setState({ fsIdType: HeatMapFsIdType.All });
                   }
@@ -956,7 +995,7 @@ export class HeatMapForm extends React.Component<
                 label="Specify FS Id"
                 value={HeatMapFsIdType.Single}
                 isChecked={this.state.fsIdType === HeatMapFsIdType.Single}
-                onChange={(isChecked, e) => {
+                onChange={(_event, isChecked) => {
                   if (isChecked) {
                     this.setState({ fsIdType: HeatMapFsIdType.Single });
                   }
@@ -967,7 +1006,7 @@ export class HeatMapForm extends React.Component<
                 <TextInput
                   label="FS Id to Check"
                   value={this.state.fsId}
-                  onChange={(x) =>
+                  onChange={(_event, x) =>
                     !isNaN(+x) ? this.setState({ fsId: Number(x) }) : this.setState({ fsId: undefined })
                   }
                   type="number"
@@ -979,14 +1018,11 @@ export class HeatMapForm extends React.Component<
               ) : (
                 <></>
               )}
-            </FormGroup>
+            </fieldset>
           </GalleryItem>
         </Gallery>
-        <FormGroup
-          label="Inquired Channel(s)"
-          fieldId="horizontal-form-operating-class"
-          className="inquiredChannelsSection"
-        >
+        <fieldset style={{ border: 'none', padding: 0, margin: 0 }} className="inquiredChannelsSection">
+          <legend>Inquired Channel(s)</legend>
           <Gallery className="nestedGallery" width={'1200px'}>
             {this.state.operatingClasses.map((e, i) => (
               <OperatingClassForm
@@ -997,28 +1033,28 @@ export class HeatMapForm extends React.Component<
               ></OperatingClassForm>
             ))}
           </Gallery>
-        </FormGroup>
+        </fieldset>
         <br />
         <React.Fragment>
           {this.state.mesgType && this.state.mesgType !== 'info' && (
             <Alert
               variant={this.state.mesgType}
               title={this.state.mesgTitle || ''}
-              action={<AlertActionCloseButton onClose={() => this.setState({ mesgType: undefined })} />}
+              actionClose={<AlertActionCloseButton onClose={() => this.setState({ mesgType: undefined })} />}
             >
               {this.state.mesgBody}
             </Alert>
           )}
         </React.Fragment>
-        <br />
-        <>
+        <ActionGroup className="afc-button-group afc-button-group--after-form">
           <Button variant="primary" isDisabled={this.state.mesgType === 'info'} onClick={this.submit}>
             Send Request
-          </Button>{' '}
+          </Button>
           <Button key="open-modal" variant="secondary" onClick={() => this.copyPasteClick()}>
             Copy/Paste
           </Button>
-        </>
+          {this.props.footerActions}
+        </ActionGroup>
       </>
     );
   }

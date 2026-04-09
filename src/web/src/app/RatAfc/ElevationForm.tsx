@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 // import ReactTooltip from 'react-tooltip';
 import { Location, LinearPolygon, RadialPolygon, Ellipse } from '../Lib/RatAfcTypes';
 import {
@@ -91,13 +91,14 @@ export class ElevationForm extends React.PureComponent<ElevationFormParams, Elev
           <FormGroup label="Height" fieldId="horizontal-form-height">
             <InputGroup>
               <TextInput
-                value={this.props.elevation.height}
-                onChange={(x) => this.setHeight(Number(x))}
+                value={this.props.elevation.height ?? ''}
+                onChange={(_event, x) => this.setHeight(Number(x))}
                 type="number"
                 step="any"
                 id="horizontal-form-height"
                 name="horizontal-form-height"
-                isValid={this.props.elevation.height >= 0}
+                // @ts-ignore
+                validated={this.props.elevation.height >= 0 ? 'default' : 'error'}
                 style={{ textAlign: 'right' }}
               />
               <InputGroupText>meters</InputGroupText>
@@ -109,10 +110,11 @@ export class ElevationForm extends React.PureComponent<ElevationFormParams, Elev
             <InputGroup>
               <FormSelect
                 value={this.props.elevation.heightType}
-                onChange={(x) => this.setHeightType(x)}
-                id="horzontal-form-height-type"
+                onChange={(_event, x) => this.setHeightType(x)}
+                id="horizontal-form-height-type"
                 name="horizontal-form-height-type"
-                isValid={heightTypes.includes(this.props.elevation.heightType)}
+                // @ts-ignore
+                validated={heightTypes.includes(this.props.elevation.heightType) ? 'default' : 'error'}
                 style={{ textAlign: 'right' }}
               >
                 <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select a height type" />
@@ -127,13 +129,14 @@ export class ElevationForm extends React.PureComponent<ElevationFormParams, Elev
           <FormGroup label="Height Uncertainty (+/-)" fieldId="horizontal-form-height-cert">
             <InputGroup>
               <TextInput
-                value={this.props.elevation.verticalUncertainty}
-                onChange={(x) => this.setVerticalUncertainty(Number(x))}
+                value={this.props.elevation.verticalUncertainty ?? ''}
+                onChange={(_event, x) => this.setVerticalUncertainty(Number(x))}
                 type="number"
                 step="any"
                 id="horizontal-form-height-cert"
                 name="horizontal-form-height-cert"
-                isValid={this.props.elevation.verticalUncertainty >= 0}
+                // @ts-ignore
+                validated={this.props.elevation.verticalUncertainty >= 0 ? 'default' : 'error'}
                 style={{ textAlign: 'right' }}
               />
               <InputGroupText>meters</InputGroupText>

@@ -10,9 +10,12 @@
 # pylint: disable=wrong-import-order, global-statement, unnecessary-pass
 
 import fastapi
+import hmac
 import logging
 import uvicorn
+import os
 from typing import Annotated, Optional
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from log_utils import dp, get_module_logger, set_dp_printer, set_parent_logger
 from rcache_models import IfDbExists, RcacheDirectionalInvalidateReq, \
@@ -28,6 +31,43 @@ LOGGER = get_module_logger()
 
 # Parameters (passed via environment variables)
 settings = RcacheServiceSettings()
+
+security = HTTPBearer(auto_error=False)
+
+
+def verify_token(credentials: HTTPAuthorizationCredentials = fastapi.Depends(security)):
+    if not settings.api_key_file:
+        # Fail closed: no API key file configured means the endpoint is
+        # unprotected by default. Require operators to configure
+        # RCACHE_API_KEY_FILE to enable write access.
+        LOGGER.error(
+            "rcache: RCACHE_API_KEY_FILE is not configured — "
+            "all mutating requests are rejected. Set RCACHE_API_KEY_FILE "
+            "to a file containing a shared secret to enable write access.")
+        raise fastapi.HTTPException(
+            status_code=fastapi.status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="rcache: authentication not configured (RCACHE_API_KEY_FILE unset)",
+        )
+    try:
+        with open(settings.api_key_file, "r") as f:
+            expected_token = f.read().strip()
+    except Exception as ex:
+        # Fail CLOSED: if the key file is configured but unreadable, deny all
+        # requests rather than allowing unauthenticated access.
+        LOGGER.error("rcache: api_key_file '%s' is unreadable: %s — "
+                     "rejecting all authenticated requests",
+                     settings.api_key_file, ex)
+        raise fastapi.HTTPException(
+            status_code=fastapi.status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication key file unavailable",
+        )
+    if not credentials or not hmac.compare_digest(
+            credentials.credentials, expected_token):
+        raise fastapi.HTTPException(
+            status_code=fastapi.status.HTTP_403_FORBIDDEN,
+            detail="Invalid authentication credentials",
+        )
+
 
 # Request cache object (created upon first request)
 rcache_service: Optional[RcacheService] = None
@@ -45,12 +85,13 @@ def get_service() -> RcacheService:
     if rcache_service is None:
         rcache_service = \
             RcacheService(
-                rcache_db_dsn=settings.postgres_dsn,
+                rcache_db_dsn=str(settings.postgres_dsn),
                 rcache_db_password_file=settings.postgres_password_file,
                 precompute_quota=settings.precompute_quota,
-                afc_req_url=settings.afc_req_url,
-                rulesets_url=settings.rulesets_url,
-                config_retrieval_url=settings.config_retrieval_url,
+                afc_req_url=str(settings.afc_req_url) if settings.afc_req_url else None,
+                rulesets_url=str(settings.rulesets_url) if settings.rulesets_url else None,
+                config_retrieval_url=str(
+                    settings.config_retrieval_url) if settings.config_retrieval_url else None,
                 keyhole_template_file=settings.keyhole_template)
     return rcache_service
 
@@ -91,7 +132,7 @@ async def healthcheck(
         else fastapi.status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
-@app.post("/invalidate")
+@app.post("/invalidate", dependencies=[fastapi.Depends(verify_token)])
 async def invalidate(
         invalidate_req: RcacheInvalidateReq,
         service: RcacheService = fastapi.Depends(get_service)) -> None:
@@ -99,7 +140,7 @@ async def invalidate(
     service.invalidate(invalidate_req)
 
 
-@app.post("/spatial_invalidate")
+@app.post("/spatial_invalidate", dependencies=[fastapi.Depends(verify_token)])
 async def spatial_invalidate(
         spatial_invalidate_req: RcacheSpatialInvalidateReq,
         service: RcacheService = fastapi.Depends(get_service)) -> None:
@@ -107,8 +148,8 @@ async def spatial_invalidate(
     service.invalidate(spatial_invalidate_req)
 
 
-@app.post("/directional_invalidate")
-async def spatial_invalidate(
+@app.post("/directional_invalidate", dependencies=[fastapi.Depends(verify_token)])
+async def directional_invalidate(
         directional_invalidate_req: RcacheDirectionalInvalidateReq,
         service: RcacheService = fastapi.Depends(get_service)) -> None:
     """ Spatial invalidate request handler """
@@ -120,7 +161,7 @@ async def spatial_invalidate(
     service.invalidate(directional_invalidate_req)
 
 
-@app.post("/update")
+@app.post("/update", dependencies=[fastapi.Depends(verify_token)])
 async def update(
         update_req: RcacheUpdateReq,
         service: RcacheService = fastapi.Depends(get_service)) -> None:
@@ -128,7 +169,7 @@ async def update(
     service.update(update_req)
 
 
-@app.post("/invalidation_state/{enabled}")
+@app.post("/invalidation_state/{enabled}", dependencies=[fastapi.Depends(verify_token)])
 async def set_invalidation_state(
         enabled: Annotated[
             bool,
@@ -139,14 +180,14 @@ async def set_invalidation_state(
     await service.set_invalidation_enabled(enabled)
 
 
-@app.get("/invalidation_state")
+@app.get("/invalidation_state", dependencies=[fastapi.Depends(verify_token)])
 async def get_invalidation_state(
         service: RcacheService = fastapi.Depends(get_service)) -> bool:
     """ Return invalidation enabled state """
     return await service.get_invalidation_enabled()
 
 
-@app.post("/precomputation_state/{enabled}")
+@app.post("/precomputation_state/{enabled}", dependencies=[fastapi.Depends(verify_token)])
 async def set_precomputation_state(
         enabled: Annotated[
             bool,
@@ -157,14 +198,14 @@ async def set_precomputation_state(
     await service.set_precomputation_enabled(enabled)
 
 
-@app.get("/precomputation_state")
+@app.get("/precomputation_state", dependencies=[fastapi.Depends(verify_token)])
 async def get_precomputation_state(
         service: RcacheService = fastapi.Depends(get_service)) -> bool:
     """ Return precomputation enabled state """
     return await service.get_precomputation_enabled()
 
 
-@app.post("/update_state/{enabled}")
+@app.post("/update_state/{enabled}", dependencies=[fastapi.Depends(verify_token)])
 async def set_update_state(
         enabled: Annotated[
             bool,
@@ -175,14 +216,14 @@ async def set_update_state(
     await service.set_update_enabled(enabled)
 
 
-@app.get("/update_state")
+@app.get("/update_state", dependencies=[fastapi.Depends(verify_token)])
 async def get_update_enabled_state(
         service: RcacheService = fastapi.Depends(get_service)) -> bool:
     """ Return update enabled state """
     return await service.get_update_enabled()
 
 
-@app.get("/status")
+@app.get("/status", dependencies=[fastapi.Depends(verify_token)])
 async def get_service_status(
         service: RcacheService = fastapi.Depends(get_service)) \
         -> RcacheStatus:
@@ -190,15 +231,15 @@ async def get_service_status(
     return await service.get_status()
 
 
-@app.get("/precomputation_quota")
+@app.get("/precomputation_quota", dependencies=[fastapi.Depends(verify_token)])
 async def get_precompute_quota(
-            service: RcacheService = fastapi.Depends(get_service)) -> int:
+        service: RcacheService = fastapi.Depends(get_service)) -> int:
     """ Returns current precomputation quota (maximum number of simultaneously
     running precomputations) """
     return service.precompute_quota
 
 
-@app.post("/precomputation_quota/{quota}")
+@app.post("/precomputation_quota/{quota}", dependencies=[fastapi.Depends(verify_token)])
 async def set_precompute_quota(
         quota: Annotated[
             int,

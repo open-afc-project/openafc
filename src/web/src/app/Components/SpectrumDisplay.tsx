@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   LineChart,
   ScatterChart,
@@ -13,7 +13,7 @@ import {
   ReferenceArea,
   TooltipProps,
 } from 'recharts';
-import { Title, CardHeader, CardBody, Card, TextArea } from '@patternfly/react-core';
+import { Title, CardHeader, CardTitle, CardBody, Card, TextArea } from '@patternfly/react-core';
 import { SpectrumProfile, PAWSResponse } from '../Lib/RatApiTypes';
 import { AvailableSpectrumInquiryResponse, AvailableSpectrumInfo, AvailableChannelInfo } from '@app/Lib/RatAfcTypes';
 
@@ -24,10 +24,22 @@ import ReactDOMServer from 'react-dom/server';
  * author: Sam Smucny
  */
 
-/**
- * Enumeration of possible colors
- */
-const colors = ['black', 'blue', 'orange', 'green', 'red', 'purple', 'gold'];
+const DARK_CLASS = 'pf-v6-theme-dark';
+
+const useDarkMode = (): boolean => {
+  const [dark, setDark] = React.useState(() => document.documentElement.classList.contains(DARK_CLASS));
+  React.useEffect(() => {
+    const mo = new MutationObserver(() => setDark(document.documentElement.classList.contains(DARK_CLASS)));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => mo.disconnect();
+  }, []);
+  return dark;
+};
+
+const getColors = (dark: boolean): string[] =>
+  dark
+    ? ['#e0e0e0', 'blue', 'orange', 'green', 'red', 'purple', 'gold']
+    : ['black', 'blue', 'orange', 'green', 'red', 'purple', 'gold'];
 
 /***
  * Things to know to draw the Spectrum line  chart correctly
@@ -116,18 +128,22 @@ const insertNullPoints = (spectra: SpectrumProfile[][]): { hz: number; dbm?: num
  */
 export const SpectrumDisplayPAWS: React.FunctionComponent<{ spectrum?: PAWSResponse; greyOutUnii: boolean }> = (
   props,
-) =>
-  !props.spectrum || props.spectrum.spectrumSpecs.length === 0 ? (
+) => {
+  const colors = getColors(useDarkMode());
+  return !props.spectrum || props.spectrum.spectrumSpecs.length === 0 ? (
     <Card>
-      <CardHeader>There is no data to display. Try sending a request above.</CardHeader>
+      <CardHeader>
+        <CardTitle>There is no data to display. Try sending a request above.</CardTitle>
+      </CardHeader>
     </Card>
   ) : (
     <>
       {props.spectrum.spectrumSpecs.map((spec) =>
         spec.spectrumSchedules.map((schedule, sIndex) => (
-          <Card key={sIndex} isHoverable={true}>
+          // @ts-ignore
+          <Card key={sIndex}>
             <CardHeader>
-              <Title size="md" style={{ textAlign: 'center' }}>
+              <Title headingLevel="h3" style={{ textAlign: 'center' }}>
                 {spec.rulesetInfo.rulesetId +
                   ': ' +
                   schedule.eventTime.startTime +
@@ -147,11 +163,16 @@ export const SpectrumDisplayPAWS: React.FunctionComponent<{ spectrum?: PAWSRespo
                 >
                   <CartesianGrid />
                   <XAxis
-                    label={{ value: 'Frequency (MHz)', position: 'bottom' }}
+                    label={{
+                      value: 'Frequency (MHz)',
+                      position: 'bottom',
+                      fill: 'var(--pf-t--global--text--color--regular)',
+                    }}
                     domain={[5925, 7125]}
                     type="number"
                     dataKey="hz"
                     name="Frequency (MHz)"
+                    tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
                     ticks={Array(15)
                       .fill(0)
                       .map((_, i) => 5925 + i * 80)
@@ -162,7 +183,13 @@ export const SpectrumDisplayPAWS: React.FunctionComponent<{ spectrum?: PAWSRespo
                     type="number"
                     dataKey="dbm"
                     name="Max. EIRP (dBm)"
-                    label={{ value: 'Max. EIRP (dBm)', angle: -90, position: 'insideLeft' }}
+                    tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
+                    label={{
+                      value: 'Max. EIRP (dBm)',
+                      angle: -90,
+                      position: 'insideLeft',
+                      fill: 'var(--pf-t--global--text--color--regular)',
+                    }}
                   />
                   <Tooltip cursor={true} />
                   {schedule.spectra.map((spectrum, i) => (
@@ -185,6 +212,7 @@ export const SpectrumDisplayPAWS: React.FunctionComponent<{ spectrum?: PAWSRespo
       )}
     </>
   );
+};
 
 /**
  * Converts AP-AFC spectrum info into a format that is able to be displayed on the plot
@@ -192,12 +220,12 @@ export const SpectrumDisplayPAWS: React.FunctionComponent<{ spectrum?: PAWSRespo
  */
 const makeSteps = (sections: AvailableSpectrumInfo[]): { hz: number; dbm?: number }[] => {
   let prev = sections[0];
-  let points: { hz: number; dbm?: number }[] = [
+  const points: { hz: number; dbm?: number }[] = [
     { hz: prev.frequencyRange.lowFrequency, dbm: prev.maxPsd },
     { hz: prev.frequencyRange.highFrequency, dbm: prev.maxPsd },
   ];
   for (let i = 1; i < sections.length; i++) {
-    let curr = sections[i];
+    const curr = sections[i];
 
     if (curr.frequencyRange.lowFrequency !== prev.frequencyRange.highFrequency) {
       points.push({ hz: (curr.frequencyRange.lowFrequency + prev.frequencyRange.highFrequency) / 2, dbm: undefined });
@@ -216,16 +244,22 @@ const makeSteps = (sections: AvailableSpectrumInfo[]): { hz: number; dbm?: numbe
  * Displays spectrum from a AP-AFC request
  * @param spectrum `AvailableSpectrumInquiryResponse` object to graph
  */
-export const SpectrumDisplayAFC: React.FunctionComponent<{ spectrum?: AvailableSpectrumInquiryResponse }> = (props) =>
-  !props.spectrum || !props.spectrum.availableFrequencyInfo || props.spectrum.availableFrequencyInfo.length === 0 ? (
+export const SpectrumDisplayAFC: React.FunctionComponent<{ spectrum?: AvailableSpectrumInquiryResponse }> = (props) => {
+  const colors = getColors(useDarkMode());
+  return !props.spectrum ||
+    !props.spectrum.availableFrequencyInfo ||
+    props.spectrum.availableFrequencyInfo.length === 0 ? (
     <Card>
-      <CardHeader>There is no spectrum data to display.</CardHeader>
+      <CardHeader>
+        <CardTitle>There is no spectrum data to display.</CardTitle>
+      </CardHeader>
     </Card>
   ) : (
     <>
-      <Card key={1} isHoverable={true}>
+      {/* @ts-ignore */}
+      <Card key={1}>
         <CardHeader>
-          <Title size="md" style={{ textAlign: 'center' }}>
+          <Title headingLevel="h3" style={{ textAlign: 'center' }}>
             {'Request ' +
               props.spectrum?.requestId +
               ': expires at ' +
@@ -244,11 +278,16 @@ export const SpectrumDisplayAFC: React.FunctionComponent<{ spectrum?: AvailableS
             >
               <CartesianGrid />
               <XAxis
-                label={{ value: 'Frequency (MHz)', position: 'bottom' }}
+                label={{
+                  value: 'Frequency (MHz)',
+                  position: 'bottom',
+                  fill: 'var(--pf-t--global--text--color--regular)',
+                }}
                 domain={[5925, 7125]}
                 type="number"
                 dataKey="hz"
                 name="Frequency (MHz)"
+                tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
                 ticks={Array(15)
                   .fill(0)
                   .map((_, i) => 5925 + i * 80)
@@ -259,7 +298,13 @@ export const SpectrumDisplayAFC: React.FunctionComponent<{ spectrum?: AvailableS
                 type="number"
                 dataKey="dbm"
                 name="PSD (dBm/MHz)"
-                label={{ value: 'PSD (dBm/MHz)', angle: -90, position: 'insideLeft' }}
+                tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
+                label={{
+                  value: 'PSD (dBm/MHz)',
+                  angle: -90,
+                  position: 'insideLeft',
+                  fill: 'var(--pf-t--global--text--color--regular)',
+                }}
               />
               <Tooltip cursor={true} />
               <Scatter
@@ -276,6 +321,7 @@ export const SpectrumDisplayAFC: React.FunctionComponent<{ spectrum?: AvailableS
       </Card>
     </>
   );
+};
 
 /**
  * Converts the channel data to frequencies
@@ -287,7 +333,7 @@ const convertOpClassData = (spectra: AvailableChannelInfo): { hz: number; dbm: n
   if (!!desc) {
     return desc.channels
       .map((e, i) => {
-        let cfiIndex = spectra.channelCfi.indexOf(e.cfi);
+        const cfiIndex = spectra.channelCfi.indexOf(e.cfi);
         return [
           {
             hz: desc!.startFrequency + desc!.channelWidth * i,
@@ -317,7 +363,7 @@ const convert137OpClassData = (
   if (!!desc) {
     return desc.channels
       .map((e, i) => {
-        let cfiIndex = spectra.channelCfi.indexOf(e.cfi);
+        const cfiIndex = spectra.channelCfi.indexOf(e.cfi);
         return [
           {
             hz: desc!.startFrequency + desc!.channelWidth * i,
@@ -363,14 +409,16 @@ var tooltipLabel: string = '';
  * Custom tooltip to display Operating class, channel Cfi, frequency and EIRP
  */
 const CustomTooltip = (pr: TooltipProps) => {
+  // @ts-ignore
   if (pr.active && pr.payload && pr.payload.length) {
     var res = (
       <>
         {' '}
         <div className="custom-tooltip">
-          {pr.payload.map((v) => {
+          {/* @ts-ignore */}
+          {pr.payload.map((v: any, idx: number) => {
             return (
-              <p>
+              <p key={idx}>
                 OC {tooltipLabel} Ch {v.payload.cfi} {v.name}:{v.value}
               </p>
             );
@@ -384,7 +432,7 @@ const CustomTooltip = (pr: TooltipProps) => {
   return null;
 };
 
-const generateScatterPlot = (data: AvailableChannelInfo[]) => {
+const generateScatterPlot = (data: AvailableChannelInfo[], colors: string[]) => {
   return data
     .map((spectrum, i) => {
       if (spectrum.globalOperatingClass == 137) {
@@ -426,15 +474,19 @@ const generateScatterPlot = (data: AvailableChannelInfo[]) => {
  */
 export const SpectrumDisplayLineAFC: React.FunctionComponent<{ spectrum?: AvailableSpectrumInquiryResponse }> = (
   props,
-) =>
-  !props.spectrum || !props.spectrum.availableChannelInfo || props.spectrum.availableChannelInfo.length === 0 ? (
+) => {
+  const colors = getColors(useDarkMode());
+  return !props.spectrum || !props.spectrum.availableChannelInfo || props.spectrum.availableChannelInfo.length === 0 ? (
     <Card>
-      <CardHeader>There is no spectrum data to display.</CardHeader>
+      <CardHeader>
+        <CardTitle>There is no spectrum data to display.</CardTitle>
+      </CardHeader>
     </Card>
   ) : (
-    <Card isHoverable={true}>
+    // @ts-ignore
+    <Card>
       <CardHeader>
-        <Title size="md" style={{ textAlign: 'center' }}>
+        <Title headingLevel="h3" style={{ textAlign: 'center' }}>
           {'Request ' +
             props.spectrum.requestId +
             ': expires at ' +
@@ -453,11 +505,16 @@ export const SpectrumDisplayLineAFC: React.FunctionComponent<{ spectrum?: Availa
           >
             <CartesianGrid />
             <XAxis
-              label={{ value: 'Frequency (MHz)', position: 'bottom' }}
+              label={{
+                value: 'Frequency (MHz)',
+                position: 'bottom',
+                fill: 'var(--pf-t--global--text--color--regular)',
+              }}
               domain={[5925, 7125]}
               type="number"
               dataKey="hz"
               name="Frequency (MHz)"
+              tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
               ticks={Array(15)
                 .fill(0)
                 .map((_, i) => 5925 + i * 80)
@@ -468,10 +525,16 @@ export const SpectrumDisplayLineAFC: React.FunctionComponent<{ spectrum?: Availa
               type="number"
               dataKey="dbm"
               name="Max. EIRP (dBm)"
-              label={{ value: 'Max. EIRP (dBm)', angle: -90, position: 'insideLeft' }}
+              tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
+              label={{
+                value: 'Max. EIRP (dBm)',
+                angle: -90,
+                position: 'insideLeft',
+                fill: 'var(--pf-t--global--text--color--regular)',
+              }}
             />
             <Tooltip cursor={true} content={<CustomTooltip />} active={true} />
-            {generateScatterPlot(props.spectrum.availableChannelInfo)}
+            {generateScatterPlot(props.spectrum.availableChannelInfo, colors)}
             <Legend verticalAlign="top" />
           </ScatterChart>
         </ResponsiveContainer>
@@ -479,3 +542,4 @@ export const SpectrumDisplayLineAFC: React.FunctionComponent<{ spectrum?: Availa
       </CardBody>
     </Card>
   );
+};

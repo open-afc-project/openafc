@@ -6,10 +6,23 @@
 #
 
 http {
+    # Use Docker's embedded DNS so monitoring upstream hostnames are re-resolved
+    # dynamically instead of being cached at nginx startup.  Required when
+    # monitoring containers (prometheus, grafana, alloy, cadvisor, etc.) are
+    # restarted independently and receive new IPs from Docker.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
+    # Collapse consecutive slashes in URIs before location matching.
+    # nginx decodes percent-encoded characters and strips dot-segments by
+    # default; merge_slashes makes the normalisation explicit and auditable.
+    merge_slashes on;
+
     log_format short_fmt '[$time_local] $request_time $upstream_response_time';
     log_format error_fmt '[$time_local] $remote_addr - $ssl_client_s_dn - $remote_user - $request_uri - $uri';
     access_log  /dev/stdout  error_fmt;
-    error_log  /dev/stdout debug;
+    # http-scope error_log inherits `crit` from master nginx.conf — do NOT set
+    # `debug` here: nginx-debug (AFC_DEVEL_ENV=devel) would log proxy_set_header
+    # values incl. X-AFC-Internal-Token / X-AFC-Dispatcher-Token to stdout.
 
 
     upstream msghnd {
@@ -18,6 +31,28 @@ http {
         server ${AFC_MSGHND_NAME}:${AFC_MSGHND_PORT};
         # idle connections preserved in the cache of each worker
         keepalive  32;
+    }
+
+    # Map ssl_client_verify to the DN only when verified — used for mTLS-DN
+    # header on InquirySec; the header is empty for unverified connections.
+    map $ssl_client_verify $mtls_verified_dn {
+        SUCCESS $ssl_client_s_dn;
+        default "";
+    }
+
+    # Map ssl_client_verify to a binary flag: 0 = verified, 1 = unverified.
+    map $ssl_client_verify $mtls_client_unverified {
+        SUCCESS 0;
+        default 1;
+    }
+
+    # Combine the unverified flag with the per-request enforcement variable
+    # ($afc_mtls_enforce, set at server level below) into a single boolean.
+    # This collapses the previous two-nested-if pattern to one guard so
+    # future AP location blocks only need: if ($mtls_should_reject) { return 403; }
+    map "$mtls_client_unverified:$afc_mtls_enforce" $mtls_should_reject {
+        "1:true" 1;   # unverified AND enforcement active → block
+        default  0;   # any other combination → allow
     }
 
     upstream webui {
@@ -29,30 +64,20 @@ http {
     }
 
     # MONITORING_BEGIN
-    upstream prometheus {
-        server ${AFC_PROMETHEUS_TARGET};
-    }
-
-    upstream grafana {
-        server ${AFC_GRAFANA_TARGET};
-    }
-
-    upstream kafka_ui {
-        server ${AFC_KAFKA_UI_TARGET};
-    }
-
-    upstream cadvisor {
-        server ${AFC_CADVISOR_TARGET};
-    }
-
-    upstream rabbitmq {
-        server ${AFC_RABBITMQ_TARGET};
-    }
+    # Monitoring upstream addresses are set as variables (not static upstream blocks)
+    # so nginx re-resolves them on every request via the resolver above.
+    # This prevents stale IPs when monitoring containers are restarted independently.
     # MONITORING_END
 
     map $scheme:$afc_https_enforce $should_redirect {
         http:TRUE 1;
         default 0;
+    }
+
+    # HSTS: only set on HTTPS connections; empty string means header is omitted by nginx
+    map $https $hsts_header_value {
+        "on" "max-age=31536000; includeSubDomains";
+        default "";
     }
 
     server {
@@ -65,21 +90,26 @@ http {
         
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_prefer_server_ciphers on;
+        # WINNF-TS-1014 R2-ASQ-02: explicitly include required cipher suites.
+        # TLS 1.3 cipher suites are always available (R2-ASQ-04); the list
+        # below covers TLS 1.2 mandatory suites plus common strong alternatives.
+        ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
         ssl_certificate /certificates/servers/server.cert.pem;
         ssl_certificate_key /certificates/servers/server.key.pem;
 
         ssl_client_certificate /etc/nginx/certs/client.bundle.pem;
         ssl_verify_client optional;
         ssl_verify_depth 10;
+        # Reject revoked client certs (CRL must be distributed alongside client.bundle.pem)
+        ssl_crl /etc/nginx/certs/client.crl.pem;
 
         add_header X-Content-Type-Options nosniff;
         add_header X-Frame-Options "SAMEORIGIN";
-        add_header Content-Security-Policy  "script-src 'self' 'unsafe-eval' https://maps.googleapis.com https://code.jquery.com https://netdna.bootstrapcdn.com/bootstrap https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; style-src 'self' https://fonts.googleapis.com https://netdna.bootstrapcdn.com https://www.gstatic.com/recaptcha/ 'unsafe-inline'";
+        add_header Content-Security-Policy  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com https://code.jquery.com https://netdna.bootstrapcdn.com/bootstrap https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://cdn.cookielaw.org/ https://*.cookielaw.org/; style-src 'self' https://fonts.googleapis.com https://netdna.bootstrapcdn.com https://www.gstatic.com/recaptcha/ https://cdn.cookielaw.org/ https://*.cookielaw.org/ 'unsafe-inline'; connect-src 'self' https://*.googleapis.com https://cdn.cookielaw.org/ https://*.cookielaw.org/ https://*.onetrust.com/; frame-src https://www.google.com/recaptcha/ https://recaptcha.google.com/ https://cdn.cookielaw.org/ https://*.cookielaw.org/; img-src 'self' https://*.googleapis.com https://*.gstatic.com https://cdn.cookielaw.org/ https://*.cookielaw.org/ data:";
         add_header X-XSS-Protection "1; mode=block";
         add_header Referrer-Policy "strict-origin-when-cross-origin";
         add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=(), fullscreen=(self), sync-xhr=(), magnetometer=(), gyroscope=(), accelerometer=(), usb=(), autoplay=(), midi=(), encrypted-media=(), xr-spatial-tracking=()";
-
-
+        add_header Strict-Transport-Security $hsts_header_value always;
         #ssl_stapling on;
         #ssl_stapling_verify on;
 
@@ -102,14 +132,11 @@ http {
         # To enforce check HTTPS set AFC_ENFORCE_HTTPS to the value "true"
         set $afc_https_enforce ${AFC_ENFORCE_HTTPS};
         # To enforce check mTLS set AFC_ENFORCE_MTLS to the value "true"
-        # otherwise it is optional
-        set $afc_mtls_status ${AFC_ENFORCE_MTLS};
+        set $afc_mtls_enforce ${AFC_ENFORCE_MTLS};
 
         if ($should_redirect = 1) {
             return 301 https://$host$request_uri;
         }
-
-        set $afc_mtls_enforce ${AFC_ENFORCE_MTLS};
 
         location /fbrat/ap-afc/availableSpectrumInquirySec {
            #if ($ssl_client_verify != SUCCESS) {
@@ -130,15 +157,23 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_pass http://webui;
             proxy_redirect http:// $scheme://;
-            proxy_set_header "mTLS-DN" '$ssl_client_s_dn';
+            # Only forward the DN when the certificate was successfully verified.
+            proxy_set_header "mTLS-DN" '$mtls_verified_dn';
+            proxy_set_header "X-SSL-Client-Verify" '$ssl_client_verify';
+            # Set gateway token so afc_server can identify requests routed via nginx
+            proxy_set_header "X-AFC-Internal-Token" '${AFC_INTERNAL_TOKEN}';
+            # Dispatcher-only token: proves mTLS-DN / X-SSL-Client-Verify were
+            # set by nginx, not by an AFC_INTERNAL_TOKEN-holding cluster peer.
+            proxy_set_header "X-AFC-Dispatcher-Token" '${AFC_DISPATCHER_TOKEN}';
         }
 
         location /fbrat/ap-afc/availableSpectrumInquiry {
-            if ($ssl_client_verify != SUCCESS) {
-                set $afc_mtls_status "${afc_mtls_status}_false";
-            }
-            # check if mtls is enforced and ssl_client_verify is not success
-            if ($afc_mtls_status = true_false) {
+            # Reject when mTLS enforcement is active and client cert was not
+            # verified. $mtls_should_reject is computed by the map block above
+            # from ($mtls_client_unverified:$afc_mtls_enforce) and is 1 only
+            # when BOTH conditions hold — a single guard that is safe to copy
+            # to future AP location blocks without risk of omitting one check.
+            if ($mtls_should_reject) {
                 return 403;
             }
             # disable buffering for latency
@@ -149,9 +184,17 @@ http {
             proxy_connect_timeout 720;
             # transmit a request to a proxied server
             proxy_send_timeout 720;
-            proxy_pass http://msghnd$uri$is_args$args;
+            proxy_pass http://msghnd$request_uri;
             proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header "mTLS-DN" '$ssl_client_s_dn';
+            # Use $mtls_verified_dn so the DN is only forwarded for successfully
+            # verified certificates; empty for unverified/expired/wrong-CA certs.
+            proxy_set_header "mTLS-DN" '$mtls_verified_dn';
+            proxy_set_header "X-SSL-Client-Verify" '$ssl_client_verify';
+            # Set gateway token so afc_server can identify requests routed via nginx
+            proxy_set_header "X-AFC-Internal-Token" '${AFC_INTERNAL_TOKEN}';
+            # Dispatcher-only token: proves mTLS-DN / X-SSL-Client-Verify were
+            # set by nginx, not by an AFC_INTERNAL_TOKEN-holding cluster peer.
+            proxy_set_header "X-AFC-Dispatcher-Token" '${AFC_DISPATCHER_TOKEN}';
             access_log off;
             log_not_found off;
         }
@@ -161,14 +204,17 @@ http {
             return 403;
         }
 
-        # forbid webdav methods other than GET
-        location /fbrat/ratapi/v1/files {
+        # forbid webdav methods other than GET; require authenticated session
+        location ~ ^/fbrat/ratapi/v1/(files|ulsFiles|antennaFiles) {
             limit_except GET { deny  all; }
+            auth_request /fbrat/_auth_check;
+            error_page 401 = @auth_redirect;
             sendfile on;
             proxy_bind $server_addr;
             proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header "X-AFC-Internal-Token" '${AFC_INTERNAL_TOKEN}';
             proxy_pass http://webui;
             proxy_redirect http:// $scheme://;
         }
@@ -188,10 +234,33 @@ http {
             return 403;
         }
 
+        # Auth subrequest: returns 200 for any authenticated user, 401 otherwise
+        location = /fbrat/_auth_check {
+            internal;
+            proxy_pass http://webui/fbrat/auth/check;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_set_header Cookie $http_cookie;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host $http_host;
+        }
+
         # Admin auth subrequest: returns 200 for Admin/Super, 403 otherwise
         location = /fbrat/_admin_check {
             internal;
             proxy_pass http://webui/fbrat/auth/admin_check;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_set_header Cookie $http_cookie;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host $http_host;
+        }
+
+        # Super auth subrequest: returns 200 for Super only, 403 otherwise.
+        # Used for monitoring UIs that may expose cross-tenant logs/metrics.
+        location = /fbrat/_super_check {
+            internal;
+            proxy_pass http://webui/fbrat/auth/super_check;
             proxy_pass_request_body off;
             proxy_set_header Content-Length "";
             proxy_set_header Cookie $http_cookie;
@@ -218,7 +287,7 @@ http {
 
         # MONITORING_BEGIN
         location /fbrat/prometheus {
-            auth_request /fbrat/_admin_check;
+            auth_request /fbrat/_super_check;
             error_page 401 = @auth_redirect;
             error_page 403 = @forbidden;
             proxy_bind $server_addr;
@@ -228,44 +297,95 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_hide_header Content-Security-Policy;
             add_header Content-Security-Policy  "script-src 'self' 'unsafe-inline'";
-            proxy_pass http://prometheus$request_uri;
+            # Re-declare server-level security headers: nginx drops inherited
+            # add_header directives when a location adds any of its own.
+            add_header X-Content-Type-Options nosniff;
+            add_header X-Frame-Options "SAMEORIGIN";
+            add_header X-XSS-Protection "1; mode=block";
+            add_header Referrer-Policy "strict-origin-when-cross-origin";
+            add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=(), fullscreen=(self), sync-xhr=(), magnetometer=(), gyroscope=(), accelerometer=(), usb=(), autoplay=(), midi=(), encrypted-media=(), xr-spatial-tracking=()";
+            add_header Strict-Transport-Security $hsts_header_value always;
+            set $upstream_prometheus ${AFC_PROMETHEUS_TARGET};
+            proxy_pass http://$upstream_prometheus$request_uri;
             proxy_redirect http:// $scheme://;
         }
 
         location /fbrat/grafana {
             proxy_connect_timeout 60;
             proxy_read_timeout 60;
-            auth_request /fbrat/_admin_check;
+            auth_request /fbrat/_super_check;
             error_page 401 = @auth_redirect;
             error_page 403 = @forbidden;
-            proxy_bind $server_addr;
+            # Do NOT use proxy_bind $server_addr here: the outbound connection to
+            # grafana must originate from the dispatcher's grafana-proxy network
+            # interface (GRAFANA_PROXY_DISPATCHER_IP) so that Grafana's auth.proxy
+            # whitelist accepts the X-WEBAUTH-USER header.  proxy_bind $server_addr
+            # would pin the source to the external interface IP, which is not in
+            # the /32 whitelist and would cause Grafana to ignore the proxy header
+            # and fall back to its own login page.
             sendfile on;
             proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection "upgrade";
+            # Auto-login Super users as Grafana org Editor "afc_super" via
+            # auth.proxy.  nginx has already verified the Super session via
+            # auth_request above.  Editor role is required for Grafana Explore
+            # and Drilldown (Metrics/Logs) access.
+            # The X-WEBAUTH-ROLE header is synced by Grafana's auth.proxy on each
+            # request (sync_ttl=0 in custom.ini), ensuring the role stays Editor
+            # even on first login after a fresh-database container start.
+            # auth.proxy accepts these headers only from the /32-whitelisted
+            # dispatcher IP; direct internal connections cannot inject them.
+            # Grafana 12.x with auth.proxy sends authProxyEnabled:true to the
+            # React frontend, which disables client-side token rotation entirely;
+            # no session cookies (grafana_session or grafana_token) are issued or
+            # needed.  Stale grafana_session cookies from pre-auth.proxy deployments
+            # are harmlessly ignored by Grafana when the proxy header is present.
+            proxy_set_header X-WEBAUTH-USER "afc_super";
+            proxy_set_header X-WEBAUTH-ROLE "Editor";
             proxy_hide_header Content-Security-Policy;
             add_header Content-Security-Policy  "script-src 'self' 'unsafe-eval' 'unsafe-inline'";
-            proxy_pass http://grafana$request_uri;
+            # Re-declare server-level security headers so they are present in all locations.
+            add_header X-Content-Type-Options nosniff;
+            add_header X-Frame-Options "SAMEORIGIN";
+            add_header X-XSS-Protection "1; mode=block";
+            add_header Referrer-Policy "strict-origin-when-cross-origin";
+            add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=(), fullscreen=(self), sync-xhr=(), magnetometer=(), gyroscope=(), accelerometer=(), usb=(), autoplay=(), midi=(), encrypted-media=(), xr-spatial-tracking=()";
+            add_header Strict-Transport-Security $hsts_header_value always;
+            set $upstream_grafana ${AFC_GRAFANA_TARGET};
+            proxy_pass http://$upstream_grafana$request_uri;
         }
 
         location /fbrat/kafka-ui {
-            auth_request /fbrat/_admin_check;
+            auth_request /fbrat/_super_check;
             error_page 401 = @auth_redirect;
             error_page 403 = @forbidden;
-            proxy_bind $server_addr;
+            # kafka_ui runs with AUTH_TYPE=DISABLED and is isolated on monitor-net.
+            # This auth_request is the sole authentication gate — only Super users
+            # reach the upstream.  No Spring Security SESSION cookie is issued.
+            # proxy_bind $server_addr is intentionally absent: dispatcher must reach
+            # kafka_ui via the monitor-net interface (not the external IP).
             sendfile on;
             proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_hide_header Content-Security-Policy;
             add_header Content-Security-Policy  "script-src 'self' 'unsafe-eval' 'unsafe-inline'";
-            proxy_pass http://kafka_ui$request_uri;
+            # Re-declare server-level security headers so they are present in all locations.
+            add_header X-Content-Type-Options nosniff;
+            add_header X-Frame-Options "SAMEORIGIN";
+            add_header X-XSS-Protection "1; mode=block";
+            add_header Referrer-Policy "strict-origin-when-cross-origin";
+            add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=(), fullscreen=(self), sync-xhr=(), magnetometer=(), gyroscope=(), accelerometer=(), usb=(), autoplay=(), midi=(), encrypted-media=(), xr-spatial-tracking=()";
+            add_header Strict-Transport-Security $hsts_header_value always;
+            set $upstream_kafka_ui ${AFC_KAFKA_UI_TARGET};
+            proxy_pass http://$upstream_kafka_ui$request_uri;
         }
 
         location /fbrat/cadvisor {
-            auth_request /fbrat/_admin_check;
+            auth_request /fbrat/_super_check;
             error_page 401 = @auth_redirect;
             error_page 403 = @forbidden;
             proxy_bind $server_addr;
@@ -274,15 +394,30 @@ http {
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_hide_header Content-Security-Policy;
-            add_header Content-Security-Policy  "script-src 'self' 'unsafe-inline'";
-            proxy_pass http://cadvisor$request_uri;
+            # Google Charts (bundled in cAdvisor's loader.js) dynamically fetches
+            # chart packages from www.gstatic.com at runtime; without this the
+            # browser blocks those requests and every panel stays empty.
+            add_header Content-Security-Policy  "script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com";
+            # Re-declare server-level security headers so they are present in all locations.
+            add_header X-Content-Type-Options nosniff;
+            add_header X-Frame-Options "SAMEORIGIN";
+            add_header X-XSS-Protection "1; mode=block";
+            add_header Referrer-Policy "strict-origin-when-cross-origin";
+            add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=(), fullscreen=(self), sync-xhr=(), magnetometer=(), gyroscope=(), accelerometer=(), usb=(), autoplay=(), midi=(), encrypted-media=(), xr-spatial-tracking=()";
+            add_header Strict-Transport-Security $hsts_header_value always;
+            set $upstream_cadvisor ${AFC_CADVISOR_TARGET};
+            proxy_pass http://$upstream_cadvisor$request_uri;
             proxy_redirect http:// $scheme://;
             proxy_redirect /docker/ /fbrat/cadvisor/docker/;
             proxy_redirect /podman/ /fbrat/cadvisor/podman/;
         }
 
+        # RabbitMQ has management.path_prefix = /fbrat/rabbitmq in rabbitmq.conf,
+        # so it serves at /fbrat/rabbitmq/ and expects the full URI to be passed.
+        # Using $request_uri (like Grafana) avoids the redirect loop caused by
+        # stripping the prefix.
         location /fbrat/rabbitmq {
-            auth_request /fbrat/_admin_check;
+            auth_request /fbrat/_super_check;
             error_page 401 = @auth_redirect;
             error_page 403 = @forbidden;
             proxy_bind $server_addr;
@@ -290,17 +425,66 @@ http {
             proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header Authorization "Basic Y2VsZXJ5OmNlbGVyeQ==";
-            proxy_set_header Accept-Encoding "";
-            sub_filter '</head>' '<script>if(!localStorage.getItem("credentials")){localStorage.setItem("credentials","Y2VsZXJ5OmNlbGVyeQ==");localStorage.setItem("auth-scheme","Basic");location.reload();}</script></head>';
-            sub_filter_once on;
-            sub_filter_types text/html;
             proxy_hide_header Content-Security-Policy;
+            proxy_hide_header WWW-Authenticate;
             add_header Content-Security-Policy  "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
-            proxy_pass http://rabbitmq$request_uri;
+            # Re-declare server-level security headers so they are present in all locations.
+            add_header X-Content-Type-Options nosniff;
+            add_header X-Frame-Options "SAMEORIGIN";
+            add_header X-XSS-Protection "1; mode=block";
+            add_header Referrer-Policy "strict-origin-when-cross-origin";
+            add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=(), fullscreen=(self), sync-xhr=(), magnetometer=(), gyroscope=(), accelerometer=(), usb=(), autoplay=(), midi=(), encrypted-media=(), xr-spatial-tracking=()";
+            add_header Strict-Transport-Security $hsts_header_value always;
+            set $upstream_rabbitmq ${AFC_RABBITMQ_TARGET};
+            proxy_pass http://$upstream_rabbitmq$request_uri;
             proxy_redirect http:// $scheme://;
         }
+
+        # Grafana Alloy built-in UI — pipeline graph, component health, shipping metrics
+        location = /fbrat/alloy {
+            return 301 $scheme://$http_host/fbrat/alloy/;
+        }
+        location /fbrat/alloy/ {
+            auth_request /fbrat/_super_check;
+            error_page 401 = @auth_redirect;
+            error_page 403 = @forbidden;
+            proxy_bind $server_addr;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Real-IP $remote_addr;
+            # Disable upstream compression so sub_filter can inspect HTML
+            proxy_set_header Accept-Encoding "";
+            proxy_hide_header Content-Security-Policy;
+            add_header Content-Security-Policy "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+            # Re-declare server-level security headers so they are present in all locations.
+            add_header X-Content-Type-Options nosniff;
+            add_header X-Frame-Options "SAMEORIGIN";
+            add_header X-XSS-Protection "1; mode=block";
+            add_header Referrer-Policy "strict-origin-when-cross-origin";
+            add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=(), fullscreen=(self), sync-xhr=(), magnetometer=(), gyroscope=(), accelerometer=(), usb=(), autoplay=(), midi=(), encrypted-media=(), xr-spatial-tracking=()";
+            add_header Strict-Transport-Security $hsts_header_value always;
+            # Strip /fbrat/alloy/ prefix before forwarding; Alloy serves from root /
+            set $upstream_alloy ${AFC_ALLOY_TARGET};
+            rewrite ^/fbrat/alloy/(.*)$ /$1 break;
+            proxy_pass http://$upstream_alloy;
+            # Rewrite the hard-coded <base href="/"> in Alloy's HTML so that
+            # relative paths (./assets/..., ./manifest.json, etc.) resolve to
+            # /fbrat/alloy/ instead of the domain root (which is the webui).
+            sub_filter '<base href="/" />' '<base href="/fbrat/alloy/" />';
+            sub_filter_once on;
+            # sub_filter_types default is text/html — no need to add it explicitly
+            # Rewrite any redirects Alloy issues (e.g. / → /ui/) back to /fbrat/alloy/
+            proxy_redirect / $scheme://$http_host/fbrat/alloy/;
+        }
         # MONITORING_END
+
+        location = /fbrat/www/ {
+            return 301 $scheme://$http_host/fbrat/www/index.html;
+        }
+
+        location = /fbrat/www {
+            return 301 $scheme://$http_host/fbrat/www/index.html;
+        }
 
         location / {
             if ($request_uri = "/") {
@@ -311,14 +495,18 @@ http {
             proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header X-Real-IP $remote_addr;
+            # Strip attestation headers so WAN clients cannot spoof internal trust
+            proxy_set_header X-AFC-Internal-Token "";
+            proxy_set_header X-AFC-Dispatcher-Token "";
+            proxy_set_header mTLS-DN "";
+            proxy_set_header X-SSL-Client-Verify "";
             proxy_pass http://webui;
             proxy_redirect http:// $scheme://;
-            proxy_cookie_flags csrf_token secure;
         }
 
         # redirect server error pages to the static page /50x.html
         #
-        error_page   500 502 503 504;
+        error_page   500 502 503 504  /50x.html;
         #error_page   500 502 503 504  /50x.html;
         #location = /50x.html {
         #    root   /usr/share/nginx/html;

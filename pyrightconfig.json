@@ -1,0 +1,42 @@
+{
+    "pythonVersion": "3.12",
+    "typeCheckingMode": "basic",
+    "include": [
+        "uls",
+        "afc_server",
+        "msghnd",
+        "rcache",
+        "rat_server",
+        "worker",
+        "als",
+        "cert_db",
+        "objstorage",
+        "src/ratapi/ratapi",
+        "src/afc-packages",
+        "tests"
+    ],
+    "exclude": [
+        "**/node_modules",
+        "**/__pycache__",
+        "**/migrations/versions"
+    ],
+
+    "reportMissingImports": "none",
+    "reportMissingModuleSource": "none",
+
+    "reportIndexIssue": "error",
+    "reportUnboundVariable": "error",
+    "reportUndefinedVariable": "error",
+    "reportOptionalSubscript": "error",
+    "reportOptionalMemberAccess": "warning",
+    "reportOptionalIterable": "warning",
+    "reportOptionalOperand": "warning",
+    "reportArgumentType": "warning",
+    "reportOperatorIssue": "warning",
+    "reportAssignmentType": "warning",
+    "reportUnusedExcept": "warning",
+    "reportReturnType": "none",
+    "reportAttributeAccessIssue": "none",
+    "reportCallIssue": "none",
+    "reportGeneralTypeIssues": "none"
+}

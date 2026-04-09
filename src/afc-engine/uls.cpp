@@ -991,8 +991,13 @@ double ULSClass::computeBeamWidth(double attnDB)
 
 	double a2 = a1;
 	double e2;
+	// Cap the sweep: the step size shrinks as 10^(-g0/20), so an anomalous
+	// database-supplied rxGain would otherwise make this loop spin
+	// effectively forever (CWE-834)
+	const int maxBeamWidthIter = 1000000;
+	int beamWidthIter = 0;
 	do {
-		if (a2 == 180.0) {
+		if ((a2 == 180.0) || (++beamWidthIter > maxBeamWidthIter)) {
 			errStr << "ERROR: Unable to compute " << attnDB
 			       << " dB beamwidth with GAIN (DB) = " << g0 << std::endl;
 			throw std::runtime_error(errStr.str());
