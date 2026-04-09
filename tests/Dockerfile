@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Configure pip to use package registry proxy (optional)
 ARG PIP_INDEX_URL

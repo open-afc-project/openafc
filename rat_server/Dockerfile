@@ -6,6 +6,8 @@
 #
 # Install required packages
 #
+# Pin Alpine 3.21: rolling python:3.12-alpine can pick newer CMake that rejects
+# cmake_minimum_required() after project() in root CMakeLists.txt.
 FROM python:3.12-alpine3.21
 # This variable should be set to used Python version (major.minor only)
 ENV AFC_PYTHONVERSION=3.12

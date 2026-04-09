@@ -22,6 +22,7 @@ import logging
 import os
 import prometheus_client
 import pydantic
+from pydantic_settings import BaseSettings
 import re
 import shlex
 import shutil
@@ -76,80 +77,80 @@ HEALTHCHECK_SCRIPT = os.path.join(os.path.dirname(__file__),
 DEFAULT_STATSD_PORT = 8125
 
 
-class Settings(pydantic.BaseSettings):
+class Settings(BaseSettings):
     """ Arguments from command lines - with their default values """
     download_script: str = \
         pydantic.Field(
             "/mnt/nfs/rat_transfer/daily_uls_parse/daily_uls_parse.py",
-            env="ULS_DOWNLOAD_SCRIPT",
+            validation_alias="ULS_DOWNLOAD_SCRIPT",
             description="FS download script")
     download_script_args: Optional[str] = \
-        pydantic.Field(None, env="ULS_DOWNLOAD_SCRIPT_ARGS",
+        pydantic.Field(None, validation_alias="ULS_DOWNLOAD_SCRIPT_ARGS",
                        description="Additional download script parameters")
     region: Optional[str] = \
-        pydantic.Field(None, env="ULS_DOWNLOAD_REGION",
+        pydantic.Field(None, validation_alias="ULS_DOWNLOAD_REGION",
                        description="Download regions", no="All")
     result_dir: str = \
         pydantic.Field(
-            "/mnt/nfs/rat_transfer/ULS_Database/", env="ULS_RESULT_DIR",
+            "/mnt/nfs/rat_transfer/ULS_Database/", validation_alias="ULS_RESULT_DIR",
             description="Directory where download script puts downloaded file")
     temp_dir: str = \
         pydantic.Field(
-            "/mnt/nfs/rat_transfer/daily_uls_parse/temp/", env="ULS_TEMP_DIR",
+            "/mnt/nfs/rat_transfer/daily_uls_parse/temp/", validation_alias="ULS_TEMP_DIR",
             description="Temporary directory of ULS download script, cleaned "
             "before downloading")
     ext_db_dir: str = \
         pydantic.Field(
-            ..., env="ULS_EXT_DB_DIR",
+            ..., validation_alias="ULS_EXT_DB_DIR",
             description="Ultimate downloaded file destination directory")
     ext_db_symlink: str = \
-        pydantic.Field(..., env="ULS_CURRENT_DB_SYMLINK",
+        pydantic.Field(..., validation_alias="ULS_CURRENT_DB_SYMLINK",
                        description="Symlink pointing to current ULS file")
     fsid_file: str = \
         pydantic.Field(
             "/mnt/nfs/rat_transfer/daily_uls_parse/data_files/fsid_table.csv",
-            env="ULS_FSID_FILE",
+            validation_alias="ULS_FSID_FILE",
             description="FSID file location expected by ULS download script")
     ext_ras_database: str = \
-        pydantic.Field(..., env="ULS_EXT_RAS_DATABASE",
+        pydantic.Field(..., validation_alias="ULS_EXT_RAS_DATABASE",
                        description="RAS database")
     ras_database: str = \
         pydantic.Field(
             "/mnt/nfs/rat_transfer/daily_uls_parse/data_files/RASdatabase.dat",
-            env="ULS_RAS_DATABASE",
+            validation_alias="ULS_RAS_DATABASE",
             description="Where from ULS script reads RAS database")
     service_state_db_dsn: str = \
         pydantic.Field(
-            ..., env="ULS_SERVICE_STATE_DB_DSN",
+            ..., validation_alias="ULS_SERVICE_STATE_DB_DSN",
             description="Connection string to service state database",
             convert=safe_dsn)
     service_state_db_password_file: Optional[str] = \
         pydantic.Field(
-            None, env="ULS_SERVICE_STATE_DB_PASSWORD_FILE",
+            None, validation_alias="ULS_SERVICE_STATE_DB_PASSWORD_FILE",
             description="Optional name of file with password for state "
             "database DSN")
     db_creator_url: Optional[str] = \
         pydantic.Field(
-            None, env="AFC_DB_CREATOR_URL",
+            None, validation_alias="AFC_DB_CREATOR_URL",
             description="Postgres database creator REST API URL")
     alembic_config: Optional[str] = \
         pydantic.Field(
-            None, env="ULS_ALEMBIC_CONFIG",
+            None, validation_alias="ULS_ALEMBIC_CONFIG",
             description="Optional name of Alembic config file")
     alembic_initial_version: Optional[str] = \
         pydantic.Field(
-            None, env="ULS_ALEMBIC_INITIAL_VERSION",
+            None, validation_alias="ULS_ALEMBIC_INITIAL_VERSION",
             description="Version to stamp Alembic database with")
     alembic_head_version: Optional[str] = \
         pydantic.Field(
-            None, env="ULS_ALEMBIC_HEAD_VERSION",
+            None, validation_alias="ULS_ALEMBIC_HEAD_VERSION",
             description="Version to stamp newly-created database with "
             "(default is 'head')")
     prometheus_port: Optional[int] = \
-        pydantic.Field(None, env="ULS_PROMETHEUS_PORT",
+        pydantic.Field(None, validation_alias="ULS_PROMETHEUS_PORT",
                        description="Port to serve Prometheus metrics on")
     statsd_server: Optional[str] = \
-        pydantic.Field(None, env="ULS_STATSD_SERVER",
+        pydantic.Field(None, validation_alias="ULS_STATSD_SERVER",
                        description="StatsD server to send metrics to")
     check_ext_files: Optional[List[str]] = \
         pydantic.Field(
@@ -160,67 +161,67 @@ class Settings(pydantic.BaseSettings):
             "category_b1_antennas.csv,high_performance_antennas.csv,"
             "fcc_fixed_service_channelization.csv,"
             "transmit_radio_unit_architecture.csv",
-            env="ULS_CHECK_EXT_FILES",
+            validation_alias="ULS_CHECK_EXT_FILES",
             description="Verify that that files are the same as in internet",
             no="None")
     max_change_percent: Optional[float] = \
         pydantic.Field(
-            10., env="ULS_MAX_CHANGE_PERCENT",
+            10., validation_alias="ULS_MAX_CHANGE_PERCENT",
             description="Limit on number of paths changed",
             convert=lambda v: f"{v}%" if v else "Don't check")
     afc_url: Optional[str] = \
         pydantic.Field(
-            None, env="ULS_AFC_URL",
+            None, validation_alias="ULS_AFC_URL",
             description="AFC Service URL to use for database validity check",
             no="Don't check")
     afc_parallel: Optional[int] = \
         pydantic.Field(
-            None, env="ULS_AFC_PARALLEL",
+            None, validation_alias="ULS_AFC_PARALLEL",
             description="Number of parallel AFC Requests to use when doing "
             "validity check", no="fs_afc.py's default")
     rcache_url: Optional[str] = \
-        pydantic.Field(None, env="RCACHE_SERVICE_URL",
+        pydantic.Field(None, validation_alias="RCACHE_SERVICE_URL",
                        description="Rcache service url",
                        no="Don't do spatial invalidation")
     rcache_enabled: bool = \
-        pydantic.Field(True, env="RCACHE_ENABLED",
+        pydantic.Field(True, validation_alias="RCACHE_ENABLED",
                        description="Rcache spatial invalidation",
                        yes="Enabled", no="Disabled")
     rcache_directional_invalidate: bool = \
         pydantic.Field(
-            True, env="RCACHE_DIRECTIONAL_INVALIDATE",
+            True, validation_alias="RCACHE_DIRECTIONAL_INVALIDATE",
             description="True to use directional invalidation (default), "
             "False to use tiled invalidation)")
     delay_hr: float = \
-        pydantic.Field(0., env="ULS_DELAY_HR",
+        pydantic.Field(0., validation_alias="ULS_DELAY_HR",
                        description="Hours to delay first download by")
     interval_hr: float = \
-        pydantic.Field(4, env="ULS_INTERVAL_HR",
+        pydantic.Field(4, validation_alias="ULS_INTERVAL_HR",
                        description="Download interval in hours")
     timeout_hr: float = \
-        pydantic.Field(1, env="ULS_TIMEOUT_HR",
+        pydantic.Field(1, validation_alias="ULS_TIMEOUT_HR",
                        description="Download maximum duration in hours")
     nice: bool = \
-        pydantic.Field(False, env="ULS_NICE",
+        pydantic.Field(False, validation_alias="ULS_NICE",
                        description="Run in lowered (nice) priority")
     verbose: bool = \
         pydantic.Field(False, description="Print debug info")
     run_once: bool = \
-        pydantic.Field(False, env="ULS_RUN_ONCE",
+        pydantic.Field(False, validation_alias="ULS_RUN_ONCE",
                        description="Run", yes="Once", no="Indefinitely")
     force: bool = \
         pydantic.Field(False,
                        description="Force FS database update (even if not "
                        "changed or found invalid)")
 
-    @pydantic.validator("check_ext_files", pre=True)
+    @pydantic.field_validator("check_ext_files", mode="before")
     @classmethod
     def check_ext_files_str_to_list(cls, v: Any) -> Any:
         """ Converts string value of 'check_ext_files' from environment from
         string to list (as it is list in argparse) """
         return [v] if v and isinstance(v, str) else v
 
-    @pydantic.validator("statsd_server", pre=False)
+    @pydantic.field_validator("statsd_server", mode="after")
     @classmethod
     def check_statsd_server(cls, v: Any) -> Any:
         """ Applies default StatsD port """
@@ -233,7 +234,7 @@ class Settings(pydantic.BaseSettings):
                 assert host
         return v
 
-    @pydantic.root_validator(pre=True)
+    @pydantic.model_validator(mode="before")
     @classmethod
     def remove_empty(cls, v: Any) -> Any:
         """ Prevalidator that removes empty values (presumably from environment
@@ -255,9 +256,11 @@ class ProcessingException(Exception):
 def print_args(settings: Settings) -> None:
     """ Print invocation parameters to log """
     logging.info("FS downloader started with the following parameters")
-    for name, model_field in settings.__fields__.items():
+    for name, field_info in settings.model_fields.items():
         value = getattr(settings, name)
-        extra = getattr(model_field.field_info, "extra", {})
+        extra = field_info.json_schema_extra or {}
+        if not isinstance(extra, dict):
+            extra = {}
         value_repr: str
         if "convert" in extra:
             value_repr = extra["convert"](value)
@@ -265,11 +268,11 @@ def print_args(settings: Settings) -> None:
             value_repr = extra["yes"]
         elif (not value) and ("no" in extra):
             value_repr = extra["no"]
-        elif model_field.type_ == bool:
+        elif field_info.annotation is bool:
             value_repr = "Yes" if value else "No"
         else:
             value_repr = str(value)
-        logging.info(f"{model_field.field_info.description}: {value_repr}")
+        logging.info(f"{field_info.description}: {value_repr}")
 
 
 class LoggingExecutor:
@@ -1196,7 +1199,7 @@ def main(argv: List[str]) -> None:
         temp_uls_file_name: Optional[str] = None
 
         while True:
-            als_record = AlsRecord(settings=settings.dict())
+            als_record = AlsRecord(settings=settings.model_dump())
             als_record.now(field_name="start_time")
             err_msg: Optional[str] = None
             completed = False
@@ -1374,7 +1377,7 @@ def main(argv: List[str]) -> None:
                 err_msg = str(ex)
                 logging.error(f"Download failed: {ex}")
             finally:
-                als.als_json_log(topic="fs_download", record=als_record.dict())
+                als.als_json_log(topic="fs_download", record=als_record.model_dump())
                 if settings.run_once:
                     flushed = als.als_flush()
                     if not flushed:

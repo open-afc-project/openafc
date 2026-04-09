@@ -17,7 +17,7 @@ double CalcITU699(const double &angleDeg, const double &maxGain, const double &D
 
 	// double Dlambda = pow(10, ((maxGain - 7.7)/20));
 	double g1 = 2.0 + 15.0 * log10(Dlambda);
-	double psiM = (maxGain >= g1 ? (20.0 / Dlambda)*sqrt(maxGain - g1) : 0.0);
+	double psiM = (maxGain >= g1 ? (20.0 / Dlambda) * sqrt(maxGain - g1) : 0.0);
 	double psiR = 15.85 * pow(Dlambda, -0.6);
 	double rv;
 
@@ -26,7 +26,7 @@ double CalcITU699(const double &angleDeg, const double &maxGain, const double &D
 	if (Dlambda > 100.0) {
 		if (cAngleDeg < psiM) {
 			double DlambdaPhi = Dlambda * cAngleDeg;
-			rv = maxGain - 2.5e-3 * DlambdaPhi*DlambdaPhi;
+			rv = maxGain - 2.5e-3 * DlambdaPhi * DlambdaPhi;
 		} else if (cAngleDeg < psiR) {
 			rv = g1;
 		} else if (cAngleDeg < 48.0) {
@@ -37,7 +37,7 @@ double CalcITU699(const double &angleDeg, const double &maxGain, const double &D
 	} else if (Dlambda <= 100.0) {
 		if (cAngleDeg < psiM) {
 			double DlambdaPhi = Dlambda * cAngleDeg;
-			rv = maxGain - 2.5e-3 * DlambdaPhi*DlambdaPhi;
+			rv = maxGain - 2.5e-3 * DlambdaPhi * DlambdaPhi;
 		} else if (cAngleDeg < 100.0 / Dlambda) {
 			rv = g1;
 		} else if (cAngleDeg < 48.0) {

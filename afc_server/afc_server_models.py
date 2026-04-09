@@ -10,7 +10,9 @@
 
 import enum
 import pydantic
-from typing import Any, ClassVar, List, NamedTuple, Optional
+from pydantic import ConfigDict
+from pydantic_settings import BaseSettings
+from typing import Any, ClassVar, Dict, List, NamedTuple, Optional
 
 __all__ = ["AfcServerSettings", "OpenAfcUsedDataVendorExtParams",
            "Rest_AvailableSpectrumInquiryRequest",
@@ -23,20 +25,10 @@ __all__ = ["AfcServerSettings", "OpenAfcUsedDataVendorExtParams",
            "Rest_SupplementalInfo", "Rest_SupportedVersions"]
 
 
-class AfcServerSettings(pydantic.BaseSettings):
+class AfcServerSettings(BaseSettings):
     """ AFC server service parameters, passed via environment variables """
 
-    class Config:
-        """ Metainformation """
-        # Prefix of environment variables
-        env_prefix = "AFC_SERVER_"
-
-        @classmethod
-        def parse_env_var(cls, field_name: str, raw_val: str) -> Any:
-            """ Parses string list environment variable(s) """
-            if field_name == "afc_state_vendor_extensions":
-                return [x for x in raw_val.split(",") if x]
-            return cls.json_loads(raw_val)
+    model_config = ConfigDict(env_prefix="AFC_SERVER_")
 
     port: int = pydantic.Field(default=...,
                                title="Port AFC server listens on")
@@ -45,10 +37,10 @@ class AfcServerSettings(pydantic.BaseSettings):
             default=...,
             title="Rcache Postgres DSN: "
             "postgresql://[user[:password]]@host[:port]/database[?...]",
-            env="RCACHE_POSTGRES_DSN")
+            validation_alias="RCACHE_POSTGRES_DSN")
     rcache_password_file: Optional[str] = \
         pydantic.Field(default=None, title="File with password for Rcache DSN",
-                       env="RCACHE_POSTGRES_PASSWORD_FILE")
+                       validation_alias="RCACHE_POSTGRES_PASSWORD_FILE")
     ratdb_dsn: pydantic.PostgresDsn = \
         pydantic.Field(
             default=...,
@@ -61,15 +53,15 @@ class AfcServerSettings(pydantic.BaseSettings):
             default=...,
             title="RabbitMQ AMQP DSN for receiving replies from worker: "
             "amqp://[user]@host[:port])",
-            env="RCACHE_RMQ_DSN")
+            validation_alias="RCACHE_RMQ_DSN")
     rmq_password_file: Optional[str] = \
         pydantic.Field(default=None,
                        title="File with password for RabbitMQ AMQP DSN",
-                       env="RCACHE_RMQ_PASSWORD_FILE")
+                       validation_alias="RCACHE_RMQ_PASSWORD_FILE")
     static_data_root: Optional[str] = \
         pydantic.Field(default=None,
                        title="Worker's mount path of static files",
-                       env="NFS_MOUNT_PATH")
+                       validation_alias="NFS_MOUNT_PATH")
     request_timeout: float = \
         pydantic.Field(
             default=...,
@@ -90,7 +82,7 @@ class AfcServerSettings(pydantic.BaseSettings):
             default=None,
             title="Comma-separated list of response vendor extensions from "
             "rcache to attach to requests sent to AFC Engine",
-            env="AFC_STATE_VENDOR_EXTENSIONS")
+            validation_alias="AFC_STATE_VENDOR_EXTENSIONS")
     bypass_cert: bool = \
         pydantic.Field(
             default=False,
@@ -102,31 +94,43 @@ class AfcServerSettings(pydantic.BaseSettings):
             title="Bypass actual Rcache lookup (always return same record). "
             "For performance estimation purposes")
 
+    @pydantic.model_validator(mode="before")
+    @classmethod
+    def _coerce_list_fields(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Coerce comma-separated env var strings to lists for list-typed
+        fields"""
+        for key in ("afc_state_vendor_extensions",
+                    "AFC_STATE_VENDOR_EXTENSIONS"):
+            val = values.get(key)
+            if isinstance(val, str):
+                values[key] = [s.strip() for s in val.split(",") if s.strip()]
+        return values
+
 
 # Supported request versions. Last is default response version
 Rest_SupportedVersions = ["1.4"]
 
 
-class Rest_VendorExtension(pydantic.BaseModel, extra=pydantic.Extra.forbid):
+class Rest_VendorExtension(pydantic.BaseModel, extra="forbid"):
     """ Vendor Extension used in AFC requests and responses """
     extensionId: str = pydantic.Field(min_length=1)
     parameters: Any
 
 
 class Rest_AvailableSpectrumInquiryRequest(pydantic.BaseModel,
-                                           extra=pydantic.Extra.allow):
+                                           extra="allow"):
     """ Minimally acceptable request structure """
     requestId: str
 
 
-class Rest_ReqMsg(pydantic.BaseModel, extra=pydantic.Extra.allow):
+class Rest_ReqMsg(pydantic.BaseModel, extra="allow"):
     """ Minimally acceptable message structure """
     version: str
     availableSpectrumInquiryRequests: \
         List[Rest_AvailableSpectrumInquiryRequest]
 
 
-class Rest_ReqMsg_1_4(pydantic.BaseModel, extra=pydantic.Extra.allow):
+class Rest_ReqMsg_1_4(pydantic.BaseModel, extra="allow"):
     """ AFC 1.4 request message with minimally acceptable requests """
     version: str
     availableSpectrumInquiryRequests: \
@@ -135,31 +139,22 @@ class Rest_ReqMsg_1_4(pydantic.BaseModel, extra=pydantic.Extra.allow):
 
 
 class Rest_CertificationId_1_4(pydantic.BaseModel,
-                               extra=pydantic.Extra.forbid):
+                               extra="forbid"):
     """ Certification definition used in AFC 1.4 requests """
     rulesetId: str = pydantic.Field(min_length=1)
     id: str = pydantic.Field(min_length=1)
 
 
 class Rest_DeviceDescriptor_1_4(pydantic.BaseModel,
-                                extra=pydantic.Extra.forbid):
+                                extra="forbid"):
     """ Device definition used in AFC 1.4 requests """
     serialNumber: str = pydantic.Field(min_length=1)
-    certificationId: List[Rest_CertificationId_1_4]
-    # Can't make this work with Pydantic 1.x:
-    # pydantic.Field(min_items=1). Pydantic 1.x doesn't get it
-
-    @classmethod
-    @pydantic.validator("certificationId")
-    def min_cert_num(cls, v: List[Rest_CertificationId_1_4]) \
-            -> List[Rest_CertificationId_1_4]:
-        if len(v) < 1:
-            raise ValueError("At least one certification must be provided")
-        return v
+    certificationId: List[Rest_CertificationId_1_4] = \
+        pydantic.Field(min_length=1)
 
 
 class Rest_AvailableSpectrumInquiryRequest_1_4(pydantic.BaseModel,
-                                               extra=pydantic.Extra.allow):
+                                               extra="allow"):
     """ Minimally acceptable 1.4 request structure """
     requestId: str = pydantic.Field(min_length=1)
     deviceDescriptor: Rest_DeviceDescriptor_1_4
@@ -212,14 +207,14 @@ class Rest_ResponseCode(enum.Enum):
     UNSUPPORTED_BASIS = ResponseCodeInfo(code=301, prefix="")
 
 
-class Rest_SupplementalInfo(pydantic.BaseModel, extra=pydantic.Extra.forbid):
+class Rest_SupplementalInfo(pydantic.BaseModel, extra="forbid"):
     """ Error supplemental info used in AFC responses """
     missingParams: Optional[List[str]] = None
     invalidParams: Optional[List[str]] = None
     unexpectedParams: Optional[List[str]] = None
 
 
-class Rest_Response(pydantic.BaseModel, extra=pydantic.Extra.forbid):
+class Rest_Response(pydantic.BaseModel, extra="forbid"):
     """ AFC Response (computation result) """
     responseCode: int
     shortDescription: Optional[str] = None
@@ -227,7 +222,7 @@ class Rest_Response(pydantic.BaseModel, extra=pydantic.Extra.forbid):
 
 
 class Rest_AvailableSpectrumInquiryResponseMinGen(pydantic.BaseModel,
-                                                  extra=pydantic.Extra.allow):
+                                                  extra="allow"):
     """ Minimal generated AFC Response structure """
     requestId: str
     rulesetId: str
@@ -236,19 +231,19 @@ class Rest_AvailableSpectrumInquiryResponseMinGen(pydantic.BaseModel,
 
 
 class Rest_AvailableSpectrumInquiryResponseMinParse(
-        pydantic.BaseModel, extra=pydantic.Extra.allow):
+        pydantic.BaseModel, extra="allow"):
     """ Minimal parsed AFC Response structure """
     vendorExtensions: Optional[List[Rest_VendorExtension]] = None
 
 
-class Rest_RespMsg_1_4(pydantic.BaseModel, extra=pydantic.Extra.allow):
+class Rest_RespMsg_1_4(pydantic.BaseModel, extra="allow"):
     """ Minimum parsed AFC 1.4 response message"""
     availableSpectrumInquiryResponses: \
         List[Rest_AvailableSpectrumInquiryResponseMinParse]
 
 
 class OpenAfcUsedDataVendorExtParams(pydantic.BaseModel,
-                                     extra=pydantic.Extra.ignore):
+                                     extra="ignore"):
     """ Vendor extension with information on what data was used by Engine """
     EXT_ID: ClassVar[str] = "openAfc.used_data"
     uls_id: Optional[str] = None

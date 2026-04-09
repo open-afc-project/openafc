@@ -328,7 +328,7 @@ class RcacheService:
                             f"Invalid format of cache update data: {ex}")
                     else:
                         if dr is not None:
-                            row_dict = dr.dict()
+                            row_dict = dr.model_dump()
                             update_bulk[self._db.get_ap_pk(row_dict)] = \
                                 row_dict
                     if (len(update_bulk) == self._db.max_update_records()) or \
@@ -495,7 +495,7 @@ class RcacheService:
                             raise aiohttp.ClientError(
                                 "Can't receive list of active configurations")
                         rulesets = \
-                            RatapiRulesetIds.parse_obj(await resp.json())
+                            RatapiRulesetIds.model_validate(await resp.json())
                     for ruleset in rulesets.rulesetId:
                         async with session.get(
                                 f"{self._config_retrieval_url}/{ruleset}") \
@@ -503,7 +503,7 @@ class RcacheService:
                             if resp.status != http.HTTPStatus.OK.value:
                                 continue
                             maxLinkDistance = \
-                                RatapiAfcConfig.parse_obj(
+                                RatapiAfcConfig.model_validate(
                                     await resp.json()).maxLinkDistance
                         if (ret is None) or (maxLinkDistance > ret):
                             ret = maxLinkDistance

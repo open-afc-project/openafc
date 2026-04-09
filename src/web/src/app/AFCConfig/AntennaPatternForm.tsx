@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import { FormGroup, FormSelect, FormSelectOption, TextInput, Tooltip, TooltipPosition } from '@patternfly/react-core';
 import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
 import { AntennaPatternState } from '../Lib/RatApiTypes';
@@ -60,10 +60,10 @@ export default class AntennaPatternForm extends React.PureComponent<{
       {' '}
       <FormSelect
         value={this.props.data.defaultAntennaPattern}
-        onChange={(x) => this.setKind(x)}
+        onChange={(_event, x) => this.setKind(x)}
         id="horzontal-form-antenna"
         name="horizontal-form-antenna"
-        isValid={this.props.data.defaultAntennaPattern !== undefined}
+        validated={this.props.data.defaultAntennaPattern !== undefined ? 'default' : 'error'}
         style={{ textAlign: 'right' }}
       >
         {this.getPatternOptionsByRegion(this.props.region).map((option) => (

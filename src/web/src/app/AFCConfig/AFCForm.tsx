@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   FormGroup,
   InputGroup,
@@ -16,13 +16,15 @@ import {
   Card,
   CardBody,
   Modal,
+  ModalBody,
+  ModalFooter,
   TextArea,
   ClipboardCopy,
   ClipboardCopyVariant,
   Tooltip,
   TooltipPosition,
   Radio,
-  CardHead,
+  CardHeader,
   PageSection,
 } from '@patternfly/react-core';
 import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
@@ -439,34 +441,36 @@ export class AFCForm extends React.Component<
       <Card>
         <Modal
           title="Copy/Paste"
-          isLarge={true}
+          variant="large"
           isOpen={this.state.isModalOpen}
           onClose={() => this.setState({ isModalOpen: false })}
-          actions={[
+        >
+          <ModalBody>
+            <ClipboardCopy
+              variant={ClipboardCopyVariant.expansion}
+              isExpanded
+              onChange={(_event: any, v: string | number) => this.setConfig(String(v).trim())}
+              aria-label="text area"
+            >
+              {this.getConfig()}
+            </ClipboardCopy>
+          </ModalBody>
+          <ModalFooter>
             <Button key="update" variant="primary" onClick={() => this.setState({ isModalOpen: false })}>
               Close
-            </Button>,
-          ]}
-        >
-          <ClipboardCopy
-            variant={ClipboardCopyVariant.expansion}
-            isExpanded
-            onChange={(v: string | number) => this.setConfig(String(v).trim())}
-            aria-label="text area"
-          >
-            {this.getConfig()}
-          </ClipboardCopy>
+            </Button>
+          </ModalFooter>
         </Modal>
         <CardBody>
-          <Gallery gutter="sm">
+          <Gallery hasGutter>
             <GalleryItem>
               <FormGroup label="Country" fieldId="horizontal-form-uls-region">
                 <FormSelect
                   value={this.state.config.regionStr}
-                  onChange={(x) => this.setUlsRegion(x)}
+                  onChange={(_event, x) => this.setUlsRegion(x)}
                   id="horizontal-form-uls-region"
                   name="horizontal-form-uls-region"
-                  isValid={!!this.state.config.regionStr}
+                  validated={!!this.state.config.regionStr ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 >
                   <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
@@ -494,10 +498,10 @@ export class AFCForm extends React.Component<
                 </Tooltip>
                 <FormSelect
                   value={this.state.config.fsDatabaseFile}
-                  onChange={(x) => this.setUlsDatabase(x)}
+                  onChange={(_event, x) => this.setUlsDatabase(x)}
                   id="horizontal-form-uls-db"
                   name="horizontal-form-uls-db"
-                  isValid={!!this.state.config.fsDatabaseFile}
+                  validated={!!this.state.config.fsDatabaseFile ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 >
                   <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select an FS Database" />
@@ -523,7 +527,7 @@ export class AFCForm extends React.Component<
               <Alert
                 variant="danger"
                 title="Error"
-                action={<AlertActionCloseButton onClose={() => this.setState({ messageError: undefined })} />}
+                actionClose={<AlertActionCloseButton onClose={() => this.setState({ messageError: undefined })} />}
               >
                 {this.state.messageError}
               </Alert>
@@ -534,24 +538,24 @@ export class AFCForm extends React.Component<
               <Alert
                 variant="success"
                 title="Success"
-                action={<AlertActionCloseButton onClose={() => this.setState({ messageSuccess: undefined })} />}
+                actionClose={<AlertActionCloseButton onClose={() => this.setState({ messageSuccess: undefined })} />}
               >
                 {this.state.messageSuccess}
               </Alert>
             )}
           </>
           <br />
-          <>
+          <ActionGroup className="afc-button-group afc-button-group--after-form">
             <Button variant="primary" onClick={this.submit}>
               Update Configuration File
-            </Button>{' '}
+            </Button>
             <Button variant="secondary" onClick={this.reset}>
               Reset Form to Default
-            </Button>{' '}
+            </Button>
             <Button key="open-modal" variant="secondary" onClick={() => this.setState({ isModalOpen: true })}>
               Copy/Paste
             </Button>
-          </>
+          </ActionGroup>
           <br />
           <br />
           <FormGroup label="Import Afc Config" fieldId="import-afc-form">

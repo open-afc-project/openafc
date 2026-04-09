@@ -7,18 +7,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="images/favicon.ico" />
     <!-- OneTrust Cookies Consent Notice start for broadcom.com -->
-    <script src="https://cdn.cookielaw.org/scripttemplates/otSDKStub.js"
-    type="text/javascript" charset="UTF-8" data-domain-script="6a5fee8c-80be-4b9a-ab7e-b607e3f8ad3e"
-    integrity="sha384-dSwLK5+rwImy8L/zbw6lO539i/QXKJFOZZljB8J//WelFZuKRVg0XC5nLzBjTy1K"
-    crossorigin="anonymous"></script>
+    <script
+      src="https://cdn.cookielaw.org/scripttemplates/otSDKStub.js"
+      type="text/javascript"
+      charset="UTF-8"
+      data-domain-script="6a5fee8c-80be-4b9a-ab7e-b607e3f8ad3e"
+      integrity="sha384-dSwLK5+rwImy8L/zbw6lO539i/QXKJFOZZljB8J//WelFZuKRVg0XC5nLzBjTy1K"
+      crossorigin="anonymous"
+    ></script>
     <script type="text/javascript">
-    function OptanonWrapper() { }
+      function OptanonWrapper() {}
     </script>
     <!-- OneTrust Cookies Consent Notice end for broadcom.com -->
   </head>
 
   <body>
     <noscript>Enabling JavaScript is required to run this app.</noscript>
+    <script>
+      (function () {
+        var t = localStorage.getItem('pf-theme');
+        if (t === 'dark' || (t === null && window.matchMedia('(prefers-color-scheme:dark)').matches))
+          document.documentElement.classList.add('pf-v6-theme-dark');
+      })();
+    </script>
     <div id="root"></div>
   </body>
 </html>

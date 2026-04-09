@@ -1,7 +1,8 @@
-import * as React from 'react';
+import React from 'react';
 import {
   PageSection,
-  CardHead,
+  CardHeader,
+  CardTitle,
   CardBody,
   Card,
   Button,
@@ -675,9 +676,9 @@ class MobileAP extends React.Component<
     return (
       <PageSection id="mobile-ap-page">
         <Card>
-          <CardHead>
-            <Title size="lg">Run Mobile AP</Title>
-          </CardHead>
+          <CardHeader>
+            <Title headingLevel="h2">Run Mobile AP</Title>
+          </CardHeader>
           <CardBody>
             <FormGroup label="Mobile AP Path Configuration" fieldId="mobile-ap-run-config">
               <InputGroup>
@@ -695,7 +696,7 @@ class MobileAP extends React.Component<
           <Alert
             title={this.state.extraWarningTitle || 'Warning'}
             variant="warning"
-            action={
+            actionClose={
               <AlertActionCloseButton
                 onClose={() => this.setState({ extraWarning: undefined, extraWarningTitle: undefined })}
               />
@@ -721,9 +722,11 @@ class MobileAP extends React.Component<
         )}
         <br />
         <Card>
-          <CardHead>Time Line</CardHead>
+          <CardHeader>
+            <CardTitle>Time Line</CardTitle>
+          </CardHeader>
           <CardBody>
-            <span>
+            <span className="afc-button-group--row">
               <Button
                 key="play-pause"
                 variant="primary"
@@ -731,7 +734,7 @@ class MobileAP extends React.Component<
                 onClick={() => this.playPause()}
               >
                 {this.state.isPlaying ? 'Pause' : 'Play'}
-              </Button>{' '}
+              </Button>
               <Button
                 key="slower-butn"
                 variant="secondary"
@@ -739,7 +742,7 @@ class MobileAP extends React.Component<
                 onClick={() => this.slowDown()}
               >
                 Slower
-              </Button>{' '}
+              </Button>
               <Button
                 key="faster-butn"
                 variant="secondary"
@@ -747,8 +750,8 @@ class MobileAP extends React.Component<
                 onClick={() => this.speedUp()}
               >
                 Faster
-              </Button>{' '}
-              {this.state.frameIncrement + 'x'}
+              </Button>
+              <span>{this.state.frameIncrement + 'x'}</span>
             </span>
             <br />
             <br />

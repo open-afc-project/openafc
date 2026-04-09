@@ -203,9 +203,9 @@ class UlsFileReader
 		void readTransmitterCA(const std::vector<std::string> &fieldList, FILE *fwarn);
 
 		void readStationDataStatic(const std::vector<std::string> &fieldList,
-				       FILE *fwarn,
-				       bool alignFederatedFlag,
-				       double alignFederatedScale);
+					   FILE *fwarn,
+					   bool alignFederatedFlag,
+					   double alignFederatedScale);
 
 		QList<UlsPath> allPaths;
 		QList<UlsEmission> allEmissions;

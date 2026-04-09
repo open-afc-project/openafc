@@ -172,9 +172,9 @@ class RcacheDb:
                     error_if(err, err)
                 try:
                     with engine.connect() as conn:
-                        conn.execute("COMMIT")
+                        conn.execute(sa.text("COMMIT"))
                         conn.execute(
-                            "CREATE EXTENSION IF NOT EXISTS postgis")
+                            sa.text("CREATE EXTENSION IF NOT EXISTS postgis"))
                 except sa.exc.SQLAlchemyError as ex:
                     error(f"Unable to create PostGIS extension in "
                           f"'{self.db_name}': {ex}")
@@ -244,7 +244,7 @@ class RcacheDb:
             if try_reconnect and (self._engine is None):
                 self.connect()
             assert (self._engine is not None) and (self.ap_table is not None)
-            s = sa.select([self.ap_table]).\
+            s = sa.select(self.ap_table).\
                 where(self.ap_table.c.req_cfg_digest.in_(req_cfg_digests))
             if not return_invalidated:
                 s = s.where(self.ap_table.c.state == ApDbRespState.Valid.name)
@@ -255,7 +255,8 @@ class RcacheDb:
                         {rec.req_cfg_digest:
                          RcacheLookupResult(
                              found=rec.state == ApDbRespState.Valid.name,
-                             response=ApDbRecord.parse_obj(rec).
+                             response=ApDbRecord.model_validate(
+                                 dict(rec._mapping)).
                              get_patched_response())
                             for rec in rp}
             except sa.exc.SQLAlchemyError as ex:

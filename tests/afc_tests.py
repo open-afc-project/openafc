@@ -112,8 +112,8 @@ class TestCfg(dict):
             # emulating request call from webui
             params_data = {}
         for key, val in [('debug', self['debug']),
-                            ('edebug', cfg['elaborated_debug']),
-                            ('gui', self['gui'])]:
+                         ('edebug', cfg['elaborated_debug']),
+                         ('gui', self['gui'])]:
             if val:
                 params_data[key] = 'True'
         if (self['cache'] == False):
@@ -506,8 +506,8 @@ def _send_recv(cfg, req_data, ssn=None):
             f"Cookies: {requests.utils.dict_from_cookiejar(ssn.cookies)}")
         post_func = ssn.post
     for key, val in [('debug', cfg['debug']),
-                        ('edebug', cfg['elaborated_debug']),
-                        ('gui', cfg['gui'])]:
+                     ('edebug', cfg['elaborated_debug']),
+                     ('gui', cfg['gui'])]:
         if val:
             params_data[key] = 'True'
     ser_cert = ()
@@ -1708,7 +1708,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         res = f"id {test_case} name {req_id} status $status time {tm_secs:.1f}"
         res_template = Template(res)
 
-        upd_data = None# remove the mapping info from the response
+        upd_data = None  # remove the mapping info from the response
         if isinstance(resp, type(None)):
             test_res = AFC_ERR
             all_test_res = AFC_ERR
@@ -1716,20 +1716,22 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
             app_log.error(f"Test case {req_id} returned error: {resp['error']}")
             test_res = AFC_ERR
         else:
-            if cfg['webui'] is True:
-                # remove the mapping info from the response
-                # to make sure the base data matches - not checking map results
-                for parent in resp['availableSpectrumInquiryResponses']:
+            for parent in resp.get('availableSpectrumInquiryResponses', []):
+                if cfg['webui'] is True:
+                    # remove the mapping info from the response
+                    # to make sure the base data matches - not checking map results
                     if 'vendorExtensions' in parent:
                         parent.pop('vendorExtensions')
-                    # rat_server returns ['certificationId', 'id'] for
-                    # a missing cert id field; afcserver returns ['id']
-                    mp = (parent.get('response', {})
-                          .get('supplementalInfo', {})
-                          .get('missingParams'))
-                    if mp == ['certificationId', 'id']:
-                        parent['response']['supplementalInfo'][
-                            'missingParams'] = ['id']
+                # afcserver returns ['id'] for a missing cert id field;
+                # rat_server returns ['certificationId', 'id'];
+                # msghnd may return ['id', 'certificationId'].
+                # Normalize all variants to ['id'] regardless of mode.
+                mp = (parent.get('response', {})
+                      .get('supplementalInfo', {})
+                      .get('missingParams'))
+                if set(mp or []) == {'certificationId', 'id'}:
+                    parent['response']['supplementalInfo'][
+                        'missingParams'] = ['id']
 
             json_lookup('availabilityExpireTime', resp, '0')
             upd_data = json.dumps(resp, sort_keys=True)

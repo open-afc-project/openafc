@@ -51,6 +51,7 @@ class AfcCertReq:
     serial         -- AP Serial Number
     certifications -- AP certifications (set of Certification objects)
     """
+
     def __init__(self, dev_dsc: afc_server_models.Rest_DeviceDescriptor_1_4) \
             -> None:
         """ Constructor from Rest_DeviceDescriptor_1_4 object """
@@ -432,13 +433,13 @@ class AfcServerDb:
         if self._bypass_rcache:
             if self._sample_rcache_reply is None:
                 try:
-                    s = sa.select([ap_table])
+                    s = sa.select(ap_table)
                     async with self._rcache_engine.connect() as conn:
                         rp = await conn.execute(s)
                         row = rp.first()
                         if row:
                             self._sample_rcache_reply = \
-                                rcache_models.ApDbRecord.parse_obj(row).\
+                                rcache_models.ApDbRecord.model_validate(row).\
                                 get_patched_response()
                 except (sa.exc.SQLAlchemyError, OSError) as ex:
                     error(f"Rcache DB lookup error: {ex}")
@@ -447,7 +448,7 @@ class AfcServerDb:
                     for d in req_cfg_digests}
 
         try:
-            s = sa.select([ap_table]).\
+            s = sa.select(ap_table).\
                 where(ap_table.c.req_cfg_digest.in_(req_cfg_digests))
             if not self._return_invalidated:
                 s = s.where(ap_table.c.state ==
@@ -457,7 +458,7 @@ class AfcServerDb:
                 ret: Dict[str, AfcRcacheResp] = {}
                 for row in rp:
                     found = row.state == rcache_models.ApDbRespState.Valid.name
-                    response = rcache_models.ApDbRecord.parse_obj(row).\
+                    response = rcache_models.ApDbRecord.model_validate(row).\
                         get_patched_response() \
                         if found or self._return_invalidated else None
                     ret[row.req_cfg_digest] = \
@@ -508,9 +509,9 @@ class AfcServerDb:
 
         try:
             s = sa.select(
-                    [ruleset_table.c.name, cert_table.c.certification_id,
-                     cert_table.c.location, deny_table.c.id,
-                     deny_table.c.serial_number]).select_from(
+                    ruleset_table.c.name, cert_table.c.certification_id,
+                    cert_table.c.location, deny_table.c.id,
+                    deny_table.c.serial_number).select_from(
                         ruleset_table.
                         join(cert_table,
                              ruleset_table.c.id == cert_table.c.ruleset_id).
@@ -530,16 +531,17 @@ class AfcServerDb:
             async with self._ratdb_engine.connect() as conn:
                 rp = await conn.execute(s)
                 for row in rp:
+                    m = row._mapping
                     res_certification = \
                         Certification(
-                            certification_id=row["certification_id"],
-                            ruleset_name=row["name"])
+                            certification_id=m["certification_id"],
+                            ruleset_name=m["name"])
                     cert_info = \
                         cert_infos.setdefault(
                             res_certification,
-                            CertInfo(location_flags=row["location"]))
-                    if row["id"] is not None:
-                        cert_info.denied_serials.add(row["serial_number"])
+                            CertInfo(location_flags=m["location"]))
+                    if m["id"] is not None:
+                        cert_info.denied_serials.add(m["serial_number"])
         except (sa.exc.SQLAlchemyError, OSError) as ex:
             error(f"RatDB certification lookup error: {ex}")
         # Note that resulting table contains excessive information: for each
@@ -594,7 +596,7 @@ class AfcServerDb:
             return {ruleset_id: None for ruleset_id in ruleset_ids}
 
         try:
-            s = sa.select([afc_config_table.c.config]).where(
+            s = sa.select(afc_config_table.c.config).where(
                 afc_config_table.c.config["regionStr"].astext.
                 in_(list(regions)))
             region_to_config: Dict[str, Dict[str, Any]] = {}

@@ -1,31 +1,36 @@
-import * as React from 'react';
+import React from 'react';
 import {
   Title,
   Card,
-  CardHead,
-  CardHeader,
   CardBody,
   PageSection,
-  InputGroup,
-  TextInput,
   FormGroup,
   Button,
   Alert,
   AlertActionCloseButton,
+  TextInput,
 } from '@patternfly/react-core';
 import { logger } from '../Lib/Logger';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { setAboutAfc } from '../Lib/RatApi';
 import { PlusCircleIcon } from '@patternfly/react-icons';
 
-export class About extends React.Component {
-  constructor(props: Readonly<{ content: RatResponse<string>; sitekey: string }>) {
-    super();
-    this.state = { content: props.content.result, name: '', email: '', org: '', token: '', sitekey: props.sitekey };
+export class About extends React.Component<any, any> {
+  constructor(props: Readonly<{ content: any; sitekey: string }>) {
+    super(props);
+    this.state = {
+      content: props.content.result,
+      name: '',
+      email: '',
+      org: '',
+      token: '',
+      sitekey: props.sitekey,
+      recaptchaError: false,
+    };
     logger.info('ABOUT state: ' + this.state.content);
   }
 
-  onChange = (value) => {
+  onChange = (value: any) => {
     this.setState({ token: value });
   };
 
@@ -37,7 +42,6 @@ export class About extends React.Component {
     if (!this.state.name || !this.state.email || !this.state.org) {
       this.setState({ messageType: 'danger', messageValue: 'User information is required' });
       return;
-      //
     }
 
     setAboutAfc(this.state.name, this.state.email, this.state.org, this.state.token).then((res) => {
@@ -55,70 +59,74 @@ export class About extends React.Component {
   private hideAlert = () => this.setState({ messageType: undefined });
 
   render() {
-    const nameChange = (s?: string) => this.setState({ name: s });
-    const emailChange = (s?: string) => this.setState({ email: s });
-    const orgChange = (s?: string) => this.setState({ org: s });
+    const nameChange = (_event: any, s?: string) => this.setState({ name: s });
+    const emailChange = (_event: any, s?: string) => this.setState({ email: s });
+    const orgChange = (_event: any, s?: string) => this.setState({ org: s });
 
     return (
       <PageSection>
         <div>
-          <Title size={'lg'}>Request Access to the AFC Website</Title>
+          <Title headingLevel="h2">Request Access to the AFC Website</Title>
           <Card>
-            {' '}
             <CardBody dangerouslySetInnerHTML={{ __html: this.state.content }} />
           </Card>
           <Card>
-            <FormGroup label="Full Name" isRequired={true} fieldId="user-full-name">
-              <TextInput
-                type="text"
-                id="user-full-name"
-                name="user-full-name"
-                isValid={true}
-                value={this.state.name}
-                onChange={nameChange}
-              />
-            </FormGroup>
+            <CardBody>
+              <FormGroup label="Full Name" isRequired={true} fieldId="user-full-name">
+                <TextInput
+                  type="text"
+                  id="user-full-name"
+                  name="user-full-name"
+                  value={this.state.name}
+                  onChange={nameChange}
+                />
+              </FormGroup>
+            </CardBody>
           </Card>
           <Card>
-            <FormGroup label="Email" isRequired={true} fieldId="user-email">
-              <TextInput
-                type="text"
-                id="user-email"
-                name="user-email"
-                isValid={true}
-                value={this.state.email}
-                onChange={emailChange}
-              />
-            </FormGroup>
+            <CardBody>
+              <FormGroup label="Email" isRequired={true} fieldId="user-email">
+                <TextInput
+                  type="text"
+                  id="user-email"
+                  name="user-email"
+                  value={this.state.email}
+                  onChange={emailChange}
+                />
+              </FormGroup>
+            </CardBody>
           </Card>
           <Card>
-            <FormGroup label="Organization" isRequired={true} fieldId="user-org">
-              <TextInput
-                type="text"
-                id="user-org"
-                name="user-org"
-                isValid={true}
-                value={this.state.org}
-                onChange={orgChange}
-              />
-            </FormGroup>
+            <CardBody>
+              <FormGroup label="Organization" isRequired={true} fieldId="user-org">
+                <TextInput type="text" id="user-org" name="user-org" value={this.state.org} onChange={orgChange} />
+              </FormGroup>
+            </CardBody>
           </Card>
           <>
             {this.state.messageType && (
               <Alert
                 variant={this.state.messageType}
                 title={this.state.messageValue}
-                action={<AlertActionCloseButton onClose={this.hideAlert} />}
+                actionClose={<AlertActionCloseButton onClose={this.hideAlert} />}
               />
             )}
           </>
           <br />
-
           <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()}>
             Submit
           </Button>
-
-          <Card>{this.state.sitekey && <ReCAPTCHA sitekey={this.state.sitekey} onChange={this.onChange} />}</Card>
+          {this.state.sitekey && !this.state.recaptchaError && (
+            <Card>
+              <CardBody>
+                <ReCAPTCHA
+                  sitekey={this.state.sitekey}
+                  onChange={this.onChange}
+                  onErrored={() => this.setState({ recaptchaError: true })}
+                />
+              </CardBody>
+            </Card>
+          )}
         </div>
       </PageSection>
     );

@@ -12,19 +12,13 @@
 '''
 import time
 import datetime
+import uuid
 from .base import db, UserDbInfo
 import jwt
-from appcfg import OIDCConfigurator
+from flask_login import UserMixin
 import os
 from sqlalchemy.schema import Sequence
 from sqlalchemy.dialects.postgresql import JSON
-
-OIDC_LOGIN = OIDCConfigurator().OIDC_LOGIN
-
-if OIDC_LOGIN:
-    from flask_login import UserMixin
-else:
-    from flask_user import UserMixin
 
 
 class User(db.Model, UserMixin):
@@ -45,6 +39,9 @@ class User(db.Model, UserMixin):
     email_confirmed_at = db.Column(db.DateTime())
     password = db.Column(db.String(255), nullable=False)
     active = db.Column(db.Boolean())
+    fs_uniquifier = db.Column(
+        db.String(255), unique=True, nullable=False,
+        default=lambda: uuid.uuid4().hex)
 
     # Application data fields
     first_name = db.Column(db.String(50))
@@ -68,7 +65,10 @@ class User(db.Model, UserMixin):
 
 
 class Role(db.Model):
-    ''' A role is used for authorization. '''
+    ''' A role is used for authorization.
+    Extends UserMixin-compatible RoleMixin so Flask-Security can introspect
+    the model when running in non-OIDC (local-login) mode.
+    '''
     __tablename__ = 'aaa_role'
     __table_args__ = (
         db.UniqueConstraint('name'),

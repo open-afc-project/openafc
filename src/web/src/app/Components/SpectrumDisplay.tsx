@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   LineChart,
   ScatterChart,
@@ -13,7 +13,7 @@ import {
   ReferenceArea,
   TooltipProps,
 } from 'recharts';
-import { Title, CardHeader, CardBody, Card, TextArea } from '@patternfly/react-core';
+import { Title, CardHeader, CardTitle, CardBody, Card, TextArea } from '@patternfly/react-core';
 import { SpectrumProfile, PAWSResponse } from '../Lib/RatApiTypes';
 import { AvailableSpectrumInquiryResponse, AvailableSpectrumInfo, AvailableChannelInfo } from '@app/Lib/RatAfcTypes';
 
@@ -119,7 +119,9 @@ export const SpectrumDisplayPAWS: React.FunctionComponent<{ spectrum?: PAWSRespo
 ) =>
   !props.spectrum || props.spectrum.spectrumSpecs.length === 0 ? (
     <Card>
-      <CardHeader>There is no data to display. Try sending a request above.</CardHeader>
+      <CardHeader>
+        <CardTitle>There is no data to display. Try sending a request above.</CardTitle>
+      </CardHeader>
     </Card>
   ) : (
     <>
@@ -127,7 +129,7 @@ export const SpectrumDisplayPAWS: React.FunctionComponent<{ spectrum?: PAWSRespo
         spec.spectrumSchedules.map((schedule, sIndex) => (
           <Card key={sIndex} isHoverable={true}>
             <CardHeader>
-              <Title size="md" style={{ textAlign: 'center' }}>
+              <Title headingLevel="h3" style={{ textAlign: 'center' }}>
                 {spec.rulesetInfo.rulesetId +
                   ': ' +
                   schedule.eventTime.startTime +
@@ -147,11 +149,16 @@ export const SpectrumDisplayPAWS: React.FunctionComponent<{ spectrum?: PAWSRespo
                 >
                   <CartesianGrid />
                   <XAxis
-                    label={{ value: 'Frequency (MHz)', position: 'bottom' }}
+                    label={{
+                      value: 'Frequency (MHz)',
+                      position: 'bottom',
+                      fill: 'var(--pf-t--global--text--color--regular)',
+                    }}
                     domain={[5925, 7125]}
                     type="number"
                     dataKey="hz"
                     name="Frequency (MHz)"
+                    tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
                     ticks={Array(15)
                       .fill(0)
                       .map((_, i) => 5925 + i * 80)
@@ -162,7 +169,13 @@ export const SpectrumDisplayPAWS: React.FunctionComponent<{ spectrum?: PAWSRespo
                     type="number"
                     dataKey="dbm"
                     name="Max. EIRP (dBm)"
-                    label={{ value: 'Max. EIRP (dBm)', angle: -90, position: 'insideLeft' }}
+                    tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
+                    label={{
+                      value: 'Max. EIRP (dBm)',
+                      angle: -90,
+                      position: 'insideLeft',
+                      fill: 'var(--pf-t--global--text--color--regular)',
+                    }}
                   />
                   <Tooltip cursor={true} />
                   {schedule.spectra.map((spectrum, i) => (
@@ -219,13 +232,15 @@ const makeSteps = (sections: AvailableSpectrumInfo[]): { hz: number; dbm?: numbe
 export const SpectrumDisplayAFC: React.FunctionComponent<{ spectrum?: AvailableSpectrumInquiryResponse }> = (props) =>
   !props.spectrum || !props.spectrum.availableFrequencyInfo || props.spectrum.availableFrequencyInfo.length === 0 ? (
     <Card>
-      <CardHeader>There is no spectrum data to display.</CardHeader>
+      <CardHeader>
+        <CardTitle>There is no spectrum data to display.</CardTitle>
+      </CardHeader>
     </Card>
   ) : (
     <>
       <Card key={1} isHoverable={true}>
         <CardHeader>
-          <Title size="md" style={{ textAlign: 'center' }}>
+          <Title headingLevel="h3" style={{ textAlign: 'center' }}>
             {'Request ' +
               props.spectrum?.requestId +
               ': expires at ' +
@@ -244,11 +259,16 @@ export const SpectrumDisplayAFC: React.FunctionComponent<{ spectrum?: AvailableS
             >
               <CartesianGrid />
               <XAxis
-                label={{ value: 'Frequency (MHz)', position: 'bottom' }}
+                label={{
+                  value: 'Frequency (MHz)',
+                  position: 'bottom',
+                  fill: 'var(--pf-t--global--text--color--regular)',
+                }}
                 domain={[5925, 7125]}
                 type="number"
                 dataKey="hz"
                 name="Frequency (MHz)"
+                tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
                 ticks={Array(15)
                   .fill(0)
                   .map((_, i) => 5925 + i * 80)
@@ -259,7 +279,13 @@ export const SpectrumDisplayAFC: React.FunctionComponent<{ spectrum?: AvailableS
                 type="number"
                 dataKey="dbm"
                 name="PSD (dBm/MHz)"
-                label={{ value: 'PSD (dBm/MHz)', angle: -90, position: 'insideLeft' }}
+                tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
+                label={{
+                  value: 'PSD (dBm/MHz)',
+                  angle: -90,
+                  position: 'insideLeft',
+                  fill: 'var(--pf-t--global--text--color--regular)',
+                }}
               />
               <Tooltip cursor={true} />
               <Scatter
@@ -429,12 +455,14 @@ export const SpectrumDisplayLineAFC: React.FunctionComponent<{ spectrum?: Availa
 ) =>
   !props.spectrum || !props.spectrum.availableChannelInfo || props.spectrum.availableChannelInfo.length === 0 ? (
     <Card>
-      <CardHeader>There is no spectrum data to display.</CardHeader>
+      <CardHeader>
+        <CardTitle>There is no spectrum data to display.</CardTitle>
+      </CardHeader>
     </Card>
   ) : (
     <Card isHoverable={true}>
       <CardHeader>
-        <Title size="md" style={{ textAlign: 'center' }}>
+        <Title headingLevel="h3" style={{ textAlign: 'center' }}>
           {'Request ' +
             props.spectrum.requestId +
             ': expires at ' +
@@ -453,11 +481,16 @@ export const SpectrumDisplayLineAFC: React.FunctionComponent<{ spectrum?: Availa
           >
             <CartesianGrid />
             <XAxis
-              label={{ value: 'Frequency (MHz)', position: 'bottom' }}
+              label={{
+                value: 'Frequency (MHz)',
+                position: 'bottom',
+                fill: 'var(--pf-t--global--text--color--regular)',
+              }}
               domain={[5925, 7125]}
               type="number"
               dataKey="hz"
               name="Frequency (MHz)"
+              tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
               ticks={Array(15)
                 .fill(0)
                 .map((_, i) => 5925 + i * 80)
@@ -468,7 +501,13 @@ export const SpectrumDisplayLineAFC: React.FunctionComponent<{ spectrum?: Availa
               type="number"
               dataKey="dbm"
               name="Max. EIRP (dBm)"
-              label={{ value: 'Max. EIRP (dBm)', angle: -90, position: 'insideLeft' }}
+              tick={{ fill: 'var(--pf-t--global--text--color--regular)' }}
+              label={{
+                value: 'Max. EIRP (dBm)',
+                angle: -90,
+                position: 'insideLeft',
+                fill: 'var(--pf-t--global--text--color--regular)',
+              }}
             />
             <Tooltip cursor={true} content={<CustomTooltip />} active={true} />
             {generateScatterPlot(props.spectrum.availableChannelInfo)}

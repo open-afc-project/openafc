@@ -230,6 +230,7 @@ class FsPath:
     _path_hash  -- Path hash (hash of pertinent non-identification fields in
                    the path) if its computation was requested, None otherwise
     """
+
     def __init__(self, fs_row: sa.engine.Row, conn: sa.engine.Connection,
                  pr_table: sa.Table, fs_hash_fields: HashFields,
                  pr_hash_fields: HashFields, compute_hash: bool = False,

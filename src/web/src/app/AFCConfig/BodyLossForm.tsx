@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import { FormGroup, InputGroup, FormSelect, FormSelectOption, TextInput, InputGroupText } from '@patternfly/react-core';
 import { BodyLossModel } from '../Lib/RatApiTypes';
 
@@ -32,11 +32,11 @@ export default class BodyLossForm extends React.PureComponent<{
     }
   };
 
-  private setFixedValueIndoor = (s: string) =>
+  private setFixedValueIndoor = (_event: any, s: string) =>
     // @ts-ignore
     this.props.onChange({ kind: 'Fixed Value', valueIndoor: Number(s), valueOutdoor: this.props.data.valueOutdoor });
 
-  private setFixedValueOutdoor = (s: string) =>
+  private setFixedValueOutdoor = (_event: any, s: string) =>
     // @ts-ignore
     this.props.onChange({ kind: 'Fixed Value', valueIndoor: this.props.data.valueIndoor, valueOutdoor: Number(s) });
 
@@ -54,7 +54,7 @@ export default class BodyLossForm extends React.PureComponent<{
                   type="number"
                   id="body-loss-fixed-value-in"
                   name="body-loss-fixed-value-in"
-                  isValid={this.props.data.valueIndoor <= 0 || this.props.data.valueIndoor > 0}
+                  validated={this.props.data.valueIndoor <= 0 || this.props.data.valueIndoor > 0 ? 'default' : 'error'}
                   value={this.props.data.valueIndoor}
                   onChange={this.setFixedValueIndoor}
                   style={{ textAlign: 'right' }}
@@ -68,7 +68,9 @@ export default class BodyLossForm extends React.PureComponent<{
                   type="number"
                   id="body-loss-fixed-value-out"
                   name="body-loss-fixed-value-out"
-                  isValid={this.props.data.valueOutdoor <= 0 || this.props.data.valueOutdoor > 0}
+                  validated={
+                    this.props.data.valueOutdoor <= 0 || this.props.data.valueOutdoor > 0 ? 'default' : 'error'
+                  }
                   value={this.props.data.valueOutdoor}
                   onChange={this.setFixedValueOutdoor}
                   style={{ textAlign: 'right' }}
@@ -93,7 +95,7 @@ export default class BodyLossForm extends React.PureComponent<{
                         onChange={x => this.setKind(x)}
                         id="horzontal-form-body-loss"
                         name="horizontal-form-body-loss"
-                        isValid={this.props.data.kind !== undefined}
+                        validated={this.props.data.kind !== undefined ? 'default' : 'error'}
                         style={{ textAlign: "right" }}
                     >
                         {penetrationLossModels.map((option) => (

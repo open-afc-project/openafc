@@ -144,13 +144,13 @@ UlsFileReader::UlsFileReader(const char *fpath,
 					/******************************************************************/
 
 					/******************************************************************/
-					/* Static Data                                                    */
+					/* Static Data */
 					/******************************************************************/
 				} else if (front == "US:SD") {
 					readStationDataStatic(fieldList,
-							  fwarn,
-							  alignFederatedFlag,
-							  alignFederatedScale);
+							      fwarn,
+							      alignFederatedFlag,
+							      alignFederatedScale);
 
 				} else {
 					errStr << std::string("ERROR: Unable to process inputFile "
@@ -1296,9 +1296,9 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 /* UlsFileReader::readStationDataStatic()                                 */
 /**************************************************************************/
 void UlsFileReader::readStationDataStatic(const std::vector<std::string> &fieldList,
-				      FILE *fwarn,
-				      bool alignFederatedFlag,
-				      double alignFederatedScale)
+					  FILE *fwarn,
+					  bool alignFederatedFlag,
+					  double alignFederatedScale)
 {
 	StationDataCAClass current;
 

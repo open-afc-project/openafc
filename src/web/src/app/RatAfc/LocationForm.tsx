@@ -1,9 +1,12 @@
-import * as React from 'react';
+import React from 'react';
 // import ReactTooltip from 'react-tooltip';
 import { Location, LinearPolygon, RadialPolygon, Ellipse, Elevation } from '../Lib/RatAfcTypes';
 import {
   GalleryItem,
   FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
   InputGroup,
   FormSelect,
   FormSelectOption,
@@ -160,7 +163,7 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
             <InputGroup>
               <FormSelect
                 value={locType}
-                onChange={(x: LocationType) => this.setFormDisplay(x)}
+                onChange={(_event: any, x: LocationType) => this.setFormDisplay(x)}
                 id="horzontal-form-location-type"
                 name="horizontal-form-location-type"
                 style={{ textAlign: 'right' }}
@@ -180,7 +183,7 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                 <InputGroup>
                   <TextInput
                     value={ellipse.center.latitude}
-                    onChange={(x) =>
+                    onChange={(_event, x) =>
                       ifNum(x, (n) =>
                         this.updateEllipse({ center: { latitude: n, longitude: ellipse.center.longitude } }),
                       )
@@ -189,10 +192,12 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                     step="any"
                     id="horizontal-form-latitude"
                     name="horizontal-form-latitude"
-                    isValid={
+                    validated={
                       ellipse.center.latitude !== undefined &&
                       ellipse.center.latitude >= -90 &&
                       ellipse.center.latitude <= 90
+                        ? 'default'
+                        : 'error'
                     }
                     style={{ textAlign: 'right' }}
                   />
@@ -205,7 +210,7 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                 <InputGroup>
                   <TextInput
                     value={ellipse.center.longitude}
-                    onChange={(x) =>
+                    onChange={(_event, x) =>
                       ifNum(x, (n) =>
                         this.updateEllipse({ center: { latitude: ellipse.center.latitude, longitude: n } }),
                       )
@@ -214,10 +219,12 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                     step="any"
                     id="horizontal-form-longitude"
                     name="horizontal-form-longitude"
-                    isValid={
+                    validated={
                       ellipse.center.longitude !== undefined &&
                       ellipse.center.longitude >= -180 &&
                       ellipse.center.longitude <= 180
+                        ? 'default'
+                        : 'error'
                     }
                     style={{ textAlign: 'right' }}
                   />
@@ -226,66 +233,69 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
               </FormGroup>
             </GalleryItem>
             <GalleryItem>
-              <FormGroup
-                label="Semi-major Axis"
-                fieldId="horizontal-form-maj-axis"
-                helperText="Attribute of uncertainty ellipse"
-              >
+              <FormGroup label="Semi-major Axis" fieldId="horizontal-form-maj-axis">
                 <InputGroup>
                   <TextInput
                     value={ellipse.majorAxis}
-                    onChange={(x) => ifNum(x, (n) => this.updateEllipse({ majorAxis: n }))}
+                    onChange={(_event, x) => ifNum(x, (n) => this.updateEllipse({ majorAxis: n }))}
                     type="number"
                     step="any"
                     id="horizontal-form-maj-axis"
                     name="horizontal-form-maj-axis"
-                    isValid={ellipse.majorAxis >= 0 && ellipse.majorAxis >= ellipse.minorAxis}
+                    validated={ellipse.majorAxis >= 0 && ellipse.majorAxis >= ellipse.minorAxis ? 'default' : 'error'}
                     style={{ textAlign: 'right' }}
                   />
                   <InputGroupText>meters</InputGroupText>
                 </InputGroup>
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>Attribute of uncertainty ellipse</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
               </FormGroup>
             </GalleryItem>
             <GalleryItem>
-              <FormGroup
-                label="Semi-minor Axis"
-                fieldId="horizontal-form-min-axis"
-                helperText="Attribute of uncertainty ellipse"
-              >
+              <FormGroup label="Semi-minor Axis" fieldId="horizontal-form-min-axis">
                 <InputGroup>
                   <TextInput
                     value={ellipse.minorAxis}
-                    onChange={(x) => ifNum(x, (n) => this.updateEllipse({ minorAxis: n }))}
+                    onChange={(_event, x) => ifNum(x, (n) => this.updateEllipse({ minorAxis: n }))}
                     type="number"
                     step="any"
                     id="horizontal-form-min-axis"
                     name="horizontal-form-min-axis"
-                    isValid={ellipse.minorAxis >= 0 && ellipse.majorAxis >= ellipse.minorAxis}
+                    validated={ellipse.minorAxis >= 0 && ellipse.majorAxis >= ellipse.minorAxis ? 'default' : 'error'}
                     style={{ textAlign: 'right' }}
                   />
                   <InputGroupText>meters</InputGroupText>
                 </InputGroup>
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>Attribute of uncertainty ellipse</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
               </FormGroup>
             </GalleryItem>
             <GalleryItem>
-              <FormGroup
-                label="Orientation"
-                fieldId="horizontal-form-orientation"
-                helperText="Degrees of major-axis off north clockwise in [0, 180)"
-              >
+              <FormGroup label="Orientation" fieldId="horizontal-form-orientation">
                 <InputGroup>
                   <TextInput
                     value={ellipse.orientation}
-                    onChange={(x) => ifNum(x, (n) => this.updateEllipse({ orientation: n }))}
+                    onChange={(_event, x) => ifNum(x, (n) => this.updateEllipse({ orientation: n }))}
                     type="number"
                     step="any"
                     id="horizontal-form-orientation"
                     name="horizontal-form-orientation"
-                    isValid={ellipse.orientation >= 0 && ellipse.orientation < 180}
+                    validated={ellipse.orientation >= 0 && ellipse.orientation < 180 ? 'default' : 'error'}
                     style={{ textAlign: 'right' }}
                   />
                   <InputGroupText>degrees</InputGroupText>
                 </InputGroup>
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>Degrees of major-axis off north clockwise in [0, 180)</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
               </FormGroup>
             </GalleryItem>
           </>
@@ -312,7 +322,7 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                 <InputGroup>
                   <TextInput
                     value={radialPolygon.center.latitude}
-                    onChange={(x) =>
+                    onChange={(_event, x) =>
                       ifNum(x, (n) =>
                         this.updateRadialPoly({ center: { latitude: n, longitude: radialPolygon.center.longitude } }),
                       )
@@ -321,10 +331,12 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                     step="any"
                     id="horizontal-form-latitude"
                     name="horizontal-form-latitude"
-                    isValid={
+                    validated={
                       radialPolygon.center.latitude !== undefined &&
                       radialPolygon.center.latitude >= -90 &&
                       radialPolygon.center.latitude <= 90
+                        ? 'default'
+                        : 'error'
                     }
                     style={{ textAlign: 'right' }}
                   />
@@ -337,7 +349,7 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                 <InputGroup>
                   <TextInput
                     value={radialPolygon.center.longitude}
-                    onChange={(x) =>
+                    onChange={(_event, x) =>
                       ifNum(x, (n) =>
                         this.updateRadialPoly({ center: { latitude: radialPolygon.center.latitude, longitude: n } }),
                       )
@@ -346,10 +358,12 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                     step="any"
                     id="horizontal-form-longitude"
                     name="horizontal-form-longitude"
-                    isValid={
+                    validated={
                       radialPolygon.center.longitude !== undefined &&
                       radialPolygon.center.longitude >= -180 &&
                       radialPolygon.center.longitude <= 180
+                        ? 'default'
+                        : 'error'
                     }
                     style={{ textAlign: 'right' }}
                   />

@@ -209,6 +209,7 @@ class Db:
     _engine  -- SqlAlchemy engine
     _verbose -- True to print SQL statements being executed
     """
+
     def __init__(self, cfg: Dict[str, Any], dsn: Optional[str],
                  password_file: Optional[str], verbose: bool) -> None:
         """ Constructor

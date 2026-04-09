@@ -281,6 +281,10 @@ http {
             proxy_redirect /podman/ /fbrat/cadvisor/podman/;
         }
 
+        # RabbitMQ has management.path_prefix = /fbrat/rabbitmq in rabbitmq.conf,
+        # so it serves at /fbrat/rabbitmq/ and expects the full URI to be passed.
+        # Using $request_uri (like Grafana) avoids the redirect loop caused by
+        # stripping the prefix.
         location /fbrat/rabbitmq {
             auth_request /fbrat/_admin_check;
             error_page 401 = @auth_redirect;
@@ -290,17 +294,26 @@ http {
             proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header Authorization "Basic Y2VsZXJ5OmNlbGVyeQ==";
+            proxy_set_header Authorization "Basic ${RABBITMQ_BASIC_AUTH}";
             proxy_set_header Accept-Encoding "";
-            sub_filter '</head>' '<script>if(!localStorage.getItem("credentials")){localStorage.setItem("credentials","Y2VsZXJ5OmNlbGVyeQ==");localStorage.setItem("auth-scheme","Basic");location.reload();}</script></head>';
+            sub_filter '<head>' '<head><script>document.addEventListener(\"DOMContentLoaded\",function(){if(typeof set_basic_auth===\"function\"&&typeof has_auth_credentials===\"function\"&&!has_auth_credentials()){set_basic_auth(\"${RABBITMQ_USER}\",\"${RABBITMQ_PASSWORD}\");}});</script>';
             sub_filter_once on;
             sub_filter_types text/html;
             proxy_hide_header Content-Security-Policy;
+            proxy_hide_header WWW-Authenticate;
             add_header Content-Security-Policy  "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
             proxy_pass http://rabbitmq$request_uri;
             proxy_redirect http:// $scheme://;
         }
         # MONITORING_END
+
+        location = /fbrat/www/ {
+            return 301 $scheme://$http_host/fbrat/www/index.html;
+        }
+
+        location = /fbrat/www {
+            return 301 $scheme://$http_host/fbrat/www/index.html;
+        }
 
         location / {
             if ($request_uri = "/") {

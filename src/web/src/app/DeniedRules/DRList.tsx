@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import { DeniedRegion, error, success, RatResponse } from '../Lib/RatApiTypes';
 import {
   getDeniedRegions,
@@ -10,17 +10,18 @@ import {
 } from '../Lib/Admin';
 import {
   Card,
-  CardHead,
   CardHeader,
+  CardTitle,
   CardBody,
   PageSection,
   InputGroup,
-  Select,
-  SelectOption,
   FormSelect,
   FormSelectOption,
   Button,
+  ActionGroup,
   Modal,
+  ModalBody,
+  ModalFooter,
   Alert,
   AlertActionCloseButton,
   GalleryItem,
@@ -270,30 +271,32 @@ export class DRList extends React.Component<DRListProps, DRListState> {
     return (
       <PageSection>
         <Card>
-          <CardHead>
-            <CardHeader>Denied Region</CardHeader>
-          </CardHead>
+          <CardHeader>
+            <CardTitle>Denied Region</CardTitle>
+          </CardHeader>
           <CardBody>
             <Modal
               title="Unsaved Changes"
               isOpen={this.state.showingSaveWarning}
               onClose={() => this.closeSaveWarning()}
-              actions={[
+            >
+              <ModalBody>
+                You have unsaved changes to the denied regions for the current country. Proceed and lose changes?
+              </ModalBody>
+              <ModalFooter>
                 <Button key="confirm" variant="link" onClick={() => this.forceChangeRegion()}>
                   Confirm
-                </Button>,
+                </Button>
                 <Button key="cancel" variant="primary" onClick={() => this.closeSaveWarning()}>
                   Cancel
-                </Button>,
-              ]}
-            >
-              You have unsaved changes to the denied regions for the current country. Proceed and lose changes?
+                </Button>
+              </ModalFooter>
             </Modal>
             {this.state.messageError !== undefined && (
               <Alert
                 variant="danger"
                 title="Error"
-                action={<AlertActionCloseButton onClose={() => this.setState({ messageError: undefined })} />}
+                actionClose={<AlertActionCloseButton onClose={() => this.setState({ messageError: undefined })} />}
               >
                 {this.state.messageError}
               </Alert>
@@ -303,37 +306,35 @@ export class DRList extends React.Component<DRListProps, DRListState> {
               <Alert
                 variant="success"
                 title="Success"
-                action={<AlertActionCloseButton onClose={() => this.setState({ messageSuccess: undefined })} />}
+                actionClose={<AlertActionCloseButton onClose={() => this.setState({ messageSuccess: undefined })} />}
               >
                 {this.state.messageSuccess}
               </Alert>
             )}
-            <Modal
-              title="Add Denied Region"
-              isOpen={this.state.isEditorOpen}
-              onClose={() => this.closeEditor()}
-              actions={[
+            <Modal title="Add Denied Region" isOpen={this.state.isEditorOpen} onClose={() => this.closeEditor()}>
+              <ModalBody>
+                <NewDR
+                  onAdd={(dr) => this.onAdd(dr)}
+                  onCloseEdit={(dr, prevName, prevZone) => this.onCloseEdit(dr, prevName, prevZone)}
+                  currentRegionStr={this.state.regionStr}
+                  drToEdit={this.state.drForEditing}
+                />
+              </ModalBody>
+              <ModalFooter>
                 <Button key="cancel" variant="primary" onClick={() => this.closeEditor()}>
                   Close without saving
-                </Button>,
-              ]}
-            >
-              <NewDR
-                onAdd={(dr) => this.onAdd(dr)}
-                onCloseEdit={(dr, prevName, prevZone) => this.onCloseEdit(dr, prevName, prevZone)}
-                currentRegionStr={this.state.regionStr}
-                drToEdit={this.state.drForEditing}
-              />
+                </Button>
+              </ModalFooter>
             </Modal>
 
             <GalleryItem>
               <FormGroup label="Country" fieldId="form-region" style={{ width: '25%' }}>
                 <FormSelect
                   value={this.state.regionStr}
-                  onChange={(x) => this.setUlsRegion(x)}
+                  onChange={(_event, x) => this.setUlsRegion(x)}
                   id="horizontal-form-uls-region"
                   name="horizontal-form-uls-region"
-                  isValid={!!this.state.regionStr}
+                  validated={!!this.state.regionStr ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 >
                   <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
@@ -351,26 +352,26 @@ export class DRList extends React.Component<DRListProps, DRListState> {
               onOpenEdit={(id: string) => this.onOpenEdit(id)}
             />
             <br />
-            {hasRole('Super') && (
-              <Button key="AddNew" variant="primary" onClick={() => this.openEditor()}>
-                Add New Denied Region
-              </Button>
-            )}
-            <br />
-            {hasRole('Super') && (
-              <Button onClick={() => this.putDeniedRegions()} isDisabled={!this.state.deniedRegionsNeedSaving}>
-                Submit Denied Regions
-              </Button>
-            )}
-            <br />
-            {hasRole('Super') && <Button onClick={() => this.downloadCSVFile()}>Download Denied Regions File</Button>}
+            <ActionGroup className="afc-button-group">
+              {hasRole('Super') && (
+                <Button key="AddNew" variant="primary" onClick={() => this.openEditor()}>
+                  Add New Denied Region
+                </Button>
+              )}
+              {hasRole('Super') && (
+                <Button onClick={() => this.putDeniedRegions()} isDisabled={!this.state.deniedRegionsNeedSaving}>
+                  Submit Denied Regions
+                </Button>
+              )}
+              {hasRole('Super') && <Button onClick={() => this.downloadCSVFile()}>Download Denied Regions File</Button>}
+            </ActionGroup>
           </CardBody>
         </Card>
 
         <Card>
-          <CardHead>
-            <CardHeader> Denied Access Points</CardHeader>
-          </CardHead>
+          <CardHeader>
+            <CardTitle>Denied Access Points</CardTitle>
+          </CardHeader>
           <CardBody>
             {hasRole('Admin') && (
               <NewAPDeny
@@ -385,7 +386,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
               <Alert
                 variant="danger"
                 title="Error"
-                action={<AlertActionCloseButton onClose={() => this.setState({ apMessageError: undefined })} />}
+                actionClose={<AlertActionCloseButton onClose={() => this.setState({ apMessageError: undefined })} />}
               >
                 {this.state.apMessageError}
               </Alert>
@@ -395,7 +396,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
               <Alert
                 variant="success"
                 title="Success"
-                action={<AlertActionCloseButton onClose={() => this.setState({ apMessageSuccess: undefined })} />}
+                actionClose={<AlertActionCloseButton onClose={() => this.setState({ apMessageSuccess: undefined })} />}
               >
                 {this.state.apMessageSuccess}
               </Alert>

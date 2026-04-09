@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   FormGroup,
   TextInput,
@@ -32,6 +32,8 @@ export class ExclusionZoneForm extends React.Component<
     limit: Limit;
     onSubmit: (a: ExclusionZoneRequest) => Promise<any>;
     onCopyPaste?: (formData: ExclusionZoneRequest, updateCallback: (v: ExclusionZoneRequest) => void) => void;
+    /** Extra actions in the same button row as Send Request / Copy-Paste (e.g. Cancel, LiDAR, RAS) */
+    footerActions?: React.ReactNode;
   },
   {
     height?: number;
@@ -39,6 +41,7 @@ export class ExclusionZoneForm extends React.Component<
     heightCert?: number;
     insideOutside: IndoorOutdoorType;
     eirp?: number;
+    eirpStr: string;
     bandwidth?: number;
     centerFreq?: number;
     fsid?: number;
@@ -90,6 +93,7 @@ export class ExclusionZoneForm extends React.Component<
       heightCert: undefined,
       insideOutside: IndoorOutdoorType.INDOOR,
       eirp: undefined,
+      eirpStr: '',
       bandwidth: undefined,
       centerFreq: undefined,
       fsid: undefined,
@@ -99,7 +103,14 @@ export class ExclusionZoneForm extends React.Component<
 
   componentDidMount() {
     const st = getCacheItem('exclusionZoneForm');
-    if (st !== undefined) this.setState(st);
+    if (st !== undefined) {
+      if (st.eirp !== undefined && st.eirpStr === undefined) {
+        st.eirpStr = String(st.eirp);
+      } else if (st.eirpStr === undefined) {
+        st.eirpStr = '';
+      }
+      this.setState(st);
+    }
   }
 
   componentWillUnmount() {
@@ -184,6 +195,7 @@ export class ExclusionZoneForm extends React.Component<
       heightCert: v.heightUncertainty,
       insideOutside: v.indoorOutdoor,
       eirp: v.EIRP,
+      eirpStr: String(v.EIRP),
       bandwidth: v.bandwidth,
       centerFreq: v.centerFrequency,
       fsid: v.FSID,
@@ -192,18 +204,18 @@ export class ExclusionZoneForm extends React.Component<
   render() {
     return (
       <>
-        <Gallery gutter="sm">
+        <Gallery hasGutter>
           <GalleryItem>
             <FormGroup label="RLAN Height" fieldId="horizontal-form-height">
               <InputGroup>
                 <TextInput
                   value={this.state.height}
-                  onChange={(x) => this.setState({ height: Number(x) })}
+                  onChange={(_event, x) => this.setState({ height: Number(x) })}
                   type="number"
                   step="any"
                   id="horizontal-form-height"
                   name="horizontal-form-height"
-                  isValid={this.validHeight(this.state.height)}
+                  validated={this.validHeight(this.state.height) ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 />
                 <InputGroupText>meters</InputGroupText>
@@ -216,10 +228,10 @@ export class ExclusionZoneForm extends React.Component<
                 <FormSelect
                   value={this.state.heightType}
                   // @ts-ignore
-                  onChange={(x) => this.setState({ heightType: HeightType[x] })}
+                  onChange={(_event, x) => this.setState({ heightType: HeightType[x] })}
                   id="horzontal-form-height-type"
                   name="horizontal-form-height-type"
-                  isValid={this.validHeightType(this.state.heightType)}
+                  validated={this.validHeightType(this.state.heightType) ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 >
                   <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select a height type" />
@@ -235,12 +247,12 @@ export class ExclusionZoneForm extends React.Component<
               <InputGroup>
                 <TextInput
                   value={this.state.heightCert}
-                  onChange={(x) => this.setState({ heightCert: Number(x) })}
+                  onChange={(_event, x) => this.setState({ heightCert: Number(x) })}
                   type="number"
                   step="any"
                   id="horizontal-form-height-cert"
                   name="horizontal-form-height-cert"
-                  isValid={this.validHeightCert(this.state.heightCert)}
+                  validated={this.validHeightCert(this.state.heightCert) ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 />
                 <InputGroupText>meters</InputGroupText>
@@ -253,10 +265,10 @@ export class ExclusionZoneForm extends React.Component<
                 <FormSelect
                   value={this.state.insideOutside}
                   // @ts-ignore
-                  onChange={(x) => this.setState({ insideOutside: x })}
+                  onChange={(_event, x) => this.setState({ insideOutside: x })}
                   id="horzontal-form-indoor-outdoor"
                   name="horizontal-form-indoor-outdoor"
-                  isValid={this.validInOut(this.state.insideOutside)}
+                  validated={this.validInOut(this.state.insideOutside) ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 >
                   <FormSelectOption
@@ -279,13 +291,13 @@ export class ExclusionZoneForm extends React.Component<
             >
               <InputGroup>
                 <TextInput
-                  value={this.state.eirp}
-                  onChange={(x) => this.setState({ eirp: Number(x) })}
-                  type="number"
-                  step="any"
+                  value={this.state.eirpStr}
+                  onChange={(_event, x) => this.setState({ eirpStr: x, eirp: x === '' ? undefined : parseFloat(x) })}
+                  type="text"
+                  inputMode="decimal"
                   id="horizontal-form-eirp"
                   name="horizontal-form-eirp"
-                  isValid={this.validEirp(this.state.eirp)}
+                  validated={this.validEirp(this.state.eirp) ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 />
                 <InputGroupText>dBm</InputGroupText>
@@ -298,10 +310,10 @@ export class ExclusionZoneForm extends React.Component<
                 <FormSelect
                   value={this.state.bandwidth}
                   // @ts-ignore
-                  onChange={(x) => this.setState({ bandwidth: Number.parseInt(x), centerFreq: undefined })}
+                  onChange={(_event, x) => this.setState({ bandwidth: Number.parseInt(x), centerFreq: undefined })}
                   id="horzontal-form-bandwidth"
                   name="horizontal-form-bandwidth"
-                  isValid={this.validBandwidth(this.state.bandwidth)}
+                  validated={this.validBandwidth(this.state.bandwidth) ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 >
                   <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select bandwidth" />
@@ -319,10 +331,10 @@ export class ExclusionZoneForm extends React.Component<
                 <FormSelect
                   value={this.state.centerFreq}
                   // @ts-ignore
-                  onChange={(x) => this.setState({ centerFreq: Number.parseInt(x) })}
+                  onChange={(_event, x) => this.setState({ centerFreq: Number.parseInt(x) })}
                   id="horzontal-form-centfreq"
                   name="horizontal-form-centfreq"
-                  isValid={this.validCenterFreq(this.state.centerFreq)}
+                  validated={this.validCenterFreq(this.state.centerFreq) ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                   isDisabled={!this.state.bandwidth}
                 >
@@ -345,12 +357,12 @@ export class ExclusionZoneForm extends React.Component<
               <InputGroup>
                 <TextInput
                   value={this.state.fsid}
-                  onChange={(x) => this.setState({ fsid: Number(x) })}
+                  onChange={(_event, x) => this.setState({ fsid: Number(x) })}
                   type="number"
                   step="any"
                   id="horizontal-form-fsid"
                   name="horizontal-form-fsid"
-                  isValid={this.validFsid(this.state.fsid)}
+                  validated={this.validFsid(this.state.fsid) ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 />
               </InputGroup>
@@ -363,21 +375,21 @@ export class ExclusionZoneForm extends React.Component<
             <Alert
               variant={this.state.mesgType}
               title={this.state.mesgTitle || ''}
-              action={<AlertActionCloseButton onClose={() => this.setState({ mesgType: undefined })} />}
+              actionClose={<AlertActionCloseButton onClose={() => this.setState({ mesgType: undefined })} />}
             >
               {this.state.mesgBody}
             </Alert>
           )}
         </React.Fragment>
-        <br />
-        <>
+        <ActionGroup className="afc-button-group afc-button-group--after-form">
           <Button variant="primary" isDisabled={this.state.mesgType === 'info'} onClick={this.submit}>
             Send Request
-          </Button>{' '}
+          </Button>
           <Button key="open-modal" variant="secondary" onClick={() => this.copyPasteClick()}>
             Copy/Paste
           </Button>
-        </>
+          {this.props.footerActions}
+        </ActionGroup>
       </>
     );
   }

@@ -152,9 +152,35 @@ def create_app(config_override=None):
                 db.session.rollback()
                 return None
     else:
-        # Non OIDC login.
-        from flask_user import UserManager
-        user_manager = UserManager(flaskapp, db, User)
+        from flask_security import Security, SQLAlchemyUserDatastore
+        from afcmodels.aaa import Role
+
+        flaskapp.config.setdefault('SECURITY_BLUEPRINT_NAME', 'user')
+        flaskapp.config.setdefault('SECURITY_LOGIN_URL', '/user/sign-in')
+        flaskapp.config.setdefault('SECURITY_LOGOUT_URL', '/user/sign-out')
+        flaskapp.config.setdefault('SECURITY_REGISTER_URL', '/user/register')
+        flaskapp.config.setdefault('SECURITY_REGISTERABLE', True)
+        flaskapp.config.setdefault('SECURITY_SEND_REGISTER_EMAIL', False)
+        flaskapp.config.setdefault('SECURITY_PASSWORD_HASH', 'bcrypt')
+        flaskapp.config.setdefault(
+            'SECURITY_PASSWORD_SALT',
+            flaskapp.config.get('SECRET_KEY', 'super-secret-salt'))
+        flaskapp.config.setdefault(
+            'SECURITY_LOGIN_USER_TEMPLATE', 'security/login_user.html')
+        flaskapp.config.setdefault(
+            'SECURITY_REGISTER_USER_TEMPLATE', 'security/register_user.html')
+        flaskapp.config.setdefault('SECURITY_CSRF_IGNORE_UNAUTH_ENDPOINTS',
+                                   True)
+        flaskapp.config.setdefault('SECURITY_POST_LOGIN_VIEW', '/')
+        flaskapp.config.setdefault('SECURITY_POST_LOGOUT_VIEW', '/')
+        flaskapp.config.setdefault('SECURITY_USERNAME_ENABLE', True)
+        flaskapp.config.setdefault('WTF_CSRF_CHECK_DEFAULT', False)
+
+        from flask_wtf import CSRFProtect
+        CSRFProtect(flaskapp)
+
+        user_datastore = SQLAlchemyUserDatastore(db, User, Role)
+        Security(flaskapp, user_datastore)
 
         @flaskapp.before_request
         def log_user_access():
@@ -177,20 +203,22 @@ def create_app(config_override=None):
             if flask.request.method == 'POST' and flask.request.endpoint == 'user.login':
                 LOGGER.debug(
                     'user:%s login status %d',
-                    flask.request.form['username'],
+                    flask.request.form.get('username', ''),
                     response.status_code)
+                username = flask.request.form.get('username',
+                                                  flask.request.form.get('email', ''))
                 if response.status_code != 302:
                     als.als_json_log('user_access',
                                      {'action': 'login',
-                                      'user': flask.request.form['username'],
-                                         'from': flask.request.remote_addr,
-                                         'status': response.status_code})
+                                      'user': username,
+                                      'from': flask.request.remote_addr,
+                                      'status': response.status_code})
                 else:
                     als.als_json_log('user_access',
                                      {'action': 'login',
-                                      'user': flask.request.form['username'],
-                                         'from': flask.request.remote_addr,
-                                         'status': 'success'})
+                                      'user': username,
+                                      'from': flask.request.remote_addr,
+                                      'status': 'success'})
 
             return response
 

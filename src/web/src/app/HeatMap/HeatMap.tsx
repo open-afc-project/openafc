@@ -1,11 +1,11 @@
-import * as React from 'react';
+import React from 'react';
 import {
   PageSection,
-  CardHead,
+  CardHeader,
   CardBody,
   Card,
   Title,
-  Expandable,
+  ExpandableSection,
   FormGroup,
   InputGroup,
   TextInput,
@@ -16,6 +16,8 @@ import {
   AlertActionCloseButton,
   Button,
   Modal,
+  ModalBody,
+  ModalFooter,
   ClipboardCopy,
   ClipboardCopyVariant,
 } from '@patternfly/react-core';
@@ -218,7 +220,7 @@ class HeatMap extends React.Component<
   private validW = (r?: Bounds) => r && r.west <= 180 && r.west >= -180;
   private validSpacing = (s?: number) => !!s && s > 0;
 
-  private setDir = (setter: (r: Bounds, i: number) => Bounds) => (s: string) => {
+  private setDir = (setter: (r: Bounds, i: number) => Bounds) => (_event: any, s: string) => {
     if (!this.state.selectionRectangle) {
       const val = Number.parseFloat(s);
       this.setState({
@@ -476,37 +478,39 @@ class HeatMap extends React.Component<
     return (
       <PageSection id="heat-map-page">
         <Card>
-          <CardHead>
-            <Title size="lg">Run Heat Map</Title>
-          </CardHead>
+          <CardHeader>
+            <Title headingLevel="h2">Run Heat Map</Title>
+          </CardHeader>
           <Modal
             title="Copy/Paste"
-            isLarge={true}
+            variant="large"
             isOpen={this.state.isModalOpen}
             onClose={() => this.setState({ isModalOpen: false })}
-            actions={[
+          >
+            <ModalBody>
+              <ClipboardCopy
+                variant={ClipboardCopyVariant.expansion}
+                onChange={(_event: any, v: string) => this.setConfig(v)}
+                aria-label="text area"
+              >
+                {this.getParamsText()}
+              </ClipboardCopy>
+            </ModalBody>
+            <ModalFooter>
               <Button key="update" variant="primary" onClick={() => this.setState({ isModalOpen: false })}>
                 Close
-              </Button>,
-            ]}
-          >
-            <ClipboardCopy
-              variant={ClipboardCopyVariant.expansion}
-              onChange={(v: string) => this.setConfig(v)}
-              aria-label="text area"
-            >
-              {this.getParamsText()}
-            </ClipboardCopy>
+              </Button>
+            </ModalFooter>
           </Modal>
           <CardBody>
-            <Expandable
+            <ExpandableSection
               toggleText={this.state.showParams ? 'Hide parameters' : 'Show parameters'}
               onToggle={toggleParams}
               isExpanded={this.state.showParams}
             >
-              <Title size="md">Heat Map Bounds</Title>
+              <Title headingLevel="h3">Heat Map Bounds</Title>
               <RegionSize bounds={this.state.selectionRectangle} />
-              <Gallery gutter="sm">
+              <Gallery hasGutter>
                 <GalleryItem>
                   <FormGroup label="North" fieldId="horizontal-form-north">
                     <InputGroup>
@@ -517,7 +521,11 @@ class HeatMap extends React.Component<
                         step="any"
                         id="horizontal-form-north"
                         name="horizontal-form-north"
-                        isValid={this.state.selectionRectangle && this.validN(this.state.selectionRectangle)}
+                        validated={
+                          this.state.selectionRectangle && this.validN(this.state.selectionRectangle)
+                            ? 'default'
+                            : 'error'
+                        }
                         style={{ textAlign: 'right' }}
                       />
                       <InputGroupText>degrees</InputGroupText>
@@ -534,7 +542,11 @@ class HeatMap extends React.Component<
                         step="any"
                         id="horizontal-form-south"
                         name="horizontal-form-south"
-                        isValid={this.state.selectionRectangle && this.validS(this.state.selectionRectangle)}
+                        validated={
+                          this.state.selectionRectangle && this.validS(this.state.selectionRectangle)
+                            ? 'default'
+                            : 'error'
+                        }
                         style={{ textAlign: 'right' }}
                       />
                       <InputGroupText>degrees</InputGroupText>
@@ -551,7 +563,11 @@ class HeatMap extends React.Component<
                         step="any"
                         id="horizontal-form-east"
                         name="horizontal-form-east"
-                        isValid={this.state.selectionRectangle && this.validE(this.state.selectionRectangle)}
+                        validated={
+                          this.state.selectionRectangle && this.validE(this.state.selectionRectangle)
+                            ? 'default'
+                            : 'error'
+                        }
                         style={{ textAlign: 'right' }}
                       />
                       <InputGroupText>degrees</InputGroupText>
@@ -568,7 +584,11 @@ class HeatMap extends React.Component<
                         step="any"
                         id="horizontal-form-west"
                         name="horizontal-form-west"
-                        isValid={this.state.selectionRectangle && this.validW(this.state.selectionRectangle)}
+                        validated={
+                          this.state.selectionRectangle && this.validW(this.state.selectionRectangle)
+                            ? 'default'
+                            : 'error'
+                        }
                         style={{ textAlign: 'right' }}
                       />
                       <InputGroupText>degrees</InputGroupText>
@@ -580,12 +600,12 @@ class HeatMap extends React.Component<
                     <InputGroup>
                       <TextInput
                         value={this.state.spacing}
-                        onChange={(x) => this.setState({ spacing: Number(x) })}
+                        onChange={(_event, x) => this.setState({ spacing: Number(x) })}
                         type="number"
                         step="any"
                         id="horizontal-form-fsid"
                         name="horizontal-form-fsid"
-                        isValid={this.validSpacing(this.state.spacing)}
+                        validated={this.validSpacing(this.state.spacing) ? 'default' : 'error'}
                         style={{ textAlign: 'right' }}
                       />
                       <InputGroupText>meters</InputGroupText>
@@ -594,38 +614,39 @@ class HeatMap extends React.Component<
                 </GalleryItem>
               </Gallery>
               <br />
-              <Title size="md">Simulation Parameters</Title>
+              <Title headingLevel="h3">Simulation Parameters</Title>
               <br />
               <HeatMapForm
                 limit={this.state.limit}
                 rulesetIds={this.state.rulesetIds}
                 onSubmit={(a: HeatMapFormData) => this.formSubmitted(a)}
                 onCopyPaste={(form, callback) => this.copyPaste(form, callback)}
+                footerActions={
+                  <>
+                    {this.state.canCancelTask && (
+                      <Button variant="secondary" onClick={this.cancelTask}>
+                        Cancel
+                      </Button>
+                    )}
+                    <LoadLidarBounds
+                      currentGeoJson={this.state.mapState.val}
+                      onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
+                    />
+                    <LoadRasBounds
+                      currentGeoJson={this.state.mapState.val}
+                      onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
+                    />
+                  </>
+                }
               />
-              {this.state.canCancelTask && (
-                <>
-                  {' '}
-                  <Button variant="secondary" onClick={this.cancelTask}>
-                    Cancel
-                  </Button>
-                </>
-              )}{' '}
-              <LoadLidarBounds
-                currentGeoJson={this.state.mapState.val}
-                onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
-              />
-              <LoadRasBounds
-                currentGeoJson={this.state.mapState.val}
-                onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
-              />
-            </Expandable>
+            </ExpandableSection>
           </CardBody>
         </Card>
         {this.state.extraWarning && (
           <Alert
             title={this.state.extraWarningTitle || 'Warning'}
             variant="warning"
-            action={
+            actionClose={
               <AlertActionCloseButton
                 onClose={() => this.setState({ extraWarning: undefined, extraWarningTitle: undefined })}
               />

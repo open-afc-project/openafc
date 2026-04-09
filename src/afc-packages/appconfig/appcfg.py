@@ -41,19 +41,12 @@ SQLALCHEMY_ENGINE_OPTIONS = \
         'pool_pre_ping': True,
     }
 
-# Flask-User settings
-USER_APP_NAME = "AFC"  # Shown in and email templates and page footers
-USER_ENABLE_EMAIL = True  # Enable email authentication
-USER_ENABLE_CONFIRM_EMAIL = False  # Disable email confirmation
-USER_ENABLE_USERNAME = True  # Enable username authentication
-USER_EMAIL_SENDER_NAME = USER_APP_NAME
-USER_EMAIL_SENDER_EMAIL = None
-REMEMBER_COOKIE_DURATION = datetime.timedelta(days=30)  # remember me timeout
+# Application name (used in templates and page footers)
+USER_APP_NAME = "AFC"
+REMEMBER_COOKIE_DURATION = datetime.timedelta(days=30)
 USER_USER_SESSION_EXPIRATION = 3600  # One hour idle timeout
 PERMANENT_SESSION_LIFETIME = datetime.timedelta(
-    seconds=USER_USER_SESSION_EXPIRATION)  # idle session timeout
-USER_LOGIN_TEMPLATE = 'login.html'
-USER_REGISTER_TEMPLATE = 'register.html'
+    seconds=USER_USER_SESSION_EXPIRATION)
 
 #: API key used for google maps
 GOOGLE_APIKEY = None

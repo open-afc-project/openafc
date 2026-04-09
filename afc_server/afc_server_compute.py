@@ -181,7 +181,7 @@ class AfcServerCompute:
                     async for msg in queue_iter:
                         try:
                             rrk = \
-                                rcache_models.RmqReqRespKey.parse_raw(msg.body)
+                                rcache_models.RmqReqRespKey.model_validate_json(msg.body)
                         except pydantic.ValidationError as ex:
                             LOGGER.error(f"Decode error on AFC Response Info "
                                          f"arrived from Worker: {ex}")

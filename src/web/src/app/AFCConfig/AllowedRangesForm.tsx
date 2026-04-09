@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   Alert,
   FormGroup,
@@ -7,7 +7,8 @@ import {
   InputGroupText,
   AlertActionCloseButton,
 } from '@patternfly/react-core';
-import { Table, TableHeader, TableBody, TableVariant } from '@patternfly/react-table';
+import { TableVariant } from '@patternfly/react-table';
+import { Table, TableHeader, TableBody } from '@patternfly/react-table/dist/esm/deprecated';
 import { FreqRange } from '../Lib/RatApiTypes';
 
 /**
@@ -104,7 +105,7 @@ export class AllowedRangesDisplay extends React.PureComponent<
           <Alert
             title={'Error Fetching Allowed Frequency Ranges'}
             variant="warning"
-            action={<AlertActionCloseButton onClose={() => this.setState({ showWarn: false })} />}
+            actionClose={<AlertActionCloseButton onClose={() => this.setState({ showWarn: false })} />}
           >
             <pre>Falling back to default UNII-5 and UNII-7 ranges</pre>
           </Alert>

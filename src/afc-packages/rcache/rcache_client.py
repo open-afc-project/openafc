@@ -78,7 +78,7 @@ class RcacheClient:
             assert "rcache_db" in sys.modules
             self._rcache_db = \
                 RcacheDb(
-                    rcache_db_dsn=client_settings.postgres_dsn,
+                    rcache_db_dsn=str(client_settings.postgres_dsn),
                     rcache_db_password_file=client_settings.
                     postgres_password_file)
 
@@ -88,14 +88,14 @@ class RcacheClient:
             assert "rcache_rmq" in sys.modules
             error_if(rmq_receiver is None,
                      "'rmq_receiver' parameter should be specified")
-            self._rcache_rmq = RcacheRmq(client_settings.rmq_dsn)
+            self._rcache_rmq = RcacheRmq(str(client_settings.rmq_dsn))
             self._rmq_receiver = rmq_receiver
 
         self._rcache_rcache: Optional["RcacheRcache"] = None
         if client_settings.enabled and \
                 (client_settings.service_url is not None):
             assert "rcache_rcache" in sys.modules
-            self._rcache_rcache = RcacheRcache(client_settings.service_url)
+            self._rcache_rcache = RcacheRcache(str(client_settings.service_url))
         self._afc_state_vendor_extensions: Set[str] = \
             set(client_settings.afc_state_vendor_extensions or [])
 

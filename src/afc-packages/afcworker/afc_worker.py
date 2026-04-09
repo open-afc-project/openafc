@@ -125,8 +125,10 @@ def run(prot, host, port, request_type, task_id, hash_val,
             tsk = afctask.Task(task_id, dataif, hash_val, history_dir)
             tsk.toJson(afctask.Task.STAT_PROGRESS, runtime_opts=runtime_opts)
 
-        err_file = open(os.path.join(tmpdir, "engine-error.txt"), "wb")
+        err_path = os.path.join(tmpdir, "engine-error.txt")
+        err_file = open(err_path, "wb")
         log_file = open(os.path.join(tmpdir, "engine-log.txt"), "wb")
+        streams_closed = False
 
         if use_tasks:
             # pathes in objstorage
@@ -159,7 +161,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
             timeout = deadline - time.time()
             if timeout <= 0:
                 error_msg += "AFC processing deadline expired"
-                timtimeout_expiredeout = True
+                timeout_expired = True
                 raise subprocess.CalledProcessError(retcode, cmd)
             cmd = [
                 conf.AFC_ENGINE,
@@ -187,8 +189,10 @@ def run(prot, host, port, request_type, task_id, hash_val,
             success = True
 
         except subprocess.CalledProcessError as error:
-            with open(os.path.join(tmpdir, "engine-error.txt"),
-                      encoding="utf-8", errors="replace") as infile:
+            log_file.close()
+            err_file.close()
+            streams_closed = True
+            with open(err_path, encoding="utf-8", errors="replace") as infile:
                 error_msg += infile.read(1000).strip()
             LOGGER.error(
                 f"run(): afc-engine crashed. Task ID={task_id}, error "
@@ -203,12 +207,16 @@ def run(prot, host, port, request_type, task_id, hash_val,
                     with dataif.open(config_path) as hfile:
                         config_str = \
                             hfile.read().decode("utf-8", errors="replace")
+                req_text = original_request_str or request_str
+                cfg_text = config_str
+                request_obj = json.loads(req_text) if req_text else None
+                config_obj = json.loads(cfg_text) if cfg_text else None
                 als.als_initialize()
                 als.als_json_log("afc_engine_crash",
                                  {"task_id": task_id, "error_msg": error_msg,
                                   "timeout": timeout_expired,
-                                  "request": json.loads(original_request_str),
-                                  "config": json.loads(config_str)})
+                                  "request": request_obj,
+                                  "config": config_obj})
             except Exception as ex:
                 LOGGER.error(
                     f"Failed to make ALS report on engine crash: {ex}")
@@ -216,8 +224,18 @@ def run(prot, host, port, request_type, task_id, hash_val,
             LOGGER.info('finished with task computation')
 
         proc = None
-        log_file.close()
-        err_file.close()
+        if not streams_closed:
+            log_file.close()
+            err_file.close()
+
+        if use_tasks and (not success) and os.path.isfile(err_path):
+            try:
+                with dataif.open(os.path.join(tmp_objdir,
+                                              "engine-error.txt")) as hfile:
+                    with open(err_path, "rb") as infile:
+                        hfile.write(infile.read())
+            except OSError as oex:
+                LOGGER.warning("Could not persist engine-error.txt: %s", oex)
 
         if not use_tasks:
             try:

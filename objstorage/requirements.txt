@@ -4,5 +4,5 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-gevent==23.9.1
-gunicorn==23.0.0
+gevent==26.4.0
+gunicorn==25.3.0

@@ -54,6 +54,7 @@ class DsnInfo:
     db       -- Database name
     dsn      -- DSN with password and schema properly substituted
     """
+
     def __init__(self, dsn: str, password_file: Optional[str] = None,
                  password: Optional[str] = None) -> None:
         """ Constructor
@@ -68,7 +69,7 @@ class DsnInfo:
                          unspecified - used as password source regardless of
                          password in 'dsn'
         """
-        parsed_dsn = urllib.parse.urlparse(dsn)
+        parsed_dsn = urllib.parse.urlparse(str(dsn))
 
         self.host = parsed_dsn.hostname
         error_if(not self.host, f"DSN '{safe_dsn(dsn)}' missing hostname")

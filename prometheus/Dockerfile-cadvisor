@@ -7,7 +7,7 @@
 
 # Cadvisor dockerfile
 
-FROM gcr.io/cadvisor/cadvisor:v0.49.1
+FROM gcr.io/cadvisor/cadvisor:v0.52.1
 
 # Housekeeping interval
 ENV CADVISOR_HOUSEKEEPING_INTERVAL=5s

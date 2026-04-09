@@ -398,7 +398,7 @@ static inline off_t orig_lseek(int fd, off_t offset, int whence)
 
 static inline struct dirent *orig_readdir(DIR *dir)
 {
-	typedef struct dirent *(*orig_readdir_t)(DIR * dir);
+	typedef struct dirent *(*orig_readdir_t)(DIR *dir);
 	orig_readdir_t orig = (orig_readdir_t)dlsym(RTLD_NEXT, "readdir");
 
 	return (*orig)(dir);
@@ -624,7 +624,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	ssize_t (*read_remote_data)(void *destv, size_t size, char *tpath, off_t off) =
 		aep_use_gs ? read_remote_data_gs : read_remote_data_nfs;
 	/* define pointer to download file func */
-	int (*download_file)(data_fd_t * data_fd, char *dest);
+	int (*download_file)(data_fd_t *data_fd, char *dest);
 	download_file = aep_use_gs ? download_file_gs : download_file_nfs;
 	struct stat stat;
 	sem_t *sem;

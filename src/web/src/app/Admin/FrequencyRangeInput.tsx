@@ -1,7 +1,6 @@
-import * as React from 'react';
+import React from 'react';
 import {
   Card,
-  CardHead,
   CardHeader,
   CardBody,
   PageSection,
@@ -77,15 +76,19 @@ export class FrequencyRangeInput extends React.Component<FrequencyRangeProps, Fr
                 name={'band-region-label'}
                 value={'region'}
                 style={{ textAlign: 'left', minWidth: '50%' }}
-                isReadOnly
+                readOnlyVariant="default"
               />
               <FormSelect
                 id={'band-region-'}
                 name={'band-region-'}
                 value={this.state.frequencyRange.region}
                 style={{ textAlign: 'right' }}
-                isValid={!!this.state.frequencyRange.region && this.state.frequencyRange.region!.length > 0}
-                onChange={(data) => this.updateField(data, 'region')}
+                validated={
+                  !!this.state.frequencyRange.region && this.state.frequencyRange.region!.length > 0
+                    ? 'default'
+                    : 'error'
+                }
+                onChange={(_event, data) => this.updateField(data, 'region')}
               >
                 {this.props.regions.map((option: string) => (
                   <FormSelectOption key={option} value={option} label={mapRegionCodeToName(option)} />
@@ -99,15 +102,15 @@ export class FrequencyRangeInput extends React.Component<FrequencyRangeProps, Fr
                 name={'band-name-label'}
                 value={'Name'}
                 style={{ textAlign: 'left', minWidth: '50%' }}
-                isReadOnly
+                readOnlyVariant="default"
               />
               <TextInput
                 id={'band-name-'}
                 name={'band-name-'}
                 value={this.state.frequencyRange.name}
                 style={{ textAlign: 'right' }}
-                isValid={this.state.frequencyRange.name.length > 0}
-                onChange={(data) => this.updateField(data, 'name')}
+                validated={this.state.frequencyRange.name.length > 0 ? 'default' : 'error'}
+                onChange={(_event, data) => this.updateField(data, 'name')}
               />
             </InputGroup>
             <InputGroup>
@@ -116,7 +119,7 @@ export class FrequencyRangeInput extends React.Component<FrequencyRangeProps, Fr
                 name={'band-lower-label'}
                 value={'Low Frequency'}
                 style={{ textAlign: 'left', minWidth: '50%' }}
-                isReadOnly
+                readOnlyVariant="default"
               />
               <TextInput
                 type="number"
@@ -124,8 +127,8 @@ export class FrequencyRangeInput extends React.Component<FrequencyRangeProps, Fr
                 name={'band-lower-'}
                 value={this.state.frequencyRange.startFreqMHz}
                 style={{ textAlign: 'right' }}
-                isValid={this.state.frequencyRange.startFreqMHz > 0}
-                onChange={(data) => this.updateField(data, 'startFreqMHz')}
+                validated={this.state.frequencyRange.startFreqMHz > 0 ? 'default' : 'error'}
+                onChange={(_event, data) => this.updateField(data, 'startFreqMHz')}
               />
               <InputGroupText>MHz</InputGroupText>
             </InputGroup>
@@ -135,7 +138,7 @@ export class FrequencyRangeInput extends React.Component<FrequencyRangeProps, Fr
                 name={'band-upper-label'}
                 value={'High Frequency'}
                 style={{ textAlign: 'left', minWidth: '50%' }}
-                isReadOnly
+                readOnlyVariant="default"
               />
               <TextInput
                 type="number"
@@ -143,8 +146,10 @@ export class FrequencyRangeInput extends React.Component<FrequencyRangeProps, Fr
                 name={'band-upper-'}
                 value={this.state.frequencyRange.stopFreqMHz}
                 style={{ textAlign: 'right' }}
-                isValid={this.state.frequencyRange.stopFreqMHz > this.state.frequencyRange.startFreqMHz}
-                onChange={(data) => this.updateField(data, 'stopFreqMHz')}
+                validated={
+                  this.state.frequencyRange.stopFreqMHz > this.state.frequencyRange.startFreqMHz ? 'default' : 'error'
+                }
+                onChange={(_event, data) => this.updateField(data, 'stopFreqMHz')}
               />
               <InputGroupText>MHz</InputGroupText>
             </InputGroup>

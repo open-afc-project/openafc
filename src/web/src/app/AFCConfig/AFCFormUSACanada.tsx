@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   FormGroup,
   InputGroup,
@@ -22,7 +22,7 @@ import {
   Tooltip,
   TooltipPosition,
   Radio,
-  CardHead,
+  CardHeader,
   PageSection,
 } from '@patternfly/react-core';
 import { IglooIcon, OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
@@ -107,11 +107,11 @@ export class AFCFormUSACanada extends React.Component<
   private setThreshold = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { threshold: n }));
   private setMaxLinkDistance = (n: number) =>
     this.props.updateConfig(Object.assign(this.props.config, { maxLinkDistance: n }));
-  private setEnableMapInVirtualAp = (n: boolean) =>
+  private setEnableMapInVirtualAp = (_event: any, n: boolean) =>
     this.props.updateConfig(Object.assign(this.props.config, { enableMapInVirtualAp: n }));
-  private setRoundPSDEIRPFlag = (n: boolean) =>
+  private setRoundPSDEIRPFlag = (_event: any, n: boolean) =>
     this.props.updateConfig(Object.assign(this.props.config, { roundPSDEIRPFlag: n }));
-  private setNearFieldAdjFlag = (n: boolean) =>
+  private setNearFieldAdjFlag = (_event: any, n: boolean) =>
     this.props.updateConfig(Object.assign(this.props.config, { nearFieldAdjFlag: n }));
   private setVisiblityThreshold = (n: number) =>
     this.props.updateConfig(Object.assign(this.props.config, { visibilityThreshold: n }));
@@ -247,7 +247,7 @@ export class AFCFormUSACanada extends React.Component<
     this.props.updateConfig(conf);
   };
 
-  private setUseClutter = (x: boolean) => {
+  private setUseClutter = (_event: any, x: boolean) => {
     const conf = { ...this.props.config };
     //If changing to true, and was false, and there is no clutter model, use the defaults
     if (x && !conf.clutterAtFS && !conf.fsClutterModel) {
@@ -257,7 +257,7 @@ export class AFCFormUSACanada extends React.Component<
     this.props.updateConfig(conf);
   };
 
-  private setFsClutterConfidence = (n: number | string) => {
+  private setFsClutterConfidence = (_event: any, n: number | string) => {
     const val = Number(n);
     const conf = this.props.config;
     const newParams: FSClutterModel = { ...conf.fsClutterModel! };
@@ -265,7 +265,7 @@ export class AFCFormUSACanada extends React.Component<
     conf.fsClutterModel = newParams;
     this.props.updateConfig(conf);
   };
-  private setFsClutterMaxHeight = (n: number | string) => {
+  private setFsClutterMaxHeight = (_event: any, n: number | string) => {
     const val = Number(n);
     const conf = this.props.config;
     const newParams: FSClutterModel = { ...conf.fsClutterModel! };
@@ -366,16 +366,18 @@ export class AFCFormUSACanada extends React.Component<
           <InputGroup>
             <TextInput
               value={this.props.config.minEIRPIndoor}
-              onChange={(x) => this.setMinEIRPIndoor(Number(x))}
+              onChange={(_event, x) => this.setMinEIRPIndoor(Number(x))}
               type="number"
               step="any"
               id="horizontal-form-min-eirp"
               name="horizontal-form-min-eirp"
-              isValid={
+              validated={
                 this.props.limit.indoorEnforce
                   ? this.props.config.minEIRPIndoor <= this.props.config.maxEIRP &&
                     this.props.config.minEIRPIndoor >= this.props.limit.indoorLimit
                   : this.props.config.minEIRPIndoor <= this.props.config.maxEIRP
+                    ? 'default'
+                    : 'error'
               }
               style={{ textAlign: 'right' }}
             />
@@ -393,16 +395,18 @@ export class AFCFormUSACanada extends React.Component<
           <InputGroup>
             <TextInput
               value={this.props.config.minEIRPOutdoor}
-              onChange={(x) => this.setMinOutdoorEIRP(Number(x))}
+              onChange={(_event, x) => this.setMinOutdoorEIRP(Number(x))}
               type="number"
               step="any"
               id="horizontal-form-min-eirp"
               name="horizontal-form-min-eirp"
-              isValid={
+              validated={
                 this.props.limit.outdoorEnforce
                   ? this.props.config.minEIRPOutdoor <= this.props.config.maxEIRP &&
                     this.props.config.minEIRPOutdoor >= this.props.limit.outdoorLimit
                   : this.props.config.minEIRPOutdoor <= this.props.config.maxEIRP
+                    ? 'default'
+                    : 'error'
               }
               style={{ textAlign: 'right' }}
             />
@@ -415,19 +419,21 @@ export class AFCFormUSACanada extends React.Component<
           <InputGroup>
             <TextInput
               value={this.props.config.maxEIRP}
-              onChange={(x) => this.setMaxEIRP(Number(x))}
+              onChange={(_event, x) => this.setMaxEIRP(Number(x))}
               type="number"
               step="any"
               id="horizontal-form-max-eirp"
               name="horizontal-form-max-eirp"
-              isValid={
+              validated={
                 this.props.limit.indoorEnforce || this.props.limit.outdoorEnforce
                   ? this.props.config.minEIRPIndoor <= this.props.config.maxEIRP &&
                     this.props.config.maxEIRP >= this.props.limit.indoorLimit &&
                     this.props.config.minEIRPOutdoor <= this.props.config.maxEIRP &&
                     this.props.config.maxEIRP >= this.props.limit.outdoorLimit
                   : this.props.config.minEIRPIndoor <= this.props.config.maxEIRP &&
-                    this.props.config.minEIRPOutdoor <= this.props.config.maxEIRP
+                      this.props.config.minEIRPOutdoor <= this.props.config.maxEIRP
+                    ? 'default'
+                    : 'error'
               }
               style={{ textAlign: 'right' }}
             />
@@ -440,12 +446,12 @@ export class AFCFormUSACanada extends React.Component<
           <InputGroup>
             <TextInput
               value={this.props.config.minPSD}
-              onChange={(x) => this.setMinPSD(Number(x))}
+              onChange={(_event, x) => this.setMinPSD(Number(x))}
               type="number"
               step="any"
               id="horizontal-form-max-eirp"
               name="horizontal-form-max-eirp"
-              isValid={this.hasValue(this.props.config.minPSD)}
+              validated={this.hasValue(this.props.config.minPSD) ? 'default' : 'error'}
               style={{ textAlign: 'right' }}
             />
             <InputGroupText>dBm/MHz</InputGroupText>
@@ -489,18 +495,18 @@ export class AFCFormUSACanada extends React.Component<
             <TextInput
               id="feeder-idu-label"
               name="feeder-idu-label"
-              isReadOnly={true}
+              readOnlyVariant="default"
               value="IDU"
               style={{ textAlign: 'left', minWidth: '35%' }}
             />
             <TextInput
               value={this.props.config.receiverFeederLoss.IDU}
-              onChange={(x) => this.setFeederLoss({ ...this.props.config.receiverFeederLoss, IDU: Number(x) })}
+              onChange={(_event, x) => this.setFeederLoss({ ...this.props.config.receiverFeederLoss, IDU: Number(x) })}
               type="number"
               step="any"
               id="horizontal-form-receiver-feeder-loss-idu"
               name="horizontal-form-receiver-feeder-loss-idu"
-              isValid={this.hasValue(this.props.config.receiverFeederLoss.IDU)}
+              validated={this.hasValue(this.props.config.receiverFeederLoss.IDU) ? 'default' : 'error'}
               style={{ textAlign: 'right' }}
             />
             <InputGroupText>dB</InputGroupText>
@@ -509,18 +515,18 @@ export class AFCFormUSACanada extends React.Component<
             <TextInput
               id="feeder-odu-label"
               name="feeder-odu-label"
-              isReadOnly={true}
+              readOnlyVariant="default"
               value="ODU"
               style={{ textAlign: 'left', minWidth: '35%' }}
             />
             <TextInput
               value={this.props.config.receiverFeederLoss.ODU}
-              onChange={(x) => this.setFeederLoss({ ...this.props.config.receiverFeederLoss, ODU: Number(x) })}
+              onChange={(_event, x) => this.setFeederLoss({ ...this.props.config.receiverFeederLoss, ODU: Number(x) })}
               type="number"
               step="any"
               id="horizontal-form-receiver-feeder-loss-7"
               name="horizontal-form-receiver-feeder-loss-7"
-              isValid={this.hasValue(this.props.config.receiverFeederLoss.ODU)}
+              validated={this.hasValue(this.props.config.receiverFeederLoss.ODU) ? 'default' : 'error'}
               style={{ textAlign: 'right' }}
             />
             <InputGroupText>dB</InputGroupText>
@@ -529,18 +535,20 @@ export class AFCFormUSACanada extends React.Component<
             <TextInput
               id="feeder-o-label"
               name="feeder-o-label"
-              isReadOnly={true}
+              readOnlyVariant="default"
               value="Unknown"
               style={{ textAlign: 'left', minWidth: '35%' }}
             />
             <TextInput
               value={this.props.config.receiverFeederLoss.UNKNOWN}
-              onChange={(x) => this.setFeederLoss({ ...this.props.config.receiverFeederLoss, UNKNOWN: Number(x) })}
+              onChange={(_event, x) =>
+                this.setFeederLoss({ ...this.props.config.receiverFeederLoss, UNKNOWN: Number(x) })
+              }
               type="number"
               step="any"
               id="horizontal-form-receiver-feeder-loss-o"
               name="horizontal-form-receiver-feeder-loss-o"
-              isValid={this.hasValue(this.props.config.receiverFeederLoss.UNKNOWN)}
+              validated={this.hasValue(this.props.config.receiverFeederLoss.UNKNOWN) ? 'default' : 'error'}
               style={{ textAlign: 'right' }}
             />
             <InputGroupText>dB</InputGroupText>
@@ -574,7 +582,7 @@ export class AFCFormUSACanada extends React.Component<
                     : -110
                 }
                 type="number"
-                onChange={(x) =>
+                onChange={(_event, x) =>
                   this.setReceiverNoise({
                     ...this.props.config.fsReceiverNoise,
                     noiseFloorList: [Number(x), this.props.config.fsReceiverNoise.noiseFloorList[1]],
@@ -583,7 +591,9 @@ export class AFCFormUSACanada extends React.Component<
                 step="any"
                 id="horizontal-form-noiseFloor-0"
                 name="horizontal-form-noiseFloor-0"
-                isValid={this.hasValueExists(() => this.props.config.fsReceiverNoise?.noiseFloorList[0])}
+                validated={
+                  this.hasValueExists(() => this.props.config.fsReceiverNoise?.noiseFloorList[0]) ? 'default' : 'error'
+                }
                 style={{ textAlign: 'right' }}
               />
               <InputGroupText>dBm/MHz</InputGroupText>
@@ -597,7 +607,7 @@ export class AFCFormUSACanada extends React.Component<
                     ? this.props.config.fsReceiverNoise?.noiseFloorList[1]
                     : -109.5
                 }
-                onChange={(x) =>
+                onChange={(_event, x) =>
                   this.setReceiverNoise({
                     ...this.props.config.fsReceiverNoise,
                     noiseFloorList: [this.props.config.fsReceiverNoise.noiseFloorList[0], Number(x)],
@@ -607,7 +617,9 @@ export class AFCFormUSACanada extends React.Component<
                 type="number"
                 id="horizontal-form-noiseFloor-1"
                 name="horizontal-form-noiseFloor-1"
-                isValid={this.hasValueExists(() => this.props.config.fsReceiverNoise.noiseFloorList[1])}
+                validated={
+                  this.hasValueExists(() => this.props.config.fsReceiverNoise.noiseFloorList[1]) ? 'default' : 'error'
+                }
                 style={{ textAlign: 'right' }}
               />
               <InputGroupText size={1}>dBm/MHz</InputGroupText>
@@ -623,12 +635,12 @@ export class AFCFormUSACanada extends React.Component<
           <InputGroup>
             <TextInput
               value={this.props.config.threshold}
-              onChange={(x) => this.setThreshold(Number(x))}
+              onChange={(_event, x) => this.setThreshold(Number(x))}
               type="number"
               step="any"
               id="horizontal-form-threshold"
               name="horizontal-form-threshold"
-              isValid={this.hasValue(this.props.config.threshold)}
+              validated={this.hasValue(this.props.config.threshold) ? 'default' : 'error'}
               style={{ textAlign: 'right' }}
             />
             <InputGroupText>dB</InputGroupText>
@@ -641,11 +653,11 @@ export class AFCFormUSACanada extends React.Component<
             <TextInput
               value={this.props.config.maxLinkDistance}
               type="number"
-              onChange={(x) => this.setMaxLinkDistance(Number(x))}
+              onChange={(_event, x) => this.setMaxLinkDistance(Number(x))}
               id="propogation-model-max-link-distance"
               name="propogation-model-max-link-distance"
               style={{ textAlign: 'right' }}
-              isValid={this.props.config.maxLinkDistance >= 1}
+              validated={this.props.config.maxLinkDistance >= 1 ? 'default' : 'error'}
             />
             <InputGroupText>km</InputGroupText>
           </InputGroup>
@@ -703,11 +715,11 @@ export class AFCFormUSACanada extends React.Component<
             </Tooltip>
             <FormSelect
               value={this.props.config.propagationEnv}
-              onChange={(x) => this.setPropogationEnv(x)}
+              onChange={(_event, x) => this.setPropogationEnv(x)}
               id="propogation-env"
               name="propogation-env"
               style={{ textAlign: 'right' }}
-              isValid={this.props.config.propagationEnv !== undefined}
+              validated={this.props.config.propagationEnv !== undefined ? 'default' : 'error'}
             >
               <FormSelectOption key="NLCD Point" value="NLCD Point" label="Land Cover Point" />
               <FormSelectOption
@@ -723,7 +735,7 @@ export class AFCFormUSACanada extends React.Component<
               <FormGroup label="Land Cover Database" fieldId="nlcd-database">
                 <FormSelect
                   value={this.props.config.nlcdFile ?? this.getDefaultLandCoverDatabase()}
-                  onChange={(x) => this.setNlcdFile(x)}
+                  onChange={(_event, x) => this.setNlcdFile(x)}
                   id="nlcd-database"
                   name="nlcd-database"
                   style={{ textAlign: 'right' }}
@@ -779,7 +791,7 @@ export class AFCFormUSACanada extends React.Component<
                 type="number"
                 id="fsclutter-p2180-confidence"
                 name="fsclutter-p2180-confidence"
-                isValid={true}
+                validated="default"
                 value={this.props.config.fsClutterModel!.p2108Confidence}
                 onChange={this.setFsClutterConfidence}
                 style={{ textAlign: 'right' }}
@@ -797,7 +809,7 @@ export class AFCFormUSACanada extends React.Component<
                 type="number"
                 id="fsclutter-maxFsAglHeight"
                 name="fsclutter-maxFsAglHeight"
-                isValid={true}
+                validated="default"
                 value={this.props.config.fsClutterModel!.maxFsAglHeight}
                 onChange={this.setFsClutterMaxHeight}
                 style={{ textAlign: 'right' }}
@@ -840,10 +852,10 @@ export class AFCFormUSACanada extends React.Component<
           </Tooltip>
           <FormSelect
             value={this.props.config.scanPointBelowGroundMethod}
-            onChange={(x) => this.setScanBelowGround(x)}
+            onChange={(_event, x) => this.setScanBelowGround(x)}
             id="horizontal-form-uls-scanBelowGround"
             name="horizontal-form-uls-scanBelowGround"
-            isValid={!!this.props.config.scanPointBelowGroundMethod}
+            validated={!!this.props.config.scanPointBelowGroundMethod ? 'default' : 'error'}
             style={{ textAlign: 'right' }}
           >
             <FormSelectOption
@@ -868,14 +880,14 @@ export class AFCFormUSACanada extends React.Component<
             </p>
           }
         >
-          <FormGroup fieldId="horizontal-form-clutter">
+          <FormGroup fieldId="horizontal-form-enable-map">
             <InputGroup label="">
               <Checkbox
                 label="Enable Map in Virtual AP"
                 isChecked={this.props.config.enableMapInVirtualAp ?? false}
                 onChange={this.setEnableMapInVirtualAp}
-                id="horizontal-form-clutter"
-                name="horizontal-form-clutter"
+                id="horizontal-form-enable-map"
+                name="horizontal-form-enable-map"
                 style={{ textAlign: 'right' }}
               />
 
@@ -892,14 +904,14 @@ export class AFCFormUSACanada extends React.Component<
           maxWidth="40.0rem"
           content={<p>If enabled, the EIRP and PSD values will be rounded down to one decimal place</p>}
         >
-          <FormGroup fieldId="horizontal-form-roundins">
+          <FormGroup fieldId="horizontal-form-round-psd-eirp">
             <InputGroup label="">
               <Checkbox
                 label="Round EIRP and PSD values"
                 isChecked={this.props.config.roundPSDEIRPFlag ?? false}
                 onChange={this.setRoundPSDEIRPFlag}
-                id="horizontal-form-clutter"
-                name="horizontal-form-clutter"
+                id="horizontal-form-round-psd-eirp"
+                name="horizontal-form-round-psd-eirp"
                 style={{ textAlign: 'right' }}
               />
 
@@ -914,7 +926,7 @@ export class AFCFormUSACanada extends React.Component<
             <Radio
               label="Total power within FS band"
               isChecked={this.props.config.channelResponseAlgorithm === 'pwr'}
-              onChange={(b) => b && this.setChannelResponseAlgorithm('pwr')}
+              onChange={(_event, b) => b && this.setChannelResponseAlgorithm('pwr')}
               id="horizontal-form-channelResponse-pwr"
               name="horizontal-form-channelResponse-pwr"
               style={{ textAlign: 'left' }}
@@ -925,7 +937,7 @@ export class AFCFormUSACanada extends React.Component<
             <Radio
               label="Max PSD over FS band"
               isChecked={this.props.config.channelResponseAlgorithm === 'psd'}
-              onChange={(b) => b && this.setChannelResponseAlgorithm('psd')}
+              onChange={(_event, b) => b && this.setChannelResponseAlgorithm('psd')}
               id="horizontal-form-channelResponse-psd"
               name="horizontal-form-channelResponse-psd"
               style={{ textAlign: 'left' }}
@@ -940,11 +952,15 @@ export class AFCFormUSACanada extends React.Component<
             <TextInput
               value={this.props.config.visibilityThreshold}
               type="number"
-              onChange={(x) => this.setVisiblityThreshold(Number(x))}
+              onChange={(_event, x) => this.setVisiblityThreshold(Number(x))}
               id="visiblity-threshold"
               name="visiblity-threshold"
               style={{ textAlign: 'right' }}
-              isValid={!!this.props.config.visibilityThreshold || this.props.config.visibilityThreshold === 0}
+              validated={
+                !!this.props.config.visibilityThreshold || this.props.config.visibilityThreshold === 0
+                  ? 'default'
+                  : 'error'
+              }
             />
             <InputGroupText>dB I/N</InputGroupText>
           </InputGroup>
@@ -960,15 +976,15 @@ export class AFCFormUSACanada extends React.Component<
                         <p>If enabled, the Virtual AP page will add map information via the Vendor extension and present a Google Map on the page</p>
                     }
                 > */}
-        <FormGroup fieldId="horizontal-form-clutter">
+        <FormGroup fieldId="horizontal-form-near-field-adj">
           <InputGroup label="">
             <Checkbox
               label="Nearfield Adjustment Factor"
               isChecked={this.props.config.nearFieldAdjFlag ?? false}
               onChange={this.setNearFieldAdjFlag}
               isDisabled={true}
-              id="horizontal-form-clutter"
-              name="horizontal-form-clutter"
+              id="horizontal-form-near-field-adj"
+              name="horizontal-form-near-field-adj"
               style={{ textAlign: 'right' }}
             />
 

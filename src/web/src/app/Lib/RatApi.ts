@@ -41,7 +41,6 @@ export var guiConfig: GuiConfig = Object.freeze({
   google_apikey: '',
   rat_api_analysis: '',
   uls_convert_url: '',
-  allowed_freq_url: '',
   login_url: '',
   admin_url: '',
   ap_deny_admin_url: '',
@@ -53,6 +52,12 @@ export var guiConfig: GuiConfig = Object.freeze({
   afc_kml: '',
   mtls_admin_url: '',
   version: 'API NOT LOADED',
+  app_name: '',
+  about_url: '',
+  about_login_url: '',
+  about_sitekey: '',
+  logout_url: '',
+  status_url: '',
   grafana_enabled: false,
 });
 

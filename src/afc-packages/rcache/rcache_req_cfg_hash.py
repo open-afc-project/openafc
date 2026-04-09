@@ -20,6 +20,7 @@ class RequestConfigHash:
     cfg_str      -- AFC Config as string
     cfg_hash     -- Config hash (None if not requested)
     """
+
     def __init__(self, req_dict: Dict[str, Any],
                  afc_config_dict: Dict[str, Any],
                  compute_config_hash: bool = False) -> None:

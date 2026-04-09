@@ -1,4 +1,9 @@
 # check .env file for env vars info and values
+#
+# Healthchecks and depends_on: after bumping images or changing a service entrypoint,
+# confirm its Dockerfile HEALTHCHECK or compose healthcheck still matches the process
+# and port the container actually exposes. If the check command changes, update any
+# services that use depends_on: condition: service_healthy for that dependency.
 
 services:
   ratdb:
@@ -43,6 +48,9 @@ services:
       - AFC_OBJST_HOST=${AFC_OBJST_HOST}
       - AFC_OBJST_PORT=${AFC_OBJST_PORT}
       - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
+      - RABBITMQ_BASIC_AUTH=${RABBITMQ_BASIC_AUTH}
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
     depends_on:
       - afcserver
       - rat_server
@@ -337,7 +345,8 @@ services:
 
   kafka_ui:
     profiles: ["monitor"]
-    image: provectuslabs/kafka-ui:latest
+    # Pinned tag (not :latest). amd64 digest v0.7.2: sha256:4346a0af1450f52286e671a6b49f701d069d7306a802f7cf6743bd27ac4dbcd1
+    image: provectuslabs/kafka-ui:v0.7.2
     restart: always
     environment:
       - KAFKA_CLUSTERS_0_NAME=afc-kafka
@@ -351,9 +360,28 @@ services:
   bulk_postgres:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/bulk-postgres-image:${TAG:-latest}
     dns_search: [.]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
     # add for bulk_postgres persistence
     # volumes:
     #   - ./bulk_pgdata:/var/lib/postgresql/data
+
+  # One-shot: upgrade PostGIS extension SQL in each DB after the server is ready
+  # (safe when already current). Rebuild bulk-postgres-image after changing postgis-upgrade.sh.
+  bulk_postgis_upgrade:
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/bulk-postgres-image:${TAG:-latest}
+    depends_on:
+      bulk_postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+    entrypoint: ["/usr/local/bin/postgis-upgrade.sh"]
+    restart: "no"
+    dns_search: [.]
 
   uls_downloader:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/uls-downloader:${TAG:-latest}

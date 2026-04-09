@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   PageSection,
   Title,
@@ -8,6 +8,8 @@ import {
   AlertActionCloseButton,
   Button,
   Modal,
+  ModalBody,
+  ModalFooter,
   TextArea,
 } from '@patternfly/react-core';
 import { spectrumInquiryRequest, downloadMapData, spectrumInquiryRequestByString } from '../Lib/RatAfcApi';
@@ -459,7 +461,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
   render() {
     return (
       <PageSection id="ap-afc-page">
-        <Title size="lg">AFC AP</Title>
+        <Title headingLevel="h2">AFC AP</Title>
         <Card>
           <CardBody>
             <RatAfcForm
@@ -478,27 +480,29 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 <Modal
                   key={'directSendModal'}
                   title="Direct Send Request"
-                  isLarge={true}
+                  variant="large"
                   isOpen={this.state.sendDirectModalOpen}
                   onClose={() => this.showDirectSendModal(false)}
-                  actions={[
+                >
+                  <ModalBody>
+                    <TextArea
+                      resizeOrientation="vertical"
+                      onChange={(_event: any, text: string) => this.setState({ sendDirectValue: text })}
+                      aria-label="text area"
+                    ></TextArea>
+                  </ModalBody>
+                  <ModalFooter>
                     <Button key="sendDirect-close" variant="secondary" onClick={() => this.showDirectSendModal(false)}>
                       Close
-                    </Button>,
+                    </Button>
                     <Button
                       key="sendDirect-send"
                       variant="primary"
                       onClick={() => this.sendDirect(this.state.sendDirectValue)}
                     >
                       Send
-                    </Button>,
-                  ]}
-                >
-                  <TextArea
-                    resizeOrientation="vertical"
-                    onChange={(text: string) => this.setState({ sendDirectValue: text })}
-                    aria-label="text area"
-                  ></TextArea>
+                    </Button>
+                  </ModalFooter>
                 </Modal>
               </>
             )}
@@ -514,7 +518,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
           <Alert
             title={this.state.extraWarningTitle || 'Warning'}
             variant="warning"
-            action={
+            actionClose={
               <AlertActionCloseButton
                 onClose={() => this.setState({ extraWarning: undefined, extraWarningTitle: undefined })}
               />
@@ -544,15 +548,16 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
             <Card>
               <CardBody>
                 <div style={{ width: '100%' }}>
-                  {' '}
-                  <LoadLidarBounds
-                    currentGeoJson={this.state.mapState.val}
-                    onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
-                  />
-                  <LoadRasBounds
-                    currentGeoJson={this.state.mapState.val}
-                    onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
-                  />
+                  <div className="afc-button-group--row" style={{ marginBottom: '8px' }}>
+                    <LoadLidarBounds
+                      currentGeoJson={this.state.mapState.val}
+                      onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
+                    />
+                    <LoadRasBounds
+                      currentGeoJson={this.state.mapState.val}
+                      onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
+                    />
+                  </div>
                   <MapContainer
                     mode="Point"
                     onMarkerUpdate={(lat: number, lon: number) => this.onMarkerUpdate(lat, lon)}

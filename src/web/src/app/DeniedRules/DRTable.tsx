@@ -1,5 +1,6 @@
-import * as React from 'react';
-import { headerCol, Table, TableVariant, TableHeader, TableBody } from '@patternfly/react-table';
+import React from 'react';
+import { TableVariant } from '@patternfly/react-table';
+import { Table, TableHeader, TableBody } from '@patternfly/react-table/dist/esm/deprecated';
 import {
   AccessPointModel,
   DeniedRegion,

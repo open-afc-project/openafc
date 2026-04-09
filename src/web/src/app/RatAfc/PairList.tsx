@@ -1,15 +1,15 @@
-import * as React from 'react';
-import { Table, TableHeader, TableBody, HeaderCell } from '@patternfly/react-table';
+import React from 'react';
+import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { TextInput, Button, InputGroup, FormGroup } from '@patternfly/react-core';
 import { ifNum } from '../Lib/Utils';
 import { Tooltip } from '@patternfly/react-core';
 import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
 
-const createHeaderWithTooltip = (text: string, tooltip) => {
+const createHeaderWithTooltip = (text: string, tooltip: string) => {
   return (
-    <HeaderCell>
+    <>
       {text} {createTooltip(tooltip)}
-    </HeaderCell>
+    </>
   );
 };
 
@@ -105,29 +105,47 @@ export class PairList extends React.Component<PairListParams, PairListState> {
     const rows = this.props.values.map((row, i) => ({ index: i, cells: row }));
     return (
       <>
-        <Table caption={this.props.tableName} cells={columns as any} rows={rows}>
-          <TableHeader />
-          <TableBody onRowClick={this.rowClickHandler} />
+        <Table aria-label={this.props.tableName}>
+          <caption>{this.props.tableName}</caption>
+          <Thead>
+            <Tr>
+              {columns.map((col, ci) => (
+                <Th key={ci}>{col.title}</Th>
+              ))}
+            </Tr>
+          </Thead>
+          <Tbody>
+            {rows.map((row) => (
+              <Tr
+                key={row.index}
+                onRowClick={(event) => this.rowClickHandler(event, { index: row.index, cells: row.cells.map(String) })}
+              >
+                {row.cells.map((cell, ci) => (
+                  <Td key={ci}>{cell}</Td>
+                ))}
+              </Tr>
+            ))}
+          </Tbody>
         </Table>
         <InputGroup>
           <TextInput
             value={this.state.first}
-            onChange={(x) => ifNum(x, (n) => this.setState({ first: n }))}
+            onChange={(_event, x) => ifNum(x, (n) => this.setState({ first: n }))}
             type="number"
             step="any"
             id="horizontal-form-lat-point"
             name="horizontal-form-lat-point"
-            isValid={this.state.first && this.props.fstValid(this.state.first)}
+            validated={this.state.first && this.props.fstValid(this.state.first) ? 'default' : 'error'}
             style={{ textAlign: 'right' }}
           />
           <TextInput
             value={this.state.second}
-            onChange={(x) => ifNum(x, (n) => this.setState({ second: n }))}
+            onChange={(_event, x) => ifNum(x, (n) => this.setState({ second: n }))}
             type="number"
             step="any"
             id="horizontal-form-lon-point"
             name="horizontal-form-lon-point"
-            isValid={this.state.second && this.props.sndValid(this.state.second)}
+            validated={this.state.second && this.props.sndValid(this.state.second) ? 'default' : 'error'}
             style={{ textAlign: 'right' }}
           />
           <Button key="add-point" variant="tertiary" onClick={() => this.addPoint()}>
