@@ -1,18 +1,6 @@
-import * as React from 'react';
+import React from 'react';
 // import ReactTooltip from 'react-tooltip';
-import {
-  GalleryItem,
-  FormGroup,
-  InputGroup,
-  Radio,
-  TextInput,
-  InputGroupText,
-  Select,
-  SelectOption,
-  SelectVariant,
-  CheckboxSelectGroup,
-  Checkbox,
-} from '@patternfly/react-core';
+import { GalleryItem, FormGroup, Radio, Checkbox } from '@patternfly/react-core';
 import { OperatingClass, OperatingClassIncludeType } from '../Lib/RatAfcTypes';
 /** OperatingClassForm.tsx - Form component to display and create the OperatingClass object
  *
@@ -126,6 +114,7 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
     return result;
   }
 
+  // @ts-ignore
   private onChannelSelected(isChecked, selection) {
     var selectedChannel = Number(selection);
 
@@ -165,8 +154,8 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
       <>
         <GalleryItem key={this.props.operatingClass.num}>
           <FormGroup
+            // @ts-ignore
             label={this.humanNames[this.props.operatingClass.num]}
-            fieldId={'horizontal-form-height-opClass' + this.props.operatingClass.num}
           >
             {!this.state.allowOnlyOneChannel && (
               <FormGroup fieldId={'horizontal-form-height-opClass-Rbs' + this.props.operatingClass.num}>
@@ -175,21 +164,21 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
                   name={this.AddIdToString('includeGrp')}
                   label="None"
                   isChecked={this.props.operatingClass.include == OperatingClassIncludeType.None}
-                  onChange={(isChecked) => isChecked && this.setInclude(OperatingClassIncludeType.None)}
+                  onChange={(_event, isChecked) => isChecked && this.setInclude(OperatingClassIncludeType.None)}
                 />
                 <Radio
                   id={this.AddIdToString('rbIncludeSome')}
                   name={this.AddIdToString('includeGrp')}
                   label="Some"
                   isChecked={this.props.operatingClass.include == OperatingClassIncludeType.Some}
-                  onChange={(isChecked) => isChecked && this.setInclude(OperatingClassIncludeType.Some)}
+                  onChange={(_event, isChecked) => isChecked && this.setInclude(OperatingClassIncludeType.Some)}
                 />
                 <Radio
                   id={this.AddIdToString('rbIncludeAll')}
                   name={this.AddIdToString('includeGrp')}
                   label="All"
                   isChecked={this.props.operatingClass.include == OperatingClassIncludeType.All}
-                  onChange={(isChecked) => isChecked && this.setInclude(OperatingClassIncludeType.All)}
+                  onChange={(_event, isChecked) => isChecked && this.setInclude(OperatingClassIncludeType.All)}
                 />
               </FormGroup>
             )}
@@ -206,7 +195,7 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
                       value={String(v)}
                       label={String(v)}
                       isChecked={this.isChannelSelected(v)}
-                      onChange={(isChecked, e) => this.onChannelSelected(isChecked, v)}
+                      onChange={(_event, isChecked) => this.onChannelSelected(isChecked, v)}
                     />
                   ) : (
                     <Radio
@@ -216,7 +205,7 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
                       value={String(v)}
                       label={String(v)}
                       isChecked={this.isChannelSelected(v)}
-                      onChange={(isChecked, e) => this.onChannelSelected(isChecked, v)}
+                      onChange={(_event, isChecked) => this.onChannelSelected(isChecked, v)}
                     />
                   );
                 })}

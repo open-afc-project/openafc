@@ -56,12 +56,12 @@ def substitute_password(dsn: Optional[str] = None,
         error_if(not os.path.isfile(password_file),
                  f"Password file '{password_file}' not found")
         with open(password_file, encoding="ascii") as f:
-            password = f.read()
+            password = f.read().strip()
     if password is None:
         return dsn
 
     # Substituting password
-    dsn_parts = urllib.parse.urlparse(dsn)
+    dsn_parts = urllib.parse.urlparse(str(dsn))
     netloc = ""
     replacement: Optional[str]
     for partname, separator, replacement in [("username", "", None),
@@ -70,6 +70,8 @@ def substitute_password(dsn: Optional[str] = None,
                                              ("port", ":", None)]:
         part: Optional[str] = replacement or getattr(dsn_parts, partname)
         if part:
+            if partname in ("username", "password"):
+                part = urllib.parse.quote(str(part), safe="")
             netloc += f"{separator}{part}"
     return dsn_parts._replace(netloc=netloc).geturl()
 
@@ -77,18 +79,28 @@ def substitute_password(dsn: Optional[str] = None,
 def safe_dsn(dsn: Optional[str]) -> Optional[str]:
     """ Returns DSN without password (if there was any) """
     if not dsn:
-        return dsn
+        return None if dsn is None else str(dsn)
     try:
-        parsed = urllib.parse.urlparse(dsn)
+        parsed = urllib.parse.urlparse(str(dsn))
         if not parsed.password:
-            return dsn
-        return \
-            urllib.parse.urlunparse(
-                parsed._replace(
-                    netloc=parsed.netloc.replace(":" + parsed.password,
-                                                 ":<PASSWORD>")))
+            return str(dsn)
+        # parsed.password is URL-decoded, but netloc still holds the raw
+        # percent-encoded form. Rebuild the netloc from components to ensure
+        # the replacement always succeeds regardless of encoding.
+        host_part = parsed.hostname or ""
+        if parsed.port:
+            host_part += f":{parsed.port}"
+        netloc = f"{parsed.username}:<PASSWORD>@{host_part}"
+        return urllib.parse.urlunparse(parsed._replace(netloc=netloc))
     except Exception:
-        return dsn
+        # Fail closed: a malformed DSN (e.g. a non-numeric port, which makes
+        # the `parsed.port` property above raise ValueError) must never
+        # cause this credential-stripping function to fall back to
+        # returning the raw, still password-bearing DSN. Since we already
+        # know (from the `parsed.password` check above) that a password is
+        # present whenever this path can be reached with one, return a
+        # constant placeholder instead.
+        return "<UNPARSEABLE DSN - REDACTED>"
 
 
 def alembic_ensure_version(

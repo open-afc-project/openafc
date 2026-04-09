@@ -17,11 +17,14 @@ const getFilesOfType = (url: string, ext: string): Promise<RatResponse<string[]>
   })
     .then(async (res: Response) => {
       if (res.ok) {
-        const el = document.createElement('html');
-        el.innerHTML = await res.text();
-        const td = el.getElementsByTagName('td');
+        // Use DOMParser instead of el.innerHTML to parse the directory listing
+        // as an inert document; this prevents subresource fetches and inline
+        // event-handler execution regardless of server-side filename escaping.
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(await res.text(), 'text/html');
+        const td = doc.getElementsByTagName('td');
         const len = td.length;
-        let names = [];
+        const names = [];
         for (let i = 0; i < len; i++) {
           const trimmed_text = (td[i].textContent ?? '').trim();
           if (trimmed_text.endsWith(ext)) {

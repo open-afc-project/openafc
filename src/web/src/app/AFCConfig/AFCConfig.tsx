@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { PageSection, Title, Alert } from '@patternfly/react-core';
+import React from 'react';
+import { PageSection, Title, Alert, AlertVariant } from '@patternfly/react-core';
 import { AFCForm } from './AFCForm';
 import { AFCConfigFile, FreqRange, RatResponse } from '../Lib/RatApiTypes';
 import { getDefaultAfcConf, putAfcConfigFile, guiConfig } from '../Lib/RatApi';
@@ -20,7 +20,7 @@ interface AFCState {
   ulsFiles: string[];
   antennaPatterns: string[];
   regions: string[];
-  messageType?: 'Warn';
+  messageType?: 'Warn' | 'Info';
   messageTitle?: string;
   messageValue?: string;
   isModalOpen?: boolean;
@@ -149,7 +149,15 @@ class AFCConfig extends React.Component<
         'description: ',
         props.regions.description,
       );
-      Object.assign(state, { regions: [] });
+      Object.assign(state, {
+        regions: [],
+        messageType: 'Info',
+        messageTitle: 'Country Selection Unavailable',
+        messageValue:
+          props.regions.errorCode === 403
+            ? 'You do not have permission to load the list of countries. Contact your administrator to request the required role.'
+            : `Could not load country list: ${props.regions.description}`,
+      });
     }
 
     this.state = state;
@@ -166,14 +174,18 @@ class AFCConfig extends React.Component<
   render() {
     return (
       <PageSection>
-        <Title size={'lg'}>AFC Configuration</Title>
-        {this.state.messageType === 'Warn' && (
-          <Alert title={this.state.messageTitle} variant="warning">
+        <Title headingLevel="h2">AFC Configuration</Title>
+        {(this.state.messageType === 'Warn' || this.state.messageType === 'Info') && (
+          <Alert
+            title={this.state.messageTitle}
+            variant={this.state.messageType === 'Info' ? AlertVariant.info : AlertVariant.warning}
+          >
             <pre>{this.state.messageValue}</pre>
           </Alert>
         )}
         <AFCForm
           frequencyBands={this.props.frequencyBands.kind == 'Success' ? this.props.frequencyBands.result : []}
+          // @ts-ignore
           limit={this.props.limit.kind == 'Success' ? this.props.limit.result : new Limit(false, 0)}
           config={this.state.config}
           ulsFiles={this.state.ulsFiles}

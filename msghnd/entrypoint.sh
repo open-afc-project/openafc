@@ -31,6 +31,7 @@ case "$AFC_DEVEL_ENV" in
 esac
 
 exec gunicorn \
+--config /wd/gunicorn_config.py \
 --bind "${AFC_MSGHND_BIND}:${AFC_MSGHND_PORT}" \
 --pid "${AFC_MSGHND_PID}" \
 --workers "${AFC_MSGHND_WORKERS}" \

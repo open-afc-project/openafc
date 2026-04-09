@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import { DeniedRegion, error, success, RatResponse } from '../Lib/RatApiTypes';
 import {
   getDeniedRegions,
@@ -10,17 +10,18 @@ import {
 } from '../Lib/Admin';
 import {
   Card,
-  CardHead,
   CardHeader,
+  CardTitle,
   CardBody,
   PageSection,
   InputGroup,
-  Select,
-  SelectOption,
   FormSelect,
   FormSelectOption,
   Button,
+  ActionGroup,
   Modal,
+  ModalBody,
+  ModalFooter,
   Alert,
   AlertActionCloseButton,
   GalleryItem,
@@ -87,6 +88,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
 
     getRulesetIds().then((res) => {
       if (res.kind === 'Success') {
+        // @ts-ignore
         this.setState({ rulesetIds: res.result });
       } else {
         alert(res.description);
@@ -111,7 +113,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
   };
 
   onOpenEdit = (id: string) => {
-    let drToEdit = this.state.deniedRegions.find(
+    const drToEdit = this.state.deniedRegions.find(
       (x) => x.regionStr == this.state.regionStr && x.name + '===' + x.zoneType == id,
     );
     this.setState({ drForEditing: drToEdit, isEditorOpen: true });
@@ -119,13 +121,13 @@ export class DRList extends React.Component<DRListProps, DRListState> {
 
   onCloseEdit = (dr: DeniedRegion, prevName: string, prevZoneType: string) => {
     if (!!dr) {
-      let oldId = prevName + '===' + prevZoneType;
-      let drToEdit = this.state.deniedRegions.findIndex(
+      const oldId = prevName + '===' + prevZoneType;
+      const drToEdit = this.state.deniedRegions.findIndex(
         (x) => x.regionStr == this.state.regionStr && x.name + '===' + x.zoneType == oldId,
       );
       if (drToEdit >= 0) {
         //Need to copy the array so that the updated state will trigger
-        let newDrs = Array.from(this.state.deniedRegions);
+        const newDrs = Array.from(this.state.deniedRegions);
         newDrs[drToEdit] = dr;
         this.setState({
           deniedRegions: newDrs,
@@ -203,7 +205,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
   downloadCSVFile = () => {
     getDeniedRegionsCsvFile(this.state.regionStr).then((res) => {
       if (res.kind === 'Success') {
-        let file = new Blob([res.result], {
+        const file = new Blob([res.result], {
           type: 'text/csv',
         });
         this.downloadBlob(file, this.state.regionStr + '_denied_regions.csv');
@@ -219,6 +221,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
     this.setState({ isEditorOpen: true });
   };
 
+  // @ts-ignore
   importList(ev) {
     // @ts-ignore
     const file = ev.target.files[0];
@@ -226,6 +229,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
     try {
       reader.onload = async () => {
         try {
+          // @ts-ignore
           const value: AccessPointListModel = { accessPoints: reader.result as string };
           const putResp = await putAccessPointDenyList(value, this.props.userId);
           if (putResp.kind === 'Error') {
@@ -247,6 +251,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
     }
   }
 
+  // @ts-ignore
   async onAddAPDeny(ap: AccessPointModel) {
     const res = await addAccessPointDeny(ap, this.props.userId);
     if (res.kind === 'Success') {
@@ -259,7 +264,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
   async exportList() {
     const res = await getAccessPointsDeny(this.props.userId);
     if (res.kind == 'Success') {
-      let b = new Blob([res.result], {
+      const b = new Blob([res.result], {
         type: 'text/csv',
       });
       this.downloadBlob(b, 'denied_aps.json');
@@ -270,30 +275,32 @@ export class DRList extends React.Component<DRListProps, DRListState> {
     return (
       <PageSection>
         <Card>
-          <CardHead>
-            <CardHeader>Denied Region</CardHeader>
-          </CardHead>
+          <CardHeader>
+            <CardTitle>Denied Region</CardTitle>
+          </CardHeader>
           <CardBody>
             <Modal
               title="Unsaved Changes"
               isOpen={this.state.showingSaveWarning}
               onClose={() => this.closeSaveWarning()}
-              actions={[
+            >
+              <ModalBody>
+                You have unsaved changes to the denied regions for the current country. Proceed and lose changes?
+              </ModalBody>
+              <ModalFooter>
                 <Button key="confirm" variant="link" onClick={() => this.forceChangeRegion()}>
                   Confirm
-                </Button>,
+                </Button>
                 <Button key="cancel" variant="primary" onClick={() => this.closeSaveWarning()}>
                   Cancel
-                </Button>,
-              ]}
-            >
-              You have unsaved changes to the denied regions for the current country. Proceed and lose changes?
+                </Button>
+              </ModalFooter>
             </Modal>
             {this.state.messageError !== undefined && (
               <Alert
                 variant="danger"
                 title="Error"
-                action={<AlertActionCloseButton onClose={() => this.setState({ messageError: undefined })} />}
+                actionClose={<AlertActionCloseButton onClose={() => this.setState({ messageError: undefined })} />}
               >
                 {this.state.messageError}
               </Alert>
@@ -303,37 +310,35 @@ export class DRList extends React.Component<DRListProps, DRListState> {
               <Alert
                 variant="success"
                 title="Success"
-                action={<AlertActionCloseButton onClose={() => this.setState({ messageSuccess: undefined })} />}
+                actionClose={<AlertActionCloseButton onClose={() => this.setState({ messageSuccess: undefined })} />}
               >
                 {this.state.messageSuccess}
               </Alert>
             )}
-            <Modal
-              title="Add Denied Region"
-              isOpen={this.state.isEditorOpen}
-              onClose={() => this.closeEditor()}
-              actions={[
+            <Modal title="Add Denied Region" isOpen={this.state.isEditorOpen} onClose={() => this.closeEditor()}>
+              <ModalBody>
+                <NewDR
+                  onAdd={(dr) => this.onAdd(dr)}
+                  onCloseEdit={(dr, prevName, prevZone) => this.onCloseEdit(dr, prevName, prevZone)}
+                  currentRegionStr={this.state.regionStr}
+                  drToEdit={this.state.drForEditing}
+                />
+              </ModalBody>
+              <ModalFooter>
                 <Button key="cancel" variant="primary" onClick={() => this.closeEditor()}>
                   Close without saving
-                </Button>,
-              ]}
-            >
-              <NewDR
-                onAdd={(dr) => this.onAdd(dr)}
-                onCloseEdit={(dr, prevName, prevZone) => this.onCloseEdit(dr, prevName, prevZone)}
-                currentRegionStr={this.state.regionStr}
-                drToEdit={this.state.drForEditing}
-              />
+                </Button>
+              </ModalFooter>
             </Modal>
 
             <GalleryItem>
               <FormGroup label="Country" fieldId="form-region" style={{ width: '25%' }}>
                 <FormSelect
                   value={this.state.regionStr}
-                  onChange={(x) => this.setUlsRegion(x)}
-                  id="horizontal-form-uls-region"
-                  name="horizontal-form-uls-region"
-                  isValid={!!this.state.regionStr}
+                  onChange={(_event, x) => this.setUlsRegion(x)}
+                  id="form-region"
+                  name="form-region"
+                  validated={!!this.state.regionStr ? 'default' : 'error'}
                   style={{ textAlign: 'right' }}
                 >
                   <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
@@ -351,29 +356,30 @@ export class DRList extends React.Component<DRListProps, DRListState> {
               onOpenEdit={(id: string) => this.onOpenEdit(id)}
             />
             <br />
-            {hasRole('Super') && (
-              <Button key="AddNew" variant="primary" onClick={() => this.openEditor()}>
-                Add New Denied Region
-              </Button>
-            )}
-            <br />
-            {hasRole('Super') && (
-              <Button onClick={() => this.putDeniedRegions()} isDisabled={!this.state.deniedRegionsNeedSaving}>
-                Submit Denied Regions
-              </Button>
-            )}
-            <br />
-            {hasRole('Super') && <Button onClick={() => this.downloadCSVFile()}>Download Denied Regions File</Button>}
+            <ActionGroup className="afc-button-group">
+              {hasRole('Super') && (
+                <Button key="AddNew" variant="primary" onClick={() => this.openEditor()}>
+                  Add New Denied Region
+                </Button>
+              )}
+              {hasRole('Super') && (
+                <Button onClick={() => this.putDeniedRegions()} isDisabled={!this.state.deniedRegionsNeedSaving}>
+                  Submit Denied Regions
+                </Button>
+              )}
+              {hasRole('Super') && <Button onClick={() => this.downloadCSVFile()}>Download Denied Regions File</Button>}
+            </ActionGroup>
           </CardBody>
         </Card>
 
         <Card>
-          <CardHead>
-            <CardHeader> Denied Access Points</CardHeader>
-          </CardHead>
+          <CardHeader>
+            <CardTitle>Denied Access Points</CardTitle>
+          </CardHeader>
           <CardBody>
             {hasRole('Admin') && (
               <NewAPDeny
+                // @ts-ignore
                 onAdd={(ap: AccessPointModel) => this.onAddAPDeny(ap)}
                 rulesetIds={this.state.rulesetIds}
                 org={this.props.org}
@@ -385,7 +391,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
               <Alert
                 variant="danger"
                 title="Error"
-                action={<AlertActionCloseButton onClose={() => this.setState({ apMessageError: undefined })} />}
+                actionClose={<AlertActionCloseButton onClose={() => this.setState({ apMessageError: undefined })} />}
               >
                 {this.state.apMessageError}
               </Alert>
@@ -395,7 +401,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
               <Alert
                 variant="success"
                 title="Success"
-                action={<AlertActionCloseButton onClose={() => this.setState({ apMessageSuccess: undefined })} />}
+                actionClose={<AlertActionCloseButton onClose={() => this.setState({ apMessageSuccess: undefined })} />}
               >
                 {this.state.apMessageSuccess}
               </Alert>
@@ -404,6 +410,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
             <FormGroup label="Import Deny AP List" fieldId="import-ap-deny-list">
               <input
                 // @ts-ignore
+                id="import-ap-deny-list"
                 type="file"
                 name="import deny ap list"
                 // @ts-ignore
@@ -424,6 +431,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
  * wrapper for ap list when it is not embedded in another page
  */
 export class DRListPage extends React.Component<{ regions: RatResponse<string[]> }, { regions: string[] }> {
+  // @ts-ignore
   constructor(props) {
     super(props);
 

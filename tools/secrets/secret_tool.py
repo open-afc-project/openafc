@@ -57,7 +57,7 @@ def get_yaml(filename: str, secret_key: str, secret_value: Optional[str]) \
             (os.path.splitext(secret_key)[1] not in YAML_EXTENSIONS):
         return (True, None)
     try:
-        return (True, yaml.load(secret_value, Loader=yaml.CLoader))
+        return (True, yaml.safe_load(secret_value))
     except yaml.YAMLError as ex:
         logging.error(f"File '{filename}' has incorrectly formatted YAML "
                       f"secret '{secret_key}': {ex}")

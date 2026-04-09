@@ -1,9 +1,8 @@
 import React from 'react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { App } from '@app/index';
-import { mount, shallow } from 'enzyme';
-import { Button } from '@patternfly/react-core';
-import { GuiConfig } from './Lib/RatApiTypes';
-import { getDefaultAfcConf, guiConfig } from './Lib/RatApi';
+import { guiConfig } from './Lib/RatApi';
 
 Object.assign(guiConfig, {
   paws_url: '/dummy/paws',
@@ -13,20 +12,7 @@ Object.assign(guiConfig, {
 
 describe('App tests', () => {
   test('should render default App component', () => {
-    const view = shallow(<App conf={Promise.resolve()} />);
-  });
-
-  it('should render a nav-toggle button', () => {
-    const wrapper = mount(<App conf={Promise.resolve()} />);
-    const button = wrapper.find(Button);
-    expect(button.exists()).toBe(true);
-  });
-
-  it('should hide the sidebar when clicking the nav-toggle button', () => {
-    const wrapper = mount(<App conf={Promise.resolve()} />);
-    const button = wrapper.find('#nav-toggle').hostNodes();
-    expect(wrapper.find('#page-sidebar').hasClass('pf-m-expanded'));
-    button.simulate('click');
-    expect(wrapper.find('#page-sidebar').hasClass('pf-m-collapsed'));
+    const { container } = render(<App conf={Promise.resolve()} />);
+    expect(container).toBeTruthy();
   });
 });

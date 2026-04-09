@@ -21,6 +21,14 @@ make_client_cert()
     #local cli_addr=$(hostname -i)
     local cli_addr=$(ifconfig | grep 'inet '| head -1 | awk '{ print $2}')
 
+    if [ ! -f "$ca_path/$ca_key" ]; then
+        echo "Generating test CA..."
+        openssl genrsa -out "$ca_path/$ca_key" 4096 > /dev/null 2>&1
+        openssl req -x509 -new -nodes -key "$ca_path/$ca_key" -sha256 -days 3650 \
+            -out "$ca_path/$ca_crt" \
+            -subj "/C=IL/ST=Israel/L=Tel Aviv/O=Broadcom/CN=AFC Testing" > /dev/null 2>&1
+    fi
+
     mkdir $cli_name
     make_key $cli_name
     openssl req -new -key $cli_name/$cli_name"_key.pem" \

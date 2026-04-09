@@ -172,78 +172,95 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	UlsFileReader r(inputFile.c_str(), fwarn, alignFederatedFlag, alignFederatedScale);
+	// A single malformed ULS record (e.g. an unrecognised record-type
+	// prefix) causes UlsFileReader to throw.  Catch it here and exit with a
+	// diagnostic code rather than letting it propagate out of main() and
+	// trigger std::terminate/SIGABRT.
+	try {
+		UlsFileReader r(inputFile.c_str(), fwarn, alignFederatedFlag, alignFederatedScale);
 
-	int maxNumPRUS = r.computeStatisticsUS(fccFreqAssignment,
-					       includeUnii5US,
-					       includeUnii6US,
-					       includeUnii7US,
-					       includeUnii8US);
-	int maxNumPRCA = r.computeStatisticsCA(fwarn);
-	int maxNumPassiveRepeater = (maxNumPRUS > maxNumPRCA ? maxNumPRUS : maxNumPRCA);
+		int maxNumPRUS = r.computeStatisticsUS(fccFreqAssignment,
+						       includeUnii5US,
+						       includeUnii6US,
+						       includeUnii7US,
+						       includeUnii8US);
+		int maxNumPRCA = r.computeStatisticsCA(fwarn);
+		int maxNumPassiveRepeater = (maxNumPRUS > maxNumPRCA ? maxNumPRUS : maxNumPRCA);
 
-	std::cout << "US Max Num Passive Repeater: " << maxNumPRUS << std::endl;
-	std::cout << "CA Max Num Passive Repeater: " << maxNumPRCA << std::endl;
-	std::cout << "Max Num Passive Repeater: " << maxNumPassiveRepeater << std::endl;
+		std::cout << "US Max Num Passive Repeater: " << maxNumPRUS << std::endl;
+		std::cout << "CA Max Num Passive Repeater: " << maxNumPRCA << std::endl;
+		std::cout << "Max Num Passive Repeater: " << maxNumPassiveRepeater << std::endl;
 
-	CsvWriter wt(outputFSFile.c_str());
-	{
-		QStringList header = UlsFunctionsClass::getCSVHeader(maxNumPassiveRepeater);
-		wt.writeRow(header);
+		CsvWriter wt(outputFSFile.c_str());
+		{
+			QStringList header = UlsFunctionsClass::getCSVHeader(maxNumPassiveRepeater);
+			wt.writeRow(header);
+		}
+
+		CsvWriter anomalous("anomalous_uls.csv");
+		{
+			QStringList header = UlsFunctionsClass::getCSVHeader(maxNumPassiveRepeater);
+			header << "Fixed";
+			header << "Anomalous Reason";
+			anomalous.writeRow(header);
+		}
+
+		writeRAS(r, outputRASFile);
+
+		processUS(r,
+			  maxNumPassiveRepeater,
+			  wt,
+			  anomalous,
+			  fwarn,
+			  antennaModelMap,
+			  fccFreqAssignment,
+			  transmitterModelMap);
+
+		processCA(r, maxNumPassiveRepeater, wt, anomalous, fwarn, antennaModelMap);
+
+		if (fwarn) {
+			fclose(fwarn);
+		}
+
+		time_t t2 = time(NULL);
+		tstr = strdup(ctime(&t2));
+		strtok(tstr, "\n");
+		std::cout << tstr << " : Completed processing." << std::endl;
+		free(tstr);
+
+		int elapsedTime = (int)(t2 - t1);
+
+		int et = elapsedTime;
+		int elapsedTimeSec = et % 60;
+		et = et / 60;
+		int elapsedTimeMin = et % 60;
+		et = et / 60;
+		int elapsedTimeHour = et % 24;
+		et = et / 24;
+		int elapsedTimeDay = et;
+
+		std::cout << "Elapsed time = " << (t2 - t1) << " sec = ";
+		if (elapsedTimeDay) {
+			std::cout << elapsedTimeDay << " days ";
+		}
+		if (elapsedTimeDay || elapsedTimeHour) {
+			std::cout << elapsedTimeHour << " hours ";
+		}
+		std::cout << elapsedTimeMin << " min ";
+		std::cout << elapsedTimeSec << " sec";
+		std::cout << std::endl;
+
+	} catch (const std::exception &ex) {
+		// ULS record processing threw; report and exit with an error code
+		// instead of aborting via std::terminate.
+		fprintf(stderr, "ERROR: ULS processing aborted: %s\n", ex.what());
+		if (fwarn) {
+			fprintf(fwarn, "ERROR: ULS processing aborted: %s\n", ex.what());
+			fclose(fwarn);
+		}
+		return -1;
 	}
-
-	CsvWriter anomalous("anomalous_uls.csv");
-	{
-		QStringList header = UlsFunctionsClass::getCSVHeader(maxNumPassiveRepeater);
-		header << "Fixed";
-		header << "Anomalous Reason";
-		anomalous.writeRow(header);
-	}
-
-	writeRAS(r, outputRASFile);
-
-	processUS(r,
-		  maxNumPassiveRepeater,
-		  wt,
-		  anomalous,
-		  fwarn,
-		  antennaModelMap,
-		  fccFreqAssignment,
-		  transmitterModelMap);
-
-	processCA(r, maxNumPassiveRepeater, wt, anomalous, fwarn, antennaModelMap);
-
-	if (fwarn) {
-		fclose(fwarn);
-	}
-
-	time_t t2 = time(NULL);
-	tstr = strdup(ctime(&t2));
-	strtok(tstr, "\n");
-	std::cout << tstr << " : Completed processing." << std::endl;
-	free(tstr);
-
-	int elapsedTime = (int)(t2 - t1);
-
-	int et = elapsedTime;
-	int elapsedTimeSec = et % 60;
-	et = et / 60;
-	int elapsedTimeMin = et % 60;
-	et = et / 60;
-	int elapsedTimeHour = et % 24;
-	et = et / 24;
-	int elapsedTimeDay = et;
-
-	std::cout << "Elapsed time = " << (t2 - t1) << " sec = ";
-	if (elapsedTimeDay) {
-		std::cout << elapsedTimeDay << " days ";
-	}
-	if (elapsedTimeDay || elapsedTimeHour) {
-		std::cout << elapsedTimeHour << " hours ";
-	}
-	std::cout << elapsedTimeMin << " min ";
-	std::cout << elapsedTimeSec << " sec";
-	std::cout << std::endl;
+	return 0;
 }
 /******************************************************************************************/
 
@@ -342,6 +359,19 @@ void processUS(UlsFileReader &r,
 		QString anomalousReason = "";
 		QString fixedReason = "";
 
+		// Skip any callsign whose per-key map hit the cap; their path
+		// records may be incomplete and cannot be used reliably.
+		if (r.overCapCallsigns.contains(QString::fromLatin1(freq.callsign))) {
+			if (fwarn) {
+				fprintf(fwarn,
+					"WARNING: callsign %s hit MAX_RECORDS_PER_CALLSIGN "
+					"cap in one or more maps — all paths for this callsign "
+					"are excluded from the output.\n",
+					freq.callsign);
+			}
+			continue;
+		}
+
 		QList<UlsPath> pathList;
 
 		foreach(const UlsPath &p, r.pathsMap(freq.callsign))
@@ -365,6 +395,13 @@ void processUS(UlsFileReader &r,
 
 		foreach(const UlsPath &path, pathList)
 		{
+			// Path-level isolation: start every path from the frequency-level
+			// baseline (empty — nothing appends to anomalousReason before this
+			// loop), so a segment-walk anomaly on an earlier path cannot leak
+			// into the pathAnomalousReason snapshot of later, valid paths and
+			// divert their emissions to the anomalous file (cf. processCA's
+			// per-station declaration).
+			anomalousReason = "";
 			cnt++;
 
 			/// Find the associated transmit location.
@@ -665,6 +702,11 @@ void processUS(UlsFileReader &r,
 			}
 
 			/// Build the actual output.
+			// Path-level anomalies (segment walk above) must divert EVERY
+			// emission row of this path to the anomalous file, not just the
+			// first: snapshot them so the per-emission reset below restores
+			// the path-level baseline instead of clearing it.
+			const QString pathAnomalousReason = anomalousReason;
 			foreach(const UlsEmission &e, allTxEm)
 			{
 				double startFreq = std::numeric_limits<double>::quiet_NaN();
@@ -1102,7 +1144,20 @@ void processUS(UlsFileReader &r,
 				row << UlsFunctionsClass::makeNumber(
 					rxAnt.diversityGain); // Rx Diversity Gain (dBi)
 
-				row << QString::number(prLocList.size());
+				if (prLocList.size() > maxNumPassiveRepeater) {
+					// More repeater segments than emitted column
+					// groups: divert the row to the anomalous
+					// output (mirrors the 'Segments missing'
+					// handling) instead of writing a count the
+					// ingester cannot satisfy, which silently
+					// truncated the repeater geometry downstream.
+					anomalousReason.append("Num Passive Repeater "
+							       "exceeds emitted repeater "
+							       "column groups, ");
+				}
+				row << QString::number((prLocList.size() > maxNumPassiveRepeater) ?
+							       maxNumPassiveRepeater :
+							       (int)prLocList.size());
 				for (prIdx = 1; prIdx <= maxNumPassiveRepeater; ++prIdx) {
 					if ((prIdx <= prLocList.size()) &&
 					    (prIdx <= prAntList.size())) {
@@ -1270,7 +1325,7 @@ void processUS(UlsFileReader &r,
 				if (anomalousReason.length() > 0) {
 					row << "0" << anomalousReason;
 					anomalous.writeRow(row);
-					anomalousReason = "";
+					anomalousReason = pathAnomalousReason;
 				} else {
 					wt.writeRow(row);
 					if (fixedReason.length() > 0) {
@@ -1314,7 +1369,7 @@ void processCA(UlsFileReader &r,
 	       int maxNumPassiveRepeater,
 	       CsvWriter &wt,
 	       CsvWriter &anomalous,
-	       FILE * /* fwarn */,
+	       FILE *fwarn,
 	       AntennaModelMapClass &antennaModelMap)
 {
 	int prIdx;
@@ -1328,10 +1383,26 @@ void processCA(UlsFileReader &r,
 	int numAntUnmatch = 0;
 
 	for (std::string authorizationNumber : r.authorizationNumberList) {
+		// Skip any authorization whose per-key map hit the cap; their
+		// records may be incomplete and cannot be used reliably.
+		if (r.overCapCallsigns.contains(QString::fromStdString(authorizationNumber))) {
+			if (fwarn) {
+				fprintf(fwarn,
+					"WARNING: authorizationNumber %s hit "
+					"MAX_RECORDS_PER_CALLSIGN cap in one or more maps "
+					"— all records for this authorization are excluded "
+					"from the output.\n",
+					authorizationNumber.c_str());
+			}
+			continue;
+		}
 		const QList<PassiveRepeaterCAClass> &prList = r.passiveRepeatersMap(
 			authorizationNumber.c_str());
 
-		int numPR = prList.size();
+		// Clamp numPR so the O(N^2) makeLink() loop and the
+		// output column count are both bounded.
+		const int maxPassiveRepeaterClamp = 16;
+		int numPR = std::min((int)prList.size(), maxPassiveRepeaterClamp);
 		std::vector<int> idxList(numPR);
 
 		foreach(const StationDataCAClass &station,
@@ -1787,6 +1858,38 @@ void makeLink(const StationDataCAClass &station,
 /******************************************************************************************/
 
 /******************************************************************************************/
+/**** csvNeutralizeLine                                                                ****/
+/**** Neutralise CSV formula injection (same rule as CsvWriter::writeRecord):         ****/
+/**** prefix any field beginning with =, +, -, @, TAB or CR with a TAB so             ****/
+/**** spreadsheet applications do not auto-evaluate it as a formula.  A quoted        ****/
+/**** field is checked on the character after the opening quote, since               ****/
+/**** spreadsheets evaluate quoted formulas after unquoting.                          ****/
+/******************************************************************************************/
+static std::string csvNeutralizeLine(const std::string &line)
+{
+	std::string out;
+	bool fieldStart = true;
+
+	for (std::size_t i = 0; i < line.size(); i++) {
+		char ch = line[i];
+		if (fieldStart) {
+			char c0 = ch;
+			if ((ch == '\"') && (i + 1 < line.size())) {
+				c0 = line[i + 1];
+			}
+			if ((c0 == '=') || (c0 == '+') || (c0 == '-') || (c0 == '@') ||
+			    (c0 == '\t') || (c0 == '\r')) {
+				out.push_back('\t');
+			}
+		}
+		out.push_back(ch);
+		fieldStart = (ch == ',');
+	}
+	return out;
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
 /**** testAntennaModelMap                                                              ****/
 /******************************************************************************************/
 void testAntennaModelMap(AntennaModelMapClass &antennaModelMap,
@@ -1894,7 +1997,9 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap,
 					}
 				}
 
-				fprintf(fout, "%s,matchedAntennaModel\n", line.c_str());
+				fprintf(fout,
+					"%s,matchedAntennaModel\n",
+					csvNeutralizeLine(line).c_str());
 
 				break;
 			case dataLineType: {
@@ -1914,7 +2019,10 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap,
 					matchedModelName = "";
 				}
 
-				fprintf(fout, "%s,%s\n", line.c_str(), matchedModelName.c_str());
+				fprintf(fout,
+					"%s,%s\n",
+					csvNeutralizeLine(line).c_str(),
+					csvNeutralizeLine(matchedModelName).c_str());
 
 			} break;
 			case ignoreLineType:
@@ -2047,7 +2155,9 @@ void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap,
 					}
 				}
 
-				fprintf(fout, "%s,matchedTransmitterModel\n", line.c_str());
+				fprintf(fout,
+					"%s,matchedTransmitterModel\n",
+					csvNeutralizeLine(line).c_str());
 
 				break;
 			case dataLineType: {
@@ -2065,7 +2175,10 @@ void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap,
 					matchedModelName = "";
 				}
 
-				fprintf(fout, "%s,%s\n", line.c_str(), matchedModelName.c_str());
+				fprintf(fout,
+					"%s,%s\n",
+					csvNeutralizeLine(line).c_str(),
+					csvNeutralizeLine(matchedModelName).c_str());
 
 			} break;
 			case ignoreLineType:

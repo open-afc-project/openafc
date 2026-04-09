@@ -9,6 +9,11 @@ License, a copy of which is included with this software program.
 - [FS Downloading overview](#overview)
 - [On importance of FS Database continuity](#continuity)
 - [FS Downloader service script](#service)
+- [FS Database integrity checks (T4 security)](#integrity)
+  - [Delta threshold check](#integrity_delta)
+  - [AFC live-fire check](#integrity_afc)
+  - [SHA-256 hash manifest check](#integrity_hash)
+  - [Trust model and T4 assessment](#integrity_t4)
 - [Service healthcheck](#healthcheck)
 - [Service state](#service_state)
   - [State database](#state_database)
@@ -19,6 +24,7 @@ License, a copy of which is included with this software program.
   - [`fs_db_diff.py` FS Database comparison tool](#fs_db_diff)
   - [`fs_afc.py` FS Database test tool](#fs_afc)
   - [`fsid_tool.py` FSID extraction/embedding tool](#fsid_tool)
+  - [`generate_hash_manifest.py` SHA-256 manifest tool](#generate_hash_manifest)
 
 
 ## FS Downloading overview <a name="overview"/>
@@ -62,7 +68,7 @@ Service implemented in `uls/uls_service.py` script that has the following functi
 `uls/uls_service.py` is controlled by command line parameters, most of which can be passed via environment variables. Most of default values defined in *uls_service.py*, but some defined in *Dockerfile-uls_service*). **It is recommended to run this script without parameters** (some exception can be found in [Troubleshooting](#troubleshooting) section.
 
 
-soTable below summarizes these parameters and environment variables:
+Table below summarizes these parameters and environment variables:
 
 |Parameter|Environment variable|Default|Comment|
 |---------|-----------------------|-------|-------|
@@ -85,6 +91,8 @@ soTable below summarizes these parameters and environment variables:
 |--max_change_percent **PERCENT**|ULS_MAX_CHANGE_PERCENT|10|Downloaded FS Database fails integrity check if it differs from previous by more than this percent of number of paths. If absent/empty - this check is not performed|
 |--afc_url **URL**|ULS_AFC_URL||REST API URL (in *rat_server*/*msghnd*) to use for AFC computation with custom FS database as part of AFS Database integrity check. If absent/empty - this check is not performed| 
 |--afc_parallel **N**|ULS_AFC_PARALLEL|1|Number of parallel AFC Requests to schedule while testing FS Database on *rat_server*/*msghnd*|
+|--hash_manifest_url **URL**|ULS_HASH_MANIFEST_URL||HTTPS URL of a JSON manifest mapping bare SQLite filename → lowercase SHA-256 hex digest. If set, the downloaded database must appear in the manifest with a matching digest; mismatch aborts activation and raises a `HashVerification` alarm. If absent/empty — hash check is **skipped** (backward-compatible). See [SHA-256 hash manifest check](#integrity_hash)|
+|--hash_manifest_file **FILENAME**|ULS_HASH_MANIFEST_FILE||Local path to a JSON manifest in the same format as `--hash_manifest_url`. Used instead of (or as fallback for) the URL. Primarily for testing or air-gapped deployments|
 |--rcache_url **URL**|RCACHE_SERVICE_URL||Rcache REST API top level URL - for invalidation of areas with changed FSs. If empty/unspecified (or if Rcache is not enabled) - see below) - no invalidation is performed|
 |--rcache_enabled [**TRUE/FALSE**]|RCACHE_ENABLED|TRUE|TRUE if Rcache enabled, FALSE if not|
 |--delay_hr **HOURS**|ULS_DELAY_HR|0|Delay (in hours) before first download attempt. Makes sense to be nonzero in regression testing, to avoid overloading system with unrelated stuff. Ignored if --run_once specified|
@@ -94,6 +102,138 @@ soTable below summarizes these parameters and environment variables:
 |--run_once|ULS_RUN_ONCE||Run once (default is to run periodically). Values for environment variable: TRUE/FALSE|
 |--verbose|||Print more detailed (for debug purposes)|
 |--force|||Force FS database update even if it is not changed and bypassing database validity checks (e.g. to overrule them)|
+
+
+## FS Database integrity checks (T4 security) <a name="integrity"/>
+
+Every downloaded FS Database goes through up to three automatic checks before
+the symlink is retargeted.  Together they implement a **T4-partially-mitigated**
+supply-chain defence according to the project security framework.
+
+| # | Check | Controlled by | Skipped when |
+|---|-------|--------------|--------------|
+| 1 | Delta threshold — new DB must not differ from previous by more than N% of paths | `ULS_MAX_CHANGE_PERCENT` | env var absent or empty |
+| 2 | AFC live-fire — test AFC requests must return without errors using the new DB | `ULS_AFC_URL` | env var absent or empty |
+| 3 | SHA-256 hash manifest — computed digest must match the operator-maintained manifest | `ULS_HASH_MANIFEST_URL` or `ULS_HASH_MANIFEST_FILE` | both env vars absent or empty |
+
+All three must pass (when enabled) for the new database to become active.
+
+The production `docker-compose.yaml` sets `ULS_MAX_CHANGE_PERCENT=10` by default.
+The hash manifest check is **opt-in** — it is off until `ULS_HASH_MANIFEST_URL` is
+configured, so existing deployments are unaffected.
+
+
+### Delta threshold check <a name="integrity_delta"/>
+
+`ULS_MAX_CHANGE_PERCENT` (default `10` in `docker-compose.yaml`) caps how many FS
+paths may appear or disappear between two successive downloads.  A legitimate
+daily FCC update changes a small fraction of entries; a corrupted or tampered
+database often replaces most of them.
+
+Set to `0` to require zero change (very strict), or leave empty/unset to disable.
+
+
+### AFC live-fire check <a name="integrity_afc"/>
+
+When `ULS_AFC_URL` is set, `uls_service.py` submits a set of test AFC requests
+using the candidate database (without making it the live DB).  Any AFC error
+aborts activation.  Test points and request templates are defined in
+`uls/fs_afc.yaml`.
+
+
+### SHA-256 hash manifest check <a name="integrity_hash"/>
+
+When `ULS_HASH_MANIFEST_URL` is set, `uls_service.py`:
+
+1. Computes the SHA-256 hex digest of the newly downloaded `.sqlite3` file.
+2. Fetches the manifest JSON from the URL (HTTPS required for a remote URL).
+3. Looks up the bare filename in the manifest.
+4. Compares the computed digest against the stored one.
+5. If the digest is absent from the manifest **or** does not match → activation
+   is aborted and a `HashVerification` alarm is recorded in the state DB and
+   sent as a healthcheck alarm email.
+
+The manifest format is a simple JSON object:
+
+```json
+{
+  "FS_2026-04-29T15_26_38.885109_UniiUS57_fixedBPS_sorted_param.sqlite3": "a3f7c1...",
+  "FS_2026-04-28T15_26_38.123456_UniiUS57_fixedBPS_sorted_param.sqlite3": "8b2e1d..."
+}
+```
+
+**Is the hash check triggered automatically?**
+
+No.  `uls_service.py` *verifies* the hash automatically on every download cycle,
+but the manifest itself must be populated by a separate process.  There are two
+modes of operation:
+
+**Mode A — operator bootstrap (one-time manual step, then fully automatic):**
+
+1. Operator runs `uls/generate_hash_manifest.py` on a trusted machine to
+   seed the manifest from a known-good set of SQLite files.
+2. Manifest is published to a read-only HTTPS endpoint (GitHub raw URL, S3
+   public bucket, etc.) and `ULS_HASH_MANIFEST_URL` is set in `.env`.
+3. New SQLite files downloaded by `uls_service.py` are rejected until the
+   manifest is updated.  An operator adds new entries (or a companion
+   automation does — see Mode B).
+
+**Mode B — fully automated (recommended for production):**
+
+Run `generate_hash_manifest.py` from a **separate CI/CD pipeline** that is
+independent of the `uls_downloader` host:
+
+```
+Separate CI runner (different host / different credentials)
+  1. Downloads the same FCC/ISED raw data independently
+  2. Runs daily_uls_parse.py to produce its own SQLite
+  3. python3 uls/generate_hash_manifest.py \
+         --manifest manifest.json \
+         <independently-computed-sqlite>
+  4. Pushes manifest.json to a read-only store
+         (e.g. git commit → GitHub, or aws s3 cp → S3 bucket)
+
+uls_downloader (production host)
+  5. Downloads from FCC/ISED as usual
+  6. Fetches manifest from ULS_HASH_MANIFEST_URL (set to GitHub/S3 URL)
+  7. Verifies digest — if tampered, rejects and raises HashVerification alarm
+```
+
+**Why must the manifest live on a separate machine?**
+
+If the manifest were generated and served on the *same host* as
+`uls_downloader`, an attacker who controls the download path controls both
+the SQLite and the manifest — providing no security benefit.  The hash
+manifest only adds an independent trust anchor when it is:
+
+* Hosted on a **separate machine** with separate credentials, OR
+* Stored in a **read-only public store** the attacker cannot write to
+  (e.g. a GitHub repository protected by a separate deploy key).
+
+A same-compose manifest server (`ULS_HASH_MANIFEST_FILE` pointing to a
+sibling container's volume) provides a second logging/audit layer but **not**
+an independent trust anchor and does not elevate the T4 assessment.
+
+**Does FCC/ISED publish SHA-256 for these files?**
+
+No.  FCC publishes MD5 hashes for the raw ULS ZIP archives it distributes.
+The `.sqlite3` files are an artifact generated by `daily_uls_parse.py` from
+those ZIPs; FCC has no knowledge of them and publishes no hash for them.
+
+
+### Trust model and T4 assessment <a name="integrity_t4"/>
+
+| Controls active | T4 likelihood |
+|----------------|---------------|
+| TLS only, auto-activates | Critical / Possible / **Unmitigated** |
+| TLS + delta threshold + AFC live-fire | **Partially mitigated** |
+| TLS + delta + AFC + hash manifest on independent host | **Partially mitigated** (stronger) |
+| Above + manual operator approval before symlink retarget | **Rare** |
+
+The current default configuration (TLS + delta threshold + AFC live-fire) is
+**T4-partially-mitigated**.  Enabling the hash manifest with an independent
+trust anchor strengthens the posture but does not reach "rare" because
+there is still no human approval step before `update_uls_file()` is called.
 
 
 ## Service healthcheck <a name="healthcheck"/>
@@ -178,6 +318,7 @@ Contains information about passed checks. As of time of this writing there are f
 |----------|-------|----------|
 |ExtParams|Files that should be in sync with their external prototypes|File name|
 |FsDatabase|FS Database validity tests|Individual tests|
+||HashVerification|SHA-256 digest of downloaded SQLite must match the hash manifest|SQLite filename|
 
 Table structure:
 
@@ -318,3 +459,74 @@ General format of this script invocation:
 Here *extract* subcommand extracts FSID table from FS Database to CSV file, whereas *embed* subcommand embeds FSID table from CSV file to FS Database.
 
 *--partial* allows for unexpected column names in FS Database or CSV file (which is normally an error).
+
+
+### `generate_hash_manifest.py` SHA-256 manifest tool <a name="generate_hash_manifest">
+
+`/wd/generate_hash_manifest.py` (`uls/generate_hash_manifest.py` in sources)
+creates and maintains the JSON hash manifest consumed by `uls_service.py` when
+`ULS_HASH_MANIFEST_URL` or `ULS_HASH_MANIFEST_FILE` is configured.
+
+**Is it triggered automatically?**
+
+No. `uls_service.py` *reads* the manifest automatically on every download
+cycle, but `generate_hash_manifest.py` must be run by a separate process.
+There is no built-in trigger inside the `uls_downloader` container.
+
+To be an effective security control the script **must run on a separate,
+independently controlled system** (different host, different credentials).
+See [SHA-256 hash manifest check](#integrity_hash) for the full trust model.
+
+**`uls/update_uls_manifest.sh` — convenience wrapper for cron / SCP:**
+
+For the common case of running on a separate machine and publishing the
+manifest to the production host via SCP, use the companion shell script:
+
+```bash
+# Bootstrap manifest from the current databases and SCP to production:
+uls/update_uls_manifest.sh \
+    --db-dir  /nfs/rat_transfer/ULS_Database/ \
+    --manifest /nfs/rat_transfer/uls-hash-manifest.json \
+    --scp-dest afc@prod-server:/opt/afc/databases/rat_transfer/uls-hash-manifest.json \
+    --prune
+
+# Run --help to see all options (cron example, dry-run, etc.):
+uls/update_uls_manifest.sh --help
+```
+
+The script requires `--db-dir` and `--manifest` to be passed explicitly
+(no hardcoded paths) so it works in any deployment.
+
+**Direct `generate_hash_manifest.py` usage:**
+
+```bash
+# Print SHA-256 of one file (no manifest written):
+./generate_hash_manifest.py FS_2026-04-29T..._param.sqlite3
+
+# Bootstrap a new manifest from all SQLite files in the DB directory:
+./generate_hash_manifest.py \
+    --manifest /trusted/path/manifest.json \
+    --dir /nfs/rat_transfer/ULS_Database/
+
+# Add a single new file to an existing manifest:
+./generate_hash_manifest.py \
+    --manifest /trusted/path/manifest.json \
+    /nfs/rat_transfer/ULS_Database/FS_2026-04-29T..._param.sqlite3
+
+# Remove entries for files that no longer exist locally:
+./generate_hash_manifest.py \
+    --manifest /trusted/path/manifest.json \
+    --dir /nfs/rat_transfer/ULS_Database/ \
+    --prune
+
+# Dry-run — show what would change without writing:
+./generate_hash_manifest.py \
+    --manifest /trusted/path/manifest.json \
+    --dir /nfs/rat_transfer/ULS_Database/ \
+    --dry_run
+```
+
+After generating or updating the manifest, publish it to the read-only HTTPS
+endpoint configured in `ULS_HASH_MANIFEST_URL`.  Symlinks in the DB directory
+are automatically skipped so only real database files are hashed.
+

@@ -14,7 +14,7 @@ class LoadRasBounds extends React.Component<{ currentGeoJson: GeoJson; onLoad: (
   downloadFile = () => {
     fetch(guiConfig.ras_bounds).then(async (response) => {
       const data: GeoJson = await response.json();
-      let newJson: GeoJson = JSON.parse(JSON.stringify(this.props.currentGeoJson));
+      const newJson: GeoJson = JSON.parse(JSON.stringify(this.props.currentGeoJson));
       newJson.features.push(...data.features);
       this.props.onLoad(newJson);
     });

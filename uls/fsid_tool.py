@@ -21,6 +21,20 @@ from typing import Any, Dict, List, Mapping, NamedTuple, Optional, Union
 # Name of table for FSID in FS Database
 FSID_TABLE_NAME = "fsid_history"
 
+# Leading characters that spreadsheet applications auto-evaluate as formulas
+_CSV_FORMULA_LEAD = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_safe(v: Any) -> str:
+    """ CWE-1236: neutralise CSV formula injection by prefixing
+    formula-leading characters (matches the _csv_safe() convention used by
+    the sibling ULS pipeline scripts, e.g. src/ratapi/ratapi/db/fix_bps.py)
+    """
+    s = str(v)
+    if s and s[0] in _CSV_FORMULA_LEAD:
+        return "'" + s
+    return s
+
 
 def warning(warnmsg: str) -> None:
     """ Print given warning message """
@@ -157,7 +171,7 @@ class Record:
         ret: List[str] = []
         for fd in self._FIELDS:
             value = self._fields.get(fd.column.name)
-            ret.append("" if value is None else str(value))
+            ret.append("" if value is None else _csv_safe(value))
         return ret
 
     @classmethod

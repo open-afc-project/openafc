@@ -5,6 +5,9 @@
 #ifndef DENIED_REGION_H
 #define DENIED_REGION_H
 
+#include <cmath>
+#include <limits>
+
 #include "Vector3.h"
 #include "cconst.h"
 #include "pop_grid.h"
@@ -181,7 +184,14 @@ class CircleDeniedRegionClass : public DeniedRegionClass
 		}
 		void setRadius(double radiusVal)
 		{
-			radius = radiusVal;
+			// A non-finite radius (e.g. from a NULL radiusKm column) would
+			// make every `dist <= drRadius + maxDist` comparison in
+			// intersect() evaluate to false, silently disabling this
+			// denied-region's enforcement. Fail closed instead: treat a
+			// non-finite radius as an effectively unbounded exclusion zone
+			// so the region is always enforced rather than never enforced.
+			radius = std::isfinite(radiusVal) ? radiusVal :
+							    std::numeric_limits<double>::max();
 			return;
 		}
 

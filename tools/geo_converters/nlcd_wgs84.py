@@ -135,17 +135,9 @@ class YamlParams:
         """ Constructor. Reads all from YAML file """
         error_if(not os.path.isfile(PARAM_FILE_NAME),
                  f"Parameter file '{PARAM_FILE_NAME}' not found")
-        if hasattr(yaml, "CLoader"):
-            loader = yaml.CLoader
-        elif hasattr(yaml, "FullLoader"):
-            loader = yaml.FullLoader
-        else:
-            loader = None
         with open(PARAM_FILE_NAME, encoding="utf-8") as f:
             yaml_content = f.read()
-        # pylint: disable=no-value-for-parameter
-        yaml_dict = yaml.load(yaml_content, loader) if loader \
-            else yaml.load(yaml_content)
+        yaml_dict = yaml.safe_load(yaml_content)
         try:
             self.default_code: int = yaml_dict["target"]["default_code"]
             self.default_color: List[int] = \

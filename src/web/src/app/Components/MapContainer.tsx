@@ -192,6 +192,24 @@ class MapContainer extends React.Component<MapProps> {
    */
   private kmlLayer?: any;
 
+  /**
+   * AdvancedMarkerElement constructor — loaded unconditionally using
+   * DEMO_MAP_ID (Google's built-in constant; no Cloud Console Map ID needed).
+   * Falls back to google.maps.Marker when unavailable.
+   */
+  private AdvancedMarkerElement?: any;
+
+  /**
+   * First click position for two-click rectangle drawing (Heatmap mode).
+   * Replaces the decommissioned Drawing Library.
+   */
+  private heatmapFirstClick?: any;
+
+  /**
+   * Temporary marker shown at the first click corner in Heatmap mode.
+   */
+  private heatmapCornerMarker?: any;
+
   constructor(props: any) {
     super(props);
     this.map = undefined;
@@ -203,7 +221,9 @@ class MapContainer extends React.Component<MapProps> {
     this.currentGeoJson = undefined;
 
     this.urlParams = { key: guiConfig.google_apikey };
-    this.urlParams.libraries = 'drawing';
+    // The Drawing Library was decommissioned in May 2026. We no longer load
+    // it here; click-based listeners handle marker placement and rectangle
+    // drawing instead.
   }
 
   /**
@@ -211,81 +231,115 @@ class MapContainer extends React.Component<MapProps> {
    * This is when we can call geoJson functions
    * and do a bunch of initialization of the map
    */
-  private apiIsLoaded = (map: any, maps: any) => {
+  private apiIsLoaded = async (map: any, maps: any) => {
     this.map = map;
     this.maps = maps;
-    this.map.setMapTypeId('satellite');
     this.map.data.setStyle(
       this.props.styles
         ? (feature: any) => {
             const kind = feature.getProperty('kind');
-            // @ts-ignore
-            if (this.props.styles.has(kind))
-              // @ts-ignore
-              const style = this.props.styles.get(kind);
-            return style instanceof Function ? style(feature) : style;
+            if (this.props.styles!.has(kind)) {
+              const style = this.props.styles!.get(kind);
+              return style instanceof Function ? style(feature) : style;
+            }
+            return {};
           }
         : {},
     );
 
+    // Load AdvancedMarkerElement unconditionally — mapId: 'DEMO_MAP_ID' is
+    // Google's official constant for enabling advanced markers without
+    // needing a Cloud Console Map ID (cloud styling is not required).
+    try {
+      const markerLib = await maps.importLibrary('marker');
+      this.AdvancedMarkerElement = markerLib.AdvancedMarkerElement;
+    } catch (e) {
+      logger.warn('AdvancedMarkerElement unavailable, using legacy Marker:', e);
+    }
+
     // update Marker, Rectangle, GeoJson, and set center/zoom
     this.componentDidUpdate();
 
-    // Point analysis specific initialization
+    // Point analysis: click on the map to place/move the RLAN marker.
+    // The Drawing Library (which provided DrawingManager) was decommissioned
+    // in May 2026 and is no longer available.
     if (this.props.mode === 'Point') {
-      const drawingManager = new this.maps.drawing.DrawingManager({
-        drawingMode: this.maps.drawing.OverlayType.MARKER,
-        drawingControl: true,
-        drawingControlOptions: {
-          position: this.maps.ControlPosition.TOP_CENTER,
-          drawingModes: ['marker'],
-        },
-        markerOptions: {
-          clickable: false,
-          label: 'R',
-          title: 'RLAN',
-          zIndex: 100,
-        },
-      });
-      drawingManager.setMap(map);
-
-      this.maps.event.addListener(drawingManager, 'markercomplete', (marker: any) => {
-        // remove existing marker
-        if (this.rlanMarker) this.rlanMarker.setMap(null);
-
-        // add new marker
-        this.rlanMarker = marker;
-        if (this.props.onMarkerUpdate)
-          this.props.onMarkerUpdate(this.rlanMarker.getPosition().lat(), this.rlanMarker.getPosition().lng());
+      this.map.setOptions({ draggableCursor: 'crosshair' });
+      this.maps.event.addListener(this.map, 'click', (event: any) => {
+        if (this.rlanMarker) {
+          // Move existing marker
+          if (this.AdvancedMarkerElement) {
+            this.rlanMarker.position = event.latLng;
+          } else {
+            this.rlanMarker.setPosition(event.latLng);
+          }
+        } else {
+          this.rlanMarker = this.createMarker({
+            position: event.latLng,
+            map: this.map,
+            title: 'RLAN',
+            label: 'R',
+            zIndex: 100,
+            clickable: false,
+          });
+        }
+        if (this.props.onMarkerUpdate) {
+          const pos = event.latLng;
+          this.props.onMarkerUpdate(pos.lat(), pos.lng());
+        }
       });
     }
 
-    // Heat map specific initalization
+    // Heatmap: two-click rectangle drawing replacing the decommissioned
+    // Drawing Library. First click sets one corner; second click completes
+    // the rectangle.
     if (this.props.mode === 'Heatmap') {
-      const drawingManager = new this.maps.drawing.DrawingManager({
-        drawingMode: this.maps.drawing.OverlayType.RECTANGLE,
-        drawingControl: true,
-        drawingControlOptions: {
-          position: this.maps.ControlPosition.TOP_CENTER,
-          drawingModes: ['rectangle'],
-        },
-        rectangleOptions: {
-          editable: false,
-          draggable: false,
-          color: 'yellow',
-          fillOpacity: 0.1,
-          map: this.map,
-        },
-      });
-      drawingManager.setMap(map);
-      this.maps.event.addListener(drawingManager, 'rectanglecomplete', (rect: any) => {
-        if (this.props.onRectUpdate) {
-          // remove existing rectangle if it exists
-          if (this.rectangle) this.rectangle.setMap(null);
+      this.map.setOptions({ draggableCursor: 'crosshair' });
+      this.maps.event.addListener(this.map, 'click', (event: any) => {
+        if (!this.heatmapFirstClick) {
+          this.heatmapFirstClick = event.latLng;
+          // Show a small marker at the first corner for visual feedback
+          this.heatmapCornerMarker = this.createMarker({
+            position: event.latLng,
+            map: this.map,
+            title: 'Corner 1 — click to set the opposite corner',
+            zIndex: 10,
+            clickable: false,
+          });
+        } else {
+          // Complete the rectangle
+          const lat1 = this.heatmapFirstClick.lat();
+          const lng1 = this.heatmapFirstClick.lng();
+          const lat2 = event.latLng.lat();
+          const lng2 = event.latLng.lng();
+          const bounds = {
+            north: Math.max(lat1, lat2),
+            south: Math.min(lat1, lat2),
+            east: Math.max(lng1, lng2),
+            west: Math.min(lng1, lng2),
+          };
 
-          // set new rectangle
-          this.rectangle = rect;
-          this.props.onRectUpdate(this.rectangle);
+          if (this.heatmapCornerMarker) {
+            if (this.AdvancedMarkerElement) {
+              this.heatmapCornerMarker.map = null;
+            } else {
+              this.heatmapCornerMarker.setMap(null);
+            }
+            this.heatmapCornerMarker = undefined;
+          }
+
+          if (this.rectangle) this.rectangle.setMap(null);
+          this.rectangle = new this.maps.Rectangle({
+            bounds,
+            editable: false,
+            draggable: false,
+            fillColor: 'yellow',
+            fillOpacity: 0.1,
+            map: this.map,
+          });
+
+          if (this.props.onRectUpdate) this.props.onRectUpdate(this.rectangle);
+          this.heatmapFirstClick = undefined;
         }
       });
 
@@ -340,6 +394,63 @@ class MapContainer extends React.Component<MapProps> {
   };
 
   /**
+   * Create a marker using AdvancedMarkerElement if a Map ID is configured,
+   * falling back to the legacy google.maps.Marker.
+   */
+  private createMarker(opts: {
+    position: any;
+    map: any;
+    title?: string;
+    label?: string;
+    zIndex?: number;
+    icon?: any;
+    clickable?: boolean;
+    visible?: boolean;
+  }): any {
+    if (this.AdvancedMarkerElement) {
+      const el = document.createElement('div');
+      el.style.cssText =
+        'background:#4285F4;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;';
+      if (opts.label) el.textContent = opts.label;
+      if (opts.icon) {
+        el.style.background = opts.icon.fillColor || '#4285F4';
+        el.style.width = `${(opts.icon.scale || 5) * 4}px`;
+        el.style.height = `${(opts.icon.scale || 5) * 4}px`;
+        el.textContent = '';
+      }
+      return new this.AdvancedMarkerElement({
+        position: opts.position,
+        map: opts.map,
+        title: opts.title,
+        zIndex: opts.zIndex,
+        content: el,
+      });
+    }
+    return new this.maps.Marker({
+      position: opts.position,
+      map: opts.map,
+      title: opts.title,
+      label: opts.label,
+      zIndex: opts.zIndex,
+      icon: opts.icon,
+      clickable: opts.clickable !== false,
+      visible: opts.visible !== false,
+    });
+  }
+
+  /**
+   * Get position from either an AdvancedMarkerElement or legacy Marker.
+   */
+  private getMarkerPosition(marker: any): { lat: () => number; lng: () => number } {
+    if (this.AdvancedMarkerElement && marker instanceof this.AdvancedMarkerElement) {
+      const pos = marker.position;
+      if (pos && typeof pos.lat === 'function') return pos;
+      return { lat: () => pos.lat, lng: () => pos.lng };
+    }
+    return marker.getPosition();
+  }
+
+  /**
    * Called when Google API is finished loading. Triggers initialization.
    */
   private onLoad = ({ map, maps }: { map: any; maps: any }) => this.apiIsLoaded(map, maps);
@@ -375,7 +486,11 @@ class MapContainer extends React.Component<MapProps> {
       // remove current geographical data from map
       this.map.data.forEach((f: any) => this.map.data.remove(f));
       this.markers.forEach((m) => {
-        m.setMap(null);
+        if (this.AdvancedMarkerElement && m instanceof this.AdvancedMarkerElement) {
+          m.map = null;
+        } else {
+          m.setMap(null);
+        }
       });
       this.markers.length = 0; // empty array
 
@@ -386,11 +501,10 @@ class MapContainer extends React.Component<MapProps> {
       this.props.geoJson.features.forEach((poly) => {
         if (poly.properties.kind === 'FS') {
           // for each fs, add marker
-          const existingMarker = this.markers.find(
-            (x) =>
-              x.getPosition().lat() === poly.geometry.coordinates[0][0][1] &&
-              x.getPosition().lng() === poly.geometry.coordinates[0][0][0],
-          );
+          const existingMarker = this.markers.find((x) => {
+            const pos = this.getMarkerPosition(x);
+            return pos.lat() === poly.geometry.coordinates[0][0][1] && pos.lng() === poly.geometry.coordinates[0][0][0];
+          });
           if (existingMarker) {
             const newTitle =
               [
@@ -399,11 +513,17 @@ class MapContainer extends React.Component<MapProps> {
                 'Stop Freq:  ' + poly.properties.stopFreq.toFixed(2) + ' MHz',
               ].join('\n') +
               '\n\n' +
-              existingMarker.getTitle();
-            existingMarker.setTitle(newTitle);
+              (this.AdvancedMarkerElement && existingMarker instanceof this.AdvancedMarkerElement
+                ? existingMarker.title
+                : existingMarker.getTitle());
+            if (this.AdvancedMarkerElement && existingMarker instanceof this.AdvancedMarkerElement) {
+              existingMarker.title = newTitle;
+            } else {
+              existingMarker.setTitle(newTitle);
+            }
           } else {
             this.markers.push(
-              new this.maps.Marker({
+              this.createMarker({
                 map: this.map,
                 position: {
                   // use the first coordinate of polygon as FS location
@@ -422,7 +542,7 @@ class MapContainer extends React.Component<MapProps> {
           }
         } else if (poly.properties.kind === 'ZONE') {
           // add marker for the FS at center of exclusion zone
-          const zone = new this.maps.Marker({
+          const zone = this.createMarker({
             map: this.map,
             position: {
               lat: poly.properties.lat,
@@ -436,7 +556,9 @@ class MapContainer extends React.Component<MapProps> {
             zIndex: 100,
           });
           this.markers.push(zone);
-          this.center = zone.getPosition();
+          this.center = this.getMarkerPosition(zone).lat
+            ? { lat: this.getMarkerPosition(zone).lat(), lng: this.getMarkerPosition(zone).lng() }
+            : undefined;
           this.zoom = 16;
         }
       });
@@ -480,14 +602,17 @@ class MapContainer extends React.Component<MapProps> {
     )
       return;
     if (this.props.onMarkerUpdate) {
+      const curPos = this.rlanMarker ? this.getMarkerPosition(this.rlanMarker) : undefined;
       const same =
-        this.rlanMarker &&
-        this.rlanMarker.getPosition().lat() === this.props.markerPosition.lat &&
-        this.rlanMarker.getPosition().lng() === this.props.markerPosition.lng;
+        curPos && curPos.lat() === this.props.markerPosition.lat && curPos.lng() === this.props.markerPosition.lng;
       if (this.rlanMarker && !same) {
-        this.rlanMarker.setPosition(this.props.markerPosition);
+        if (this.AdvancedMarkerElement && this.rlanMarker instanceof this.AdvancedMarkerElement) {
+          this.rlanMarker.position = this.props.markerPosition;
+        } else {
+          this.rlanMarker.setPosition(this.props.markerPosition);
+        }
       } else if (!this.rlanMarker) {
-        this.rlanMarker = new this.maps.Marker({
+        this.rlanMarker = this.createMarker({
           clickable: false,
           map: this.map,
           visible: true,
@@ -501,29 +626,24 @@ class MapContainer extends React.Component<MapProps> {
       }
     } else if (this.props.markerPosition) {
       // called for mobile AP
+      const circleRLAN = {
+        path: this.maps.SymbolPath.CIRCLE,
+        scale: 5,
+        fillOpacity: 1,
+        fillColor: this.props.markerColor || 'blue',
+        strokeColor: this.props.markerColor || 'blue',
+      };
       if (this.rlanMarker) {
-        if (this.props.markerColor) {
-          const circleRLAN = {
-            path: this.maps.SymbolPath.CIRCLE,
-            scale: 5,
-            fillOpacity: 1,
-            fillColor: this.props.markerColor,
-            strokeColor: this.props.markerColor,
-          };
-          this.rlanMarker.setIcon(circleRLAN);
+        if (this.AdvancedMarkerElement && this.rlanMarker instanceof this.AdvancedMarkerElement) {
+          this.rlanMarker.position = this.props.markerPosition;
+        } else {
+          if (this.props.markerColor) this.rlanMarker.setIcon(circleRLAN);
+          this.rlanMarker.setPosition(this.props.markerPosition);
         }
-        this.rlanMarker.setPosition(this.props.markerPosition);
         this.center = this.props.markerPosition;
         this.zoom = this.map.getZoom();
       } else {
-        const circleRLAN = {
-          path: this.maps.SymbolPath.CIRCLE,
-          scale: 5,
-          fillOpacity: 1,
-          fillColor: this.props.markerColor || 'blue',
-          strokeColor: this.props.markerColor || 'blue',
-        };
-        this.rlanMarker = new this.maps.Marker({
+        this.rlanMarker = this.createMarker({
           clickable: false,
           map: this.map,
           visible: true,
@@ -568,15 +688,15 @@ class MapContainer extends React.Component<MapProps> {
     const update = nextProps.versionId !== this.props.versionId;
     if (nextProps.markerPosition && nextProps.markerPosition !== this.props.markerPosition) {
       this.updateMarker();
-      this.map && this.center && this.map.setCenter(this.center);
-      this.map && this.zoom && this.map.setZoom(this.zoom);
+      if (this.map && this.center) this.map.setCenter(this.center);
+      if (this.map && this.zoom) this.map.setZoom(this.zoom);
       if (
         nextProps.onMarkerUpdate &&
         nextProps.markerPosition &&
         nextProps.markerPosition.lat !== undefined &&
         nextProps.markerPosition.lng !== undefined
       )
-        this.map && this.map.panTo(nextProps.markerPosition);
+        if (this.map) this.map.panTo(nextProps.markerPosition);
     }
     if (update && this.maps && this.map && this.map.getCenter() && this.map.getZoom()) {
       // update center so that map doesn't move back
@@ -598,7 +718,7 @@ class MapContainer extends React.Component<MapProps> {
       this.updateGeoJson();
       this.updateRect();
       this.updateMarker();
-      this.props.kmlUrl && this.updateKml(this.props.kmlUrl);
+      if (this.props.kmlUrl) this.updateKml(this.props.kmlUrl);
 
       // update map center an zoom to they match the previous values
       // unless one of the three previous methods changed them
@@ -608,6 +728,22 @@ class MapContainer extends React.Component<MapProps> {
   }
 
   render() {
+    const mapOptions: any = {
+      gestureHandling: 'cooperative',
+      mapTypeControl: true,
+      // Suppress the google-map-react default styles:[{featureType:"poi"...}]
+      // which would conflict with mapId and produce a console warning.
+      // null overrides the library's Object.assign merge so Google Maps
+      // never sees a non-null styles array alongside mapId.
+      styles: null,
+      // Set at construction time so it does not conflict with the mapId's
+      // vector rendering pipeline (post-load setMapTypeId causes a warning
+      // when mapId is present).
+      mapTypeId: 'satellite',
+    };
+    // DEMO_MAP_ID is Google's built-in constant that enables AdvancedMarkerElement
+    // without a real Cloud Console Map ID (cloud styling is optional/separate).
+    mapOptions.mapId = 'DEMO_MAP_ID';
     return (
       <div style={{ height: 500, width: '100%' }}>
         <GoogleMapReact
@@ -616,10 +752,7 @@ class MapContainer extends React.Component<MapProps> {
           defaultZoom={this.props.zoom}
           yesIWantToUseGoogleMapApiInternals={true}
           onGoogleApiLoaded={this.onLoad}
-          options={{
-            gestureHandling: 'cooperative',
-            mapTypeControl: true,
-          }}
+          options={mapOptions}
         />
       </div>
     );

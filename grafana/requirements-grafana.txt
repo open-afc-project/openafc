@@ -4,12 +4,65 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
+# Full transitive dependency tree with sha256 hashes (pip --require-hashes
+# needs a hash for every package that gets installed, not just direct pins).
+# Hash-pinned via (must match grafana/Dockerfile-grafana's base image glibc/
+# Python ABI, NOT Alpine/musl -- this image is Ubuntu-based):
+#   docker run --rm --user root --entrypoint bash \
+#     -v "$(pwd)/grafana:/reqlock:ro" \
+#     grafana/grafana:12.4.2-ubuntu -c \
+#     "apt-get update -qq && apt-get -y install -qq python3-minimal python3-pip && \
+#      pip3 download -q --no-cache-dir --dest /p -r /reqlock/requirements-grafana.txt && \
+#      for f in /p/*.whl /p/*.tar.gz; do [ -f \"\$f\" ] || continue;
+#        n=\$(basename \"\$f\"); h=\$(sha256sum \"\$f\" | cut -d' ' -f1);
+#        printf '%s sha256:%s\n' \"\$n\" \"\$h\"; done"
+#
 
-icecream==2.1.3
-Jinja2==3.1.6
-psycopg2-binary==2.9.10
-pydantic==1.10.21
-PyYAML==6.0.1
-requests==2.32.5
-SQLAlchemy==1.4.54
-tabulate==0.9.0
+annotated-types==0.7.0 \
+    --hash=sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53
+asttokens==3.0.2 \
+    --hash=sha256:9da13157f5b28becde0bd374fc677dcd3c290614264eff096f167c469cd9f933
+certifi==2026.6.17 \
+    --hash=sha256:2227dcbaafe0d2f59279d1762ddddc37783ed4354594f194ffc31d20f41fc3db
+charset-normalizer==3.4.9 \
+    --hash=sha256:9bb41182d93ea91f60b4bc8fbf4c820c69ef8a12ab2d917f3f1834f1acad07e8
+colorama==0.4.6 \
+    --hash=sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6
+executing==2.2.1 \
+    --hash=sha256:760643d3452b4d777d295bb167ccc74c64a81df23fb5e08eff250c425a4b2017
+greenlet==3.5.3 \
+    --hash=sha256:9bcd2d72ccd70a1ec68ba6ef93e7fbb4420ef9997dabc7010d893bd4015e0bec
+icecream==2.2.0 \
+    --hash=sha256:f8df7343b3e787023eec22f42fbe4722df2f93099d394fd820b91e16b2e6cb56
+idna==3.18 \
+    --hash=sha256:7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2
+jinja2==3.1.6 \
+    --hash=sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
+markupsafe==3.0.3 \
+    --hash=sha256:f42d0984e947b8adf7dd6dde396e720934d12c506ce84eea8476409563607591
+psycopg2-binary==2.9.12 \
+    --hash=sha256:c5ee5213445dd45312459029b8c4c0a695461eb517b753d2582315bd07995f5e
+pydantic==2.13.4 \
+    --hash=sha256:45a282cde31d808236fd7ea9d919b128653c8b38b393d1c4ab335c62924d9aba
+pydantic-core==2.46.4 \
+    --hash=sha256:395aebd9183f9d112f569aeb5b2214d1a10a33bec8456447f7fbdfa51d38d4cd
+pydantic-settings==2.14.2 \
+    --hash=sha256:a20c97b37910b6550d5ea50fbcc2d4187defe58cd57070b73863d069419c9440
+pygments==2.20.0 \
+    --hash=sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176
+python-dotenv==1.2.2 \
+    --hash=sha256:1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a
+pyyaml==6.0.3 \
+    --hash=sha256:9c7708761fccb9397fe64bbc0395abcae8c4bf7b0eac081e12b809bf47700d0b
+requests==2.34.2 \
+    --hash=sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0
+sqlalchemy==2.0.51 \
+    --hash=sha256:2e54ff2dd657f2e3e0fbf2b097db1182f7bfea263eca4353f00065bae2a67c3d
+tabulate==0.10.0 \
+    --hash=sha256:f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3
+typing-extensions==4.16.0 \
+    --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8
+typing-inspection==0.4.2 \
+    --hash=sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7
+urllib3==2.7.0 \
+    --hash=sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897

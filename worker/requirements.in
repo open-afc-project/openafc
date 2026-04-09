@@ -1,0 +1,400 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+# Hash-pinned via:
+#   docker run --rm -v "$(pwd)/<svc>/requirements.txt:/req.in:ro"
+#     python:3.12-alpine3.21 sh -c
+#     "apk add --no-cache gcc musl-dev python3-dev librdkafka-dev
+#        postgresql-dev libffi-dev openssl-dev cargo rust &&
+#      pip install --quiet pip-tools &&
+#      pip-compile --generate-hashes --allow-unsafe --output-file=- /req.in"
+#
+
+#
+amqp==5.3.1
+
+
+    # via kombu
+annotated-types==0.8.0
+
+
+    # via pydantic
+billiard==4.2.4
+
+
+    # via celery
+celery==5.6.3
+
+
+    # via -r worker.in
+certifi==2026.7.22
+
+
+    # via requests
+charset-normalizer==3.5.1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # via requests
+click==8.5.0
+
+
+    # via
+    #   celery
+    #   click-didyoumean
+    #   click-plugins
+    #   click-repl
+click-didyoumean==0.3.1
+
+
+    # via celery
+click-plugins==1.1.1.2
+
+
+    # via celery
+click-repl==0.3.0
+
+
+    # via celery
+confluent-kafka==2.15.0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # via -r worker.in
+idna==3.19
+
+
+    # via requests
+kombu==5.6.2
+
+
+    # via celery
+packaging==26.3
+
+
+    # via kombu
+pika==1.4.4
+
+
+    # via -r worker.in
+prompt-toolkit==3.0.53
+
+
+    # via click-repl
+pydantic==2.13.5
+
+
+    # via
+    #   -r worker.in
+    #   pydantic-settings
+pydantic-core==2.48.0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # via pydantic
+pydantic-settings==2.15.0
+
+
+    # via -r worker.in
+python-dateutil==2.9.0.post0
+
+
+    # via
+    #   -r worker.in
+    #   celery
+python-dotenv==1.2.3
+
+
+    # via pydantic-settings
+pytz==2026.3.post1
+
+
+    # via -r worker.in
+requests==2.34.2
+
+
+    # via -r worker.in
+six==1.17.0
+
+
+    # via python-dateutil
+typing-extensions==4.16.0
+
+
+    # via
+    #   pydantic
+    #   pydantic-core
+    #   typing-inspection
+typing-inspection==0.4.4
+
+
+    # via
+    #   pydantic
+    #   pydantic-settings
+tzdata==2026.3
+
+
+    # via kombu
+tzlocal==5.4.4
+
+
+    # via
+    #   -r worker.in
+    #   celery
+urllib3==2.7.0
+
+
+    # via requests
+vine==5.1.0
+
+
+    # via
+    #   amqp
+    #   celery
+    #   kombu
+wcwidth==0.8.3
+
+
+    # via prompt-toolkit

@@ -49,7 +49,7 @@ f.close()
 f = open(conf_file)
 config_data = json.load(f)
 f.close()
-password = config_data['password']
+password = os.environ.get('GMAIL_SMTP_PASSWORD') or config_data.get('password')
 sender_email = config_data['sender_email']
 port = int(config_data['port'])
 

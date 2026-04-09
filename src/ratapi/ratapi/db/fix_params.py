@@ -1,7 +1,33 @@
 import csv
 import sys
 import math
-from os.path import exists
+
+_CSV_FORMULA_LEAD = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_safe(v):
+    """CWE-1236: neutralise CSV formula injection by prefixing formula-leading characters."""
+    s = str(v)
+    if s and s[0] in _CSV_FORMULA_LEAD:
+        return "'" + s
+    return s
+
+
+def _csv_decode_float(v):
+    """Convert a CSV field to float, stripping any _csv_safe sentinel prefix."""
+    s = str(v).strip()
+    if s.startswith("'"):
+        s = s[1:].strip()
+    return float(s)
+
+
+def _csv_decode_int(v):
+    """Convert a CSV field to int, stripping any _csv_safe sentinel prefix."""
+    s = str(v).strip()
+    if s.startswith("'"):
+        s = s[1:].strip()
+    return int(s)
+
 
 csmap = {}
 fsidmap = {}
@@ -57,7 +83,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
     file_handle = open(inputPath, 'r')
     csvreader = csv.DictReader(file_handle)
 
-    fieldnames = csvreader.fieldnames + [
+    fieldnames = (csvreader.fieldnames or []) + [
         'return_FSID',
         'Rx Gain (dBi)',
         'Rx Height to Center RAAT (m)',
@@ -74,7 +100,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
     for field in csvreader.fieldnames:
         wordList = field.split()
         if (wordList[0] == 'Passive') and (wordList[1] == 'Repeater'):
-            n = int(wordList[2])
+            n = _csv_decode_int(wordList[2])
             if (n > maxNumPR):
                 maxNumPR = n
     print('maxNumPR = {}'.format(str(maxNumPR)))
@@ -119,7 +145,6 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                        "Passive Repeater Long Coords",
                        "Passive Repeater Height to Center RAAT (m)"]
 
-    entriesFixed = 0
     with open(outputPath, 'w') as fout:
         csvwriter = csv.writer(fout, delimiter=',')
         csvwriter = csv.DictWriter(fout, fieldnames)
@@ -128,8 +153,8 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
         for count, row in enumerate(csvreader):
             region = row['Region']
             FRN = row['FRN']
-            freq = float(row['Center Frequency (MHz)'])
-            bandwidth = float(row['Bandwidth (MHz)'])
+            freq = _csv_decode_float(row['Center Frequency (MHz)'])
+            bandwidth = _csv_decode_float(row['Bandwidth (MHz)'])
 
             lowFreq = freq - bandwidth / 2
             highFreq = freq + bandwidth / 2
@@ -142,7 +167,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
             row['Rx Diversity Height to Center RAAT (m)'] = row['Rx Diversity Height to Center RAAT ULS (m)']
             row['Tx Height to Center RAAT (m)'] = row['Tx Height to Center RAAT ULS (m)']
 
-            numPR = int(row['Num Passive Repeater'])
+            numPR = _csv_decode_int(row['Num Passive Repeater'])
             for prIdx in range(numPR):
                 prNum = prIdx + 1
                 prTxGainULSFixStr = 'Passive Repeater ' + \
@@ -218,7 +243,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
             for ri in range(len(csmap[keyv])):
                 matchmap[ri] = -1
                 r = csmap[keyv][ri]
-                numPR = int(r['Num Passive Repeater'])
+                numPR = _csv_decode_int(r['Num Passive Repeater'])
                 for prIdx in range(numPR):
                     prNum = prIdx + 1
                     rxGainULSStr = 'Passive Repeater ' + \
@@ -275,11 +300,11 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                             rxGainULS = 0.0
                             txGainULS = 0.0
                             if (r[rxGainULSStr].strip() != ''):
-                                rxGainULS = float(r[rxGainULSStr])
+                                rxGainULS = _csv_decode_float(r[rxGainULSStr])
                                 if ((rxGainULS >= 32.0) and (rxGainULS <= 48.0)):
                                     rxFlag = True
                             if (r[txGainULSStr].strip() != ''):
-                                txGainULS = float(r[txGainULSStr])
+                                txGainULS = _csv_decode_float(r[txGainULSStr])
                                 if ((txGainULS >= 32.0) and (txGainULS <= 48.0)):
                                     txFlag = True
                             if (r[prTypeStr] == 'UNKNOWN'):
@@ -303,20 +328,20 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                 r[prHeightULSFixStr] = str(4.88)
                                 r[prWidthULSFixStr] = str(6.10)
                             # 2022.11.08: Need to confirm this
-                            elif (float(r[prHeightULSStr]) + 0.1 < 1.83) or (float(r[prWidthULSStr]) + 0.1 < 2.44):
+                            elif (_csv_decode_float(r[prHeightULSStr]) + 0.1 < 1.83) or (_csv_decode_float(r[prWidthULSStr]) + 0.1 < 2.44):
                                 r[prHeightULSFixStr] = str(4.88)
                                 r[prWidthULSFixStr] = str(6.10)
 
-                            prHeightULS = float(r[prHeightULSFixStr])
-                            prWidthULS = float(r[prWidthULSFixStr])
+                            prHeightULS = _csv_decode_float(r[prHeightULSFixStr])
+                            prWidthULS = _csv_decode_float(r[prWidthULSFixStr])
                             # R2-AIP-29-b-iii-1
                             if (r[prHeightAntennaStr].strip() == '') or (
                                     r[prWidthAntennaStr].strip() == ''):
                                 prHeight = prHeightULS
                                 prWidth = prWidthULS
                             else:
-                                prHeightAnt = float(r[prHeightAntennaStr])
-                                prWidthAnt = float(r[prWidthAntennaStr])
+                                prHeightAnt = _csv_decode_float(r[prHeightAntennaStr])
+                                prWidthAnt = _csv_decode_float(r[prWidthAntennaStr])
 
                                 # R2-AIP-29-b-iii-2
                                 if (abs(prHeightAnt - prHeightULS) <=
@@ -379,7 +404,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
 
             for ri in range(len(csmap[keyv])):
                 r = csmap[keyv][ri]
-                numPR = int(r['Num Passive Repeater'])
+                numPR = _csv_decode_int(r['Num Passive Repeater'])
                 if keyv[0] == 'US':
                     if (keyv[2] == 5):
                         Fc_unii = (
@@ -420,7 +445,6 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                 fwdGainStrULS = 'Rx Gain ULS (dBi)'
                                 fwdGainStr = 'Rx Gain (dBi)'
                                 retGainStrULS = 'Tx Gain ULS (dBi)'
-                                retGainStr = 'Tx Gain (dBi)'
                                 fwdAntDiameterStr = 'Rx Ant Diameter (m)'
                                 retAntDiameterStr = 'Tx Ant Diameter (m)'
                                 fwdHeightStr = 'Rx Height to Center RAAT (m)'
@@ -438,7 +462,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                     str(numPR + 1 - prNum) + \
                                     ' ULS Fixed Back-to-Back Gain ' + \
                                     ret + ' (dBi)'
-                                retGainStr = 'Passive Repeater ' + \
+                                'Passive Repeater ' + \
                                     str(numPR + 1 - prNum) + \
                                     ' Back-to-Back Gain ' + ret + ' (dBi)'
                                 fwdAntDiameterStr = 'Passive Repeater ' + \
@@ -478,9 +502,9 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                 r[fwdAntDiameterStr] = 6 * 12 * 2.54 / 100
 
                             # R2-AIP-05 (a)
-                            elif (antType == 'Ant') and (float(r[fwdAntDiameterStr]) != -1):
-                                fwdGainULS = float(r[fwdGainStrULS])
-                                Drx = float(r[fwdAntDiameterStr])
+                            elif (antType == 'Ant') and (_csv_decode_float(r[fwdAntDiameterStr]) != -1):
+                                fwdGainULS = _csv_decode_float(r[fwdGainStrULS])
+                                Drx = _csv_decode_float(r[fwdAntDiameterStr])
                                 Eta = 0.55
                                 Gtypical = 10 * \
                                     math.log10(
@@ -489,17 +513,17 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                         0.7) and (fwdGainULS <= Gtypical + 0.7):
                                     fwdGain = fwdGainULS
                                 elif (r[fwdAntMidbandGain].strip() != ''):
-                                    fwdGain = float(r[fwdAntMidbandGain])
+                                    fwdGain = _csv_decode_float(r[fwdAntMidbandGain])
                                 else:
                                     fwdGain = Gtypical
 
                             # R2-AIP-05 (b): Does not apply to passive
                             # repeaters
-                            elif (prNum == 0) and (float(r[retAntDiameterStr]) != -1) and (r[retGainStrULS].strip() != ''):
-                                fwdGainULS = float(r[fwdGainStrULS])
-                                retGainULS = float(r[retGainStrULS])
+                            elif (prNum == 0) and (_csv_decode_float(r[retAntDiameterStr]) != -1) and (r[retGainStrULS].strip() != ''):
+                                fwdGainULS = _csv_decode_float(r[fwdGainStrULS])
+                                retGainULS = _csv_decode_float(r[retGainStrULS])
                                 if (abs(fwdGainULS - retGainULS) <= 0.05):
-                                    D = float(r[retAntDiameterStr])
+                                    D = _csv_decode_float(r[retAntDiameterStr])
                                     Eta = 0.55
                                     Gtypical = 10 * \
                                         math.log10(
@@ -508,7 +532,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                             0.7) and (fwdGainULS <= Gtypical + 0.7):
                                         fwdGain = fwdGainULS
                                     elif (r[retAntMidbandGain].strip() != ''):
-                                        fwdGain = float(r[retAntMidbandGain])
+                                        fwdGain = _csv_decode_float(r[retAntMidbandGain])
                                     else:
                                         fwdGain = Gtypical
                                     r[fwdAntDiameterStr] = D
@@ -518,31 +542,31 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                             else:
                                 matchFlagFwdGain = False
 
-                            if float(r[fwdHeightStr]) == -1:
+                            if _csv_decode_float(r[fwdHeightStr]) == -1:
                                 matchFlagFwdHeight = True
                             else:
                                 matchFlagFwdHeight = False
 
-                            if float(r[retHeightStr]) == -1:
+                            if _csv_decode_float(r[retHeightStr]) == -1:
                                 matchFlagRetHeight = True
                             else:
                                 matchFlagRetHeight = False
 
                             if (matchFlagFwdGain or matchFlagFwdHeight or matchFlagRetHeight) and r['return_FSID'].strip(
                             ) == '':
-                                rxLat = float(r['Rx Lat Coords'])
-                                rxLon = float(r['Rx Long Coords'])
-                                txLat = float(r['Tx Lat Coords'])
-                                txLon = float(r['Tx Long Coords'])
+                                rxLat = _csv_decode_float(r['Rx Lat Coords'])
+                                rxLon = _csv_decode_float(r['Rx Long Coords'])
+                                txLat = _csv_decode_float(r['Tx Lat Coords'])
+                                txLon = _csv_decode_float(r['Tx Long Coords'])
                                 foundMatch = False
                                 foundCandidate = False
                                 for (mi, m) in enumerate(csmap[keyv]):
                                     if (not foundMatch) and (mi != ri):
-                                        m_rxLat = float(m['Rx Lat Coords'])
-                                        m_rxLon = float(m['Rx Long Coords'])
-                                        m_txLat = float(m['Tx Lat Coords'])
-                                        m_txLon = float(m['Tx Long Coords'])
-                                        m_numPR = int(
+                                        m_rxLat = _csv_decode_float(m['Rx Lat Coords'])
+                                        m_rxLon = _csv_decode_float(m['Rx Long Coords'])
+                                        m_txLat = _csv_decode_float(m['Tx Lat Coords'])
+                                        m_txLon = _csv_decode_float(m['Tx Long Coords'])
+                                        m_numPR = _csv_decode_int(
                                             m['Num Passive Repeater'])
                                         if ((abs(rxLon - m_txLon) < 2.78e-4) and (abs(rxLat - m_txLat) < 2.78e-4)
                                                 and (abs(txLon - m_rxLon) < 2.78e-4) and (abs(txLat - m_rxLat) < 2.78e-4) and (numPR == m_numPR)):
@@ -550,15 +574,15 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                             prMatch = True
                                             while (prMatch and (
                                                     prIdx <= numPR)):
-                                                prLat = float(
+                                                prLat = _csv_decode_float(
                                                     r['Passive Repeater ' + str(prIdx) + ' Lat Coords'])
-                                                prLon = float(
+                                                prLon = _csv_decode_float(
                                                     r['Passive Repeater ' + str(prIdx) + ' Long Coords'])
                                                 prType = r['Passive Repeater ' +
                                                            str(prIdx) + ' Ant Type']
-                                                m_prLat = float(
+                                                m_prLat = _csv_decode_float(
                                                     m['Passive Repeater ' + str(numPR + 1 - prIdx) + ' Lat Coords'])
-                                                m_prLon = float(
+                                                m_prLon = _csv_decode_float(
                                                     m['Passive Repeater ' + str(numPR + 1 - prIdx) + ' Long Coords'])
                                                 m_prType = r['Passive Repeater ' +
                                                              str(numPR + 1 - prIdx) + ' Ant Type']
@@ -614,7 +638,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                     m = csmap[keyv][matchi]
 
                                     if m[retHeightStr].strip() != '':
-                                        m_retHeightAGL = float(m[retHeightStr])
+                                        m_retHeightAGL = _csv_decode_float(m[retHeightStr])
                                         if m_retHeightAGL > 1.5:
                                             r[fwdHeightStr] = str(
                                                 m_retHeightAGL)
@@ -631,7 +655,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                     m = csmap[keyv][matchi]
 
                                     if m[fwdHeightStr].strip() != '':
-                                        m_fwdHeightAGL = float(m[fwdHeightStr])
+                                        m_fwdHeightAGL = _csv_decode_float(m[fwdHeightStr])
                                         if m_fwdHeightAGL > 1.5:
                                             r[retHeightStr] = str(
                                                 m_fwdHeightAGL)
@@ -640,13 +664,13 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                             if matchFlagFwdGain:
                                 if matchi != -1:
                                     m = csmap[keyv][matchi]
-                                    if (float(m[retAntDiameterStr]) != -
+                                    if (_csv_decode_float(m[retAntDiameterStr]) != -
                                             1) and (m[retGainStrULS].strip() != ''):
 
-                                        fwdGainULS = float(r[fwdGainStrULS])
-                                        m_txGainULS = float(m[retGainStrULS])
+                                        fwdGainULS = _csv_decode_float(r[fwdGainStrULS])
+                                        m_txGainULS = _csv_decode_float(m[retGainStrULS])
                                         if (abs(fwdGainULS - m_txGainULS) <= 0.05):
-                                            D = float(m[retAntDiameterStr])
+                                            D = _csv_decode_float(m[retAntDiameterStr])
                                             Eta = 0.55
                                             Gtypical = 10 * \
                                                 math.log10(
@@ -655,7 +679,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                                     0.7) and (fwdGainULS <= Gtypical + 0.7):
                                                 fwdGain = fwdGainULS
                                             elif (m[retAntMidbandGain].strip() != ''):
-                                                fwdGain = float(
+                                                fwdGain = _csv_decode_float(
                                                     m[retAntMidbandGain])
                                             else:
                                                 fwdGain = Gtypical
@@ -663,7 +687,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
 
                             # R2-AIP-05 (d)
                             if (antType == 'Ant') and (fwdGain == ''):
-                                fwdGainULS = float(r[fwdGainStrULS])
+                                fwdGainULS = _csv_decode_float(r[fwdGainStrULS])
                                 if fwdGainULS < 32.0:
                                     fwdGain = 32.0
                                 elif fwdGainULS > 48.0:
@@ -693,33 +717,33 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                     diversityHeightStr = 'Rx Diversity Height to Center RAAT (m)'
 
                     if (r[diversityGainStrULS] != '') and (
-                            float(r[diversityGainStrULS]) != 0.0):
+                            abs(_csv_decode_float(r[diversityGainStrULS])) > 1e-9):
                         if (r[rxGainStrULS] != '') and (r[rxAntModelMatchedStr] != '') and (
-                                abs(float(r[rxGainStrULS]) - float(r[diversityGainStrULS])) < 0.05):
+                                abs(_csv_decode_float(r[rxGainStrULS]) - _csv_decode_float(r[diversityGainStrULS])) < 0.05):
                             r[diversityGainStr] = r[rxGainStr]
                             r[diversityDiameterStr] = r[rxDiameterStr]
                         else:
-                            diversityGainULS = float(r[diversityGainStrULS])
+                            diversityGainULS = _csv_decode_float(r[diversityGainStrULS])
                             if (diversityGainULS >= 28.0) and (
                                     diversityGainULS <= 48.0):
                                 r[diversityGainStr] = r[diversityGainStrULS]
                             else:
                                 r[diversityGainStr] = r[rxGainStrULS]
 
-                            diversityGain = float(r[diversityGainStr])
+                            diversityGain = _csv_decode_float(r[diversityGainStr])
                             oneOverSqrtEta = 1.0 / math.sqrt(0.55)
                             D = (c / (math.pi * Fc_unii)) * \
                                 (10**((diversityGain) / 20)) * oneOverSqrtEta
                             r[diversityDiameterStr] = str(D)
 
                         if (r[diversityHeightStr] == ''):
-                            rxHeight = float(r[rxHeightStr])
+                            rxHeight = _csv_decode_float(r[rxHeightStr])
                             if (rxHeight < 14.0):
                                 r[diversityHeightStr] = str(rxHeight + 11)
                             else:
                                 r[diversityHeightStr] = str(rxHeight - 11)
 
-                        if (float(r[diversityHeightStr]) < 1.5):
+                        if (_csv_decode_float(r[diversityHeightStr]) < 1.5):
                             r[diversityHeightStr] = str(1.5)
                     ###########################################################
 
@@ -731,7 +755,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                     nearFieldEfficiencyStr = 'Rx Near Field Ant Efficiency'
 
                     if (r[rxAntModelMatchedStr] != ''):
-                        rxNearFieldAntennaDiameter = float(r[rxDiameterStr])
+                        rxNearFieldAntennaDiameter = _csv_decode_float(r[rxDiameterStr])
                         method = 1
                         if (keyv[2] == 5):
                             if (abs(rxNearFieldAntennaDiameter -
@@ -803,7 +827,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                         rxNearFieldAntennaDiameter = diameterFt * 12.0 * 2.54 * 0.01  # convert ft to m
                         method = 3
                     elif (keyv[2] == 5):
-                        rxGainULS = float(r[rxGainStrULS])
+                        rxGainULS = _csv_decode_float(r[rxGainStrULS])
                         if ((rxGainULS >= 32.0) and (rxGainULS <= 48.0)):
                             # ****************************************************************************#
                             # * Table 3: U-NII-5 Antenna Size versus Gain                                *#
@@ -830,7 +854,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                             rxNearFieldAntennaDiameter = diameterFt * 12.0 * 2.54 * 0.01  # convert ft to m
                             method = 3
                     else:
-                        rxGainULS = float(r[rxGainStrULS])
+                        rxGainULS = _csv_decode_float(r[rxGainStrULS])
                         if ((rxGainULS >= 32.0) and (rxGainULS <= 48.0)):
                             # ****************************************************************************#
                             # * Table 4: U-NII-7 Antenna Size versus Gain                                *#
@@ -861,7 +885,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                     if (r[rxGainStrULS] == ''):
                         effDB = -2.6
                     else:
-                        rxGainULS = float(r[rxGainStrULS])
+                        rxGainULS = _csv_decode_float(r[rxGainStrULS])
                         if (method == 1) and (not foundDiameter):
                             effDB = -2.6
                         elif (method == 1) and ((rxGainULS < gainRangeMin - 0.3) or (rxGainULS > gainRangeMax + 0.3)):
@@ -888,7 +912,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                     ###########################################################
 
                 elif keyv[0] == 'CA':
-                    freq = float(r['Center Frequency (MHz)'])
+                    freq = _csv_decode_float(r['Center Frequency (MHz)'])
 
                     for prIdx in range(2 * numPR + 1):
                         if prIdx == 0:
@@ -923,7 +947,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                         # R2-AIP-05-CAN
                         # R2-AIP-39-CAN
                         if (antType == "Ant"):
-                            if r[fwdGainStrULS].strip() == '' or float(
+                            if r[fwdGainStrULS].strip() == '' or _csv_decode_float(
                                     r[fwdGainStrULS]) < 0.0:
                                 if (freq <= 6425.0):
                                     r[fwdGainStr] = '41.7'
@@ -934,10 +958,10 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                         # R2-AIP-XX-CAN
                         if r[fwdHeightStr].strip() == '':
                             r[fwdHeightStr] = '56'
-                        elif float(r[fwdHeightStr]) < 1.5:
+                        elif _csv_decode_float(r[fwdHeightStr]) < 1.5:
                             r[fwdHeightStr] = '1.5'
                 else:
-                    freq = float(r['Center Frequency (MHz)'])
+                    freq = _csv_decode_float(r['Center Frequency (MHz)'])
 
                     for prIdx in range(2 * numPR + 1):
                         if prIdx == 0:
@@ -966,13 +990,13 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
 
                         if (antType == "Ant"):
                             if (r[fwdAntDiameterStr] == '-1'):
-                                gain = float(r[fwdGainStr])
+                                gain = _csv_decode_float(r[fwdGainStr])
                                 wavelength = 2.99792458e2 / freq
                                 D = wavelength * 10**((gain - 7.7) / 20.0)
                                 r[fwdAntDiameterStr] = str(D)
 
             for ri, r in enumerate(csmap[keyv]):
-                fsid = int(r['FSID'])
+                fsid = _csv_decode_int(r['FSID'])
                 if fsid in fsidmap:
                     sys.exit('ERROR: FSID: ' + str(fsid) + " not unique\n")
                 fsidmap[fsid] = tuple([ri, keyv])
@@ -982,21 +1006,8 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
             keyv = fsidmap[fsid][1]
             r = csmap[keyv][ri]
 
-            numPR = int(r['Num Passive Repeater'])
+            numPR = _csv_decode_int(r['Num Passive Repeater'])
             for prIdx in range(numPR):
                 prNum = prIdx + 1
                 prType = r['Passive Repeater ' + str(prNum) + ' Ant Type']
-                if (prType == 'Ant') and False:
-                    rxGainStr = 'Passive Repeater ' + \
-                        str(prNum) + ' Back-to-Back Gain Rx (dBi)'
-                    txGainStr = 'Passive Repeater ' + \
-                        str(prNum) + ' Back-to-Back Gain Tx (dBi)'
-                    rxGain = r[rxGainStr]
-                    txGain = r[txGainStr]
-                    txFlag = False
-                    if txGain != '':
-                        if ((float(txGain) >= 32.0) and (float(txGain) <= 48.0)):
-                            txFlag = True
-                    if not txFlag:
-                        r[txGainStr] = rxGain
-            csvwriter.writerow(r)
+            csvwriter.writerow({k: _csv_safe(v) for k, v in r.items()})

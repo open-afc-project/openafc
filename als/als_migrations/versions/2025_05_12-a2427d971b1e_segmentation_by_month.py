@@ -667,6 +667,12 @@ def get_last_values() -> Dict[str, int]:
              "WHERE (c.relkind = 'S') AND (n.nspname = 'public')"))]
     ret: Dict[str, int] = {}
     for seq in sequences:
+        # Only plain identifiers may reach the SQL f-strings below: a decoy
+        # sequence planted with a malicious quoted name (e.g. containing ';')
+        # must never be interpolated (second-order SQL injection; same guard
+        # as als_db_tool.py Db.get_partitions())
+        if not re.match(r"^[A-Za-z0-9_]+$", seq):
+            continue
         ret[seq] = \
             conn.execute(sa.text(
                 f"SELECT last_value FROM public.{seq}")).one()[0]
@@ -676,6 +682,9 @@ def get_last_values() -> Dict[str, int]:
 def reset_last_values(last_values: Dict[str, int]) -> None:
     """ Sets last values of sequences """
     for seq, value in last_values.items():
+        # Same second-order-injection guard as in get_last_values()
+        if not re.match(r"^[A-Za-z0-9_]+$", seq):
+            continue
         op.execute(f"ALTER SEQUENCE public.{seq} RESTART WITH {value}")
 
 

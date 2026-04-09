@@ -13,7 +13,15 @@ services:
     image: bitnami/node-exporter:1.6.1-debian-11-r78
     restart: always
     command:
-      - --path.rootfs=/host
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --no-collector.filesystem
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     volumes:
-      - /:/host:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    profiles: ["monitor"]
     dns_search: [.]

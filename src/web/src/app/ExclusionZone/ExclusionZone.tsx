@@ -1,13 +1,15 @@
-import * as React from 'react';
+import React from 'react';
 import {
   PageSection,
-  CardHead,
+  CardHeader,
   CardBody,
   Card,
   Title,
-  Expandable,
+  ExpandableSection,
   Alert,
   Modal,
+  ModalBody,
+  ModalFooter,
   Button,
   ClipboardCopy,
   ClipboardCopyVariant,
@@ -107,6 +109,7 @@ class ExclusionZone extends React.Component<
   constructor(props: any) {
     super(props);
 
+    // @ts-ignore
     const apiLimit = props.limit.kind === 'Success' ? props.limit.result : new Limit(false, 18);
 
     // set the default start state, but load from cache if available
@@ -164,7 +167,7 @@ class ExclusionZone extends React.Component<
     state.messageType = 'None';
 
     // cancel running task
-    this.cancelTask && this.cancelTask();
+    if (this.cancelTask) this.cancelTask();
 
     cacheItem('ExclusionZoneStateCache', state);
   }
@@ -240,8 +243,11 @@ class ExclusionZone extends React.Component<
 
         this.setState({
           results: res.result,
+          // @ts-ignore
           messageType: res.result.statusMessageList.length ? 'Warn' : 'None',
+          // @ts-ignore
           messageTitle: res.result.statusMessageList.length ? 'Status messages' : '',
+          // @ts-ignore
           messageValue: res.result.statusMessageList.length ? res.result.statusMessageList.join('\n') : '',
           mapCenter: {
             lat: res.result.geoJson.features[0].properties.lat,
@@ -293,30 +299,33 @@ class ExclusionZone extends React.Component<
     return (
       <PageSection id="exclusion-contour-page">
         <Card>
-          <CardHead>
-            <Title size="lg">Run Exclusion Zone</Title>
-          </CardHead>
+          <CardHeader>
+            <Title headingLevel="h2">Run Exclusion Zone</Title>
+          </CardHeader>
           <Modal
             title="Copy/Paste"
-            isLarge={true}
+            variant="large"
             isOpen={this.state.isModalOpen}
             onClose={() => this.setState({ isModalOpen: false })}
-            actions={[
+          >
+            <ModalBody>
+              <ClipboardCopy
+                variant={ClipboardCopyVariant.expansion}
+                // @ts-ignore
+                onChange={(_event: any, v: string) => this.setConfig(v)}
+                aria-label="text area"
+              >
+                {this.getParamsText()}
+              </ClipboardCopy>
+            </ModalBody>
+            <ModalFooter>
               <Button key="update" variant="primary" onClick={() => this.setState({ isModalOpen: false })}>
                 Close
-              </Button>,
-            ]}
-          >
-            <ClipboardCopy
-              variant={ClipboardCopyVariant.expansion}
-              onChange={(v: string) => this.setConfig(v)}
-              aria-label="text area"
-            >
-              {this.getParamsText()}
-            </ClipboardCopy>
+              </Button>
+            </ModalFooter>
           </Modal>
           <CardBody>
-            <Expandable
+            <ExpandableSection
               toggleText={this.state.showParams ? 'Hide parameters' : 'Show parameters'}
               onToggle={toggleParams}
               isExpanded={this.state.showParams}
@@ -327,24 +336,25 @@ class ExclusionZone extends React.Component<
                 onCopyPaste={(formData: ExclusionZoneRequest, updateCallback: (v: ExclusionZoneRequest) => void) =>
                   this.copyPaste(formData, updateCallback)
                 }
+                footerActions={
+                  <>
+                    {this.state.canCancelTask && (
+                      <Button variant="secondary" onClick={this.cancelTask}>
+                        Cancel
+                      </Button>
+                    )}
+                    <LoadLidarBounds
+                      currentGeoJson={this.state.mapState.val}
+                      onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
+                    />
+                    <LoadRasBounds
+                      currentGeoJson={this.state.mapState.val}
+                      onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
+                    />
+                  </>
+                }
               />
-              {this.state.canCancelTask && (
-                <>
-                  {' '}
-                  <Button variant="secondary" onClick={this.cancelTask}>
-                    Cancel
-                  </Button>
-                </>
-              )}{' '}
-              <LoadLidarBounds
-                currentGeoJson={this.state.mapState.val}
-                onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
-              />
-              <LoadRasBounds
-                currentGeoJson={this.state.mapState.val}
-                onLoad={(data) => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })}
-              />
-            </Expandable>
+            </ExpandableSection>
           </CardBody>
         </Card>
         <br />
@@ -352,7 +362,7 @@ class ExclusionZone extends React.Component<
           <Alert
             title={this.state.extraWarningTitle || 'Warning'}
             variant="warning"
-            action={
+            actionClose={
               <AlertActionCloseButton
                 onClose={() => this.setState({ extraWarning: undefined, extraWarningTitle: undefined })}
               />
@@ -389,6 +399,7 @@ class ExclusionZone extends React.Component<
           />
         </div>
         {this.state.results && this.state.kml && (
+          // @ts-ignore
           <DownloadContents contents={() => this.state.kml} fileName="results.kmz" />
         )}
       </PageSection>

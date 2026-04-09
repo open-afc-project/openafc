@@ -27,8 +27,14 @@ if [ "$AFC_DEVEL_ENV" == "devel" ]; then
             set_uid="-u $AFC_WORKER_UID"
         fi
         adduser $set_uid $AFC_WORKER_USER -G fbrat -h /home/$AFC_WORKER_USER -s /bin/bash -D
-        echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
-        addgroup $AFC_WORKER_USER wheel
+        # Root escalation is a separate explicit opt-in (AFC_DEVEL_SUDO):
+        # a debug-tooling build must not automatically hand any code
+        # running as the worker user a blanket passwordless root grant in
+        # an image that processes untrusted AP traffic.
+        if [ x"$AFC_DEVEL_SUDO" = x"enabled" ]; then
+            echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
+            addgroup $AFC_WORKER_USER wheel
+        fi
     fi
 else
     apk del --purge apk-tools libc-utils

@@ -1,14 +1,14 @@
 {
   "users": [
     {
-      "name": "celery",
-      "password": "celery",
-      "tags": "administrator"
+      "name": "__BROKER_USER__",
+      "password": "__BROKER_PWD__",
+      "tags": ""
     },
     {
-      "name": "rcache",
-      "password": "rcache",
-      "tags": "administrator"
+      "name": "__RCACHE_USER__",
+      "password": "__RCACHE_RMQ_PWD__",
+      "tags": ""
     }
   ],
   "vhosts": [
@@ -21,14 +21,14 @@
   ],
   "permissions": [
     {
-      "user": "celery",
+      "user": "__BROKER_USER__",
       "vhost": "fbrat",
       "configure": ".*",
       "write": ".*",
       "read": ".*"
     },
     {
-      "user": "rcache",
+      "user": "__RCACHE_USER__",
       "vhost": "rcache",
       "configure": ".*",
       "write": ".*",

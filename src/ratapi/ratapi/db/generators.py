@@ -4,7 +4,7 @@ import logging
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 import csv
-from numpy import loadtxt, genfromtxt
+from numpy import loadtxt
 from .models.base import Base
 from .models.population import Population
 from .models.uls import ULS
@@ -114,7 +114,7 @@ def create_pop_db(db_name, data_file):
                        ]
                        )
 
-        if not (file_handle is None):
+        if file_handle is not None:
             file_handle.close()
         LOGGER.debug("committing")
         s.commit()
@@ -240,7 +240,7 @@ def create_uls_db(db_name, data_file):
             save_chunk(s, to_save)
             to_save = []
 
-        if not (file_handle is None):
+        if file_handle is not None:
             file_handle.close()
 
         if len(to_save) > 0:
@@ -279,16 +279,16 @@ def shp_to_spatialite(dst, src):
         os.remove(dst)
 
     try:
-        cmd = (
-            'ogr2ogr ' +
-            '-f SQLite ' +
-            '-t_srs "WGS84" ' +
-            '-dsco SPATIALITE=YES ' +
-            dst + ' ' +
+        cmd = [
+            'ogr2ogr',
+            '-f', 'SQLite',
+            '-t_srs', 'WGS84',
+            '-dsco', 'SPATIALITE=YES',
+            dst,
             src
-        )
-        LOGGER.debug(cmd)
-        check_call(cmd, shell=True)
+        ]
+        LOGGER.debug(" ".join(cmd))
+        check_call(cmd, shell=False)
         LOGGER.debug("converted to sqlite.")
 
     except CalledProcessError as e:
@@ -313,27 +313,21 @@ def spatialite_to_raster(dst, src, table, elev_field):
         :param elev_field: name of field in table to get raster value from
     '''
     from subprocess import check_call, CalledProcessError
-    import os
 
     try:
-        check_call(
-            'gdal_rasterize ' +
-            # use sort to ensure that overlapping polygons give highest hight
-            # in raster lookup
-            '-sql "SELECT * FROM {} ORDER BY {}" '.format(table, elev_field) +
-            # pull from ELEVATION attribute (view in QGIS)
-            '-a {} '.format(elev_field) +
-            '-of GTiff ' +                                            # output format
-            # tile output (optimization)
-            '-co "TILED=YES" ' +
-            '-ot Float32 ' +                                          # raster data type
-            # no data special value
-            '-a_nodata 0x7FC00000 ' +
-            # resolution (in units of projection)
-            '-tr 0.00001 0.00001 ' +
-            '-a_srs WGS84 ' +
-            src + ' ' +
-            dst, shell=True)
+        check_call([
+            'gdal_rasterize',
+            '-sql', f'SELECT * FROM {table} ORDER BY {elev_field}',
+            '-a', elev_field,
+            '-of', 'GTiff',
+            '-co', 'TILED=YES',
+            '-ot', 'Float32',
+            '-a_nodata', '0x7FC00000',
+            '-tr', '0.00001', '0.00001',
+            '-a_srs', 'WGS84',
+            src,
+            dst
+        ])
 
     except CalledProcessError as e:
         LOGGER.error(

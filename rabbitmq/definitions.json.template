@@ -1,0 +1,38 @@
+{
+  "users": [
+    {
+      "name": "${BROKER_USER}",
+      "password": "${BROKER_PWD}",
+      "tags": ""
+    },
+    {
+      "name": "rcache",
+      "password": "${RCACHE_RMQ_PWD}",
+      "tags": ""
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "fbrat"
+    },
+    {
+      "name": "rcache"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "${BROKER_USER}",
+      "vhost": "fbrat",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "rcache",
+      "vhost": "rcache",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ]
+}

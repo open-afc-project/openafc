@@ -35,7 +35,9 @@ double CalcITU1245(const double &angleDeg, const double &maxGain, const double &
 	double g1 = 2.0 + 15.0 * log10(Dlambda);
 	double psiM = 20.0 * (1.0 / Dlambda) * pow((maxGain - g1), 0.5);
 	double psiR = 12.02 * pow(Dlambda, -0.6);
-	double rv;
+	// Fail-safe: a NaN Dlambda makes both branch guards below false; return the
+	// conservative maxGain instead of an uninitialized value.
+	double rv = maxGain;
 
 	// qDebug() << Dlambda;
 

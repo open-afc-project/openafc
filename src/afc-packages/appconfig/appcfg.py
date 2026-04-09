@@ -11,7 +11,9 @@
 '''
 import abc
 import os
+import sys
 import logging
+from typing import Optional
 import datetime
 
 #: The externally-visible script root path
@@ -22,12 +24,69 @@ DEBUG = False
 PROPAGATE_EXCEPTIONS = False
 #: Root logger filter
 AFC_RATAPI_LOG_LEVEL = os.getenv("AFC_RATAPI_LOG_LEVEL", "WARNING")
-# Default request timeout in seconds
-AFC_MSGHND_RATAFC_TOUT = 600
+# Default request timeout in seconds.
+# This budget starts when rat_server dispatches the Celery task, so it must
+# cover both Celery queue-wait time and engine computation time.  In a
+# single-worker (serial) deployment the queue can hold many precompute tasks
+# ahead of a test request, each taking 30–60 s; 1800 s gives comfortable
+# headroom while still bounding runaway tasks.
+AFC_MSGHND_RATAFC_TOUT = int(os.getenv("AFC_MSGHND_RATAFC_TOUT", "1800"))
 #: Set of log handlers to use for root logger
 LOG_HANDLERS = [
     logging.StreamHandler(),
 ]
+
+
+class _CredentialRedactFilter(logging.Filter):
+    """Logging filter that redacts DSN/URL passwords before emission.
+
+    Catches any log record whose rendered message contains an AMQP/HTTP/
+    PostgreSQL password embedded as ``://user:password@host``.  Applied to
+    every root-logger handler: handler-level filters run in Handler.handle()
+    for all records the handler emits, including records propagated from
+    named/library child loggers, which never traverse logger-level filters
+    attached to the root logger itself.
+    """
+    import re as _re
+    _DSN_RE = _re.compile(r"(://[^:@/\s]+:)[^@\s]+(@)")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+            if "://" in msg and "@" in msg:
+                record.msg = self._DSN_RE.sub(r"\1***\2", msg)
+                record.args = ()
+        except Exception:
+            # Fail closed: if redaction cannot be evaluated, withhold the
+            # message rather than risk emitting an unredacted secret.
+            record.msg = ("[log message withheld: credential-redact filter "
+                          "error]")
+            record.args = ()
+        return True
+
+
+def install_credential_redact_filter() -> None:
+    """Install _CredentialRedactFilter on all root-logger handlers (idempotent).
+
+    The filter must be attached to *handlers*, not only the root logger:
+    CPython consults logger-level filters only in Logger.handle() of the
+    logger a record was emitted on, so records from named/library loggers
+    (logging.getLogger(__name__), pika, kombu, sqlalchemy, celery) propagate
+    to root handlers without ever running root's own filters.  Call this
+    AFTER adding any service-specific handlers to the root logger.  The
+    filter is also kept on the root logger itself so records emitted
+    directly on it stay redacted even when no handler is installed
+    (logging.lastResort path).
+    """
+    root = logging.getLogger()
+    if not any(isinstance(f, _CredentialRedactFilter)
+               for f in root.filters):
+        root.addFilter(_CredentialRedactFilter())
+    for handler in set(root.handlers) | set(LOG_HANDLERS):
+        if not any(isinstance(f, _CredentialRedactFilter)
+                   for f in handler.filters):
+            handler.addFilter(_CredentialRedactFilter())
+
 
 SECRET_KEY = None  # Must be set in app config
 
@@ -41,19 +100,12 @@ SQLALCHEMY_ENGINE_OPTIONS = \
         'pool_pre_ping': True,
     }
 
-# Flask-User settings
-USER_APP_NAME = "AFC"  # Shown in and email templates and page footers
-USER_ENABLE_EMAIL = True  # Enable email authentication
-USER_ENABLE_CONFIRM_EMAIL = False  # Disable email confirmation
-USER_ENABLE_USERNAME = True  # Enable username authentication
-USER_EMAIL_SENDER_NAME = USER_APP_NAME
-USER_EMAIL_SENDER_EMAIL = None
-REMEMBER_COOKIE_DURATION = datetime.timedelta(days=30)  # remember me timeout
+# Application name (used in templates and page footers)
+USER_APP_NAME = "AFC"
+REMEMBER_COOKIE_DURATION = datetime.timedelta(days=30)
 USER_USER_SESSION_EXPIRATION = 3600  # One hour idle timeout
 PERMANENT_SESSION_LIFETIME = datetime.timedelta(
-    seconds=USER_USER_SESSION_EXPIRATION)  # idle session timeout
-USER_LOGIN_TEMPLATE = 'login.html'
-USER_REGISTER_TEMPLATE = 'register.html'
+    seconds=USER_USER_SESSION_EXPIRATION)
 
 #: API key used for google maps
 GOOGLE_APIKEY = None
@@ -72,6 +124,27 @@ TASK_QUEUE = '/var/spool/fbrat'
 DAILY_ULS_RAN_TODAY = False
 
 
+def read_secret(env_var: str, file_env_var: Optional[str] = None) -> Optional[str]:
+    """Read a secret from a Docker secret file or plain environment variable.
+
+    Prefers the file path from ``file_env_var`` (e.g. ``BROKER_PWD_FILE``)
+    over the direct value in ``env_var`` (e.g. ``BROKER_PWD``).  Returns
+    ``None`` when neither is set.
+    """
+    file_path = os.getenv(file_env_var or (env_var + "_FILE"))
+    if file_path:
+        try:
+            with open(file_path) as fh:
+                return fh.read().strip()
+        except OSError as exc:
+            logging.getLogger(__name__).critical(
+                # logs file PATH and OS error, not the secret value
+                "FATAL: cannot read secret file %s (%s): %s",
+                file_env_var or (env_var + "_FILE"), file_path, exc)
+            sys.exit(1)
+    return os.getenv(env_var)
+
+
 class InvalidEnvVar(Exception):
     """Wrong/missing env var exception"""
     pass
@@ -81,9 +154,18 @@ class BrokerConfigurator(object):
     """Keep configuration for a broker"""
 
     def __init__(self) -> None:
+        import logging as _logging
         self.BROKER_PROT = os.getenv('BROKER_PROT', 'amqp')
         self.BROKER_USER = os.getenv('BROKER_USER', 'celery')
-        self.BROKER_PWD = os.getenv('BROKER_PWD', 'celery')
+        self.BROKER_PWD = read_secret('BROKER_PWD')
+        if not self.BROKER_PWD:
+            _logging.getLogger(__name__).critical(
+                "FATAL: BROKER_PWD is not set. "
+                "Set BROKER_PWD_FILE to a Docker secret path, or set BROKER_PWD. "
+                "Generate a random secret: "
+                "python3 -c \"import secrets; print(secrets.token_hex(32))\"")
+            sys.exit(1)
+
         self.BROKER_FQDN = os.getenv('BROKER_FQDN', 'rmq')
         self.BROKER_PORT = os.getenv('BROKER_PORT', '5672')
         self.BROKER_VHOST = os.getenv('BROKER_VHOST', 'fbrat')
@@ -204,7 +286,8 @@ class OIDCConfigurator(SecretConfigurator):
     def __init__(self):
         oidc_bool_attr = ['OIDC_LOGIN']
         oidc_str_attr = ['OIDC_CLIENT_ID',
-                         'OIDC_CLIENT_SECRET', 'OIDC_DISCOVERY_URL']
+                         'OIDC_CLIENT_SECRET', 'OIDC_DISCOVERY_URL',
+                         'OIDC_REDIRECT_BASE']
         oidc_env = 'OIDC_ARG'
         super().__init__(secret_env=oidc_env, file_env_prefix='OIDCFILE_',
                          bool_attr=oidc_bool_attr, str_attr=oidc_str_attr,

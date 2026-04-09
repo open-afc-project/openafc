@@ -29,7 +29,6 @@ esac
 rat-manage-api db-create --if_absent || exit 1
 rat-manage-api db-upgrade || exit 1
 
-postfix start &
 exec gunicorn \
 --bind "${AFC_WEBUI_BIND}:${AFC_WEBUI_PORT}" \
 --pid "${AFC_WEBUI_PID}" \
@@ -39,5 +38,5 @@ ${AFC_WEBUI_ACCESS_LOG:+--access-logfile "$AFC_WEBUI_ACCESS_LOG"} \
 --error-logfile "${AFC_WEBUI_ERROR_LOG}" \
 --log-level "${AFC_WEBUI_LOG_LEVEL}" \
 --worker-class gevent \
---forwarder-headers SCRIPT_NAME,PATH_INFO,REMOTE_USER \
+--forwarder-headers SCRIPT_NAME \
 wsgi:app

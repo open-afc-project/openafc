@@ -1,0 +1,61 @@
+{% extends 'flask_user_layout.html' %}
+
+{% block content %}
+<h1>{%trans%}Register{%endtrans%}</h1>
+
+<form action="{{ url_for('user.register') }}" method="POST" novalidate formnovalidate class="form" role="form">
+    {{ register_user_form.hidden_tag() }}
+
+    {# Email field #}
+    {% set field = register_user_form.email %}
+    <div class="form-group {% if field.errors %}has-error{% endif %}">
+        <div class="row">
+            <div class="col-xs-6">
+                <label for="{{ field.id }}" class="control-label">{{ field.label.text }}</label>
+            </div>
+            <div class="col-xs-6 text-right">
+                <a href="{{ url_for('user.login') }}" tabindex='290'>
+                    {%trans%}Already registered? Sign in.{%endtrans%}</a>
+            </div>
+        </div>
+        {{ field(class_='form-control', tabindex=210, autocomplete="off") }}
+        {% if field.errors %}
+            {% for e in field.errors %}
+                <p class="help-block">{{ e }}</p>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    {# Password field #}
+    {% set field = register_user_form.password %}
+    <div class="form-group {% if field.errors %}has-error{% endif %}">
+        <label for="{{ field.id }}" class="control-label">{{ field.label.text }}</label>
+        {{ field(class_='form-control', tabindex=230, autocomplete="off") }}
+        {% if field.errors %}
+            {% for e in field.errors %}
+                <p class="help-block">{{ e }}</p>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    {# Password confirm field #}
+    {% if register_user_form.password_confirm %}
+    {% set field = register_user_form.password_confirm %}
+    <div class="form-group {% if field.errors %}has-error{% endif %}">
+        <label for="{{ field.id }}" class="control-label">{{ field.label.text }}</label>
+        {{ field(class_='form-control', tabindex=240, autocomplete="off") }}
+        {% if field.errors %}
+            {% for e in field.errors %}
+                <p class="help-block">{{ e }}</p>
+            {% endfor %}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# Submit button #}
+    <div class="form-group">
+        {{ register_user_form.submit(class_='btn btn-primary', tabindex=280) }}
+    </div>
+</form>
+
+{% endblock %}

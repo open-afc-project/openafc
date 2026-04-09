@@ -12,12 +12,12 @@
 
 import pika
 import pydantic
-import random
-import string
-from typing import cast, List, Optional, Set
+import secrets
+from typing import cast, Dict, List, Optional, Set
 
 from log_utils import error, get_module_logger
-from rcache_models import RCACHE_RMQ_EXCHANGE_NAME, RmqReqRespKey
+from rcache_models import compute_rmq_resp_hmac, RCACHE_RMQ_EXCHANGE_NAME, \
+    RmqReqRespKey, verify_rmq_resp_hmac
 import db_utils
 
 __all__ = ["RcacheRmq", "RcacheRmqConnection"]
@@ -58,9 +58,7 @@ class RcacheRmqConnection:
         self._for_rx = tx_queue_name is None
         if self._for_rx:
             self._queue_name = \
-                "afc_response_queue_" + \
-                "".join(random.choices(string.ascii_uppercase + string.digits,
-                                       k=10))
+                "afc_response_queue_" + secrets.token_hex(5)
             self._channel.queue_declare(queue=self._queue_name, exclusive=True)
             self._channel.queue_bind(queue=self._queue_name,
                                      exchange=RCACHE_RMQ_EXCHANGE_NAME)
@@ -72,13 +70,16 @@ class RcacheRmqConnection:
         assert self._for_rx
         return self._queue_name
 
-    def send_response(self, req_cfg_digest: str, response: Optional[str]) \
+    def send_response(self, req_cfg_digest: str, response: Optional[str],
+                      task_id: Optional[str] = None) \
             -> None:
         """ Send computed AFC Response
 
         Arguments:
         req_cfg_digest -- Request/config digest that identifies request
         response       -- Response as a string. None on failure
+        task_id        -- Celery task ID of the dispatch being answered.
+                          Bound into resp_hmac (replay/freshness binding)
         """
         assert not self._for_rx
         assert self._channel is not None
@@ -88,7 +89,11 @@ class RcacheRmqConnection:
             self._channel.basic_publish(
                 exchange=RCACHE_RMQ_EXCHANGE_NAME, routing_key=self._queue_name,
                 body=RmqReqRespKey(
-                    afc_resp=response, req_cfg_digest=req_cfg_digest).json(),
+                    afc_resp=response, req_cfg_digest=req_cfg_digest,
+                    task_id=task_id,
+                    resp_hmac=compute_rmq_resp_hmac(
+                        req_cfg_digest, response,
+                        task_id)).model_dump_json(),
                 properties=pika.BasicProperties(
                     content_type="application/json",
                     delivery_mode=pika.DeliveryMode.Transient),
@@ -100,12 +105,20 @@ class RcacheRmqConnection:
             error(f"RabbitMQ send failed: {repr(ex)}")
 
     def receive_responses(self, req_cfg_digests: List[str],
-                          timeout_sec: float) -> List[RmqReqRespKey]:
+                          timeout_sec: float,
+                          expected_task_ids: Optional[Dict[str, str]] = None) \
+            -> List[RmqReqRespKey]:
         """ Receive AFC responses
 
         Arguments:
-        req_cfg_digests -- Request/config digests of expected responses
-        timeout_sec     -- Timeout in seconds
+        req_cfg_digests   -- Request/config digests of expected responses
+        timeout_sec       -- Timeout in seconds
+        expected_task_ids -- Optional per-digest map of the Celery task ID of
+                             the outstanding dispatch. When provided, a
+                             response whose signed task_id does not match the
+                             outstanding dispatch is rejected
+                             (replay/freshness defense, cf.
+                             afc_server_compute.py)
         Returns list of request(optional)/response/digest triplets
         """
         assert self._for_rx
@@ -125,10 +138,37 @@ class RcacheRmqConnection:
                     self._channel.consume(
                         queue=self._queue_name, auto_ack=True, exclusive=True):
                 try:
-                    rrk = RmqReqRespKey.parse_raw(body)
+                    rrk = RmqReqRespKey.model_validate_json(body)
                 except pydantic.ValidationError as ex:
                     LOGGER.error(f"Decode error on AFC Response Info "
                                  f"arrived from Worker: {ex}")
+                    continue
+                if rrk.req_cfg_digest in remaining_responses and \
+                        not verify_rmq_resp_hmac(
+                            rrk.req_cfg_digest, rrk.afc_resp, rrk.resp_hmac,
+                            rrk.task_id):
+                    LOGGER.error(
+                        "Rejected RMQ response for digest %s: missing/"
+                        "invalid resp_hmac — message was not authenticated "
+                        "as coming from a holder of the objstore API key "
+                        "(possible forgery by a bare broker-credential "
+                        "holder)", rrk.req_cfg_digest)
+                    continue
+                # Freshness/replay defense: only accept the response
+                # produced for the dispatch that is actually outstanding
+                # for this digest. A validly signed triple captured before
+                # a data update carries the old task_id and is rejected
+                # here (mirrors afc_server_compute.py, SUB-0138-13).
+                if expected_task_ids is not None and \
+                        rrk.req_cfg_digest in remaining_responses and \
+                        (rrk.task_id is None or
+                         expected_task_ids.get(rrk.req_cfg_digest) !=
+                         rrk.task_id):
+                    LOGGER.error(
+                        "Rejected RMQ response for digest %s: task_id %r "
+                        "does not match the outstanding dispatch (possible "
+                        "replay of a stale signed response)",
+                        rrk.req_cfg_digest, rrk.task_id)
                     continue
                 if rrk.req_cfg_digest in remaining_responses:
                     remaining_responses.remove(rrk.req_cfg_digest)
@@ -173,14 +213,17 @@ class RcacheRmq:
     _url_params -- Connection parameters
     """
 
-    def __init__(self, rmq_dsn: str) -> None:
+    def __init__(self, rmq_dsn: str,
+                 password_file: Optional[str] = None) -> None:
         """ Constructor
 
         Arguments:
-        rmq_dsn     -- RabbitMQ AMQP URI
-        as_receiver -- True if will be used for RX, false if for TX
+        rmq_dsn       -- RabbitMQ AMQP URI
+        password_file -- Optional file with password to substitute into DSN
         """
-        self.rmq_dsn = rmq_dsn
+        self.rmq_dsn = db_utils.substitute_password(
+            dsn=rmq_dsn, password_file=password_file, optional=True) \
+            or rmq_dsn
         try:
             self._url_params = pika.URLParameters(self.rmq_dsn)
         except pika.exceptions.AMQPError as ex:

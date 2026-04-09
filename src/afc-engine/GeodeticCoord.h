@@ -5,7 +5,7 @@
 
 #include <QMetaType>
 #include <QVariant>
-//#include <qtglobal.h>
+// #include <qtglobal.h>
 
 /** The base structure contains a 3D Earth-fixed geodetic coordinate.
  * This is in the WGS84 ellipsoid, so any conversion functions must follow

@@ -19,10 +19,9 @@ import http
 import json
 import logging
 import os
-import random
 import re
 import requests
-import string
+import secrets
 import sys
 from typing import Any, Dict, List, NamedTuple, NoReturn, Optional, Union
 import yaml
@@ -71,6 +70,9 @@ RESPONSE_DESC_PATH_KEY = "response_desc"
 
 # Config subkey in response description in AFC Response JSON
 RESPONSE_SUPP_PATH_KEY = "response_supp"
+
+# Config subkey for path to vendorExtensions list in AFC Response JSON
+RESPONSE_VENDOR_EXT_PATH_KEY = "response_vendor_ext"
 
 # Config subkey for descrition substring of statuses to ignore
 SUCCESS_STATUSES_KEY = "success_statuses"
@@ -143,11 +145,12 @@ def json_substitute(json_obj: Union[List[Any], Dict[str, Any]],
     error_if(json_obj is not None,
              f"Path {path} is invalid for '{original_obj}' - must end on "
              f"'null' element, instead ends on '{json_obj}'")
+    assert container is not None
     container[path[-1]] = value
 
 
 def json_retrieve(json_obj: Optional[Union[List[Any], Dict[str, Any]]],
-                  path=List[Union[int, str]]) -> Any:
+                  path: List[Union[int, str]]) -> Any:
     """ Try to read value at given path in given JSON
 
     Arguments:
@@ -206,8 +209,26 @@ def do_request(req: Dict[str, Any], url: str, timeout_sec: float) \
     timeout = False
     start_time = datetime.datetime.now()
     result: Optional[requests.Response] = None
+    headers = {}
+    if "AFC_INTERNAL_TOKEN" in os.environ:
+        headers["x-afc-internal-token"] = os.environ["AFC_INTERNAL_TOKEN"]
+    # Send the batch-caller precompute token so the internal endpoint grants
+    # is_internal=True. The downloader must NOT hold the dispatcher-only
+    # AFC_DISPATCHER_TOKEN: that token additionally authorises trusting the
+    # mTLS-DN/X-SSL-Client-Verify attestation headers on the external route
+    # and is mounted only into dispatcher, rat_server, msghnd and afcserver
+    # (scripts/gen_secrets.sh audience contract).
+    precompute_token_file = os.environ.get("AFC_PRECOMPUTE_TOKEN_FILE")
+    if precompute_token_file and os.path.exists(precompute_token_file):
+        try:
+            with open(precompute_token_file, encoding="utf-8") as f:
+                tok = f.read().strip()
+            if tok:
+                headers["x-afc-precompute-token"] = tok
+        except OSError:
+            pass
     try:
-        result = requests.post(url=url, json=req, timeout=timeout_sec)
+        result = requests.post(url=url, json=req, headers=headers, timeout=timeout_sec)
     except requests.Timeout:
         timeout = True
     return \
@@ -304,10 +325,7 @@ def main(argv: List[str]) -> None:
              f"Config file '{args.config}' not found")
     with open(args.config, mode="r", encoding="utf-8") as f:
         config = \
-            yaml.load(
-                f.read(),
-                Loader=yaml.CLoader if hasattr(yaml, "CLoader")
-                else yaml.Loader)
+            yaml.safe_load(f.read())
 
     if args.region:
         error_if(
@@ -385,10 +403,7 @@ def main(argv: List[str]) -> None:
                         json_obj=req, path=paths[REQ_ID_PATH_KEY],
                         value=config[REQ_ID_FORMAT_KEY].format(
                             req_idx=len(future_to_req_info), region=region,
-                            random_str="".join(
-                                random.choices(
-                                    string.ascii_uppercase + string.digits,
-                                    k=10))))
+                            random_str=secrets.token_hex(5)))
                     json_substitute(json_obj=req, path=paths[REGION_PATH_KEY],
                                     value=config[REGION_PATTERNS_KEY][region])
                     json_substitute(json_obj=req, path=paths[COORD_PATH_KEY],
@@ -400,12 +415,12 @@ def main(argv: List[str]) -> None:
                         executor.submit(
                             do_request, req=req, url=args.server_url,
                             timeout_sec=request_timeout_sec
-                            )] = ReqInfo(name=point[POINT_NAME_KEY],
-                                         region=region, req=req,
-                                         lat=point[POINT_COORD_DICT_KEY][
-                                             POINT_COORD_LAT_KEY],
-                                         lon=point[POINT_COORD_DICT_KEY][
-                                             POINT_COORD_LON_KEY])
+                        )] = ReqInfo(name=point[POINT_NAME_KEY],
+                                     region=region, req=req,
+                                     lat=point[POINT_COORD_DICT_KEY][
+                            POINT_COORD_LAT_KEY],
+                        lon=point[POINT_COORD_DICT_KEY][
+                            POINT_COORD_LON_KEY])
             # Processing finished requests
             for future in concurrent.futures.as_completed(future_to_req_info):
                 req_info = future_to_req_info[future]
@@ -433,6 +448,44 @@ def main(argv: List[str]) -> None:
                     response_supp = \
                         json_retrieve(json_obj=response_info.afc_response,
                                       path=paths[RESPONSE_SUPP_PATH_KEY])
+                    # Verify the engine applied the candidate FS database via
+                    # the openAfc.used_data response extension.  Positive
+                    # confirmation is REQUIRED: the engine no longer honours
+                    # the openAfc.overrideAfcConfig request extension, so
+                    # without it this check silently exercises the currently
+                    # active FS database instead of the candidate.  Fail
+                    # closed when the extension is absent (CWE-754).
+                    if RESPONSE_VENDOR_EXT_PATH_KEY in paths:
+                        response_uls_id = None
+                        for ve in (json_retrieve(
+                                json_obj=response_info.afc_response,
+                                path=paths[RESPONSE_VENDOR_EXT_PATH_KEY])
+                                or []):
+                            if isinstance(ve, dict) and \
+                                    ve.get("extensionId") == \
+                                    "openAfc.used_data":
+                                response_uls_id = \
+                                    (ve.get("parameters") or {}).get(
+                                        "uls_id")
+                                break
+                        if response_uls_id is None:
+                            error(
+                                f"Request '{req_info.point_info()}':"
+                                f" openAfc.used_data not returned by engine;"
+                                f" cannot confirm candidate FS database was"
+                                f" applied - refusing to accept unvalidated"
+                                f" ULS data (engine must emit and whitelist"
+                                f" the openAfc.used_data response extension)")
+                        else:
+                            error_if(
+                                response_uls_id !=
+                                os.path.basename(args.FS_DATABASE),
+                                f"Request '{req_info.point_info()}':"
+                                f" engine applied FS database"
+                                f" {response_uls_id!r} instead of"
+                                f" candidate"
+                                f" {os.path.basename(args.FS_DATABASE)!r};"
+                                f" refusing unvalidated ULS data")
                     for ss in config[SUCCESS_STATUSES_KEY]:
                         if (STATUS_CODE_KEY in ss) and \
                                 (ss[STATUS_CODE_KEY] != response_code):

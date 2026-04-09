@@ -8,6 +8,7 @@
 
 # pylint: disable=wrong-import-order, invalid-name, useless-parent-delegation
 
+import datetime
 import geoalchemy2 as ga
 import math
 import os
@@ -17,12 +18,18 @@ import sqlalchemy.ext.asyncio as sa_async
 import sqlalchemy.dialects.postgresql as sa_pg
 from typing import Any, Dict, List, NamedTuple, Optional
 
-from log_utils import dp, error, error_if, FailOnError
-from rcache_db import RcacheDb
+from log_utils import dp, error, error_if, FailOnError, get_module_logger
+from rcache_db import RcacheDb, RCACHE_MAX_AGE
 from rcache_models import ApDbRespState, Beam, FuncSwitch, LatLonRect, ApDbPk
 import db_utils
 
 __all__ = ["RcacheDbAsync"]
+
+# Module logger. Used for nonfatal reporting - log_utils.error() raises
+# SystemExit by default, which is not appropriate for recoverable,
+# per-row/per-batch data problems (e.g. a caller-supplied duplicate
+# req_cfg_digest) that must not permanently kill a worker task.
+LOGGER = get_module_logger()
 
 
 class RcacheDbAsync(RcacheDb):
@@ -117,16 +124,101 @@ class RcacheDbAsync(RcacheDb):
             return
         assert self._engine is not None
         assert len(rows) <= self.max_update_records()
-        try:
-            ins = sa_pg.insert(self.ap_table).values(rows)
-            ins = \
+
+        def make_ins(vals: List[Dict[str, Any]]) -> Any:
+            ins = sa_pg.insert(self.ap_table).values(vals)
+            # Only update an existing row when the request digest matches.
+            # A conflicting row with a different digest (e.g. a different device
+            # claiming the same identity with a different location) is silently
+            # dropped, preventing eviction of another device's cached result.
+            return \
                 ins.on_conflict_do_update(
                     index_elements=self.ap_pk_columns,
-                    set_={col_name: ins.excluded[col_name]
-                          for col_name in self.ap_table.columns.keys()
-                          if col_name not in self.ap_pk_columns})
+                    set_={
+                        **{col_name: ins.excluded[col_name]
+                           for col_name in self.ap_table.columns.keys()
+                           if col_name not in
+                           tuple(self.ap_pk_columns) + ("created_at",)},
+                        # created_at is the squat epoch: preserve it while
+                        # the row keeps the same req_cfg_digest (e.g. the
+                        # precomputation refresh re-posting the stored
+                        # request), so the age arm below cannot be reset by
+                        # the service's own precomputer; a digest change
+                        # starts a new epoch
+                        "created_at": sa.case(
+                            (self.ap_table.c.req_cfg_digest ==
+                             ins.excluded.req_cfg_digest,
+                             self.ap_table.c.created_at),
+                            else_=ins.excluded.created_at)},
+                    # Refuse to resurrect a row that was invalidated while
+                    # this computation was in flight (lost-update guard).
+                    # Rows in Precomp state must always be updated even when
+                    # req_cfg_digest changed (config edit), otherwise they
+                    # stay Precomp forever and exhaust precompute_quota.
+                    # The age arm is anchored to created_at - when the
+                    # current digest holder first claimed the PK slot - not
+                    # last_update, which the precomputation refresh rewrites
+                    # on every invalidation cycle. Since created_at survives
+                    # digest-preserving rewrites (see set_ above), a
+                    # first-writer row holding a foreign req_cfg_digest
+                    # (spoofed-identity squat) can block a device's cache
+                    # updates for at most RCACHE_MAX_AGE, even though
+                    # routine invalidations keep re-precomputing it.
+                    where=sa.and_(
+                        sa.or_(
+                            self.ap_table.c.state ==
+                            ApDbRespState.Precomp.name,
+                            self.ap_table.c.state ==
+                            ApDbRespState.Invalid.name,
+                            self.ap_table.c.req_cfg_digest ==
+                            ins.excluded.req_cfg_digest,
+                            self.ap_table.c.created_at <
+                            (datetime.datetime.now() - RCACHE_MAX_AGE)),
+                        sa.or_(
+                            self.ap_table.c.state !=
+                            ApDbRespState.Invalid.name,
+                            self.ap_table.c.req_cfg_digest ==
+                            ins.excluded.req_cfg_digest,
+                            self.ap_table.c.created_at <
+                            (datetime.datetime.now() - RCACHE_MAX_AGE))))
+
+        def connection_level(ex: sa.exc.DBAPIError) -> bool:
+            """ True for errors indicating a dead/unusable connection
+            (fatal), False for bad row content (recoverable: drop row) """
+            return ex.connection_invalidated or \
+                isinstance(ex,
+                           (sa.exc.OperationalError, sa.exc.InterfaceError))
+
+        try:
             async with self._engine.begin() as conn:
-                await conn.execute(ins)
+                await conn.execute(make_ins(rows))
+        except sa.exc.DBAPIError as ex:
+            # ON CONFLICT arbitrates only the primary key. A row whose PK is
+            # new but whose caller-supplied req_cfg_digest duplicates an
+            # existing (or same-batch) row's value violates the separate
+            # unique index on req_cfg_digest and raises IntegrityError; a
+            # row carrying values PostgreSQL cannot store (e.g. NUL in a
+            # text field) raises DataError; a row whose btree index entry
+            # exceeds the PostgreSQL size limit raises ProgramLimitExceeded
+            # (SQLSTATE 54000), which maps to neither class. All represent
+            # bad/malicious row content, not a fatal condition: retry row by
+            # row and drop only the offending row(s) instead of letting
+            # error()'s SystemExit permanently kill the updater worker. Only
+            # connection-level errors remain fatal.
+            if connection_level(ex):
+                error(f"Cache database upsert failed: {ex}")
+            for row in rows:
+                try:
+                    async with self._engine.begin() as conn:
+                        await conn.execute(make_ins([row]))
+                except sa.exc.DBAPIError as row_ex:
+                    if connection_level(row_ex):
+                        error(f"Cache database upsert failed: {row_ex}")
+                    LOGGER.error(
+                        f"Cache row dropped (constraint or data error): "
+                        f"{row_ex}")
+                except sa.exc.SQLAlchemyError as row_ex:
+                    error(f"Cache database upsert failed: {row_ex}")
         except sa.exc.SQLAlchemyError as ex:
             error(f"Cache database upsert failed: {ex}")
 
@@ -154,19 +246,32 @@ class RcacheDbAsync(RcacheDb):
             else:
                 pk_columns = [self.ap_table.c[col_name]
                               for col_name in self.ap_pk_columns]
+                sel = sa.select(*pk_columns).\
+                    where(self.ap_table.c.state == ApDbRespState.Valid.name)
+                if ruleset:
+                    # Chunk subquery must select only rows the outer UPDATE
+                    # targets - otherwise a chunk composed entirely of
+                    # other-ruleset rows yields rowcount 0 and the caller
+                    # (which treats rowcount==0 as "invalidation complete")
+                    # ends the invalidation early while Valid rows of this
+                    # ruleset remain.
+                    sel = sel.where(
+                        self.ap_table.c.config_ruleset == ruleset)
                 upd = \
-                    upd.where(
-                        sa.tuple_(*pk_columns).in_(
-                            sa.select(pk_columns).
-                            where(self.ap_table.c.state ==
-                                  ApDbRespState.Valid.name).
-                            limit(limit)))
+                    upd.where(sa.tuple_(*pk_columns).in_(sel.limit(limit)))
             async with self._engine.begin() as conn:
                 rp = await conn.execute(upd)
                 return rp.rowcount
+        except sa.exc.DataError as ex:
+            # Bad/malicious input (e.g. NUL in a ruleset ID) must not kill
+            # the invalidator worker via error()'s SystemExit - drop the
+            # request and let the worker continue (same policy as the
+            # per-row IntegrityError/DataError handling in update_cache).
+            # Returning 0 ends the caller's invalidation chunk loop.
+            LOGGER.error(f"Cache invalidation dropped (bad input): {ex}")
         except sa.exc.SQLAlchemyError as ex:
             error(f"Cache database invalidation failed: {ex}")
-        return 0  # Will never happen
+        return 0
 
     async def spatial_invalidate(self, rect: LatLonRect) -> None:
         """ Spatial invalidation
@@ -212,9 +317,11 @@ class RcacheDbAsync(RcacheDb):
                 else f"ST_Azimuth("
                 f"ST_Point({beam.rx_lon}, {beam.rx_lat}, 4329)::geography, "
                 f"ST_Point({beam.tx_lon}, {beam.tx_lat}, 4329)::geography)")
-        upd = f"UPDATE {self.AP_TABLE_NAME} " \
-            f"SET state = '{ApDbRespState.Invalid.name}' " \
+        upd = (
+            f"UPDATE {self.AP_TABLE_NAME} "
+            f"SET state = '{ApDbRespState.Invalid.name}' "
             f"WHERE ST_Covers({positioned_keyhole}, coordinates)"
+        )
         try:
             async with self._engine.begin() as conn:
                 await conn.execute(sa.text(upd))
@@ -237,7 +344,7 @@ class RcacheDbAsync(RcacheDb):
         """ Return number of requests currently being precomputed """
         assert self._engine is not None
         try:
-            sel = sa.select([sa.func.count()]).select_from(self.ap_table).\
+            sel = sa.select(sa.func.count()).select_from(self.ap_table).\
                 where(self.ap_table.c.state == ApDbRespState.Precomp.name)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
@@ -257,9 +364,9 @@ class RcacheDbAsync(RcacheDb):
         """
         assert self._engine is not None
         try:
-            sq = sa.select([self.ap_table.c.serial_number,
-                            self.ap_table.c.rulesets,
-                            self.ap_table.c.cert_ids]).\
+            sq = sa.select(self.ap_table.c.serial_number,
+                           self.ap_table.c.rulesets,
+                           self.ap_table.c.cert_ids).\
                 where(self.ap_table.c.state == ApDbRespState.Invalid.name).\
                 order_by(sa.desc(self.ap_table.c.last_update)).\
                 limit(limit)
@@ -280,7 +387,7 @@ class RcacheDbAsync(RcacheDb):
         """ Returns number of invalidated records """
         assert self._engine is not None
         try:
-            sel = sa.select([sa.func.count()]).select_from(self.ap_table).\
+            sel = sa.select(sa.func.count()).select_from(self.ap_table).\
                 where(self.ap_table.c.state == ApDbRespState.Invalid.name)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
@@ -293,7 +400,7 @@ class RcacheDbAsync(RcacheDb):
         """ Returns total number entries in cache (including nonvalid) """
         assert self._engine is not None
         try:
-            sel = sa.select([sa.func.count()]).select_from(self.ap_table)
+            sel = sa.select(sa.func.count()).select_from(self.ap_table)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
                 return rp.fetchone()[0]
@@ -306,12 +413,27 @@ class RcacheDbAsync(RcacheDb):
         assert self._engine is not None
         try:
             d = sa.delete(self.ap_table)
-            for k, v in pk.dict().items():
+            for k, v in pk.model_dump().items():
                 d = d.where(self.ap_table.c[k] == v)
-                async with self._engine.begin() as conn:
-                    await conn.execute(d)
+            async with self._engine.begin() as conn:
+                await conn.execute(d)
         except sa.exc.SQLAlchemyError as ex:
             error(f"Cache database removal failed: {ex}")
+
+    async def mark_invalid(self, pk: ApDbPk) -> None:
+        """ Revert row to Invalid state by primary key (e.g. after a failed
+        precomputation attempt), so update_cache's state != Invalid upsert
+        guard keeps protecting it """
+        assert self._engine is not None
+        try:
+            upd = sa.update(self.ap_table).\
+                values(state=ApDbRespState.Invalid.name)
+            for k, v in pk.model_dump().items():
+                upd = upd.where(self.ap_table.c[k] == v)
+            async with self._engine.begin() as conn:
+                await conn.execute(upd)
+        except sa.exc.SQLAlchemyError as ex:
+            error(f"Cache database invalidation-revert failed: {ex}")
 
     async def get_switch(self, sw: FuncSwitch) -> bool:
         """ Gets value of given switch """
@@ -320,7 +442,7 @@ class RcacheDbAsync(RcacheDb):
             return True
         try:
             table = self.metadata.tables[self.SWITCHES_TABLE_NAME]
-            sel = sa.select([table.c.state]).where(table.c.name == sw.name)
+            sel = sa.select(table.c.state).where(table.c.name == sw.name)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
                 v = rp.first()
