@@ -21,6 +21,8 @@ datasources:
     isDefault: false
     jsonData: {}
     name: Loki
+    # Stable UID for bookmarks / API (Explore, Drilldown > Logs)
+    uid: afc-loki
     orgId: 1
     readOnly: false
     secureJsonFields: {}

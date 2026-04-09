@@ -106,7 +106,8 @@ class AfcManager
 			std::tie(lat, lon, alt) = _rlanLLA;
 			std::tie(minorUncert, majorUncert, heightUncert) = _rlanUncerts_m;
 			return (((_rlanUncertaintyRegionType == RLANBoundary::ELLIPSE ||
-				  _rlanUncertaintyRegionType == RLANBoundary::RADIAL_POLY) &&
+				  _rlanUncertaintyRegionType == RLANBoundary::RADIAL_POLY ||
+				  _rlanUncertaintyRegionType == RLANBoundary::LINEAR_POLY) &&
 				 (std::isnan(lat) || std::isnan(lon))) ||
 				(_analysisType != "HeatmapAnalysis" && std::isnan(alt)) ||
 				(_rlanUncertaintyRegionType == RLANBoundary::ELLIPSE &&
@@ -365,6 +366,11 @@ class AfcManager
 		std::string getHeatmapColor(double itonVal, bool indoorFlag, bool hexFlag);
 
 	private:
+		/** Returns true when value is finite and within [minVal, maxVal].
+		 *  Used for AP JSON bounds validation to ensure the isfinite check
+		 *  is never accidentally omitted when adding new range guards. */
+		static bool _inFiniteRange(double value, double minVal, double maxVal);
+
 		void importGUIjsonVersion1_4(const QJsonObject &jsonObj);
 
 		void runPointAnalysis();
@@ -724,6 +730,7 @@ class AfcManager
 		std::string _kmlFile; // Generate kml file showing simulation results, primarily for
 				      // debugging
 		std::string _fsAnalysisListFile; // File containing list of FS used in the analysis
+		std::string _tempDir; // Per-request temporary directory (avoids shared /tmp races)
 		int _maxLidarRegionLoadVal;
 		/**************************************************************************************/
 

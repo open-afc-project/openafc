@@ -144,8 +144,10 @@ QString UlsFunctionsClass::hasNecessaryFields(const UlsEmission &e,
 	for (prIdx = 0; prIdx < prLocList.size(); ++prIdx) {
 		const UlsLocation &prLoc = prLocList[prIdx];
 
-		// check lat/lon degree for pr
-		if (isnan(prLoc.latitudeDeg) || isnan(prLoc.longitudeDeg)) {
+		// check lat/lon degree for pr: test the assembled double
+		// latitude/longitude (as the rx/tx checks do) - isnan on the
+		// int latitudeDeg/longitudeDeg fields is always false
+		if (isnan(prLoc.latitude) || isnan(prLoc.longitude)) {
 			failReason.append("Invalid passive repeater lat degree or long degree, ");
 		}
 		// check pr latitude/longitude direction

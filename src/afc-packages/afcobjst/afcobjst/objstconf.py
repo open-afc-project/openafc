@@ -22,6 +22,12 @@ class ObjstConfigInternal(ObjstConfigBase):
         self.AFC_OBJST_LOG_FILE = os.getenv(
             "AFC_OBJST_LOG_FILE", "/proc/self/fd/2")
         self.AFC_OBJST_LOG_LVL = os.getenv("AFC_OBJST_LOG_LVL", "ERROR")
+        # Request-body cap (bytes) for objst_app/hist_app (Flask
+        # MAX_CONTENT_LENGTH). Bounds how much a single authenticated
+        # upload may carry; oversized bodies are rejected instead of being
+        # buffered wholesale into gunicorn worker memory.
+        self.MAX_CONTENT_LENGTH = int(os.getenv(
+            "AFC_OBJST_MAX_CONTENT_LENGTH", str(512 * 1024 * 1024)))
         # supported AFC_OBJST_MEDIA backends are "GoogleCloudBucket" and
         # "LocalFS"
         self.AFC_OBJST_MEDIA = os.getenv("AFC_OBJST_MEDIA", "LocalFS")

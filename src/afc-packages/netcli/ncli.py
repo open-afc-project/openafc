@@ -13,9 +13,7 @@ test
 """
 
 import os
-import inspect
 import logging
-import sys
 import uuid
 from kombu.mixins import ConsumerMixin
 from kombu import Queue, Exchange, Connection, Producer
@@ -44,7 +42,19 @@ class MsgAcceptor(ConsumerMixin):
         self.queue.no_ack = True
 
     def get_consumers(self, Consumer, channel):
-        return [Consumer(queues=self.queue, callbacks=[self.accept_message])]
+        # accept list: legitimate dispatcher commands are published as raw
+        # str (text/plain) by MsgPublisher; json kept for forward compat.
+        # Disallowed content types (e.g. x-python-serialize) and malformed
+        # bodies go to on_decode_error instead of raising out of
+        # ConsumerMixin.run() and killing the container's foreground process.
+        return [Consumer(queues=self.queue, callbacks=[self.accept_message],
+                         accept=['text/plain', 'json'],
+                         on_decode_error=self.reject_undecodable)]
+
+    def reject_undecodable(self, message, exc):
+        app_log.error(f"({os.getpid()}) rejecting undecodable broker "
+                      f"message (content_type="
+                      f"{message.content_type!r}): {exc!r}")
 
     def accept_message(self, body, message):
         if self.message_handler:

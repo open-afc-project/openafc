@@ -1,5 +1,4 @@
 #!/bin/bash
-#!/bin/sh
 #
 # Copyright (C) 2024 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
@@ -66,9 +65,20 @@ images=(
 )
 
 for img in ${images[@]}; do
-	docker pull ${REPO}/${img}:${from} 
-	docker tag ${REPO}/${img}:${from} ${REPO}/${img}:${to}
- 	docker tag ${REPO}/${img}:${from} ${REPO}/${img}:latest
-	docker push ${REPO}/${img}:${to}
-	docker push ${REPO}/${img}:latest
+    src_ref="${REPO}/${img}:${from}"
+    digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' \
+        "${src_ref}" 2>/dev/null)
+    if [ -z "${digest}" ]; then
+        echo "ERROR: could not resolve digest for ${src_ref} — skipping" >&2
+        continue
+    fi
+    # Pull by digest so we get exactly the manifest we inspected above,
+    # not whatever the mutable tag points to at pull time.
+    pinned_ref="${REPO}/${img}@${digest}"
+    echo "Pulling ${pinned_ref}  (tag: ${from})"
+    docker pull "${pinned_ref}"
+    docker tag  "${pinned_ref}" "${REPO}/${img}:${to}"
+    docker tag  "${pinned_ref}" "${REPO}/${img}:latest"
+    docker push "${REPO}/${img}:${to}"
+    docker push "${REPO}/${img}:latest"
 done

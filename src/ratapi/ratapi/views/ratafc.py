@@ -10,16 +10,13 @@
 ''' API for AFC specification
 '''
 
-import gzip
 import contextlib
+import hmac
 import logging
 import os
 import sys
-import shutil
 import flask
 import json
-import glob
-import re
 import datetime
 import zlib
 import uuid
@@ -28,33 +25,29 @@ import time
 import platform
 from flask.views import MethodView
 import werkzeug.exceptions
+import re
 import threading
 import inspect
 from typing import NamedTuple, Optional
-import six
-from appcfg import RatafcMsghndCfgIface, AFC_RATAPI_LOG_LEVEL
+from appcfg import AFC_RATAPI_LOG_LEVEL
 from hchecks import RmqHealthcheck
-from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, \
-    RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG, \
+from defs import RNTM_OPT_DBG, RNTM_OPT_GUI, \
+    RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_SLOW_DBG, \
     RNTM_OPT_CERT_ID
-from afc_worker import run
-from ..util import AFCEngineException, require_default_uls, getQueueDirectory
-from afcmodels.aaa import User, AFCConfig, CertId, Ruleset, \
-    Organization, AccessPointDeny
+from afcmodels.aaa import AFCConfig, CertId, AccessPointDeny
 from afcmodels.hardcoded_relations import RulesetVsRegion, \
-    SpecialCertifications, VendorExtensionFilter, CERT_ID_LOCATION_UNKNOWN, \
-    CERT_ID_LOCATION_OUTDOOR, CERT_ID_LOCATION_INDOOR
-from .auth import auth
-from .ratapi import build_task
+    SpecialCertifications, VendorExtensionFilter, CERT_ID_LOCATION_INDOOR, \
+    cert_id_is_stale
+from .auth import auth, public_route
+from .ratapi import build_task, _admin_may_access_task
+import afc_worker
 from fst import DataIf
 import afctask
 import als
 from afcmodels.base import db
-from flask_login import current_user
-from .auth import auth
 import traceback
 from urllib.parse import urlparse
-from typing import Any, Dict, NamedTuple, Optional
+from typing import Any, Dict
 from rcache_models import RcacheClientSettings
 from rcache_client import RcacheClient
 from rcache_req_cfg_hash import RequestConfigHash
@@ -65,6 +58,25 @@ import afc_traffic_metrics
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(AFC_RATAPI_LOG_LEVEL)
+
+
+def _read_file(path):
+    """Return stripped contents of a file, or None if path is falsy/unreadable."""
+    if not path:
+        return None
+    try:
+        with open(path) as fh:
+            return fh.read().strip() or None
+    except OSError:
+        return None
+
+
+if os.environ.get("AFC_ENABLE_TEST_CERTS", "").lower() in ("1", "true", "yes"):
+    LOGGER.critical(
+        "SECURITY WARNING: AFC_ENABLE_TEST_CERTS is enabled. "
+        "TestCertificationId / TestSerialNumber are accepted without database "
+        "registration. This setting is intended only for development/CI; "
+        "must never be active in production deployments.")
 
 # Metrics for autoscaling - only works in gunicorn (not on apache)
 if prometheus_utils.multiprocess_prometheus_configured():
@@ -206,6 +218,22 @@ class UnsupportedSpectrumException(AP_Exception):
             'outside of the frequency band under the management of the AFC.')
 
 
+def _validate_request_location_geo(individual_request: Dict[str, Any]) -> None:
+    """Validate location has exactly one of ellipse/linearPolygon/radialPolygon.
+
+    Inner field validation (center, axes, boundary points) is deferred to
+    the AFC Engine, which returns MISSING_PARAM/INVALID_VALUE as needed.
+    """
+    location = individual_request.get("location")
+    if not isinstance(location, dict) or \
+            sum(1 for k in ("ellipse", "linearPolygon", "radialPolygon")
+                if location.get(k) is not None) != 1:
+        raise InvalidValueException(
+            invalid_params=["location",
+                            "Not exactly one location type "
+                            "(ellipse/linearPolygon/radialPolygon)"])
+
+
 def _translate_afc_error(error_msg):
     unsupported_spectrum = error_msg.find('UNSUPPORTED_SPECTRUM')
     if unsupported_spectrum != -1:
@@ -237,23 +265,25 @@ def drop_unwanted_extensions(json_dict, is_input, is_gui, is_internal):
     is_gui      -- True if from GUI
     is_internal -- True if internal (from within AFC Cluster)
     """
+    if not json_dict or not isinstance(json_dict, dict):
+        return
     for container, is_message in [(json_dict, True)] + \
             [(req_resp, False) for req_resp in
-             json_dict.get("availableSpectrumInquiryRequests" if is_input
-                           else "availableSpectrumInquiryResponses", [])]:
+             (json_dict.get("availableSpectrumInquiryRequests" if is_input
+                            else "availableSpectrumInquiryResponses") or [])
+             if isinstance(req_resp, dict)]:
         extensions = container.get("vendorExtensions")
         if extensions is None:
             continue
-        idx = 0
-        while idx < len(extensions):
+        extensions = [
+            e for e in extensions
             if VendorExtensionFilter.allowed_extension(
-                    extension=extensions[idx]["extensionId"],
-                    is_message=is_message, is_input=is_input, is_gui=is_gui,
-                    is_internal=is_internal):
-                idx += 1
-            else:
-                extensions.pop(idx)
-        if not extensions:
+                extension=e["extensionId"],
+                is_message=is_message, is_input=is_input, is_gui=is_gui,
+                is_internal=is_internal)]
+        if extensions:
+            container["vendorExtensions"] = extensions
+        else:
             del container["vendorExtensions"]
 
 
@@ -276,6 +306,36 @@ def _get_vendor_extension(json_dict, ext_id):
     return None
 
 
+# Size caps for objstore-sourced /responses bodies: objstorage is writable
+# by any holder of the shared bearer key, so bodies must be bounded before
+# buffering (fst.DataIntHttp.read max_bytes) and before inflation.
+MAX_RESPONSE_BODY_BYTES = 64 * 1024 * 1024
+MAX_ERROR_TXT_BYTES = 1024 * 1024
+MAX_INFLATED_BYTES = 64 * 1024 * 1024
+
+
+def _bounded_gunzip(data):
+    """ Gunzip with a hard output cap.
+
+    One-shot zlib.decompress has no output bound. Abort once the
+    cumulative decompressed size exceeds MAX_INFLATED_BYTES, treating the
+    task as failed.
+    """
+    d = zlib.decompressobj(16 + zlib.MAX_WBITS)
+    out = []
+    total = 0
+    buf = data
+    while buf:
+        chunk = d.decompress(buf, 65536)
+        total += len(chunk)
+        if total > MAX_INFLATED_BYTES:
+            raise AP_Exception(
+                -1, 'Decompressed response exceeds size limit')
+        out.append(chunk)
+        buf = d.unconsumed_tail
+    return b''.join(out)
+
+
 def fail_done(t):
     LOGGER.debug('fail_done()')
     task_stat = t.getStat()
@@ -283,7 +343,8 @@ def fail_done(t):
     error_data = None
     with dataif.open(os.path.join("/responses", t.getId(), "engine-error.txt")) as hfile:
         try:
-            error_data = hfile.read().decode("utf-8", errors="replace")
+            error_data = hfile.read(
+                max_bytes=MAX_ERROR_TXT_BYTES).decode("utf-8", errors="replace")
         except BaseException:
             LOGGER.debug("engine-error.txt not found")
         else:
@@ -301,16 +362,14 @@ def in_progress(t):
     # get progress and ETA
     LOGGER.debug('in_progress()')
     task_stat = t.getStat()
-    if not isinstance(task_stat['runtime_opts'], type(None)) and \
+    if task_stat.get('runtime_opts') is not None and \
             task_stat['runtime_opts'] & RNTM_OPT_GUI:
         return flask.jsonify(
             percent=0,
             message='In progress...'
         ), 202
 
-    return flask.make_response(
-        flask.json.dumps(dict(percent=0, message="Try Again")),
-        503)
+    return flask.jsonify(percent=0, message="Try Again"), 503
 
 
 def success_done(t):
@@ -321,26 +380,26 @@ def success_done(t):
 
     resp_data = None
     with dataif.open(os.path.join("/responses", hash_val, "analysisResponse.json.gz")) as hfile:
-        resp_data = hfile.read()
+        resp_data = hfile.read(max_bytes=MAX_RESPONSE_BODY_BYTES)
     if task_stat['runtime_opts'] & RNTM_OPT_DBG:
         with dataif.open(os.path.join(task_stat['history_dir'],
                                       "analysisResponse.json.gz")) as hfile:
             hfile.write(resp_data)
     LOGGER.debug('resp_data size=%d', sys.getsizeof(resp_data))
-    resp_json = json.loads(zlib.decompress(resp_data, 16 + zlib.MAX_WBITS))
+    resp_json = json.loads(_bounded_gunzip(resp_data))
 
     # if task_stat['runtime_opts'] & RNTM_OPT_GUI:
     # Add the map data file (if it is generated) into a vendor extension
     kmz_data = None
     try:
         with dataif.open(os.path.join("/responses", t.getId(), "results.kmz")) as hfile:
-            kmz_data = hfile.read()
+            kmz_data = hfile.read(max_bytes=MAX_RESPONSE_BODY_BYTES)
     except BaseException:
         pass
     map_data = None
     try:
         with dataif.open(os.path.join("/responses", t.getId(), "mapData.json.gz")) as hfile:
-            map_data = hfile.read()
+            map_data = hfile.read(max_bytes=MAX_RESPONSE_BODY_BYTES)
     except BaseException:
         pass
     if kmz_data or map_data:
@@ -356,15 +415,14 @@ def success_done(t):
                 "extensionId": "openAfc.mapinfo",
                 "parameters": {
                     "kmzFile": kmz_data if kmz_data else None,
-                    "geoJsonFile": zlib.decompress(
-                        map_data,
-                        16 +
-                        zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None}})
+                    "geoJsonFile": _bounded_gunzip(
+                        map_data).decode('iso-8859-1') if map_data else None}})
     drop_unwanted_extensions(
         json_dict=resp_json, is_input=False,
         is_gui=bool(task_stat['runtime_opts'] & RNTM_OPT_GUI),
         is_internal=bool(task_stat['is_internal_request']))
     resp_data = json.dumps(resp_json)
+
     resp = flask.make_response(resp_data)
     resp.content_type = 'application/json'
     LOGGER.debug("returning data: %s", resp.data)
@@ -424,6 +482,7 @@ class ReqInfo(NamedTuple):
     task_id: str
 
 
+@public_route
 class RatAfc(MethodView):
     ''' RAT AFC resources
     '''
@@ -435,20 +494,34 @@ class RatAfc(MethodView):
         LOGGER.debug("(%d) %s::%s()", threading.get_native_id(),
                      self.__class__, inspect.stack()[0][3])
         indoor_certified = True
-        certId = session.query(CertId).filter_by(certification_id=cert_id).first()
+        certId = session.query(CertId).filter_by(certification_id=cert_id).\
+            filter(CertId.ruleset.has(name=ruleset)).order_by(CertId.id).\
+            first()
         if not certId:
             raise DeviceUnallowedException("")
         if not certId.ruleset.name == ruleset:
             raise InvalidValueException(["ruleset", ruleset])
         # add check for certId.valid
 
-        now = datetime.datetime.now()
-        delta = now - certId.refreshed_at
+        now = datetime.datetime.utcnow()
+        delta = now - certId.refreshed_at.replace(tzinfo=None)
         if delta.days > 1:
             LOGGER.debug("(%d) %s::%s() stale CertId %s",
                          threading.get_native_id(),
                          self.__class__, inspect.stack()[0][3],
                          certId.certification_id)
+        # Enforce CertId freshness TTL so stale certifications do not receive
+        # spectrum grants indefinitely when the nightly sweep fails.
+        # Shared predicate keeps semantics identical to the afc_server
+        # ingress path (default 7; empty value tolerated; 0 disables;
+        # '>=' comparison); see afcmodels.hardcoded_relations.
+        if cert_id_is_stale(certId.refreshed_at):
+            LOGGER.warning("(%d) %s::%s() CertId %s stale for %d days "
+                           "— rejecting request",
+                           threading.get_native_id(),
+                           self.__class__, inspect.stack()[0][3],
+                           certId.certification_id, delta.days)
+            raise DeviceUnallowedException("")
 
         if certId.location & CERT_ID_LOCATION_INDOOR:
             indoor_certified = True
@@ -461,11 +534,20 @@ class RatAfc(MethodView):
         ''' Authenticate an access point. If must match the serial_number and
             certification_id in the database to be valid
         '''
+        if serial_number:
+            serial_number = serial_number.strip().upper()
         LOGGER.debug("(%d) %s::%s()Starting auth_ap,serial: %s; prefix: %s; "
                      "certId: %s ruleset %s; version %s",
                      threading.get_native_id(),
                      self.__class__, inspect.stack()[0][3],
                      serial_number, prefix, cert_id, rulesets, version)
+        if not isinstance(serial_number, str) \
+                or not re.fullmatch(r'[A-Za-z0-9._-]+', serial_number):
+            raise DeviceUnallowedException("")
+        if not isinstance(cert_id, str) or not cert_id \
+                or not cert_id.isascii() or not cert_id.isprintable() \
+                or any(c.isspace() for c in cert_id):
+            raise DeviceUnallowedException("")
         with db.session() as session:
             deny_ap = session.query(AccessPointDeny).filter_by(
                 serial_number=serial_number). filter_by(
@@ -494,6 +576,20 @@ class RatAfc(MethodView):
     def get(self):
         ''' GET method for Analysis Status '''
         task_id = flask.request.args['task_id']
+        if not (isinstance(task_id, str) and len(task_id) == 36 and
+                all(c in '0123456789abcdef-' for c in task_id)):
+            raise werkzeug.exceptions.NotFound(
+                'Invalid task_id')
+        # Require the same dispatcher-injected internal token as post() so that
+        # direct-to-rat_server GETs are also protected.
+        expected_token = os.environ.get("AFC_INTERNAL_TOKEN") or \
+            _read_file(os.environ.get("AFC_INTERNAL_TOKEN_FILE"))
+        supplied = flask.request.headers.get("x-afc-internal-token") or ""
+        if not expected_token or not hmac.compare_digest(
+                supplied.encode("utf-8", errors="replace"),
+                expected_token.encode("utf-8", errors="replace")):
+            LOGGER.error("Internal token required for AFC status GET")
+            raise werkzeug.exceptions.Forbidden("Forbidden")
         LOGGER.debug("(%d) %s::%s() task_id=%s", threading.get_native_id(),
                      self.__class__, inspect.stack()[0][3], task_id)
 
@@ -502,6 +598,25 @@ class RatAfc(MethodView):
             task_id, dataif,
             flask.current_app.config['AFC_MSGHND_RATAFC_TOUT'])
         task_stat = t.get()
+
+        # Per-user ownership gate, mirroring AnalysisStatus /
+        # AnalysisKmlResult (_admin_may_access_task): the Sec route serves
+        # only the submitting user or an org-scoped Admin / Super; the
+        # sessionless AP route serves only ownerless (AP/internal) tasks,
+        # so a leaked task_id of a GUI/async submission cannot be fetched
+        # or destroyed through this route.
+        task_owner = task_stat.get('owner_id')
+        if isinstance(self, RatAfcSec):
+            from flask_login import current_user as _cu
+            user_id = _cu.id if _cu.is_authenticated else None
+            if task_owner is None or user_id != task_owner:
+                if not _admin_may_access_task(task_owner, _cu):
+                    raise werkzeug.exceptions.Forbidden(
+                        'You do not have access to this task')
+        elif task_owner is not None:
+            LOGGER.error("Session-owned task requested on sessionless "
+                         "AFC status GET route")
+            raise werkzeug.exceptions.Forbidden("Forbidden")
 
         if t.ready(task_stat):  # The task is done
             if t.successful(task_stat):  # The task is done w/o exception
@@ -518,9 +633,7 @@ class RatAfc(MethodView):
                              threading.get_native_id(),
                              self.__class__, inspect.stack()[0][3],
                              task_stat['status'])
-                return flask.make_response(
-                    flask.json.dumps(dict(percent=0, message='Pending...')),
-                    202)
+                return flask.jsonify(percent=0, message='Pending...'), 202
 
     def post(self):
         ''' POST method for RAT AFC
@@ -533,50 +646,162 @@ class RatAfc(MethodView):
         request_ids = set()
         dataif = DataIf()
 
+        # Token check and gui flag are set before the broad except block so
+        # that auth failures propagate as proper 403s rather than being swallowed
+        # and causing an UnboundLocalError at the drop_unwanted_extensions call.
+        expected_token = os.environ.get("AFC_INTERNAL_TOKEN") or \
+            _read_file(os.environ.get("AFC_INTERNAL_TOKEN_FILE"))
+        supplied = flask.request.headers.get("x-afc-internal-token") or ""
+        if not expected_token or not hmac.compare_digest(
+                supplied.encode("utf-8", errors="replace"),
+                expected_token.encode("utf-8", errors="replace")):
+            LOGGER.error("Internal token required for all AFC requests")
+            raise werkzeug.exceptions.Forbidden("Forbidden")
+        is_internal_request = urlparse(flask.request.url).path.\
+            endswith("/availableSpectrumInquiryInternal")
+        is_gui = (flask.request.args.get('gui') == 'True') and \
+            isinstance(self, RatAfcSec)
+        # Mirror afc_server enforcement (afc_server_app.py:170-182) for the
+        # AP-facing route only: require mTLS-DN when AFC_ENFORCE_MTLS is set,
+        # and trust mTLS-DN only when nginx attests SUCCESS. The Sec (WebUI,
+        # session-authenticated) and Internal routes do not carry AP mTLS.
+        if not isinstance(self, RatAfcSec) and not is_internal_request:
+            # mTLS-DN / X-SSL-Client-Verify are nginx attestation headers; only
+            # honour them when the request also carries the nginx-only
+            # AFC_DISPATCHER_TOKEN. AFC_INTERNAL_TOKEN alone is insufficient
+            # because it is shared with non-gateway cluster services.
+            expected_disp = os.environ.get("AFC_DISPATCHER_TOKEN") or \
+                _read_file(os.environ.get("AFC_DISPATCHER_TOKEN_FILE"))
+            supplied_disp = \
+                flask.request.headers.get("x-afc-dispatcher-token") or ""
+            if not expected_disp or not hmac.compare_digest(
+                    supplied_disp.encode("utf-8", errors="replace"),
+                    expected_disp.encode("utf-8", errors="replace")):
+                LOGGER.error("Dispatcher token required for AP-facing route")
+                raise werkzeug.exceptions.Forbidden("Forbidden")
+            mtls_dn = flask.request.headers.get('mTLS-DN')
+            enforce_mtls = os.environ.get(
+                "AFC_ENFORCE_MTLS", "true").lower() in ("true", "1", "yes")
+            if enforce_mtls and not mtls_dn:
+                LOGGER.error("mTLS client certificate required")
+                raise werkzeug.exceptions.Forbidden(
+                    "mTLS client certificate required")
+            if mtls_dn and flask.request.headers.get(
+                    'X-SSL-Client-Verify') != "SUCCESS":
+                LOGGER.error("mTLS certificate verification failed")
+                raise werkzeug.exceptions.Forbidden(
+                    "mTLS certificate verification failed")
+
+        # openAfc.overrideAfcConfig on the Internal route lets the caller
+        # supersede operator-stored AFCConfig per request. Gate the WHOLE
+        # Internal route on a token NOT shared with every bridge service
+        # (AFC_INTERNAL_TOKEN is): require AFC_PRECOMPUTE_TOKEN, falling
+        # back to AFC_DISPATCHER_TOKEN. Reject outright on failure:
+        # downgrading to external-caller semantics would serve the request
+        # WITHOUT the dispatcher-token/mTLS enforcement above that every
+        # external request must pass (weaker-authenticated fallback).
+        if is_internal_request:
+            expected_pc = os.environ.get("AFC_PRECOMPUTE_TOKEN") or \
+                _read_file(os.environ.get("AFC_PRECOMPUTE_TOKEN_FILE")) or \
+                os.environ.get("AFC_DISPATCHER_TOKEN") or \
+                _read_file(os.environ.get("AFC_DISPATCHER_TOKEN_FILE"))
+            supplied_pc = \
+                flask.request.headers.get("x-afc-precompute-token") or \
+                flask.request.headers.get("x-afc-dispatcher-token") or ""
+            if not expected_pc or not hmac.compare_digest(
+                    supplied_pc.encode("utf-8", errors="replace"),
+                    expected_pc.encode("utf-8", errors="replace")):
+                LOGGER.error(
+                    "Precompute/dispatcher token required for the "
+                    "Internal AFC route")
+                raise werkzeug.exceptions.Forbidden("Forbidden")
+
         try:
-            is_internal_request = urlparse(flask.request.url).path.\
-                endswith("/availableSpectrumInquiryInternal")
-            is_gui = flask.request.args.get('gui') == 'True'
+            args = flask.request.get_json(silent=True)
+            if args is None or not isinstance(args, dict):
+                # Audit the rejected raw body so the AFC_RESPONSE emitted
+                # by the disaster-recovery path below has a paired
+                # AFC_REQUEST record instead of an orphan response.
+                als.als_afc_request(
+                    req_id=als_req_id,
+                    req={"invalidRawRequest":
+                         flask.request.get_data(as_text=True)[:65536]},
+                    mtls_dn=flask.request.headers.get('mTLS-DN'),
+                    ap_ip=flask.request.headers.get('X-Real-IP'))
+                raise werkzeug.exceptions.BadRequest("Missing or invalid JSON body")
+
+            message_runtime_opts = 0
+            for arg, mask in [('gui', RNTM_OPT_GUI), ('debug', RNTM_OPT_DBG),
+                              ('edebug', RNTM_OPT_SLOW_DBG)]:
+                if flask.request.args.get(arg):
+                    # gui/debug/edebug restricted to authenticated (WebUI) route
+                    if arg in ('gui', 'debug', 'edebug') and \
+                            not isinstance(self, RatAfcSec):
+                        continue
+                    message_runtime_opts |= mask
+
+            # Audit-before-transform: write the AFC_REQUEST regulatory
+            # record with the message exactly as the AP sent it, BEFORE
+            # vendor-extension filtering and schema validation (the als
+            # client serializes the dict synchronously), so stripped
+            # extension attempts and schema-invalid messages stay visible
+            # and attributable in the ALS audit domain, and every
+            # AFC_RESPONSE has a paired AFC_REQUEST.
+            als.als_afc_request(req_id=als_req_id, req=args,
+                                mtls_dn=flask.request.headers.get('mTLS-DN'),
+                                runtime_opt=message_runtime_opts,
+                                ap_ip=flask.request.headers.get('X-Real-IP'))
+
             drop_unwanted_extensions(
-                json_dict=flask.request.json, is_input=True, is_gui=is_gui,
+                json_dict=args, is_input=True, is_gui=is_gui,
                 is_internal=is_internal_request)
-            # start request
-            args = flask.request.json
+
+            import pydantic
+            from afcmodels import afc_server_models
+            try:
+                afc_server_models.Rest_ReqMsg_1_4.model_validate(args)
+            except Exception as exc:
+                LOGGER.warning("Pydantic validation failed: %s", exc)
+                raise werkzeug.exceptions.BadRequest(f"Invalid request format: {exc}")
+
             # check request version
-            ver = flask.request.json["version"]
-            if not (ver in ALLOWED_VERSIONS):
+            ver = args["version"]
+            if ver not in ALLOWED_VERSIONS:
                 raise VersionNotSupportedException([ver])
             results["version"] = ver
+
+            # Bound per-message work: more than 16 sub-requests is a
+            # resource-amplification attack (each fans out to a worker + engine).
+            MAX_REQUESTS_PER_MSG = 16
+            raw_reqs = args["availableSpectrumInquiryRequests"]
+            if len(raw_reqs) > MAX_REQUESTS_PER_MSG:
+                raise AP_Exception(
+                    -1,
+                    f"Too many requests in one message: {len(raw_reqs)} "
+                    f"(max {MAX_REQUESTS_PER_MSG})")
 
             # split multiple requests into an array of individual requests
             requests = map(
                 lambda r: {
                     "availableSpectrumInquiryRequests": [r],
                     "version": ver},
-                args["availableSpectrumInquiryRequests"])
-            request_ids = \
-                set([r["requestId"]
-                     for r in args["availableSpectrumInquiryRequests"]])
+                raw_reqs)
+            request_ids = set([r["requestId"] for r in raw_reqs])
 
             LOGGER.debug("(%d) %s::%s() Running AFC analysis with params: %s",
                          threading.get_native_id(),
                          self.__class__, inspect.stack()[0][3], args)
             request_type = 'AP-AFC'
 
-            use_tasks = (rcache is None) or \
-                (flask.request.args.get('conn_type') == 'async') or is_gui
+            # conn_type=async is restricted to the authenticated (WebUI)
+            # route, like gui/debug/edebug below: the async early-return
+            # skips als_afc_config/als_afc_response regulatory audit
+            # logging, so the AP-facing route must never select it.
+            conn_type_async = \
+                (flask.request.args.get('conn_type') == 'async') and \
+                isinstance(self, RatAfcSec)
+            use_tasks = (rcache is None) or conn_type_async or is_gui
 
-            message_runtime_opts = 0
-            for arg, mask in [('gui', RNTM_OPT_GUI), ('debug', RNTM_OPT_DBG),
-                              ('edebug', RNTM_OPT_SLOW_DBG),
-                              ('nocache', RNTM_OPT_NOCACHE)]:
-                if flask.request.args.get(arg):
-                    message_runtime_opts |= mask
-
-            als.als_afc_request(req_id=als_req_id, req=args,
-                                mtls_dn=flask.request.headers.get('mTLS-DN'),
-                                runtime_opt=message_runtime_opts,
-                                ap_ip=flask.request.headers.get('X-Real-IP'))
             uls_id = "Unknown"
             geo_id = "Unknown"
             indoor_certified = True
@@ -593,6 +818,46 @@ class RatAfc(MethodView):
                     individual_request = \
                         request["availableSpectrumInquiryRequests"][0]
                     prefix = None
+                    # Pre-read rulesetId so error responses carry it even
+                    # when validation raises before the per-device loop.
+                    try:
+                        prefix = individual_request[
+                            "deviceDescriptor"][
+                            "certificationId"][0]["rulesetId"] or None
+                    except (KeyError, IndexError, TypeError):
+                        pass
+                    # Apply the same per-request validation as
+                    # afc_server_msg_proc so both ingress paths reject
+                    # invalid sub-requests before Celery dispatch (parity
+                    # with afc_server:320). Fail closed on EVERY pydantic
+                    # error type: the checks below cover neither lat/lon
+                    # range/finiteness, nor the certificationId '|'/NUL
+                    # exclusion, nor StrictInt indoorDeployment. (The
+                    # message was already validated before the ALS audit
+                    # write above; this is the per-request backstop.)
+                    try:
+                        afc_server_models.\
+                            Rest_AvailableSpectrumInquiryRequest_1_4.\
+                            model_validate(individual_request)
+                    except pydantic.ValidationError as exc:
+                        errs = exc.errors()
+                        missing = [str(e["loc"][-1])
+                                   for e in errs
+                                   if e.get("type") == "missing"
+                                   and e.get("loc")]
+                        if missing:
+                            raise MissingParamException(
+                                missing_params=missing)
+                        invalid = []
+                        for e in errs:
+                            if e.get("loc"):
+                                field_name = str(e["loc"][-1])
+                                inp = e.get("input")
+                                invalid.extend([field_name, "" if inp is None or not isinstance(inp, (str, int, float)) else str(inp)])
+                        raise InvalidValueException(
+                            invalid or
+                            ["availableSpectrumInquiryRequests"])
+                    _validate_request_location_geo(individual_request)
                     device_desc = individual_request.get('deviceDescriptor')
 
                     devices = device_desc.get('certificationId')
@@ -649,9 +914,6 @@ class RatAfc(MethodView):
                                       device_desc.get('rulesetIds'), ver)
                     if indoor_certified:
                         runtime_opts |= RNTM_OPT_CERT_ID
-                    if use_tasks:
-                        runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
-
                     LOGGER.debug("(%d) %s::%s() runtime %d",
                                  threading.get_native_id(),
                                  self.__class__, inspect.stack()[0][3],
@@ -662,8 +924,11 @@ class RatAfc(MethodView):
                         config = session.query(AFCConfig).filter(
                             AFCConfig.config['regionStr'].astext == region).first()
                     if not config:
-                        raise DeviceUnallowedException(
-                            "No AFC configuration for ruleset " + str(region))
+                        raise AP_Exception(
+                            -1,
+                            "AFC has no stored configuration for region "
+                            f"'{region}'. Add AFC configuration for this "
+                            "ruleset in Admin (not a device denial).")
                     afc_config = config.config
                     try:
                         overwrite_region = \
@@ -677,7 +942,8 @@ class RatAfc(MethodView):
 
                     rcc = RequestConfigHash(req_dict=individual_request,
                                             afc_config_dict=afc_config,
-                                            compute_config_hash=True)
+                                            compute_config_hash=True,
+                                            runtime_opt=runtime_opts)
                     config_path = \
                         os.path.join("/afc_config", prefix, rcc.cfg_hash,
                                      "afc_config.json") if use_tasks else None
@@ -685,7 +951,8 @@ class RatAfc(MethodView):
                     if runtime_opts & (RNTM_OPT_DBG | RNTM_OPT_SLOW_DBG):
                         history_dir =\
                             os.path.join(
-                                "/history", str(serial),
+                                "/history", str(serial).replace('/', '_').replace('\\',
+                                                                                  '_').replace('..', '_'),
                                 str(datetime.datetime.now().isoformat()))
                     req_infos[rcc.req_cfg_hash] = \
                         ReqInfo(
@@ -725,7 +992,7 @@ class RatAfc(MethodView):
             # Computing the responses not found in cache
             # First handling async case
             if len(responses) != len(req_infos):
-                if flask.request.args.get('conn_type') == 'async':
+                if conn_type_async:
                     # Special case of async request
                     if len(req_infos) > 1:
                         raise \
@@ -848,28 +1115,15 @@ class RatAfc(MethodView):
         Returns dictionary of RcacheLookupResult, indexed by request/config
         hashes
         """
-        cached_keys = \
-            [req_cfg_hash for req_cfg_hash in req_infos.keys()
-             if not (req_infos[req_cfg_hash].runtime_opts &
-                     (RNTM_OPT_GUI | RNTM_OPT_NOCACHE))]
+        cached_keys = [req_cfg_hash for req_cfg_hash in req_infos.keys()
+                       if not (req_infos[req_cfg_hash].runtime_opts &
+                               RNTM_OPT_GUI)]
         if not cached_keys:
             return {}
         if rcache is None:
-            ret = {}
-            for req_cfg_hash in cached_keys:
-                try:
-                    with dataif.open(os.path.join(
-                            "/responses", req_cfg_hash,
-                            "analysisResponse.json.gz")) as hfile:
-                        resp_data = hfile.read()
-                except BaseException:
-                    continue
-                ret[req_cfg_hash] = \
-                    RcacheLookupResult(
-                        found=True,
-                        response=zlib.decompress(
-                            resp_data, 16 + zlib.MAX_WBITS))
-            return ret
+            # rcache is not configured; treat as a cache miss so responses
+            # go through full computation with current staleness controls.
+            return {}
         return rcache.lookup_responses(cached_keys)
 
     def _start_processing(self, dataif, req_info, is_internal_request,
@@ -879,16 +1133,37 @@ class RatAfc(MethodView):
         If 'use_tasks' - returns created Task
         """
         request_str = json.dumps(req_info.request, sort_keys=True)
-        original_request_str = \
-            json.dumps(original_request, sort_keys=True) if original_request \
-            else request_str
+        original_request_str = json.dumps(
+            original_request, sort_keys=True) if original_request else request_str
         if use_tasks:
+            # Always (re)write, never write-if-absent: the path is keyed by
+            # req_cfg_hash, so skipping the write when something is already
+            # there would let a config planted at that path via a different
+            # write route (e.g. a direct objstorage write, SUB-0138-38)
+            # survive unverified instead of being replaced by the config
+            # ratafc itself just validated.
             with dataif.open(req_info.config_path) as hfile:
-                if not hfile.head():
-                    hfile.write(req_info.config_str.encode("utf-8"))
+                hfile.write(req_info.config_str.encode("utf-8"))
             with dataif.open(os.path.join("/responses", req_info.req_cfg_hash,
                                           "analysisRequest.json")) as hfile:
                 hfile.write(request_str)
+            rmq_config_path = None
+        else:
+            # RMQ-sync path: write config to objstore so the worker reads it
+            # from the operator trust domain rather than the broker message,
+            # matching the constraint in afc_worker. Always overwrite for
+            # the same reason as the use_tasks branch above (SUB-0138-38).
+            rmq_config_path = \
+                f"/afc_config/{req_info.req_cfg_hash}/afc_config.json"
+            try:
+                with dataif.open(rmq_config_path) as hfile:
+                    hfile.write(req_info.config_str.encode("utf-8"))
+            except Exception as ex:
+                LOGGER.warning(
+                    "ratafc: failed to write config to objstore (%s): %s; "
+                    "worker will reject task (config_path=None)",
+                    rmq_config_path, ex)
+                rmq_config_path = None
 
         if req_info.runtime_opts & RNTM_OPT_DBG:
             for fname, content in [("analysisRequest.json", request_str),
@@ -896,9 +1171,21 @@ class RatAfc(MethodView):
                 with dataif.open(os.path.join(req_info.history_dir, fname)) \
                         as hfile:
                     hfile.write(content.encode("utf-8"))
+        # Record the submitting user in status.json so AnalysisStatus /
+        # AnalysisKmlResult can enforce per-user task ownership. GUI/async
+        # submissions (RatAfcSec) run under an authenticated session; AP and
+        # internal submissions get no session user, so owner_id stays None
+        # and the task is Super-only (see _admin_may_access_task fail-closed
+        # handling of a null owner).
+        try:
+            from flask_login import current_user as _cu
+            owner_id = _cu.id if _cu.is_authenticated else None
+        except Exception:
+            owner_id = None
         build_task(dataif=dataif, request_type=req_info.request_type,
                    task_id=req_info.task_id, hash_val=req_info.req_cfg_hash,
-                   config_path=req_info.config_path if use_tasks else None,
+                   config_path=req_info.config_path if use_tasks
+                   else rmq_config_path,
                    history_dir=req_info.history_dir,
                    runtime_opts=req_info.runtime_opts,
                    rcache_queue=rcache_queue,
@@ -907,7 +1194,12 @@ class RatAfc(MethodView):
                    else original_request_str,
                    config_str=None if use_tasks else req_info.config_str,
                    timeout_sec=flask.current_app.config[
-                        'AFC_MSGHND_RATAFC_TOUT'])
+                       'AFC_MSGHND_RATAFC_TOUT'],
+                   priority=afc_worker.CELERY_PRIORITY_USER
+                   if use_tasks else afc_worker.CELERY_PRIORITY_NORMAL,
+                   queue=afc_worker.CELERY_GUI_QUEUE
+                   if use_tasks else afc_worker.CELERY_QUEUE,
+                   owner_id=owner_id)
         if use_tasks:
             return afctask.Task(task_id=req_info.task_id, dataif=dataif,
                                 hash_val=req_info.req_cfg_hash,
@@ -940,51 +1232,55 @@ class RatAfc(MethodView):
             original_requests = {}
             if invalidated_responses:
                 for req_cfg_hash, req_info in req_infos.items():
-                    invalidated_response_s = \
-                        invalidated_responses.get(req_cfg_hash)
+                    invalidated_response_s = invalidated_responses.get(req_cfg_hash)
                     if not invalidated_response_s:
                         continue    # No such invalidated response
                     invalidated_response = json.loads(
                         invalidated_response_s)
                     vendor_extensions = invalidated_response.get(
-                        "availableSpectrumInquiryResponses")[0].\
-                        get("vendorExtensions")
+                        "availableSpectrumInquiryResponses")[0].get("vendorExtensions")
                     if not vendor_extensions:
                         continue    # No vendor extensions
                     for ve in vendor_extensions:
-                        if ve.get("extensionId") in \
-                                rcache.afc_state_vendor_extensions():
+                        if ve.get("extensionId") in rcache.afc_state_vendor_extensions():
+                            # Apply the same VendorExtensionFilter gate used on
+                            # the live-AP path to avoid resurrecting extensions
+                            # that drop_unwanted_extensions would have filtered.
+                            if not VendorExtensionFilter.allowed_extension(
+                                    extension=ve.get("extensionId"),
+                                    is_input=True,
+                                    is_message=False,
+                                    is_gui=False,
+                                    is_internal=is_internal_request):
+                                continue
                             if req_cfg_hash not in original_requests:
-                                original_requests[req_cfg_hash] = \
-                                    copy.deepcopy(req_info.request)
+                                original_requests[req_cfg_hash] = copy.deepcopy(req_info.request)
                             req_info.request[
-                                "availableSpectrumInquiryRequests"][0].\
-                                setdefault("vendorExtensions", []).append(ve)
+                                "availableSpectrumInquiryRequests"][0].setdefault("vendorExtensions", []).append(ve)
             tasks = {}
             for req_cfg_hash, req_info in req_infos.items():
-                tasks[req_cfg_hash] = \
-                    self._start_processing(
-                        dataif=dataif, req_info=req_info, use_tasks=use_tasks,
-                        is_internal_request=is_internal_request,
-                        rcache_queue=None if use_tasks
-                        else rmq_conn.rx_queue_name(),
-                        original_request=original_requests.get(req_cfg_hash))
+                tasks[req_cfg_hash] = self._start_processing(
+                    dataif=dataif, req_info=req_info, use_tasks=use_tasks,
+                    is_internal_request=is_internal_request,
+                    rcache_queue=None if use_tasks
+                    else rmq_conn.rx_queue_name(),
+                    original_request=original_requests.get(req_cfg_hash))
             if use_tasks:
                 ret = {}
                 for req_cfg_hash, task in tasks.items():
-                    task_stat = \
-                        task.wait(
-                            timeout=flask.current_app.config[
-                                'AFC_MSGHND_RATAFC_TOUT'])
-                    ret[req_cfg_hash] = \
-                        response_map[task_stat['status']](task).data
+                    task_stat = task.wait(
+                        timeout=flask.current_app.config[
+                            'AFC_MSGHND_RATAFC_TOUT'])
+                    ret[req_cfg_hash] = response_map[task_stat['status']](task).data
                 return ret
-            ret = \
-                rcache.rmq_receive_responses(
-                    rx_connection=rmq_conn,
-                    req_cfg_digests=req_infos.keys(),
-                    timeout_sec=flask.current_app.config[
-                        'AFC_MSGHND_RATAFC_TOUT'])
+            ret = rcache.rmq_receive_responses(
+                rx_connection=rmq_conn,
+                req_cfg_digests=req_infos.keys(),
+                timeout_sec=flask.current_app.config[
+                    'AFC_MSGHND_RATAFC_TOUT'],
+                expected_task_ids={
+                    req_cfg_hash: req_info.task_id
+                    for req_cfg_hash, req_info in req_infos.items()})
             for req_cfg_hash, response in ret.items():
                 req_info = req_infos[req_cfg_hash]
                 if (not response) or (not req_info.history_dir):
@@ -1000,30 +1296,32 @@ class RatAfcSec(RatAfc):
     def get(self):
         LOGGER.debug("(%d) %s::%s()", threading.get_native_id(),
                      self.__class__, inspect.stack()[0][3])
-        user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
+        auth(roles=['Analysis', 'Trial', 'Admin'])
         return super().get()
 
     def post(self):
         LOGGER.debug("(%d) %s::%s()", threading.get_native_id(),
                      self.__class__, inspect.stack()[0][3])
-        user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
+        auth(roles=['Analysis', 'Trial', 'Admin'])
         return super().post()
 
 
+@public_route
 class RatAfcInternal(MethodView):
     """ Add rule for availableSpectrumInquiryInternal """
     pass
 
 
+@public_route
 class HealthCheck(MethodView):
 
     def get(self):
         '''GET method for HealthCheck'''
         msg = 'The ' + flask.current_app.config['AFC_APP_TYPE'] + ' is healthy'
-
         return flask.make_response(msg, 200)
 
 
+@public_route
 class ReadinessCheck(MethodView):
 
     def get(self):
@@ -1049,7 +1347,7 @@ def traffic_metrics_bedore():
 
 @module.after_request
 def traffic_metrics_after(response):
-    if flask.g.is_afc:
+    if getattr(flask.g, 'is_afc', False):
         afc_traffic_metrics.message_processed(
             duration_sec=time.time() - flask.g.afc_start_time,
             status=response.status_code if flask.g.afc_no_exception

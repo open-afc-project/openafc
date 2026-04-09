@@ -1120,7 +1120,9 @@ void readOneCol(const char *flname, ListClass<T> *lc_t)
 	FILE *fp;
 	T val;
 
-	char *line = (char *)malloc(500 * sizeof(char));
+	// Buffer must match FGETLINE_CHAR_MAX so the char-ptr fgetline variant
+	// cannot write beyond the allocation on long lines.
+	char *line = (char *)malloc(4096 * sizeof(char));
 
 	#define TMP_NEDELIM (lnptr[0] != ',') && (lnptr[0] != ' ') && (lnptr[0] != '\t')
 	#define TMP_EQDELIM (lnptr[0] == ',') || (lnptr[0] == ' ') || (lnptr[0] == '\t')

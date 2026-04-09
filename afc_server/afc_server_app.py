@@ -10,6 +10,17 @@
 # pylint: disable=wrong-import-order, global-statement, too-many-arguments
 # pylint: disable=too-many-positional-arguments
 
+import prometheus_utils
+from log_utils import dp, get_module_logger, set_dp_printer, \
+    set_error_exception, set_parent_logger
+import appcfg
+import afc_traffic_metrics
+import afc_server_msg_proc
+from afcmodels import afc_server_models
+import afc_server_db
+import afc_server_compute
+import os
+import hmac
 import fastapi
 import logging
 import time
@@ -17,14 +28,51 @@ import uvicorn
 from typing import Any, Awaitable, Callable, Dict, Optional, Union
 
 
-import afc_server_compute
-import afc_server_db
-import afc_server_models
-import afc_server_msg_proc
-import afc_traffic_metrics
-import appcfg
-from log_utils import dp, get_module_logger, set_dp_printer, set_parent_logger
-import prometheus_utils
+def _get_internal_token() -> Optional[str]:
+    """Read AFC_INTERNAL_TOKEN from file (AFC_INTERNAL_TOKEN_FILE) or env."""
+    file_path = os.environ.get("AFC_INTERNAL_TOKEN_FILE")
+    if file_path:
+        try:
+            with open(file_path) as fh:
+                return fh.read().strip() or None
+        except OSError:
+            pass
+    return os.environ.get("AFC_INTERNAL_TOKEN") or None
+
+
+def _get_dispatcher_token() -> Optional[str]:
+    """Read AFC_DISPATCHER_TOKEN from file (AFC_DISPATCHER_TOKEN_FILE) or env.
+
+    This token is mounted ONLY into the nginx dispatcher and afc_server/msghnd
+    (not shared with other AFC_INTERNAL_TOKEN holders), so its presence on a
+    request proves that mTLS-DN / X-SSL-Client-Verify were set by nginx.
+    """
+    file_path = os.environ.get("AFC_DISPATCHER_TOKEN_FILE")
+    if file_path:
+        try:
+            with open(file_path) as fh:
+                return fh.read().strip() or None
+        except OSError:
+            pass
+    return os.environ.get("AFC_DISPATCHER_TOKEN") or None
+
+
+def _get_precompute_token() -> Optional[str]:
+    """Read AFC_PRECOMPUTE_TOKEN from file (AFC_PRECOMPUTE_TOKEN_FILE) or env.
+
+    Batch-caller credential for the Internal route (uls_downloader precompute
+    jobs). Unlike AFC_DISPATCHER_TOKEN it never authorises trusting the
+    mTLS-DN / X-SSL-Client-Verify attestation headers.
+    """
+    file_path = os.environ.get("AFC_PRECOMPUTE_TOKEN_FILE")
+    if file_path:
+        try:
+            with open(file_path) as fh:
+                return fh.read().strip() or None
+        except OSError:
+            pass
+    return os.environ.get("AFC_PRECOMPUTE_TOKEN") or None
+
 
 __all__ = ["app"]
 
@@ -44,9 +92,9 @@ async def get_message_processor() \
     if g_message_processor is None:
         db = \
             afc_server_db.AfcServerDb(
-                ratdb_dsn=settings.ratdb_dsn,
+                ratdb_dsn=str(settings.ratdb_dsn),
                 ratdb_password_file=settings.ratdb_password_file,
-                rcache_dsn=settings.rcache_dsn,
+                rcache_dsn=str(settings.rcache_dsn),
                 rcache_password_file=settings.rcache_password_file,
                 bypass_cert=settings.bypass_cert,
                 bypass_rcache=settings.bypass_rcache,
@@ -54,7 +102,7 @@ async def get_message_processor() \
                     settings.afc_state_vendor_extensions))
         compute = \
             afc_server_compute.AfcServerCompute(
-                rmq_dsn=settings.rmq_dsn,
+                rmq_dsn=str(settings.rmq_dsn),
                 rmq_password_file=settings.rmq_password_file,
                 engine_request_type=settings.engine_request_type,
                 worker_mnt_root=settings.static_data_root or
@@ -71,15 +119,52 @@ async def get_message_processor() \
 
 
 # FastAPI APP
-app = fastapi.FastAPI()
+# /docs, /redoc and /openapi.json enumerate the full route map, the auth
+# header names (x-afc-internal-token, x-afc-dispatcher-token, mtls-dn) and
+# the internal debug flags, with no token gate. Every substantive sibling
+# route on this listener is token-gated; disable the schema endpoints in
+# production and re-enable them only in the devel environment.
+if os.environ.get("AFC_DEVEL_ENV") == "devel":
+    app = fastapi.FastAPI()
+else:
+    app = fastapi.FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
 
 @app.on_event("startup")
 async def startup() -> None:
     """ App startup event handler """
     set_dp_printer(fastapi.logger.logger.error)
+    # log_utils.error() raises SystemExit by default. SystemExit is a
+    # BaseException, so it escapes the 'except Exception' guards in
+    # DbPipeline._worker and asyncio re-raises it out of the event loop,
+    # killing the uvicorn worker process. Make runtime DB/broker error
+    # paths raise an ordinary exception instead (as rcache_client does).
+    set_error_exception(RuntimeError)
+    appcfg.install_credential_redact_filter()
     if settings.log_level is not None:
         logging.getLogger(PARENT_LOGGER).setLevel(settings.log_level.upper())
+    _token = _get_internal_token()
+    if not _token:
+        logging.getLogger(PARENT_LOGGER).critical(
+            "FATAL: AFC_INTERNAL_TOKEN is not set. The internal endpoint "
+            "cannot be secured without it. Set AFC_INTERNAL_TOKEN_FILE to "
+            "a Docker secret path, or set AFC_INTERNAL_TOKEN. "
+            "Generate a random secret:  python3 -c \"import secrets; "
+            "print(secrets.token_hex(32))\"")
+        raise SystemExit(1)
+    if os.environ.get("AFC_ENABLE_TEST_CERTS", "").lower() in ("1", "true", "yes"):
+        logging.getLogger(PARENT_LOGGER).critical(
+            "SECURITY WARNING: AFC_ENABLE_TEST_CERTS is enabled. "
+            "TestCertificationId / TestSerialNumber are accepted without "
+            "registration. This setting is intended only for development/CI; "
+            "must never be active in production deployments.")
+    if settings.bypass_cert or settings.bypass_rcache:
+        logging.getLogger(PARENT_LOGGER).critical(
+            "SECURITY WARNING: AFC_SERVER_BYPASS_CERT and/or "
+            "AFC_SERVER_BYPASS_RCACHE is enabled. These flags are intended "
+            "for performance estimation only and relax certification / "
+            "response-cache checks; they must never be active in production "
+            "deployments.")
 
 
 @app.on_event("shutdown")
@@ -96,6 +181,21 @@ async def shutdown() -> None:
 @app.get("/healthy", summary="200 if somehow alive")
 async def healthcheck(response: fastapi.Response) -> None:
     """ Healthcheck """
+    # Surface a dead RMQ reader or DB pipeline worker so orchestrators
+    # (Docker compose, k8s) recycle the worker.  A worker task that has
+    # exited while not in the shutdown path means the corresponding
+    # requests will time out with GENERAL_FAILURE.
+    mp = g_message_processor
+    if mp is not None and not mp._compute._stopping:
+        db = mp._db
+        worker_tasks = [mp._compute._rmq_reader_task,
+                        db._rcache_lookup_pipeline._task,
+                        db._cert_lookup_pipeline._task,
+                        db._afc_config_lookup_pipeline._task]
+        if any(task.done() for task in worker_tasks):
+            response.status_code = \
+                fastapi.status.HTTP_503_SERVICE_UNAVAILABLE
+            return
     response.status_code = fastapi.status.HTTP_200_OK
 
 
@@ -106,24 +206,59 @@ async def healthcheck(response: fastapi.Response) -> None:
           summary="Process AFC Request from outside the cluster")
 async def available_spectrum_inquiry(
         afc_req_msg: afc_server_models.Rest_ReqMsg,
-        debug: bool = fastapi.Query(
-            False, title="Run request in AFC Engine in debug mode"),
-        edebug: bool = fastapi.Query(
-            False, title="Run request in AFC Engine in extended debug mode"),
-        nocache: bool = fastapi.Query(
-            False, title="Run request in AFC Engine (bypass cache lookup)"),
-        gui: bool = fastapi.Query(
-            False, title="Request from Web GUI"),
         mtls_dn: Optional[str] = fastapi.Header(default=None),
         x_real_ip: Optional[str] = fastapi.Header(default=None),
+        x_ssl_client_verify: Optional[str] = fastapi.Header(default=None),
+        x_afc_precompute: Optional[str] = fastapi.Header(default=None),
+        x_afc_internal_token: Optional[str] = fastapi.Header(default=None),
+        x_afc_dispatcher_token: Optional[str] = fastapi.Header(default=None),
         message_processor: afc_server_msg_proc.AfcServerMessageProcessor =
         fastapi.Depends(get_message_processor)) -> Dict[str, Any]:
     """ Process external AFC Request message """
+    # Require the gateway token that nginx sets via proxy_set_header.
+    # Requests not routed through nginx will not carry this token.
+    expected_token = _get_internal_token()
+    if not expected_token:
+        raise fastapi.HTTPException(
+            status_code=503,
+            detail="Gateway token unavailable")
+    supplied = x_afc_internal_token or ""
+    if not hmac.compare_digest(supplied, expected_token):
+        raise fastapi.HTTPException(
+            status_code=403,
+            detail="Missing or invalid gateway token")
+    # mTLS-DN / X-SSL-Client-Verify below are nginx attestation headers; only
+    # honour them when the request also carries the nginx-only
+    # AFC_DISPATCHER_TOKEN. AFC_INTERNAL_TOKEN alone is insufficient because it
+    # is shared with non-gateway cluster services.
+    expected_disp = _get_dispatcher_token()
+    if not expected_disp or not hmac.compare_digest(
+            x_afc_dispatcher_token or "", expected_disp):
+        raise fastapi.HTTPException(
+            status_code=403,
+            detail="Missing or invalid dispatcher token")
+    # When AFC_ENFORCE_MTLS is true nginx requires a valid client cert; the
+    # afc_server should reject requests that lack the forwarded mTLS-DN header
+    # as an additional server-side enforcement layer.
+    if settings.enforce_mtls and not mtls_dn:
+        raise fastapi.HTTPException(
+            status_code=403,
+            detail="mTLS client certificate required")
+    # Trust mTLS-DN only when nginx attests successful verification.
+    # Reject any request that supplies an mTLS-DN without a verify header that
+    # explicitly says SUCCESS. A previous version only rejected when the verify
+    # header was *present* and != SUCCESS, so an absent header now also triggers
+    # rejection when an mTLS-DN is supplied.
+    if mtls_dn and x_ssl_client_verify != "SUCCESS":
+        raise fastapi.HTTPException(
+            status_code=403,
+            detail="mTLS certificate verification failed")
     return \
         await message_processor.process_msg(
-            req_msg=afc_req_msg, debug=debug, edebug=edebug,
-            nocache=nocache, gui=gui, mtls_dn=mtls_dn, ap_ip=x_real_ip,
-            internal=False)
+            req_msg=afc_req_msg, debug=False, edebug=False,
+            gui=False, mtls_dn=mtls_dn, ap_ip=x_real_ip,
+            internal=False,
+            low_priority=x_afc_precompute is not None)
 
 
 @app.post("/fbrat/ap-afc/availableSpectrumInquiryInternal",
@@ -136,24 +271,68 @@ async def available_spectrum_inquiry_internal(
             False, title="Run request in AFC Engine in debug mode"),
         edebug: bool = fastapi.Query(
             False, title="Run request in AFC Engine in extended debug mode"),
-        nocache: bool = fastapi.Query(
-            False, title="Run request in AFC Engine (bypass cache lookup)"),
         gui: bool = fastapi.Query(
             False, title="Request from Web GUI"),
         mtls_dn: Optional[str] = fastapi.Header(default=None),
         x_real_ip: Optional[str] = fastapi.Header(default=None),
+        x_afc_internal_token: Optional[str] = fastapi.Header(default=None),
+        x_afc_dispatcher_token: Optional[str] = fastapi.Header(default=None),
+        x_afc_precompute_token: Optional[str] = fastapi.Header(default=None),
         message_processor: afc_server_msg_proc.AfcServerMessageProcessor =
         fastapi.Depends(get_message_processor)) -> Dict[str, Any]:
     """ Process internal AFC Request message """
+    expected_token = _get_internal_token()
+    supplied = x_afc_internal_token or ""
+    if not expected_token or not hmac.compare_digest(supplied, expected_token):
+        raise fastapi.HTTPException(status_code=403, detail="Forbidden")
+    # AFC_INTERNAL_TOKEN is shared with non-gateway cluster services; the
+    # Internal route therefore requires a narrower credential outright: the
+    # batch-caller precompute token (uls_downloader precompute jobs) or the
+    # dispatcher token. Rejecting (not downgrading) on failure: falling back
+    # to external-caller semantics would serve the request WITHOUT the
+    # dispatcher-token/mTLS enforcement that available_spectrum_inquiry
+    # applies to every external request. The dispatcher token additionally
+    # authorises mTLS attestation headers on the external route and MUST NOT
+    # be distributed to batch callers (scripts/gen_secrets.sh).
+    expected_pc = _get_precompute_token()
+    expected_disp = _get_dispatcher_token()
+    pc_ok = bool(expected_pc) and hmac.compare_digest(
+        x_afc_precompute_token or "", expected_pc)
+    disp_ok = bool(expected_disp) and hmac.compare_digest(
+        x_afc_dispatcher_token or "", expected_disp)
+    if not (pc_ok or disp_ok):
+        raise fastapi.HTTPException(
+            status_code=403,
+            detail="Missing or invalid precompute/dispatcher token")
     return \
         await message_processor.process_msg(
             req_msg=afc_req_msg, debug=debug, edebug=edebug,
-            nocache=nocache, gui=gui, mtls_dn=mtls_dn, ap_ip=x_real_ip,
+            gui=gui, mtls_dn=mtls_dn, ap_ip=x_real_ip,
             internal=True)
 
 
-# Exposing Promtheus metrics
-app.mount("/metrics", prometheus_utils.multiprocess_fastapi_metrics())
+# Exposing Prometheus metrics behind X-AFC-Internal-Token gate so only
+# authorised scrapers (Prometheus, configured with bearer_token_file) can read.
+def _make_token_gated_metrics_app(
+        metrics_app: Any) -> Any:
+    """Wrap a metrics ASGI app with X-AFC-Internal-Token verification."""
+    async def _gated(scope: Any, receive: Any, send: Any) -> None:
+        if scope.get("type") == "http":
+            expected = _get_internal_token()
+            headers = dict(scope.get("headers", []))
+            auth_header = headers.get(b"x-afc-internal-token", b"").decode()
+            if not expected or not hmac.compare_digest(auth_header, expected):
+                response = fastapi.Response(status_code=403,
+                                            content="Forbidden")
+                await response(scope, receive, send)
+                return
+        await metrics_app(scope, receive, send)
+    return _gated
+
+
+app.mount("/metrics",
+          _make_token_gated_metrics_app(
+              prometheus_utils.multiprocess_fastapi_metrics()))
 
 
 @app.middleware("http")

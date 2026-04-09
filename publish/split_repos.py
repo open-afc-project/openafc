@@ -31,7 +31,7 @@ def pat_match(pattern, full, positive=True):
     '''
     re_obj = re.compile(pattern)
     if full:
-        re_func = re_obj.match
+        re_func = re_obj.fullmatch
     else:
         re_func = re_obj.search
 
@@ -141,7 +141,7 @@ def main(argv):
         priv_pname.append(pat_match(pat, full=False))
     pub_pname = []
     for pat in args.public:
-        pub_pname.append(pat_match(pat, full=False))
+        pub_pname.append(pat_match(pat, full=True))
     exact_names = set()
     if args.public_list:
         with open(args.public_list, 'r') as listfile:
@@ -217,6 +217,12 @@ def main(argv):
                 else:
                     pkggrp = seen_pkg
                     archname = head[rpm.RPMTAG_ARCH]
+                    # Reject arch names with invalid path characters
+                    if not archname or '/' in archname or '..' in archname or \
+                            '\x00' in archname:
+                        raise ValueError(
+                            f'Invalid RPMTAG_ARCH {archname!r} in {filename!r}; '
+                            f'value contains disallowed characters')
 
                 # check for dupes
                 if pkgname in pkggrp and not args.ignore_dupes:
@@ -227,17 +233,45 @@ def main(argv):
 
                 # SRPMs are always in private repos
                 # Any not-explicitly-public packages are private
-                if is_src or not is_pub:
+                # A pattern-matched public name that also matches a private
+                # suffix stays private unless exactly whitelisted.
+                is_exact_pub = any_match(exact_names, pkgname)
+                if is_src or not is_pub or (is_priv and not is_exact_pub):
                     tgtpath = priv_path
                 else:
                     tgtpath = pub_path
 
-            arch_path = os.path.join(tgtpath, archname)
-            if not os.path.exists(arch_path):
-                os.mkdir(arch_path)
-            # copy, preserving permission/time
-            dst_path = os.path.join(tgtpath, archname, filename)
-            shutil.copyfile(src_path, dst_path)
+                arch_path = os.path.join(tgtpath, archname)
+                if not os.path.exists(arch_path):
+                    os.mkdir(arch_path)
+                # copy, preserving permission/time
+                dst_path = os.path.join(tgtpath, archname, filename)
+                # Realpath containment check — ensure destination is under tgtpath
+                real_dst = os.path.realpath(dst_path)
+                real_tgt = os.path.realpath(tgtpath)
+                # This uses os.path.commonpath instead of real_dst.startswith(real_tgt)
+                if os.path.commonpath([real_dst, real_tgt]) != real_tgt:
+                    raise ValueError(
+                        f'Destination {dst_path!r} escapes target root {tgtpath!r}')
+                # Collision check keyed on the actual output path: the pkgname
+                # dupe check above cannot see two different packages whose
+                # flattened basename+arch collide (dirpath is dropped from
+                # dst_path), and copyfile would silently overwrite the earlier
+                # file - a basename collision must be an error, not a
+                # substitution.
+                if os.path.lexists(dst_path):
+                    raise ValueError(
+                        f'Output collision: {dst_path!r} already exists; '
+                        f'refusing to overwrite it with {src_path!r}')
+                # TOCTOU guard: copy from the already-held file object so the
+                # bytes published are the bytes whose header was validated
+                # above. Re-opening src_path by path (shutil.copyfile) let a
+                # concurrent writer on the shared input filesystem swap in a
+                # hostile file between validation and copy (same threat model
+                # and fix as breakpad_extract_rpm.py pkg_snap).
+                rpmfile.seek(0)
+                with open(dst_path, 'xb') as dstfile:
+                    shutil.copyfileobj(rpmfile, dstfile)
             shutil.copystat(src_path, dst_path)
 
     unmatched = set()

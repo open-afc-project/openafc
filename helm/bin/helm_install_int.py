@@ -170,6 +170,7 @@ class ClusterHandlerK3d(ClusterHandler):
     _cluster_info  -- K3d cluster information dictionary
     _registry_info -- Optional k3d image registry information
     """
+
     def __init__(self, cluster_context: ClusterContext, args: Any,
                  tag: Optional[str], k3d_cluster: str) -> None:
         """ Constructor

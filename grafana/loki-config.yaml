@@ -43,3 +43,8 @@ compactor:
 
 limits_config:
   retention_period: ${GRAFANA_LOKI_RETENTION_PERIOD}
+  # Security: reject /loki/api/v1/delete for every tenant. The HTTP API is
+  # unauthenticated (auth_enabled: false above), so leaving the deletion API
+  # active lets any peer with network reach to loki:3100 destroy stored log
+  # streams (anti-forensics). Compactor retention cleanup is unaffected.
+  deletion_mode: disabled

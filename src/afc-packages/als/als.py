@@ -237,12 +237,55 @@ arg_dscs: List[ArgDsc] = [
     # Maximum number of unconfirmed requests in flight. Default is 5
     ArgDsc("ALS_KAFKA_CLIENT_MAX_UNCONFIRMED_REQS",
            "max.in.flight.requests.per.connection", type_conv=int),
-    # Security protocol: 'PLAINTEXT', 'SSL' (hope we do not need SASL_...).
-    # Default is 'PLAINTEXT'
+    # Security protocol: 'PLAINTEXT', 'SSL', 'SASL_SSL' etc.
+    # Defaults to 'PLAINTEXT' when unset; for production deployments set to
+    # 'SASL_SSL' or 'SSL' via ALS_KAFKA_CLIENT_SECURITY_PROTOCOL in compose.
     ArgDsc("ALS_KAFKA_CLIENT_SECURITY_PROTOCOL", "security.protocol"),
     # SSL. CA file for certificate verification
+    ArgDsc("ALS_KAFKA_CLIENT_SSL_CA_LOCATION", "ssl.ca.location"),
+    # SASL. Mechanism (e.g. 'PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512')
+    ArgDsc("ALS_KAFKA_CLIENT_SASL_MECHANISM", "sasl.mechanism"),
+    # SASL. Username
+    ArgDsc("ALS_KAFKA_CLIENT_SASL_USERNAME", "sasl.username"),
+    # SASL. Password is intentionally NOT read by a plain ArgDsc — see
+    # _add_sasl_password() below, which prefers the *_FILE Docker-secret
+    # form used elsewhere in this codebase (e.g. BROKER_PWD_FILE,
+    # AFC_OBJST_API_KEY_FILE) over a plaintext-env-var fallback.
     # Maximum message size
     ArgDsc("ALS_KAFKA_MAX_REQUEST_SIZE", "message.max.bytes", type_conv=int)]
+
+# Env var containing a file with the SASL password (preferred over
+# ALS_KAFKA_CLIENT_SASL_PASSWORD, which passes the secret via plaintext env)
+ALS_KAFKA_CLIENT_SASL_PASSWORD_FILE_ENV = "ALS_KAFKA_CLIENT_SASL_PASSWORD_FILE"
+# Env var containing the SASL password directly (fallback)
+ALS_KAFKA_CLIENT_SASL_PASSWORD_ENV = "ALS_KAFKA_CLIENT_SASL_PASSWORD"
+
+
+def _add_sasl_password(kwargs: Dict[str, Any]) -> None:
+    """ Reads the SASL password (file preferred, plain env var fallback)
+    into kwargs['sasl.password'] if either is set. """
+    password_file = os.environ.get(ALS_KAFKA_CLIENT_SASL_PASSWORD_FILE_ENV)
+    if password_file:
+        try:
+            with open(password_file, encoding="utf-8") as f:
+                password = f.read().strip()
+        except OSError as ex:
+            LOGGER.error(
+                "ALS Kafka: failed to read %s '%s': %s",
+                ALS_KAFKA_CLIENT_SASL_PASSWORD_FILE_ENV, password_file, ex)
+            password = None
+        if password:
+            kwargs["sasl.password"] = password
+            return
+    password = os.environ.get(ALS_KAFKA_CLIENT_SASL_PASSWORD_ENV)
+    if password:
+        kwargs["sasl.password"] = password
+
+
+def _security_protocol_needs_sasl(security_protocol: Optional[str]) -> bool:
+    """ True if given security.protocol value requires SASL credentials """
+    return bool(security_protocol) and \
+        security_protocol.upper().startswith("SASL")
 
 
 class Als:
@@ -305,6 +348,25 @@ class Als:
                     "'%s': %s",
                     argdsc.env_var, os.environ.get(argdsc.env_var), repr(ex))
                 break
+        if has_parameters:
+            _add_sasl_password(kwargs)
+            if _security_protocol_needs_sasl(kwargs.get("security.protocol")) \
+                    and not (kwargs.get("sasl.mechanism") and
+                             kwargs.get("sasl.username") and
+                             kwargs.get("sasl.password")):
+                # Fail loudly rather than let confluent_kafka.Producer()
+                # construct an unauthenticatable client that silently never
+                # connects (SUB-0138-78): security.protocol=SASL_* requires
+                # sasl.mechanism/username/password, all of which must come
+                # from ALS_KAFKA_CLIENT_SASL_{MECHANISM,USERNAME} and
+                # ALS_KAFKA_CLIENT_SASL_PASSWORD(_FILE).
+                has_parameters = False
+                LOGGER.error(
+                    "ALS Kafka: security.protocol=%s requires SASL "
+                    "credentials (ALS_KAFKA_CLIENT_SASL_MECHANISM/"
+                    "_USERNAME/_PASSWORD(_FILE)), but at least one is "
+                    "missing. No ALS logging will be performed.",
+                    kwargs.get("security.protocol"))
         self._server_id: str = \
             cast(str, (client_id or kwargs.get("client.id", "Unknown"))) + \
             "_" + random_hex(10)
@@ -465,7 +527,7 @@ class Als:
             self._send_afc_config(
                 req_id=req_id, config_text=config_text, customer=customer,
                 geo_data_version=geo_data_version, uls_id=uls_id,
-                req_indices=indices if len(configs) != 1 else None)
+                req_indices=indices)
 
     def _send_afc_config(self, req_id: str, config_text: str, customer: str,
                          geo_data_version: str, uls_id: str,

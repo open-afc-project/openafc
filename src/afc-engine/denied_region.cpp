@@ -148,8 +148,11 @@ double CircleDeniedRegionClass::computeRadius(double txHeightAGL) const
 	if (!horizonDistFlag) {
 		returnVal = radius;
 	} else {
-		returnVal = sqrt(2 * CConst::earthRadius * 4.0 / 3) *
-			    (sqrt(heightAGL) + sqrt(txHeightAGL));
+		/* Clamp AGL heights to >= 0 so a negative AP-supplied height cannot
+		 * yield sqrt(negative) -> NaN and fail-open the intersect() check. */
+		double rxH = (heightAGL > 0.0) ? heightAGL : 0.0;
+		double txH = (txHeightAGL > 0.0) ? txHeightAGL : 0.0;
+		returnVal = sqrt(2 * CConst::earthRadius * 4.0 / 3) * (sqrt(rxH) + sqrt(txH));
 	}
 
 	return returnVal;

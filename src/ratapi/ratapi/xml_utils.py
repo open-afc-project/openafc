@@ -16,7 +16,7 @@ def int_to_xml(value):
     if value is None:
         return None
 
-    return unicode(value)
+    return str(value)
 
 
 def xml_to_int(text, default=None):

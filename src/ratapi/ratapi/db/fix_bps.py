@@ -2,7 +2,33 @@
 
 import csv
 import sys
-import math
+
+_CSV_FORMULA_LEAD = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_safe(v):
+    """CWE-1236: neutralise CSV formula injection by quoting leading =+-@."""
+    s = str(v)
+    if s and s[0] in _CSV_FORMULA_LEAD:
+        return "'" + s
+    return s
+
+
+def _csv_decode_float(v):
+    """Convert a CSV field to float, stripping any _csv_safe sentinel prefix."""
+    s = str(v).strip()
+    if s.startswith("'"):
+        s = s[1:].strip()
+    return float(s)
+
+
+def _csv_decode_int(v):
+    """Convert a CSV field to int, stripping any _csv_safe sentinel prefix."""
+    s = str(v).strip()
+    if s.startswith("'"):
+        s = s[1:].strip()
+    return int(s)
+
 
 modmapBPS = {}
 cslistBPS = {}
@@ -26,9 +52,9 @@ def RepresentFloat(s):
 
 def getBPSFromMod(mod_type, cs):
     try:
-        bits_per_sym = int(modmapBPS[mod_type])
-        if (len(cslistBPS[mc]) > 0):
-            if cs not in cslistBPS[mc]:
+        bits_per_sym = _csv_decode_int(modmapBPS[mod_type])
+        if (len(cslistBPS[mod_type]) > 0):
+            if cs not in cslistBPS[mod_type]:
                 bits_per_sym = -1
         return bits_per_sym
     except BaseException:
@@ -63,8 +89,6 @@ def fixBPS(inputPath, modcodFile, outputPath):
             cslistBPS[mc] = []
             for cs in lns:
                 cslistBPS[mc].append(cs)
-
-    csmap = {}
 
     modmapEmdegScale = {}
     modmapEmdegScale["M"] = 1.0e6
@@ -116,8 +140,8 @@ def fixBPS(inputPath, modcodFile, outputPath):
                         sys.exit('ERROR: Digital Mod Type not found')
                 else:
                     cs = row[callsignIdx]
-                    path = int(row[pathIdx])
-                    freq = row[freqIdx]
+                    _csv_decode_int(row[pathIdx])
+                    row[freqIdx]
                     emdeg = row[emdegIdx][0:4]
                     mod_type = row[modTypeIdx]
                     mod_rate_bps = ""
@@ -128,8 +152,8 @@ def fixBPS(inputPath, modcodFile, outputPath):
                     mod_type = mod_type.replace(',', '')
 
                     if RepresentFloat(row[digitalModRateIdx]):
-                        mod_rate = float(row[digitalModRateIdx])
-                        if mod_rate == 0.0:
+                        mod_rate = _csv_decode_float(row[digitalModRateIdx])
+                        if abs(mod_rate) < 1e-9:
                             comment = "INVALID Digital Mod Rate = " + \
                                 str(mod_rate)
                             # print ("WARN: "+ comment + " for callsign " + cs + " at line "+ str(linenum))
@@ -154,7 +178,7 @@ def fixBPS(inputPath, modcodFile, outputPath):
                         bw = getEmdegBW(emdeg)
 
                         se = mod_rate / bw
-                        if se == 0.0:
+                        if abs(se) < 1e-9:
                             comment = "ERROR: se = 0.0, bw = " + \
                                 str(bw) + ", mod_rate = " + str(mod_rate)
                             print(comment + " for callsign " +
@@ -177,4 +201,4 @@ def fixBPS(inputPath, modcodFile, outputPath):
                         row.append(mod_rate_bps)
                         row.append(spectral_efficiency)
                         row.append(comment)
-                        csvwriter.writerow(row)
+                        csvwriter.writerow([_csv_safe(c) for c in row])

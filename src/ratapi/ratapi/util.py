@@ -2,13 +2,11 @@
 '''
 
 import os
-import json
 import logging
 import flask
 import tempfile
 import shutil
 import uuid
-from celery import Celery
 from werkzeug.exceptions import HTTPException
 from werkzeug.http import HTTP_STATUS_CODES
 from werkzeug._internal import _get_environ
@@ -47,11 +45,11 @@ class AFCEngineException(HTTPException):
         """The status name."""
         return HTTP_STATUS_CODES.get(self.code, 'AFC Engine Error')
 
-    def get_description(self, environ=None):
+    def get_description(self, environ=None, scope=None):
         """Get the description."""
         return self.description
 
-    def get_body(self, environ=None):
+    def get_body(self, environ=None, scope=None):
         """Get the HTML body."""
         return flask.json.dumps(dict(
             type='AFC Engine Exception',
@@ -60,11 +58,11 @@ class AFCEngineException(HTTPException):
             # env=environ
         ))
 
-    def get_headers(self, environ=None):
+    def get_headers(self, environ=None, scope=None):
         """Get a list of headers."""
         return [('Content-Type', 'application/json')]
 
-    def get_response(self, environ=None):
+    def get_response(self, environ=None, scope=None):
         """Get a response object.  If one was passed to the exception
         it's returned directly.
 
@@ -159,17 +157,18 @@ class PrefixMiddleware(object):
     def __call__(self, environ, start_response):
 
         # we need to strip prefix from path info before flask can handle it
-        if environ['PATH_INFO'].startswith(self.prefix):
+        if environ['PATH_INFO'] == '/metrics':
+            return self.app(environ, start_response)
+        elif environ['PATH_INFO'].startswith(self.prefix):
             environ['PATH_INFO'] = environ['PATH_INFO'][len(self.prefix):]
             LOGGER.debug('Path: %s', environ['PATH_INFO'])
             environ['SCRIPT_NAME'] = self.prefix
             LOGGER.debug('Script: %s', environ['SCRIPT_NAME'])
             return self.app(environ, start_response)
         else:
-            # here the prefix has already been stripped by apache so just set
-            # script and pass on
-            environ['SCRIPT_NAME'] = self.prefix
-            return self.app(environ, start_response)
+            # Reject requests that don't start with the prefix
+            start_response('403 Forbidden', [('Content-Type', 'text/plain')])
+            return [b'Forbidden']
 
 
 class HeadersMiddleware(object):

@@ -1,5 +1,6 @@
-FROM postgres:14.9-alpine
-ENV POSTGRES_PASSWORD=postgres
+FROM postgres:14-alpine@sha256:f1341c01408dc7278e9d365ed4f860cd3f87dd16b4464ac326fc0f422083a579
+# POSTGRES_PASSWORD is no longer baked in — it must be supplied at runtime
+# via POSTGRES_PASSWORD_FILE (Docker secret) or POSTGRES_PASSWORD env var.
 ENV PGDATA=/mnt/nfs/psql/data
 #
 ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}

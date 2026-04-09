@@ -1,20 +1,14 @@
-import * as React from 'react';
+import React from 'react';
 // import ReactTooltip from 'react-tooltip';
 import {
   GalleryItem,
   FormGroup,
-  InputGroup,
-  Radio,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
   TextInput,
-  InputGroupText,
-  Select,
-  SelectOption,
-  SelectVariant,
-  CheckboxSelectGroup,
-  Checkbox,
   Gallery,
   Button,
-  Label,
   ClipboardCopy,
   ClipboardCopyVariant,
 } from '@patternfly/react-core';
@@ -37,7 +31,7 @@ export interface VendorExtensionFormState {
 export class VendorExtensionForm extends React.PureComponent<VendorExtensionFormParams, VendorExtensionFormState> {
   constructor(props: VendorExtensionFormParams) {
     super(props);
-    let len = this.props.VendorExtensions.length;
+    const len = this.props.VendorExtensions.length;
     this.state = {
       VendorExtensions: this.props.VendorExtensions,
       parseValidationMessages: Array(len).fill(''),
@@ -54,18 +48,18 @@ export class VendorExtensionForm extends React.PureComponent<VendorExtensionForm
 
   setParameters(x: string, idx: number): void {
     try {
-      let cleanedString = x.replace(/\s+/g, ' ').trim();
-      let newParamObj = JSON.parse(cleanedString);
+      const cleanedString = x.replace(/\s+/g, ' ').trim();
+      const newParamObj = JSON.parse(cleanedString);
       var newVeList = this.state.VendorExtensions.slice();
       newVeList[idx].parameters = newParamObj;
-      let msgArray = this.state.parseValidationMessages.slice();
+      const msgArray = this.state.parseValidationMessages.slice();
       msgArray[idx] = '';
       this.setState({ VendorExtensions: newVeList, parseValidationMessages: msgArray }, () => {
         this.props.onChange(this.state.VendorExtensions);
       });
     } catch (err) {
       if (err instanceof SyntaxError) {
-        let msgArray = this.state.parseValidationMessages.slice();
+        const msgArray = this.state.parseValidationMessages.slice();
         msgArray[idx] = 'Parameter format not correct: ' + err.message;
         this.setState({ parseValidationMessages: msgArray });
       }
@@ -74,7 +68,7 @@ export class VendorExtensionForm extends React.PureComponent<VendorExtensionForm
 
   deleteVendorExtension(idx: number): void {
     var newVeList = this.state.VendorExtensions.slice();
-    let msgArray = this.state.parseValidationMessages.slice();
+    const msgArray = this.state.parseValidationMessages.slice();
     newVeList.splice(idx, 1);
     msgArray.splice(idx, 1);
     this.setState({ VendorExtensions: newVeList, parseValidationMessages: msgArray }, () => {
@@ -83,9 +77,9 @@ export class VendorExtensionForm extends React.PureComponent<VendorExtensionForm
   }
 
   addVendorExtension(): void {
-    let newVe = { extensionId: '', parameters: {} };
+    const newVe = { extensionId: '', parameters: {} };
     var newVeList = this.state.VendorExtensions.slice();
-    let msgArray = this.state.parseValidationMessages.slice();
+    const msgArray = this.state.parseValidationMessages.slice();
     newVeList.push(newVe);
     msgArray.push('');
     this.setState({ VendorExtensions: newVeList, parseValidationMessages: msgArray }, () => {
@@ -97,40 +91,45 @@ export class VendorExtensionForm extends React.PureComponent<VendorExtensionForm
     return (
       <Gallery width={'1200px'}>
         <GalleryItem width={'50%'}>
-          {this.state.VendorExtensions.map((ve, idx) => (
-            <FormGroup fieldId={'ve-form-group-' + idx}>
-              <FormGroup fieldId={'vendor-extension-id-group-' + idx} label={'Extension Id ' + (idx + 1)}>
-                <TextInput
-                  value={ve.extensionId}
-                  type="text"
-                  onChange={(x) => this.setExtensionId(x, idx)}
-                  id={'vendor-extension-id-' + idx}
-                  name={'vendor-extension-id-' + idx}
-                  style={{ textAlign: 'left' }}
-                  isValid={!!ve.extensionId}
-                />
+          <React.Fragment>
+            {this.state.VendorExtensions.map((ve, idx) => (
+              <FormGroup key={`ve-${idx}`} fieldId={'ve-form-group-' + idx}>
+                <FormGroup fieldId={'vendor-extension-id-' + idx} label={'Extension Id ' + (idx + 1)}>
+                  <TextInput
+                    value={ve.extensionId || ''}
+                    type="text"
+                    onChange={(_event, x) => this.setExtensionId(x, idx)}
+                    id={'vendor-extension-id-' + idx}
+                    name={'vendor-extension-id-' + idx}
+                    style={{ textAlign: 'left', width: '100%' }}
+                    validated={!!ve.extensionId ? 'default' : 'error'}
+                  />
+                </FormGroup>
+                <FormGroup fieldId={'vendor-params-' + idx} label="Parameters" className="vendorParamsEntry">
+                  <ClipboardCopy
+                    id={'vendor-params-' + idx}
+                    variant={ClipboardCopyVariant.expansion}
+                    onChange={(_event, x) => this.setParameters(x as string, idx)}
+                  >
+                    {JSON.stringify(ve.parameters, null, ' ')}
+                  </ClipboardCopy>
+                  {this.state.parseValidationMessages[idx] && (
+                    <FormHelperText>
+                      <HelperText>
+                        <HelperTextItem variant={this.state.parseValidationMessages[idx] === '' ? 'default' : 'error'}>
+                          {this.state.parseValidationMessages[idx]}
+                        </HelperTextItem>
+                      </HelperText>
+                    </FormHelperText>
+                  )}
+                </FormGroup>
+                <Button id={'delete-ve-' + idx} onClick={() => this.deleteVendorExtension(idx)} variant="tertiary">
+                  Delete this Extension
+                </Button>
               </FormGroup>
-              <FormGroup
-                fieldId={'ve-form-group-' + idx}
-                label="Parameters"
-                className="vendorParamsEntry"
-                helperTextInvalid={this.state.parseValidationMessages[idx]}
-                validated={this.state.parseValidationMessages[idx] == '' ? 'success' : 'error'}
-              >
-                <ClipboardCopy
-                  id={'vendor-params-' + idx}
-                  variant={ClipboardCopyVariant.expansion}
-                  onChange={(x) => this.setParameters(x as string, idx)}
-                >
-                  {JSON.stringify(ve.parameters, null, ' ')}
-                </ClipboardCopy>
-              </FormGroup>
-              <Button id={'delete-ve-' + idx} onClick={() => this.deleteVendorExtension(idx)} variant="tertiary">
-                Delete this Extension
-              </Button>
-            </FormGroup>
-          ))}
-          <Button id="add-new-ve" onClick={() => this.addVendorExtension()} variant="tertiary">
+            ))}
+          </React.Fragment>
+          <Button key="add-new-ve" id="add-new-ve" onClick={() => this.addVendorExtension()} variant="tertiary">
             Add New Vendor Extension
           </Button>
         </GalleryItem>

@@ -3,7 +3,7 @@
 #ifndef CPOBG_SRC_CPOSQL_SQLSCOPEDCONNECTION_H_
 #define CPOBG_SRC_CPOSQL_SQLSCOPEDCONNECTION_H_
 
-//#include "cposql_export.h"
+// #include "cposql_export.h"
 #include <QScopedPointer>
 #include <QSqlDatabase>
 

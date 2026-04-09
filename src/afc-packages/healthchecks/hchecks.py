@@ -15,7 +15,6 @@ test
 import os
 import inspect
 import logging
-import sys
 import requests
 import socket
 from appcfg import HealthchecksMsghndCfgIface
@@ -34,7 +33,7 @@ class BasicHealthcheck():
                       f" url: {self.url}")
         result = 0
         try:
-            rawresp = requests.get(self.url)
+            rawresp = requests.get(self.url, timeout=30)
         except Exception as e:
             app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
                           f" exception: {type(e).__name__}")

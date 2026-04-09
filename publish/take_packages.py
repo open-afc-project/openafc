@@ -8,6 +8,7 @@ import os
 import argparse
 import re
 import shutil
+import tempfile
 import rpm
 import logging
 import time
@@ -120,6 +121,14 @@ def main(argv):
     # Error on duplicates
     seen_fullnames = {}
 
+    # Private snapshot directory for TOCTOU-safe validate-then-move
+    # (mirrors publish/breakpad_extract_rpm.py): the header is validated
+    # on a private copy and that same copy is moved into the output tree,
+    # so a concurrent writer on a shared staging filesystem cannot swap a
+    # hostile file over src_path between the include-list check and the
+    # move.
+    snap_dir = tempfile.mkdtemp(prefix='take_packages.')
+
     for inpath in args.inpath:
         LOGGER.info('Scanning input: %s', inpath)
         for (dirpath, dirnames, filenames) in os.walk(inpath):
@@ -131,7 +140,12 @@ def main(argv):
                 # get package info
                 src_path = os.path.join(dirpath, filename)
                 rel_path = os.path.relpath(src_path, inpath)
-                with open(src_path, 'rb') as rpmfile:
+                # Snapshot before validation: the bytes that are validated
+                # and the bytes that are moved must be the same object
+                # (TOCTOU guard, see snap_dir above).
+                snap_path = os.path.join(snap_dir, filename)
+                shutil.copy2(src_path, snap_path)
+                with open(snap_path, 'rb') as rpmfile:
                     try:
                         head = rpm_trans.hdrFromFdno(rpmfile.fileno())
                     except rpm.error as err:
@@ -150,9 +164,11 @@ def main(argv):
 
                 if not any_match(pkg_incl, fullname):
                     LOGGER.info('Ignoring name %s', fullname)
+                    os.remove(snap_path)
                     continue
                 if pkg_excl and any_match(pkg_excl, fullname):
                     LOGGER.info('Excluding name %s', fullname)
+                    os.remove(snap_path)
                     continue
 
                 # check for dupes
@@ -167,8 +183,26 @@ def main(argv):
                 dst_dir = os.path.dirname(dst_path)
                 if not os.path.exists(dst_dir):
                     os.makedirs(dst_dir)
+                # Collision check keyed on the actual output path: the
+                # fullname dupe check above cannot see two different
+                # packages at the same rel_path in different inpaths, and
+                # shutil.move (os.rename semantics on POSIX) would silently
+                # replace the earlier file - an output-path collision must
+                # be an error, not a substitution.
+                if os.path.lexists(dst_path):
+                    raise ValueError(
+                        'Output collision: "{0}" already exists; '
+                        'refusing to overwrite it with "{1}"'.format(
+                            dst_path, src_path))
                 LOGGER.info('Moving %s to %s', fullname, dst_path)
-                shutil.move(src_path, dst_path)
+                # Move the validated snapshot (not the by-path source,
+                # which a concurrent writer may have swapped since the
+                # header check) into the output tree, then remove the
+                # taken source file.
+                shutil.move(snap_path, dst_path)
+                os.remove(src_path)
+
+    shutil.rmtree(snap_dir, ignore_errors=True)
 
     unmatched = set()
     for matcher in pkg_incl:
