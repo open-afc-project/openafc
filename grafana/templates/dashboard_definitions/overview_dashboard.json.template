@@ -35,7 +35,7 @@
     },
 {%- if GRAFANA_COMPOSE_PROJECT_NAME is defined %}
     {
-      "datasource": "Docker",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -51,34 +51,23 @@
           "mappings": [
             {
               "options": {
-                "healthy": {
-                  "color": "dark-green",
-                  "index": 1
+                "-1": {
+                  "color": "dark-blue",
+                  "index": 2,
+                  "text": "no healthcheck"
                 },
-                "Restarting": {
-                  "color": "red",
-                  "index": 2
-                },
-                "starting": {
-                  "color": "dark-purple",
-                  "index": 3
-                },
-                "unhealthy": {
+                "0": {
                   "color": "dark-red",
-                  "index": 0
+                  "index": 0,
+                  "text": "unhealthy"
+                },
+                "1": {
+                  "color": "dark-green",
+                  "index": 1,
+                  "text": "healthy"
                 }
               },
               "type": "value"
-            },
-            {
-              "options": {
-                "match": "null",
-                "result": {
-                  "color": "dark-orange",
-                  "index": 3
-                }
-              },
-              "type": "special"
             }
           ],
           "noValue": "unknown",
@@ -96,7 +85,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Health"
+              "options": "Value"
             },
             "properties": [
               {
@@ -105,6 +94,10 @@
                   "applyToRow": true,
                   "type": "color-background"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Health"
               }
             ]
           }
@@ -132,48 +125,38 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "columns": [
-            { "selector": "Labels.com\\.docker\\.compose\\.service", "text": "Service", "type": "string" },
-            { "selector": "Status", "text": "Status", "type": "string" }
-          ],
-          "datasource": "Docker",
-          "filters": [],
+          "datasource": "Prometheus",
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (service) (container_health_state{project=\"{{ GRAFANA_COMPOSE_PROJECT_NAME }}\"})",
           "format": "table",
-          "global_query_id": "",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "url": "/containers/json?filters={\"label\":[\"com.docker.compose.project={{ GRAFANA_COMPOSE_PROJECT_NAME }}\"]}",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
+          "instant": true,
+          "legendFormat": "{% raw %}{{service}}{% endraw %}",
+          "range": false,
+          "refId": "A"
         }
       ],
       "title": "Services",
       "transformations": [
         {
-          "id": "extractFields",
-          "options": {
-            "source": "Status",
-            "format": "regex",
-            "regex": "^(?P<Up>[^(]+?)\\s*(?:\\((?P<Health>[^)]+)\\))?$"
-          }
-        },
-        {
           "id": "organize",
           "options": {
             "excludeByName": {
-              "Status": true
+              "Time": true,
+              "__name__": true,
+              "image": true,
+              "instance": true,
+              "job": true,
+              "name": true,
+              "project": true
             },
             "indexByName": {
-              "Service": 0,
-              "Up": 1,
-              "Health": 2
+              "service": 0,
+              "Value": 1
             },
-            "renameByName": {}
+            "renameByName": {
+              "service": "Service"
+            }
           }
         },
         {
@@ -181,7 +164,7 @@
           "options": {
             "fields": {},
             "sort": [
-              { "field": "Health", "desc": true }
+              { "field": "Value", "desc": false }
             ]
           }
         }

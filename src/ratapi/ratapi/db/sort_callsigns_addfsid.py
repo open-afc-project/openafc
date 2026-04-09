@@ -2,6 +2,17 @@ import csv
 import sys
 from os.path import exists
 
+_CSV_FORMULA_LEAD = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_safe(v):
+    """CWE-1236: neutralise CSV formula injection by quoting leading =+-@."""
+    s = str(v)
+    if s and s[0] in _CSV_FORMULA_LEAD:
+        return "'" + s
+    return s
+
+
 csmapA = {}  # Items stored in fsid table (currently FS in US)
 csmapB = {}  # Items not stored in fsid table (currently FS in CA)
 fsidmap = {}
@@ -108,7 +119,6 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                         callsignIdx = -1
                         pathIdx = -1
                         freqIdx = -1
-                        emdegIdx = -1
                         digitalModRateIdx = -1
                         txEirpIdx = -1
                         txGainIdx = -1
@@ -214,8 +224,8 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                             if filterMaxEIRPFlag:
                                 txEirp = float(r[txEirpIdx])
                                 if idx == 0 or txEirp > maxEirp:
-                                    maxEirp = txEirp
                                     maxEirpIdx = ri
+                                    maxEirp = txEirp
                         initFlag = True
                         recordNum = 1
                         for rate_idx in rate_idx_list:
@@ -225,7 +235,7 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                                 r = csmapA[keyv][ri]
                             else:
                                 r = csmapB[keyv][ri]
-                            if rate == 0.0:
+                            if abs(rate) < 1e-9:
                                 lowRateFlag = 2
                                 highRateFlag = 2
                             else:
@@ -265,9 +275,9 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                                         nextFSID += 1
                                         fsidTable.write(str(fsid) +
                                                         "," +
-                                                        keyv[0] +
+                                                        _csv_safe(keyv[0]) +
                                                         "," +
-                                                        keyv[1] +
+                                                        _csv_safe(keyv[1]) +
                                                         "," +
                                                         str(keyv[2]) +
                                                         "," +
@@ -280,7 +290,8 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                                     fsid = nextFSID
                                     nextFSID += 1
                                 r.insert(0, str(fsid))
-                                csvwriter.writerow(r)
+                                csvwriter.writerow(
+                                    [_csv_safe(c) for c in r])
 
                             recordNum = recordNum + 1
 

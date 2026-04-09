@@ -697,7 +697,8 @@ class CachedGdal : public CachedGdalBase
 					v = tileVector->at(pixelIndex);
 				}
 			}
-			if (ret && (std::isnan(v) || (v == static_cast<PixelData>(gdalNoData(band))))) {
+			if (ret &&
+			    (std::isnan(v) || (v == static_cast<PixelData>(gdalNoData(band))))) {
 				// If 'no-data' pixel was retrieved - count as failure
 				ret = false;
 			}

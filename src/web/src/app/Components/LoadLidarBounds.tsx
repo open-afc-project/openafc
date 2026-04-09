@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@patternfly/react-core';
 import { GeoJson } from '../Lib/RatApiTypes';
 import { guiConfig } from '../Lib/RatApi';
+import { apiFetch } from '../Lib/HttpClient';
 
 /**
  * React component that renders a button which loads LiDAR Bounds onto Google Maps feature list
@@ -12,9 +13,9 @@ class LoadLidarBounds extends React.Component<{ currentGeoJson: GeoJson; onLoad:
   }
 
   downloadFile = () => {
-    fetch(guiConfig.lidar_bounds).then(async (response) => {
+    apiFetch(guiConfig.lidar_bounds).then(async (response) => {
       const data: GeoJson = await response.json();
-      let newJson: GeoJson = JSON.parse(JSON.stringify(this.props.currentGeoJson));
+      const newJson: GeoJson = JSON.parse(JSON.stringify(this.props.currentGeoJson));
       newJson.features.push(...data.features);
       this.props.onLoad(newJson);
     });

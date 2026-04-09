@@ -4,6 +4,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <cmath>
+#include <stdexcept>
 
 #include "global_defines.h"
 #include "list.h"
@@ -15,6 +17,13 @@
 LinInterpClass::LinInterpClass(ListClass<DblDblClass> *dataList, double xshift, double yshift)
 {
 	n = dataList->getSize();
+	// n==1 → DVECTOR(n-1) == DVECTOR(0) returns NULL; a[0]/b[0] would
+	// then dereference NULL.  Linear interpolation requires at least 2
+	// data points.
+	if (n < 2) {
+		throw std::invalid_argument("LinInterpClass: data list must contain at least 2 "
+					    "points");
+	}
 
 	a = DVECTOR(n - 1);
 	b = DVECTOR(n - 1);
@@ -32,6 +41,12 @@ LinInterpClass::LinInterpClass(std::vector<std::tuple<double, double>> dataList,
 			       double yshift)
 {
 	n = dataList.size();
+	// See ListClass constructor: n<2 yields a NULL 'a' and 'b' from
+	// DVECTOR(n-1), which makelininterpcoeffs would then dereference.
+	if (n < 2) {
+		throw std::invalid_argument("LinInterpClass: data list must contain at least 2 "
+					    "points");
+	}
 
 	a = DVECTOR(n - 1);
 	b = DVECTOR(n - 1);
@@ -125,6 +140,9 @@ double LinInterpClass::lininterpval(double xpoint) const
 	int s = -1;
 	double h, z;
 
+	if (!std::isfinite(xpoint)) {
+		throw std::range_error("LinInterpClass::lininterpval: non-finite xpoint");
+	}
 	if ((xpoint >= x[0]) && (xpoint <= x[n - 1])) {
 		s = lininterp_getintindex(xpoint);
 	} else if (xpoint > x[n - 1]) {
@@ -132,12 +150,10 @@ double LinInterpClass::lininterpval(double xpoint) const
 	} else if (xpoint < x[0]) {
 		s = 0;
 	} else {
-		fprintf(stdout, "ERROR in routine lininterpval()\n");
-		fprintf(stdout, "input x out of range in lininterp evaluation routine.\n");
-		fprintf(stdout, "input x = %5.3f\n", xpoint);
-		fprintf(stdout, "first, last in array = %5.3f, %5.3f\n", x[0], x[n - 1]);
-		fprintf(stdout, "\n");
-		CORE_DUMP;
+		// Reachable only with a non-finite interpolation table (DB-derived
+		// data): reject via exception instead of a process abort.
+		throw std::range_error("LinInterpClass::lininterpval: non-finite "
+				       "interpolation table");
 	}
 
 	h = xpoint - x[s];
@@ -164,12 +180,10 @@ double LinInterpClass::lininterpDerivativeVal(double xpoint) const
 	} else if (xpoint < x[0]) {
 		s = 0;
 	} else {
-		fprintf(stdout, "ERROR in routine lininterpval()\n");
-		fprintf(stdout, "input x out of range in lininterp evaluation routine.\n");
-		fprintf(stdout, "input x = %5.3f\n", xpoint);
-		fprintf(stdout, "first, last in array = %5.3f, %5.3f\n", x[0], x[n - 1]);
-		fprintf(stdout, "\n");
-		CORE_DUMP;
+		// Reachable only with a non-finite xpoint or interpolation table:
+		// reject via exception instead of a process abort.
+		throw std::range_error("LinInterpClass::lininterpDerivativeVal: non-finite "
+				       "xpoint or interpolation table");
 	}
 
 	z = b[s];
@@ -184,12 +198,10 @@ int LinInterpClass::lininterp_getintindex(double xtest) const
 	int lowind, upind, testind, index;
 
 	if ((xtest < x[0]) || (xtest > x[n - 1])) {
-		fprintf(stdout, "ERROR in routine getintindex()\n");
-		fprintf(stdout, "input x out of range.\n");
-		fprintf(stdout, "x =%5.3f\n", xtest);
-		fprintf(stdout, "range = %5.3f, %5.3f\n", x[0], x[n - 1]);
-		fprintf(stdout, "\n");
-		CORE_DUMP;
+		// Out-of-range/non-finite lookup against a DB-derived table: reject
+		// via exception instead of a process abort.
+		throw std::range_error("LinInterpClass::lininterp_getintindex: input x out "
+				       "of range");
 	}
 
 	lowind = 0;

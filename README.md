@@ -34,6 +34,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
     - [docker-compose build and run](#docker-compose-build-and-run)
     - [Initial configuration and first user](#initial-configuration-and-first-user)
         - [Initial Super Administrator account](#initial-super-administrator-account)
+        - [Security hardening for production](#security-hardening-for-production)
     - [**Environment variables**](#environment-variables)
     - [RabbitMQ settings](#rabbitmq-settings)
     - [Managing the PostgreSQL database for users](#managing-the-postgresql-database-for-users)
@@ -48,23 +49,26 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 
 # **Introduction**
 
-This document describes the procedure for submitting the source code changes to the openAFC github project. Procedure described in this document requires access to the openAFC project and knowledge of the GIT usage. Please contact TBD@TBD.com in case you need access to the openAFC project.
+This document describes the procedure for submitting the source code changes to the openAFC github project. Procedure described in this document requires access to the openAFC project and knowledge of the GIT usage. Please file an issue or open a discussion at [https://github.com/open-afc-project/openafc](https://github.com/open-afc-project/openafc) if you need assistance.
 
 Github.com can be referred for [details of alternate procedures for creating the pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests), developers can use any of these methods but need to include change description as part of pull requests description.
 
 OpenAFC conforms to all the requirements from FCC per [6GHz Report & Order](https://docs.fcc.gov/public/attachments/DOC-363490A1.pdf) and FCC 47 CFR Part 15.407 for unlicensed standard power devices in the 6 GHz band.
 
-In addition, OpenAFC fully conforms to WinnForum’s Functional Requirements for the U.S. 6 GHz Band under the Control of an AFC System in WINNF-TS-1014-V1.4.0 ([https://6ghz.wirelessinnovation.org/baseline-standards](https://6ghz.wirelessinnovation.org/baseline-standards)). This includes some of the implementation details – for example correction of FS parameters in the ULS database, FS antenna pattern, FS noise power and feederloss to use, calculation of near-field adjustment factor, calculation of interference to FS links with passive sites and diversity receivers, path loss models and their parameters, etc.
+In addition, OpenAFC fully conforms to WinnForum’s Functional Requirements for the U.S. 6 GHz Band under the Control of an AFC System in WINNF-TS-1014-V1.5.0 ([https://6ghz.wirelessinnovation.org/baseline-standards](https://6ghz.wirelessinnovation.org/baseline-standards)). This includes some of the implementation details – for example correction of FS parameters in the ULS database, FS antenna pattern, FS noise power and feederloss to use, calculation of near-field adjustment factor, calculation of interference to FS links with passive sites and diversity receivers, path loss models and their parameters, etc.
 Finally, OpenAFC fully conforms to the implementation details specified in [WFA SUT Test Plan v1.5](https://www.wi-fi.org/file/afc-specification-and-test-plans).
 
 OpenAFC software deployment consists of multiple containers, and it can be deployed on a standalone system for test and development purposes via the provided docker-compose based solution. Instructions on how to build the containers and a sample docker-compose.yaml can be found in the [OpenAFC Engine Server usage in Docker Environment](#afc-engine-build-in-docker).
 
-OpenAFC software can also be deployed for production using the Kubernetes framework. Please refer to the readme-kubernetes.md for the instructions.
+OpenAFC software can also be deployed for production using the Kubernetes framework. Please refer to [`helm/README.md`](helm/README.md) for the Helm-based Kubernetes instructions.
 
 The sample docker-compose.yaml assumes that the required databases (e.g. terrain, landcover, winnforum databases, etc.) have been obtained and placed in an accessible folder according to the information in [database_readme.md](https://github.com/Telecominfraproject/open-afc/blob/main/database_readme.md) on Github.
 Many of the components have additional README files inside folders that describe the additional configuration for each component. Default values are provided either inside the component or in the sample files that will work to stand up the system.
 
 Note that this sample does not provide working SSL certificates for authentication to the server.
+
+> **New deployers:** See [**DEPLOYMENT.md**](DEPLOYMENT.md) for a complete step-by-step deployer guide covering secret generation, certificate creation, first-time initialisation, and deployment validation.  
+> See [**SECURITY.md**](SECURITY.md) for the security reference: credential defaults, how to rotate each secret, and mTLS configuration.
 
 <br /><br />
 
@@ -238,7 +242,7 @@ docker build . -t msghnd -f msghnd/Dockerfile
 
 docker build . -t ratdb -f ratdb/Dockerfile
 
-docler build . -t objst -f objstorage/Dockerfile
+docker build . -t objst -f objstorage/Dockerfile
 
 docker build . -t rmq -f rabbitmq/Dockerfile
 
@@ -343,6 +347,12 @@ In order to run the system you will need to
 - Set up a local set of secrets containing various passwords and other private information. See the [secrets readme](/tools/secrets/README.md) for details
 - Data mappings as described in [Data mappings](#data-mappings)
 
+For a complete step-by-step guide covering all of the above, see [**DEPLOYMENT.md**](DEPLOYMENT.md).
+
+### Security hardening for production
+
+See [**SECURITY.md**](SECURITY.md) for the complete security reference: which credentials must be replaced before production, what the system does if defaults are left in place, how to rotate each secret, and mTLS configuration.
+
 Just run in this folder following command and it is done:
 
 ```
@@ -428,6 +438,8 @@ chown -R 1003:1003 /var/databases /var/afc_config
 
 ## Initial configuration and first user
 
+> For a guided walkthrough, see [**DEPLOYMENT.md — Steps 7–8**](DEPLOYMENT.md#7-start-the-stack).
+
 On the first start of the PostgreSQL server there are some initial steps to do. First to create the database. Its default name now is **fbrat**. If you are using compose script described above, everything will be done automatically to prepare the database for intialization.
 
 After that, once OpenAFC server is started, you need to create DB structure for the user database. This can be done using a _rat-manage-api_ utility.
@@ -464,9 +476,15 @@ this means you are in.
 
 By default, the login uses non OIDC login method which manages user accounts locally. You can use the following command to create an administrator for your OpenAFC server.
 
+```bash
+echo "Enter Your Password Here" | \
+    rat-manage-api user create \
+        --role Super --role Admin --role AP --role Analysis \
+        --password-file /dev/stdin \
+        admin
 ```
-rat-manage-api user create --role Super --role Admin --role AP --role Analysis admin "Enter Your Password Here"
-```
+
+Or omit `--password-file` to be prompted interactively.
 
 Once done, you can authorize with this user and password in WebUI.
 To exit the console press Ctrl+D or type the 'exit' command.
@@ -481,7 +499,8 @@ If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Lo
 |BROKER_TYPE|`internal`|rat-server,msghnd,worker|whether `internal` or `external` AFC RMQ service used|
 |BROKER_PROT|`amqp`|rat-server,msghnd,worker|what protocol used for AFC RMQ service|
 |BROKER_USER|`celery`|rat-server,msghnd,worker|user used for AFC RMQ service|
-|BROKER_PWD|`celery`|rat-server,msghnd,worker|password used for AFC RMQ service|
+|BROKER_PWD|**no default — must be set**|rat-server,msghnd,worker|password used for AFC RMQ service; CRITICAL warning logged if unset or if the known default `celery` is detected|
+|RCACHE_RMQ_PWD|**no default — must be set**|rmq,rcache|password for the RabbitMQ rcache user; must match the password embedded in `RCACHE_RMQ_DSN`|
 |BROKER_FQDN|`localhost`|rat-server,msghnd,worker|IP/domain name of AFC RMQ service|
 |BROKER_PORT|`5672`|rat-server,msghnd,worker|port of AFC RMQ service|
 |RMQ_LOG_CONSOLE_LEVEL|warning|rmq|RabbitMQ console log level (debug, info, warning, error, critical, none)|
@@ -495,7 +514,7 @@ If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Lo
 |AFC_OBJST_HIST_PORT|`4999`|objst,rat-server,msghnd,worker|history service port|
 |AFC_OBJST_WORKERS|`10`|objst|number of gunicorn workers running objst server|
 |AFC_OBJST_HIST_WORKERS|`2`|objst|number of gunicorn workers runnining history server|
-|**MSGHND settings**||||
+|**MSGHND settings**||| `msghnd` is an alternative AFC request server. It is only started when the `msghnd` Compose profile is active (`COMPOSE_PROFILES=msghnd`) **and** `AFC_REQ_SERVER=msghnd`. The default request server is `afcserver` (FastAPI); `msghnd` is the legacy Gunicorn-based handler.|
 |AFC_MSGHND_BIND|`0.0.0.0`|msghnd|the socket to bind. a string of the form: <host>|
 |AFC_MSGHND_PORT|`8000`|msghnd|the port to use in bind. a string of the form: <port>|
 |AFC_MSGHND_PID|`/run/gunicorn/openafc_app.pid`|msghnd|a filename to use for the PID file|
@@ -536,6 +555,10 @@ If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Lo
 |AFC_WEBUI_NAME|rat_server|dispatcher|WebUI service hostname|
 |AFC_WEBUI_PORT|80|dispatcher|WebUI service HTTP Port|
 |AFC_ENFORCE_HTTPS|TRUE|dispatcher|Wether to enforce forwarding of HTTP requests to HTTPS. TRUE - for enable, everything else - to disable|
+||AFC_ENFORCE_MTLS|FALSE|dispatcher, afcserver|Set to `true` to require a valid mTLS client certificate on every AP-AFC request. When `true`, the dispatcher returns HTTP 403 and the afcserver rejects requests lacking a mTLS-DN header. Default `false` (certificate optional).|
+||**Security settings**||||
+||AFC_INTERNAL_TOKEN|**no default — must be set**|afcserver, msghnd, worker, rat_server|Shared secret for intra-cluster calls from msghnd/worker → afcserver’s internal endpoint. **MUST be set to a random value in production.** The server returns HTTP 403 if a placeholder default value is detected; a CRITICAL warning is also logged at startup. Generate with: `python3 -c "import secrets; print(secrets.token_hex(32))"`.|
+||AFC_ENABLE_TEST_CERTS|`""` (disabled)|afcserver, msghnd, rat_server|Set to `"1"`, `"true"`, or `"yes"` only for test/development. Accepts development test credentials without database registration. **MUST be disabled (unset or empty) in production.** If enabled at startup, a CRITICAL warning is logged.|
 |AFC_SERVER_NAME|"\_"|dispatcher|Hostname of the AFC Server, for example - "openafc.tip.build". "\_" - will accept any hostname (but this is not secure)|
 |**RCACHE settings**||||
 |RCACHE_ENABLED|TRUE|rcache, rat_server, msghnd, worker, uls_downloader|TRUE if Rcache enabled, FALSE to use legacy objstroage response cache|
@@ -579,8 +602,8 @@ Following the list of environment variables you may configure a server to use 'e
 ```
 BROKER_TYPE = external
 BROKER_PROT = amqp
-BROKER_USER = celery
-BROKER_PWD  = celery
+BROKER_USER = <your broker username>
+BROKER_PWD  = <your broker password>
 BROKER_FQDN = <ip address>
 BROKER_PORT = 5672
 BROKER_MNG_PORT = 15672
@@ -598,7 +621,20 @@ Following the example to use RabbitMQ service in docker-compose.
 
 ### Upgrading PostgresSQL
 
-When PostgreSQL is upgraded the pgdata should be converted to be compatible with the new PostgreSQL version. It can be done by tools/db_tools/update_db.sh script.
+**For PostgreSQL 14 → 17 upgrades on Docker-based deployments** see the comprehensive
+[PostgreSQL-upgrade.md](PostgreSQL-upgrade.md) guide which covers:
+
+- automated dump-and-restore via `scripts/upgrade_pg_production.sh` (recommended, 2–30 min downtime)
+- step-by-step manual procedure with rollback instructions
+- dry-run mode to verify the plan before any changes are made
+- post-upgrade verification and cleanup
+
+PostgreSQL 14 reaches **end-of-life on 9 November 2026**.
+
+#### Legacy in-place upgrade (pgdata dir)
+
+For older deployments that mount a raw `pgdata` directory (not Docker volumes), the legacy
+upgrade tool is still available:
 
 ```
 tools/db_tools/update_db.sh [pgdata_dir] [postgres_password] [old_postgres_version] [new_postgres_version]
@@ -650,9 +686,13 @@ rat-manage-api user update --role Admin --role AP --role Analysis --email "user@
 
 Create user with user create command. If org argument is not given, the organization can be derived from the username if it's given in the form of an email address e.g.:
 
-```
-rat-manage-api user create --role Admin --role AP --role Analysis --org mycompany.com "username" "mypassword'
-
+```bash
+echo "mypassword" | \
+    rat-manage-api user create \
+        --role Admin --role AP --role Analysis \
+        --org mycompany.com \
+        --password-file /dev/stdin \
+        username
 ```
 
 ## User roles

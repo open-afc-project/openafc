@@ -1,0 +1,121 @@
+#
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+# Hash-pinned via `pip download --dest /tmp/pkgs -r requirements.txt`
+# then sha256sum for each artifact (python:3.12-alpine, musllinux_1_2_x86_64).
+# Regenerate with:
+#   docker run --rm -v "$(pwd)/rcache/requirements.txt:/req.txt:ro"
+#     python:3.12-alpine sh -c
+#     "pip download -q --no-cache-dir --dest /p -r /req.txt 2>/dev/null &&
+#      for f in /p/*.whl /p/*.tar.gz; do
+#        [ -f \"\$f\" ] || continue
+#        n=\$(basename \"\$f\")
+#        h=\$(sha256sum \"\$f\" | cut -d' ' -f1)
+#        echo \"  \$n: sha256:\$h\"
+#      done"
+# then rebuild the hash lines below.
+#
+# Direct dependencies (pin order preserved):
+aiohttp==3.14.3
+
+
+
+alembic==1.19.1
+
+asyncpg==0.31.0
+
+# Pinned to Alpine 3.21 librdkafka-dev==2.6.1; upgrade only when Alpine ships librdkafka>=2.7
+confluent-kafka==2.15.0
+
+fastapi==0.141.1
+
+GeoAlchemy2==0.20.0
+
+greenlet==3.5.5
+
+matplotlib==3.11.1
+
+psycopg2-binary==2.9.12
+
+pydantic==2.13.5
+
+pydantic-settings==2.15.0
+
+python_dateutil==2.9.0.post0
+
+requests==2.34.2
+
+SQLAlchemy==2.0.52
+
+tabulate==0.10.0
+
+uvicorn==0.52.4
+
+# Transitive dependencies (resolved by pip download on python:3.12-alpine):
+aiohappyeyeballs==2.7.1
+
+aiosignal==1.4.0
+
+annotated-doc==0.0.5
+
+annotated-types==0.8.0
+
+anyio==4.14.2
+
+attrs==26.1.0
+
+certifi==2026.7.22
+
+charset-normalizer==3.5.1
+
+click==8.5.0
+
+contourpy==1.3.3
+
+cycler==0.12.1
+
+fonttools==4.64.0
+
+frozenlist==1.8.0
+
+h11==0.16.0
+
+idna==3.19
+
+kiwisolver==1.5.1
+
+Mako==1.4.1
+
+MarkupSafe==3.0.3
+
+multidict==6.7.1
+
+numpy==2.5.0
+
+packaging==26.3
+
+pillow==12.3.0
+
+propcache==0.5.2
+
+pydantic-core==2.48.0
+
+pyparsing==3.3.2
+
+python-dotenv==1.2.3
+
+six==1.17.0
+
+starlette==1.6.0
+
+typing-extensions==4.16.0
+
+typing-inspection==0.4.4
+
+urllib3==2.7.0
+
+yarl==1.24.5
+

@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   AvailableSpectrumInquiryRequest,
   LinearPolygon,
@@ -15,6 +15,8 @@ import {
 import { logger } from '../Lib/Logger';
 import {
   Modal,
+  ModalBody,
+  ModalFooter,
   Button,
   ClipboardCopy,
   ClipboardCopyVariant,
@@ -22,14 +24,16 @@ import {
   Gallery,
   GalleryItem,
   FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
   TextInput,
   InputGroup,
   InputGroupText,
   FormSelect,
   FormSelectOption,
-  ChipGroup,
-  Chip,
-  SelectOption,
+  LabelGroup,
+  Label,
   Tooltip,
   TooltipPosition,
 } from '@patternfly/react-core';
@@ -160,6 +164,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
         location: location,
         indoorDeployment: location?.indoorDeployment,
         minDesiredPower: params?.minDesiredPower,
+        // @ts-ignore
         operatingClasses: this.toOperatingClassArray(params?.inquiredChannels),
         inquiredFrequencyRange: params.inquiredFrequencyRange,
         vendorExtensions: params.vendorExtensions,
@@ -224,6 +229,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
           : [],
     }) as AvailableSpectrumInquiryRequest;
 
+  // @ts-ignore
   private fromOperatingClass(oc: OperatingClass) {
     switch (oc.include) {
       case OperatingClassIncludeType.None:
@@ -381,8 +387,11 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
       const location = { ...this.state.location };
       location.ellipse = {
         center: center,
+        // @ts-ignore
         majorAxis: location.ellipse.majorAxis,
+        // @ts-ignore
         minorAxis: location.ellipse.minorAxis,
+        // @ts-ignore
         orientation: location.ellipse.orientation,
       };
       this.setState({ location: location });
@@ -398,26 +407,29 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
       <>
         <Modal
           title="Copy/Paste"
-          isLarge={true}
+          variant="large"
           isOpen={this.state.isModalOpen}
           onClose={() => this.setState({ isModalOpen: false })}
-          actions={[
+        >
+          <ModalBody>
+            <ClipboardCopy
+              variant={ClipboardCopyVariant.expansion}
+              // @ts-ignore
+              onChange={(_event: any, text: string | number) => this.setConfig(String(text).trim())}
+              aria-label="text area"
+            >
+              {JSON.stringify(this.getParamsJSON())}
+            </ClipboardCopy>
+          </ModalBody>
+          <ModalFooter>
             <Button key="update" variant="primary" onClick={() => this.setState({ isModalOpen: false })}>
               Close
-            </Button>,
-          ]}
-        >
-          <ClipboardCopy
-            variant={ClipboardCopyVariant.expansion}
-            onChange={(text: string | number) => this.setConfig(String(text).trim())}
-            aria-label="text area"
-          >
-            {JSON.stringify(this.getParamsJSON())}
-          </ClipboardCopy>
+            </Button>
+          </ModalFooter>
         </Modal>
-        <Gallery gutter="sm">
+        <Gallery hasGutter>
           <GalleryItem>
-            <FormGroup label="Serial Number" fieldId="horizontal-form-name" helperText="Must be unique for every AP">
+            <FormGroup label="Serial Number" fieldId="horizontal-form-name">
               {' '}
               <Tooltip
                 position={TooltipPosition.top}
@@ -457,25 +469,24 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                 <></>
               )}
               <TextInput
-                value={this.state.serialNumber}
+                value={this.state.serialNumber ?? ''}
                 type="text"
                 id="horizontal-form-name"
                 aria-describedby="horizontal-form-name-helper"
                 name="horizontal-form-name"
-                onChange={(x) => this.setState({ serialNumber: x })}
-                isValid={!!this.state.serialNumber}
+                onChange={(_event, x) => this.setState({ serialNumber: x })}
+                validated={!!this.state.serialNumber ? 'default' : 'error'}
                 style={{ textAlign: 'right' }}
               />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>Must be unique for every AP</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
           </GalleryItem>
           <GalleryItem>
-            <FormGroup
-              label="Certification Id"
-              fieldId="horizontal-form-certification-id"
-              helperTextInvalid="Provide at least one Certification Id"
-              // helperTextInvalidIcon={<ExclamationCircleIcon />} //This is not supported in our version of Patternfly
-              validated={this.state.certificationId.length > 0 ? 'success' : 'error'}
-            >
+            <FormGroup label="Certification Id" fieldId="horizontal-form-certification-list">
               {' '}
               <Tooltip
                 position={TooltipPosition.top}
@@ -513,13 +524,13 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
               ) : (
                 <></>
               )}
-              <ChipGroup aria-orientation="vertical">
+              <LabelGroup>
                 {this.state.certificationId.map((currentCid) => (
-                  <Chip width="100%" key={currentCid.id} onClick={() => this.deleteCertifcationId(currentCid.id)}>
+                  <Label key={currentCid.id} onClose={() => this.deleteCertifcationId(currentCid.id)}>
                     {currentCid.rulesetId + ' ' + currentCid.id}
-                  </Chip>
+                  </Label>
                 ))}
-              </ChipGroup>
+              </LabelGroup>
               <div>
                 {' '}
                 <Button
@@ -539,7 +550,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                 <FormSelect
                   label="Ruleset"
                   value={this.state.newCertificationRulesetId}
-                  onChange={(x) => this.setState({ newCertificationRulesetId: x })}
+                  onChange={(_event, x) => this.setState({ newCertificationRulesetId: x })}
                   type="text"
                   step="any"
                   id="horizontal-form-certification-nra"
@@ -555,54 +566,71 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
 
                 <TextInput
                   label="Id"
-                  value={this.state.newCertificationId}
-                  onChange={(x) => this.setState({ newCertificationId: x })}
+                  value={this.state.newCertificationId ?? ''}
+                  onChange={(_event, x) => this.setState({ newCertificationId: x })}
                   type="text"
                   step="any"
                   id="horizontal-form-certification-list"
                   name="horizontal-form-certification-list"
-                  style={{ textAlign: 'left' }}
+                  style={{ textAlign: 'left', width: '100%' }}
                   placeholder="Id"
                 />
               </div>
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant={this.state.certificationId.length > 0 ? 'default' : 'error'}>
+                    Provide at least one Certification Id
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
           </GalleryItem>
           <LocationForm location={this.state.location} onChange={(x) => this.setState({ location: x })} />
           <GalleryItem>
-            <FormGroup
-              label={
-                this.props.limit.enforce
-                  ? 'Minimum Desired EIRP (Min: ' + this.props.limit.limit + ' dBm)'
-                  : 'Minimum Desired EIRP'
-              }
-              fieldId="horizontal-form-min-eirp"
-            >
-              <InputGroup>
-                <TextInput
-                  value={this.state.minDesiredPower}
-                  onChange={(x) => ifNum(x, (n) => this.setState({ minDesiredPower: n }))}
-                  type="number"
-                  step="any"
-                  id="horizontal-form-min-eirp"
-                  name="horizontal-form-min-eirp"
-                  isValid={
-                    this.props.limit.enforce
-                      ? this.state.minDesiredPower === undefined || this.state.minDesiredPower >= this.props.limit.limit
-                      : this.state.minDesiredPower === undefined || this.state.minDesiredPower >= 0
-                  }
-                  style={{ textAlign: 'right' }}
-                />
-                <InputGroupText>dBm</InputGroupText>
-              </InputGroup>
-            </FormGroup>
+            {(() => {
+              const isIndoor = this.state.indoorDeployment === 2;
+              const enforce = isIndoor ? this.props.limit.indoorEnforce : this.props.limit.outdoorEnforce;
+              const limitValue = isIndoor ? this.props.limit.indoorLimit : this.props.limit.outdoorLimit;
+              return (
+                <FormGroup
+                  label={enforce ? 'Minimum Desired EIRP (Min: ' + limitValue + ' dBm)' : 'Minimum Desired EIRP'}
+                  fieldId="horizontal-form-min-eirp"
+                >
+                  <InputGroup>
+                    <TextInput
+                      value={this.state.minDesiredPower ?? ''}
+                      onChange={(_event, x) => ifNum(x, (n) => this.setState({ minDesiredPower: n }))}
+                      type="number"
+                      step="any"
+                      id="horizontal-form-min-eirp"
+                      name="horizontal-form-min-eirp"
+                      // @ts-ignore
+                      validated={
+                        enforce
+                          ? this.state.minDesiredPower === undefined || this.state.minDesiredPower >= limitValue
+                            ? 'default'
+                            : 'error'
+                          : this.state.minDesiredPower === undefined || this.state.minDesiredPower >= 0
+                            ? 'default'
+                            : 'error'
+                      }
+                      style={{ textAlign: 'right' }}
+                    />
+                    <InputGroupText>dBm</InputGroupText>
+                  </InputGroup>
+                </FormGroup>
+              );
+            })()}
           </GalleryItem>
           <GalleryItem>
             <FormGroup label="Indoor Deployment" fieldId="horizontal-form-indoor-deployment">
               <InputGroup>
                 <FormSelect
-                  value={this.state.indoorDeployment}
-                  onChange={(x: string) => x !== undefined && this.setState({ indoorDeployment: Number.parseInt(x) })}
-                  isValid={this.state.indoorDeployment !== undefined}
+                  value={this.state.indoorDeployment ?? ''}
+                  onChange={(_event: any, x: string) =>
+                    x !== undefined && this.setState({ indoorDeployment: Number.parseInt(x) })
+                  }
+                  validated={this.state.indoorDeployment !== undefined ? 'default' : 'error'}
                   id="horizontal-form-indoor-deployment"
                   name="horizontal-form-indoor-deployment"
                 >
@@ -624,6 +652,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
           </GalleryItem>
           <GalleryItem>
             <InquiredFrequencyForm
+              // @ts-ignore
               inquiredFrequencyRange={this.state.inquiredFrequencyRange}
               onChange={(x) => this.setState({ inquiredFrequencyRange: x.inquiredFrequencyRange })}
             ></InquiredFrequencyForm>
@@ -659,11 +688,8 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                         </FormGroup>*/}
           </GalleryItem>
         </Gallery>
-        <FormGroup
-          label="Inquired Channel(s)"
-          fieldId="horizontal-form-operating-class"
-          className="inquiredChannelsSection"
-        >
+        <fieldset style={{ border: 'none', padding: 0, margin: 0 }} className="inquiredChannelsSection">
+          <legend>Inquired Channel(s)</legend>
           <Gallery className="nestedGallery" width={'1200px'}>
             {this.state.operatingClasses.map((e, i) => (
               <OperatingClassForm
@@ -673,13 +699,14 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
               ></OperatingClassForm>
             ))}
           </Gallery>
-        </FormGroup>
-        <FormGroup label="Vendor Extensions" fieldId="form-vendor-extensions" className="vendorExtensionSection">
+        </fieldset>
+        <fieldset style={{ border: 'none', padding: 0, margin: 0 }} className="vendorExtensionSection">
+          <legend>Vendor Extensions</legend>
           <VendorExtensionForm
             VendorExtensions={this.state.vendorExtensions}
             onChange={this.setVendorExtensions}
           ></VendorExtensionForm>
-        </FormGroup>
+        </fieldset>
 
         <br />
         {this.state.status === 'Error' && (
@@ -687,15 +714,14 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
             <pre>{this.state.message}</pre>
           </Alert>
         )}
-        <br />
-        <>
+        <div className="afc-button-group--row afc-button-group--after-form">
           <Button variant="primary" isDisabled={this.state.submitting} onClick={() => this.submit()}>
             Send Request
-          </Button>{' '}
+          </Button>
           <Button key="open-modal" variant="secondary" onClick={() => this.copyPasteClick()}>
             Copy/Paste
           </Button>
-        </>
+        </div>
       </>
     );
   }

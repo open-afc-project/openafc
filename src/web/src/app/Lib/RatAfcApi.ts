@@ -7,6 +7,7 @@ import {
 } from './RatAfcTypes';
 import { RatResponse, success, error } from './RatApiTypes';
 import { guiConfig, getDefaultAfcConf, getCSRF } from './RatApi';
+import { apiFetch } from './HttpClient';
 
 /**
  * RatAfcApi.ts
@@ -19,9 +20,9 @@ import { guiConfig, getDefaultAfcConf, getCSRF } from './RatApi';
 export const spectrumInquiryRequest = async (
   request: AvailableSpectrumInquiryRequest,
 ): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> => {
-  let csrf_token = getCSRF();
+  const csrf_token = getCSRF();
 
-  let resp = await fetch(guiConfig.rat_afc + '?debug=True&gui=True', {
+  const resp = await apiFetch(guiConfig.rat_afc + '?debug=True&gui=True', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -40,7 +41,8 @@ export const spectrumInquiryRequest = async (
       return error(response.response.shortDescription, response.response.responseCode, response);
     }
   } else {
-    return error(resp.statusText, resp.status, resp);
+    const bodyText = await resp.text().catch(() => '');
+    return error(bodyText || resp.statusText, resp.status, resp);
   }
 };
 
@@ -48,8 +50,8 @@ export const spectrumInquiryRequestByString = async (
   version: string,
   requestAsJsonString: string,
 ): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> => {
-  let csrf_token = getCSRF();
-  let resp = await fetch(guiConfig.rat_afc + '?debug=True&gui=True', {
+  const csrf_token = getCSRF();
+  const resp = await apiFetch(guiConfig.rat_afc + '?debug=True&gui=True', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -67,7 +69,8 @@ export const spectrumInquiryRequestByString = async (
       return error(response.response.shortDescription, response.response.responseCode, response);
     }
   } else {
-    return error(resp.statusText, resp.status, resp);
+    const bodyText = await resp.text().catch(() => '');
+    return error(bodyText || resp.statusText, resp.status, resp);
   }
 };
 
@@ -76,7 +79,7 @@ export const spectrumInquiryRequestByString = async (
  */
 export function downloadMapData(kml_filename: any, method: string): Promise<Response> {
   var url = guiConfig.afc_kml.replace('p_kml_file', kml_filename);
-  return fetch(url, {
+  return apiFetch(url, {
     method: method,
     headers: {
       'Content-Type': 'application/json',

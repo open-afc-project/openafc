@@ -23,7 +23,10 @@ module.exports = merge(common, {
   plugins: [
     new HtmlWebpackPlugin({
       template: "@ADD_DIST_LIB_SOURCECOPY@/src/index.html",
-      title: "AFC"
+      title: "AFC",
+      minify: {
+        removeComments: false,
+      }
     }),
     new MiniCssExtractPlugin({
       filename: "[name].css",
@@ -32,6 +35,15 @@ module.exports = merge(common, {
   ],
   module: {
     rules: [
+      {
+        // @patternfly/react-styles declares sideEffects:["*.css"] in package.json,
+        // which implicitly marks .mjs files as side-effect-free. That causes webpack
+        // to tree-shake the `import './page.css'` calls inside every .mjs module,
+        // so no component CSS ever gets injected.  This rule overrides that declaration
+        // for the react-styles CSS namespace so the CSS imports are preserved.
+        include: /node_modules\/@patternfly\/react-styles\/css\//,
+        sideEffects: true,
+      },
       {
         test: /\.css$/,
         include: (input) => {

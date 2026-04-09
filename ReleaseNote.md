@@ -1,5 +1,26 @@
 # Release Note
 ## **Version and Date**
+|Version|**467**|
+| :- | :- |
+|**Date**|**11/23/2026**|
+
+## **Issues Addressed**
+ * 437: Return unauthorized for unauthenticated Debug Files requests and restrict CSRF cookie creation to authenticated sessions.
+ * 443: Add support for external WIF files in ULS processing.
+ * 450: Add OIDC support for WebUI-mode tests and database initialization checks.
+ * 460: Add role-gated monitoring navigation links and compose-profile support.
+ * 467: Update Python, JavaScript, TypeScript dependencies and Docker base images.
+
+## **Interface Changes**
+ * No public API changes identified for this release.
+
+## **Testing Done**
+ * Release build and production migration validation are pending.
+
+## **Open Issues**
+ * Production PostgreSQL 14-to-17 migration requires staging rehearsal before cutover.
+
+## **Version and Date**
 |Version|**430**|
 | :- | :- |
 |**Date**|**07/07/2026**|

@@ -7,6 +7,7 @@
 #include <QColor>
 #include <iomanip>
 #include <exception>
+#include <stdexcept>
 #include <tuple>
 #include "GdalHelpers.h"
 
@@ -352,7 +353,22 @@ double *computeElevationVector(const TerrainClass *terrain,
 	MultibandRasterClass::HeightResult lidarHeightResult;
 	CConst::HeightSourceEnum heightSource;
 
+	// numpts derives from operator-configurable ITM parameters (minSpacing /
+	// maxPoints); clamp the lower bound so a malformed value cannot drive a
+	// negative/zero-size profile (a negative numpts converts to a huge
+	// size_t in the calloc below, and numpts - 1 divides ret[1]).
+	if (numpts < 2) {
+		numpts = 2;
+	}
+
 	// QVector<QPointF> latlons = computeApproximateGreatCircleLine(from, to, numpts, &tdist);
+	// Guard: numpts == 1 (path shorter than the ITM min spacing) makes the
+	// profile spacing tdist / (numpts - 1) divide by zero, and the great
+	// circle interpolation below divide 0/0, poisoning the ITM path loss
+	// with inf/NaN. Clamp so the profile always has at least two points.
+	if (numpts < 2) {
+		numpts = 2;
+	}
 	QVector<QPointF> latlons = computeGreatCircleLineMM(from, to, numpts, &tdist);
 
 	double bldgDistRes = 1.0; // 1 meter
@@ -364,6 +380,10 @@ double *computeElevationVector(const TerrainClass *terrain,
 	// printf("Returned %d points instead of %d.\n", latlons.count(), numpts);
 
 	double *ret = (double *)calloc(sizeof(double), numpts + 2);
+	if (ret == NULL) {
+		throw std::runtime_error("computeElevationVector(): cannot "
+					 "allocate elevation profile");
+	}
 	ret[0] = numpts - 1;
 	ret[1] = (tdist / (numpts - 1)) * 1000.0;
 
@@ -475,7 +495,7 @@ double *computeElevationVector(const TerrainClass *terrain,
 		if (numpts < 3) {
 			*cdsmFracPtr = 0.0;
 		} else {
-			*cdsmFracPtr = cdsmCount / (numpts - 2);
+			*cdsmFracPtr = static_cast<double>(cdsmCount) / (numpts - 2);
 		}
 	}
 
@@ -640,6 +660,13 @@ bool isLOS(const TerrainClass *terrain,
 							   numpts,
 							   cdsmFracPtr);
 	}
+
+	// The profile may be cached from an earlier call that computed it with a
+	// different point count (the caller recomputes numpts per path). Bind the
+	// index bounds to the buffer's self-describing header (ret[0] = numpts - 1,
+	// see computeElevationVector), as point_to_point does, so a larger
+	// recomputed numpts cannot index past the allocation.
+	numpts = (int)((*heightProfilePtr)[0]) + 1;
 
 	double txHeightAMSL = (*heightProfilePtr)[2] + transHt;
 	double rxHeightAMSL = (*heightProfilePtr)[2 + numpts - 1] + receiveHt;

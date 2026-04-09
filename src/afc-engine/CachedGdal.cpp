@@ -328,6 +328,7 @@ bool CachedGdalBase::findTile(int band, double latDeg, double lonDeg)
 	    (_tileCache.recentValue()->boundRect.contains(latDeg, lonDeg)) &&
 	    (_tileCache.recentValue()->gdalInfo->boundRect.contains(latDeg, lonDeg)) &&
 	    (_tileCache.recentKey()->band == band)) {
+		_recentGdalInfo = _tileCache.recentValue()->gdalInfo;
 		return true;
 	}
 	// Will look up in cache. First need to find pixel whereabouts in file
@@ -344,6 +345,7 @@ bool CachedGdalBase::findTile(int band, double latDeg, double lonDeg)
 			gdalInfo->baseName);
 	// Trying to bring tile from cache
 	if (_tileCache.get(tileKey)) {
+		_recentGdalInfo = _tileCache.recentValue()->gdalInfo;
 		return true;
 	}
 	// Tile not in cache - will add it. First building TileInfo object
