@@ -15,6 +15,7 @@ on:
 # Need ID token write permission to use OIDC
 permissions:
   id-token: write
+  contents: read
 
 # limit to 1 job at a time, others will be queued
 concurrency:
