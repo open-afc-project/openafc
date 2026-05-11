@@ -41,6 +41,6 @@ pyxdg==0.28
 requests==2.32.5
 six==1.16.0
 SQLAlchemy==1.4.54
-urllib3==2.6.3
+urllib3==2.7.0
 Werkzeug==3.1.5
 WsgiDAV==4.3.3
