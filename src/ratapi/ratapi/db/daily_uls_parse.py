@@ -145,6 +145,8 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
 # Downloads antenna files
 
 # Retrieves the most recent download from the passed region
+
+
 def getMostRecentRegionDownload(region, fullPathSaveDir):
     regionSaveParentDir = os.path.join(fullPathSaveDir, region)
 
@@ -155,7 +157,7 @@ def getMostRecentRegionDownload(region, fullPathSaveDir):
 
     if existingBackups:
         existingBackups.sort()
-        
+
         mostRecentName = existingBackups[-1]
         mostRecentPath = os.path.join(regionSaveParentDir, mostRecentName)
         return mostRecentPath
@@ -163,6 +165,8 @@ def getMostRecentRegionDownload(region, fullPathSaveDir):
         return None
     
 # Replaces the region data with the most recent backup found in the saved directory
+
+
 def replaceRegionDataWithLastSuccess(region, fullPathSaveDir, fullPathTempDir):
     destDir = os.path.join(fullPathTempDir, region)
 
@@ -174,14 +178,17 @@ def replaceRegionDataWithLastSuccess(region, fullPathSaveDir, fullPathTempDir):
     shutil.copytree(srcDir, destDir)
 
 # Handles a failure of a region, returning or crashing based on the passed flag
+
+
 def handleRegionFailure(region, regionFailureFlag, fullPathSaveDir, fullPathTempDir):
     if not regionFailureFlag:
         print(f"Attempting to replace the failed download of region: {region} with last success.")
         replaceRegionDataWithLastSuccess(region, fullPathSaveDir, fullPathTempDir)
         print(f"Replacement Successful.")
-        return True # Original Download has failed
+        return True  # Original Download has failed
     else:
         raise RuntimeError(f"Previously successful data has failed.")
+
 
 def prepareAFCGitHubFiles(rawDir, destDir, logFile):
     # Files in rawDir are downloaded from
@@ -648,15 +655,14 @@ def daily_uls_parse(state_root, interactive):
     for region in regionList:
         try:
             #######################################################################
-            # If interactive, prompt for downloading of data files for region         #
+            # If interactive, prompt for downloading of data files for region     #
             #######################################################################
             if wfaFlag:
                 downloadDataFilesFlag = False
             elif interactive:
                 accepted = False
                 while not accepted:
-                    value = input("Download data files for " +
-                                region + "? (y/n): ")
+                    value = input("Download data files for " + region + "? (y/n): ")
                     if value == "y":
                         accepted = True
                         downloadDataFilesFlag = True
@@ -664,14 +670,13 @@ def daily_uls_parse(state_root, interactive):
                         accepted = True
                         downloadDataFilesFlag = False
                     else:
-                        print("ERROR: Invalid input: " +
-                            value + ", must be y or n")
+                        print("ERROR: Invalid input: " + value + ", must be y or n")
             else:
                 downloadDataFilesFlag = True
             #######################################################################
 
             #######################################################################
-            # If downloadDataFilesFlag set, download data files for region            #
+            # If downloadDataFilesFlag set, download data files for region        #
             #######################################################################
             if downloadDataFilesFlag:
                 downloadFiles(region, logFile, currentWeekday, fullPathTempDir)
@@ -681,7 +686,7 @@ def daily_uls_parse(state_root, interactive):
 
             if region == 'US':
                 ###################################################################
-                # If interactive, prompt for extraction of files from zip files           #
+                # If interactive, prompt for extraction of files from zip files   #
                 ###################################################################
                 if wfaFlag:
                     extractZipFlag = True
@@ -693,8 +698,7 @@ def daily_uls_parse(state_root, interactive):
                     elif value == "n":
                         extractZipFlag = False
                     else:
-                        print("ERROR: Invalid input: " +
-                            value + ", must be y or n")
+                        print("ERROR: Invalid input: " + value + ", must be y or n")
                 else:
                     extractZipFlag = True
                 ###################################################################
@@ -705,7 +709,7 @@ def daily_uls_parse(state_root, interactive):
                 if extractZipFlag:
                     extractZips(logFile, regionDataDir)
                 ###################################################################
-        except:
+        except Exception as e:
             if region == 'US':
                 didUSFail = handleRegionFailure(region, didUSFail, fullPathSaveDir, fullPathTempDir)
             elif region == 'CA':
@@ -793,16 +797,16 @@ def daily_uls_parse(state_root, interactive):
     if processAntFilesFlag:
         try:
             processAntFiles(fullPathTempDir, processCA, combineAntennaRegionFlag,
-                                fullPathTempDir + '/antenna_model_list.csv',
-                                fullPathTempDir + '/antenna_prefix_list.csv',
-                                fullPathAntennaPatternFile, logFile)
-        except:
+                            fullPathTempDir + '/antenna_model_list.csv',
+                            fullPathTempDir + '/antenna_prefix_list.csv',
+                            fullPathAntennaPatternFile, logFile)
+        except Exception as e:
             # Only CA is accessed so the assumption is CA Failed
             didCAFail = handleRegionFailure('CA', didCAFail, fullPathSaveDir, fullPathTempDir)
             processAntFiles(fullPathTempDir, processCA, combineAntennaRegionFlag,
-                                fullPathTempDir + '/antenna_model_list.csv',
-                                fullPathTempDir + '/antenna_prefix_list.csv',
-                                fullPathAntennaPatternFile, logFile)
+                            fullPathTempDir + '/antenna_model_list.csv',
+                            fullPathTempDir + '/antenna_prefix_list.csv',
+                            fullPathAntennaPatternFile, logFile)
     ###########################################################################
 
     ###########################################################################
@@ -858,7 +862,7 @@ def daily_uls_parse(state_root, interactive):
                     rasDataFileUSSrc = root + '/data_files/RASdatabase.dat'
                     rasDataFileUSTgt = regionDataDir + '/weekly/RA.dat_withDaily'
                     logFile.write("Copying " + rasDataFileUSSrc +
-                                ' to ' + rasDataFileUSTgt + '\n')
+                                  ' to ' + rasDataFileUSTgt + '\n')
                     subprocess.call(['cp', rasDataFileUSSrc, rasDataFileUSTgt])
 
                     # generate the combined csv/txt file for the coalition uls
@@ -867,9 +871,9 @@ def daily_uls_parse(state_root, interactive):
                         regionDataDir + '/weekly',
                         logFile,
                         fullPathCoalitionScriptInput)
-                except: 
+                except Exception as e: 
                     didUSFail = handleRegionFailure(region, didUSFail, fullPathSaveDir, fullPathTempDir)
-                    
+
                     weeklyCreation = verifyCountsFile(regionDataDir + '/weekly')
                     uploadTime = processDailyFiles(
                         weeklyCreation, logFile, regionDataDir, currentWeekday)
@@ -878,7 +882,7 @@ def daily_uls_parse(state_root, interactive):
                     rasDataFileUSSrc = root + '/data_files/RASdatabase.dat'
                     rasDataFileUSTgt = regionDataDir + '/weekly/RA.dat_withDaily'
                     logFile.write("Copying " + rasDataFileUSSrc +
-                                ' to ' + rasDataFileUSTgt + '\n')
+                                  ' to ' + rasDataFileUSTgt + '\n')
                     subprocess.call(['cp', rasDataFileUSSrc, rasDataFileUSTgt])
                     generateUlsScriptInputUS(
                         regionDataDir + '/weekly',
@@ -890,7 +894,7 @@ def daily_uls_parse(state_root, interactive):
                 try:
                     dataIdentity = generateUlsScriptInputCA(
                         regionDataDir, logFile, fullPathCoalitionScriptInput)
-                except:
+                except Exception as e:
                     didCAFail = handleRegionFailure(region, didCAFail, fullPathSaveDir, fullPathTempDir)
                     dataIdentity = generateUlsScriptInputCA(
                         regionDataDir, logFile, fullPathCoalitionScriptInput)
@@ -1210,7 +1214,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-r', '--region', default='US:CA',
                         help='":" separated list of regions')
-    parser.add_argument('-s_dir', '--saved_dir', default=None,
+    parser.add_argument('-s_dir', '--save_dir', default=None,
                         help='Location of the saves')
 
     args = parser.parse_args()
@@ -1252,10 +1256,10 @@ if __name__ == '__main__':
     print("WFA = " + str(wfaFlag))
 
     regionList = args.region.split(':')
-    
+
     backupDir = None
-    if args.saved_dir is not None:
-        backupDir = str(args.saved_dir)
+    if args.save_dir is not None:
+        backupDir = str(args.save_dir)
         print("Backups are expected to be located at " + str(backupDir))
 
     processUS = False

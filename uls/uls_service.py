@@ -616,19 +616,20 @@ def update_uls_file(uls_dir: str, uls_file: str, symlink: str,
     logging.info(f"FS database symlink '{os.path.join(uls_dir, symlink)}' "
                  f"now points to '{uls_file}'")
     
+
 def save_recent_download(regions, num_of_saves, recent_download_dir: str, saved_download_dir: str) -> None:
     """ Handles the saving and storage of the country downloads
 
     Arguments:
-    regions  -- List of regions to saves 
-    uls_file -- Base name of new ULS file (already in ULS directory)
-    symlink  -- Base name of symlink pointing to current ULS file
-    executor -- LoggingExecutor object
+    regions  -- List of regions to saves
+    num_of_saves -- Number of backups to save
+    recent_download_dir  -- Location of where the most recent download took place
+    saved_download_dir -- Location of where to save the backups
     """
     startTime = datetime.datetime.now()
     nameTime = startTime.isoformat(timespec='seconds').replace(":", '_')
     newSaveName = f"{nameTime}"
-    
+
     for region in regions:
         regionDataDir = os.path.join(recent_download_dir, region)
         regionSaveParentDir = os.path.join(saved_download_dir, region)
@@ -636,20 +637,20 @@ def save_recent_download(regions, num_of_saves, recent_download_dir: str, saved_
         shutil.copytree(regionDataDir, saveDir)
 
         existingBackups = [
-            d for d in os.listdir(regionSaveParentDir) 
+            d for d in os.listdir(regionSaveParentDir)
             if os.path.isdir(os.path.join(regionSaveParentDir, d))
         ]
-        
+
         existingBackups.sort()
-        
+
         while len(existingBackups) > num_of_saves:
-            oldestBackupName = existingBackups.pop(0) 
+            oldestBackupName = existingBackups.pop(0)
             oldest_backup_path = os.path.join(regionSaveParentDir, oldestBackupName)
-            
+
             shutil.rmtree(oldest_backup_path)
 
     logging.info(f"Successfully saved the recent downloads to backups for: "
-                                 f"{', '.join(sorted(regions))}")
+                 f"{', '.join(sorted(regions))}")
 
 
 class DbDiff:
@@ -1042,11 +1043,11 @@ def main(argv: List[str]) -> None:
         f"before downloading){env_help(Settings, 'temp_dir')}")
     argument_parser.add_argument(
         "--save_dir", metavar="SAVE_DIR",
-        help=f"Directory containing downloader's saved files "
+        help=f"Directory containing uls downloader's previously successful downloaded region files"
         f"per region){env_help(Settings, 'save_dir')}")
     argument_parser.add_argument(
         "--num_save", metavar="NUM_SAVE",
-        help=f"Number of saved prior downloads "
+        help=f"Number of successful region files prior downloads expected"
         f"expected ){env_help(Settings, 'num_saves')}")
     argument_parser.add_argument(
         "--ext_db_dir", metavar="EXTERNAL_DATABASE_DIR",
@@ -1408,7 +1409,7 @@ def main(argv: List[str]) -> None:
                                      db_diff.diff_tiles[: 1000]]
                                 rcache.rcache_spatial_invalidate(
                                     tiles=db_diff.diff_tiles)
-                        
+
                         # Upon success, save the new region files
                         if settings.force:
                             # Saves regardless of new data
