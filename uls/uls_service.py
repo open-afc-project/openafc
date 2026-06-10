@@ -98,6 +98,13 @@ class Settings(pydantic.BaseSettings):
             "/mnt/nfs/rat_transfer/daily_uls_parse/temp/", env="ULS_TEMP_DIR",
             description="Temporary directory of ULS download script, cleaned "
             "before downloading")
+    save_dir: str = \
+        pydantic.Field(
+            "/rat_transfer/daily_uls_parse/country_history/", env="ULS_SAVE_DIR",
+            description="Directory where download script puts downloaded file for country")
+    num_saves: Optional[int] = \
+        pydantic.Field(3, env="NUM_SAVE",
+                       description="Number of backup saved for data")
     ext_db_dir: str = \
         pydantic.Field(
             ..., env="ULS_EXT_DB_DIR",
@@ -608,6 +615,41 @@ def update_uls_file(uls_dir: str, uls_file: str, symlink: str,
         fail_on_error=True)
     logging.info(f"FS database symlink '{os.path.join(uls_dir, symlink)}' "
                  f"now points to '{uls_file}'")
+    
+def save_recent_download(regions, num_of_saves, recent_download_dir: str, saved_download_dir: str) -> None:
+    """ Handles the saving and storage of the country downloads
+
+    Arguments:
+    regions  -- List of regions to saves 
+    uls_file -- Base name of new ULS file (already in ULS directory)
+    symlink  -- Base name of symlink pointing to current ULS file
+    executor -- LoggingExecutor object
+    """
+    startTime = datetime.datetime.now()
+    nameTime = startTime.isoformat(timespec='seconds').replace(":", '_')
+    newSaveName = f"{nameTime}"
+    
+    for region in regions:
+        regionDataDir = os.path.join(recent_download_dir, region)
+        regionSaveParentDir = os.path.join(saved_download_dir, region)
+        saveDir = os.path.join(regionSaveParentDir, newSaveName)
+        shutil.copytree(regionDataDir, saveDir)
+
+        existingBackups = [
+            d for d in os.listdir(regionSaveParentDir) 
+            if os.path.isdir(os.path.join(regionSaveParentDir, d))
+        ]
+        
+        existingBackups.sort()
+        
+        while len(existingBackups) > num_of_saves:
+            oldestBackupName = existingBackups.pop(0) 
+            oldest_backup_path = os.path.join(regionSaveParentDir, oldestBackupName)
+            
+            shutil.rmtree(oldest_backup_path)
+
+    logging.info(f"Successfully saved the recent downloads to backups for: "
+                                 f"{', '.join(sorted(regions))}")
 
 
 class DbDiff:
@@ -999,6 +1041,14 @@ def main(argv: List[str]) -> None:
         help=f"Directory containing downloader's temporary files (cleared "
         f"before downloading){env_help(Settings, 'temp_dir')}")
     argument_parser.add_argument(
+        "--save_dir", metavar="SAVE_DIR",
+        help=f"Directory containing downloader's saved files "
+        f"per region){env_help(Settings, 'save_dir')}")
+    argument_parser.add_argument(
+        "--num_save", metavar="NUM_SAVE",
+        help=f"Number of saved prior downloads "
+        f"expected ){env_help(Settings, 'num_saves')}")
+    argument_parser.add_argument(
         "--ext_db_dir", metavar="EXTERNAL_DATABASE_DIR",
         help=f"Directory where new ULS databases should be copied. If "
         f"--ext_db_symlink contains path, this parameter is root directory "
@@ -1235,6 +1285,7 @@ def main(argv: List[str]) -> None:
                 cmdline_args.append(settings.download_script)
                 if settings.region:
                     cmdline_args += ["--region", settings.region]
+                cmdline_args += ["--saved_dir", settings.save_dir]
                 if settings.download_script_args:
                     cmdline_args.append(settings.download_script_args)
                 logging.info(f"Starting {' '.join(cmdline_args)}")
@@ -1357,6 +1408,14 @@ def main(argv: List[str]) -> None:
                                      db_diff.diff_tiles[: 1000]]
                                 rcache.rcache_spatial_invalidate(
                                     tiles=db_diff.diff_tiles)
+                        
+                        # Upon success, save the new region files
+                        if settings.force:
+                            # Saves regardless of new data
+                            save_recent_download(set(new_uls_identity.keys()), settings.num_saves, settings.temp_dir, settings.save_dir)
+                        else:
+                            # Saves based on new data
+                            save_recent_download(updated_regions, settings.num_saves, settings.temp_dir, settings.save_dir)
 
                         # Update data change times (for health checker)
                         status_updater.milestone(
