@@ -151,7 +151,7 @@ def getMostRecentRegionDownload(region, fullPathSaveDir):
     regionSaveParentDir = os.path.join(fullPathSaveDir, region)
 
     existingBackups = [
-        d for d in os.listdir(regionSaveParentDir) 
+        d for d in os.listdir(regionSaveParentDir)
         if os.path.isdir(os.path.join(regionSaveParentDir, d))
     ]
 
@@ -163,7 +163,7 @@ def getMostRecentRegionDownload(region, fullPathSaveDir):
         return mostRecentPath
     else:
         return None
-    
+
 # Replaces the region data with the most recent backup found in the saved directory
 
 
@@ -714,7 +714,7 @@ def daily_uls_parse(state_root, interactive):
                 didUSFail = handleRegionFailure(region, didUSFail, fullPathSaveDir, fullPathTempDir)
             elif region == 'CA':
                 didCAFail = handleRegionFailure(region, didCAFail, fullPathSaveDir, fullPathTempDir)
-            
+
     ###########################################################################
     # If interactive, prompt for converting AFC GitHub data files            #
     ###########################################################################
@@ -871,7 +871,7 @@ def daily_uls_parse(state_root, interactive):
                         regionDataDir + '/weekly',
                         logFile,
                         fullPathCoalitionScriptInput)
-                except Exception as e: 
+                except Exception as e:
                     didUSFail = handleRegionFailure(region, didUSFail, fullPathSaveDir, fullPathTempDir)
 
                     weeklyCreation = verifyCountsFile(regionDataDir + '/weekly')

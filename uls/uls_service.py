@@ -615,7 +615,7 @@ def update_uls_file(uls_dir: str, uls_file: str, symlink: str,
         fail_on_error=True)
     logging.info(f"FS database symlink '{os.path.join(uls_dir, symlink)}' "
                  f"now points to '{uls_file}'")
-    
+
 
 def save_recent_download(regions, num_of_saves, recent_download_dir: str, saved_download_dir: str) -> None:
     """ Handles the saving and storage of the country downloads
@@ -1286,7 +1286,7 @@ def main(argv: List[str]) -> None:
                 cmdline_args.append(settings.download_script)
                 if settings.region:
                     cmdline_args += ["--region", settings.region]
-                cmdline_args += ["--saved_dir", settings.save_dir]
+                cmdline_args += ["--save_dir", settings.save_dir]
                 if settings.download_script_args:
                     cmdline_args.append(settings.download_script_args)
                 logging.info(f"Starting {' '.join(cmdline_args)}")
