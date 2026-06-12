@@ -48,7 +48,7 @@ jobs:
 
 # sign into AWS
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v5.1.0
+      uses: aws-actions/configure-aws-credentials@v6.1.0
       with:
         aws-region: us-east-1
         role-to-assume: ${{ secrets.RKF_AWS_CONTROL_ROLE_ARN }}
