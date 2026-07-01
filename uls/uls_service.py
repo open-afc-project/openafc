@@ -1047,7 +1047,7 @@ def main(argv: List[str]) -> None:
         f"per region){env_help(Settings, 'save_dir')}")
     argument_parser.add_argument(
         "--num_save", metavar="NUM_SAVE",
-        help=f"Number of successful region files prior downloads expected"
+        help=f"Number of previously successful region files to save"
         f"expected ){env_help(Settings, 'num_saves')}")
     argument_parser.add_argument(
         "--ext_db_dir", metavar="EXTERNAL_DATABASE_DIR",
