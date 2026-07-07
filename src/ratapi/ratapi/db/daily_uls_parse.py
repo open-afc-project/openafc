@@ -144,6 +144,51 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
 
 # Downloads antenna files
 
+# Retrieves the most recent download from the passed region
+
+
+def getMostRecentRegionDownload(region, fullPathSaveDir):
+    regionSaveParentDir = os.path.join(fullPathSaveDir, region)
+
+    existingBackups = [
+        d for d in os.listdir(regionSaveParentDir)
+        if os.path.isdir(os.path.join(regionSaveParentDir, d))
+    ]
+
+    if existingBackups:
+        existingBackups.sort()
+
+        mostRecentName = existingBackups[-1]
+        mostRecentPath = os.path.join(regionSaveParentDir, mostRecentName)
+        return mostRecentPath
+    else:
+        return None
+
+# Replaces the region data with the most recent backup found in the saved directory
+
+
+def replaceRegionDataWithLastSuccess(region, fullPathSaveDir, fullPathTempDir):
+    destDir = os.path.join(fullPathTempDir, region)
+
+    srcDir = getMostRecentRegionDownload(region, fullPathSaveDir)
+    if srcDir is None:
+        raise FileNotFoundError(f"Backup directory does not exist.")
+    if os.path.exists(destDir):
+        shutil.rmtree(destDir)
+    shutil.copytree(srcDir, destDir)
+
+# Handles a failure of a region, returning or crashing based on the passed flag
+
+
+def handleRegionFailure(region, regionFailureFlag, fullPathSaveDir, fullPathTempDir):
+    if not regionFailureFlag:
+        print(f"Attempting to replace the failed download of region: {region} with last success.")
+        replaceRegionDataWithLastSuccess(region, fullPathSaveDir, fullPathTempDir)
+        print(f"Replacement Successful.")
+        return True  # Original Download has failed
+    else:
+        raise RuntimeError(f"Previously successful data has failed.")
+
 
 def prepareAFCGitHubFiles(rawDir, destDir, logFile):
     # Files in rawDir are downloaded from
@@ -475,7 +520,7 @@ def generateUlsScriptInputStatic(staticDataFile, logFile, genFilename):
 
 
 def storeDataIdentities(sqlFile, identityDict):
-    """ Stores region data identities in gewnerated SQLite database.
+    """ Stores region data identities in generated SQLite database.
     For FCC ULS identity is upload datetime, for Canada SMS, for now, sadly,
     only an MD5 of downloaded files.
 
@@ -509,6 +554,11 @@ def daily_uls_parse(state_root, interactive):
     nameTime += "_UniiUS" + uniiStr.replace(":", "")
 
     temp = "/temp"
+
+    save = "/country_history"
+
+    didCAFail = False
+    didUSFail = False
 
     root = state_root + "/daily_uls_parse"  # root so path is consisent
 
@@ -545,6 +595,9 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
 
     fullPathTempDir = root + temp
+    fullPathSaveDir = root + save
+    if backupDir is not None:
+        fullPathSaveDir = backupDir
 
     ###########################################################################
     # If interactive, prompt for removal of temp directory                    #
@@ -600,65 +653,67 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
 
     for region in regionList:
-
-        #######################################################################
-        # If interactive, prompt for downloading of data files for region         #
-        #######################################################################
-        if wfaFlag:
-            downloadDataFilesFlag = False
-        elif interactive:
-            accepted = False
-            while not accepted:
-                value = input("Download data files for " +
-                              region + "? (y/n): ")
-                if value == "y":
-                    accepted = True
-                    downloadDataFilesFlag = True
-                elif value == "n":
-                    accepted = True
-                    downloadDataFilesFlag = False
-                else:
-                    print("ERROR: Invalid input: " +
-                          value + ", must be y or n")
-        else:
-            downloadDataFilesFlag = True
-        #######################################################################
-
-        #######################################################################
-        # If downloadDataFilesFlag set, download data files for region            #
-        #######################################################################
-        if downloadDataFilesFlag:
-            downloadFiles(region, logFile, currentWeekday, fullPathTempDir)
-        #######################################################################
-
-        regionDataDir = fullPathTempDir + '/' + region
-
-        if region == 'US':
-            ###################################################################
-            # If interactive, prompt for extraction of files from zip files           #
-            ###################################################################
+        try:
+            #######################################################################
+            # If interactive, prompt for downloading of data files for region     #
+            #######################################################################
             if wfaFlag:
-                extractZipFlag = True
+                downloadDataFilesFlag = False
             elif interactive:
-                value = input(
-                    "Extract FCC files from downloaded zip files? (y/n): ")
-                if value == "y":
-                    extractZipFlag = True
-                elif value == "n":
-                    extractZipFlag = False
-                else:
-                    print("ERROR: Invalid input: " +
-                          value + ", must be y or n")
+                accepted = False
+                while not accepted:
+                    value = input("Download data files for " + region + "? (y/n): ")
+                    if value == "y":
+                        accepted = True
+                        downloadDataFilesFlag = True
+                    elif value == "n":
+                        accepted = True
+                        downloadDataFilesFlag = False
+                    else:
+                        print("ERROR: Invalid input: " + value + ", must be y or n")
             else:
-                extractZipFlag = True
-            ###################################################################
+                downloadDataFilesFlag = True
+            #######################################################################
 
-            ###################################################################
-            # If extractZipFlag set, extract files from zip files                     #
-            ###################################################################
-            if extractZipFlag:
-                extractZips(logFile, regionDataDir)
-            ###################################################################
+            #######################################################################
+            # If downloadDataFilesFlag set, download data files for region        #
+            #######################################################################
+            if downloadDataFilesFlag:
+                downloadFiles(region, logFile, currentWeekday, fullPathTempDir)
+            #######################################################################
+
+            regionDataDir = fullPathTempDir + '/' + region
+
+            if region == 'US':
+                ###################################################################
+                # If interactive, prompt for extraction of files from zip files   #
+                ###################################################################
+                if wfaFlag:
+                    extractZipFlag = True
+                elif interactive:
+                    value = input(
+                        "Extract FCC files from downloaded zip files? (y/n): ")
+                    if value == "y":
+                        extractZipFlag = True
+                    elif value == "n":
+                        extractZipFlag = False
+                    else:
+                        print("ERROR: Invalid input: " + value + ", must be y or n")
+                else:
+                    extractZipFlag = True
+                ###################################################################
+
+                ###################################################################
+                # If extractZipFlag set, extract files from zip files                     #
+                ###################################################################
+                if extractZipFlag:
+                    extractZips(logFile, regionDataDir)
+                ###################################################################
+        except Exception as e:
+            if region == 'US':
+                didUSFail = handleRegionFailure(region, didUSFail, fullPathSaveDir, fullPathTempDir)
+            elif region == 'CA':
+                didCAFail = handleRegionFailure(region, didCAFail, fullPathSaveDir, fullPathTempDir)
 
     ###########################################################################
     # If interactive, prompt for converting AFC GitHub data files            #
@@ -740,10 +795,18 @@ def daily_uls_parse(state_root, interactive):
     # antenna_model_list.csv                                                  #
     ###########################################################################
     if processAntFilesFlag:
-        processAntFiles(fullPathTempDir, processCA, combineAntennaRegionFlag,
-                        fullPathTempDir + '/antenna_model_list.csv',
-                        fullPathTempDir + '/antenna_prefix_list.csv',
-                        fullPathAntennaPatternFile, logFile)
+        try:
+            processAntFiles(fullPathTempDir, processCA, combineAntennaRegionFlag,
+                            fullPathTempDir + '/antenna_model_list.csv',
+                            fullPathTempDir + '/antenna_prefix_list.csv',
+                            fullPathAntennaPatternFile, logFile)
+        except Exception as e:
+            # Only CA is accessed so the assumption is CA Failed
+            didCAFail = handleRegionFailure('CA', didCAFail, fullPathSaveDir, fullPathTempDir)
+            processAntFiles(fullPathTempDir, processCA, combineAntennaRegionFlag,
+                            fullPathTempDir + '/antenna_model_list.csv',
+                            fullPathTempDir + '/antenna_prefix_list.csv',
+                            fullPathAntennaPatternFile, logFile)
     ###########################################################################
 
     ###########################################################################
@@ -786,31 +849,55 @@ def daily_uls_parse(state_root, interactive):
             dataIdentity = None
 
             if region == 'US':
-                # US files (FCC) consist of weekly and daily updates.
-                # get the time creation of weekly file from the counts file
-                weeklyCreation = verifyCountsFile(regionDataDir + '/weekly')
-                # process the daily files day by day
-                uploadTime = processDailyFiles(
-                    weeklyCreation, logFile, regionDataDir, currentWeekday)
-                # For US identity is FCC ULS upoload datetime
-                dataIdentity = uploadTime.isoformat()
+                try:
+                    # US files (FCC) consist of weekly and daily updates.
+                    # get the time creation of weekly file from the counts file
+                    weeklyCreation = verifyCountsFile(regionDataDir + '/weekly')
+                    # process the daily files day by day
+                    uploadTime = processDailyFiles(
+                        weeklyCreation, logFile, regionDataDir, currentWeekday)
+                    # For US identity is FCC ULS upoload datetime
+                    dataIdentity = uploadTime.isoformat()
 
-                rasDataFileUSSrc = root + '/data_files/RASdatabase.dat'
-                rasDataFileUSTgt = regionDataDir + '/weekly/RA.dat_withDaily'
-                logFile.write("Copying " + rasDataFileUSSrc +
-                              ' to ' + rasDataFileUSTgt + '\n')
-                subprocess.call(['cp', rasDataFileUSSrc, rasDataFileUSTgt])
+                    rasDataFileUSSrc = root + '/data_files/RASdatabase.dat'
+                    rasDataFileUSTgt = regionDataDir + '/weekly/RA.dat_withDaily'
+                    logFile.write("Copying " + rasDataFileUSSrc +
+                                  ' to ' + rasDataFileUSTgt + '\n')
+                    subprocess.call(['cp', rasDataFileUSSrc, rasDataFileUSTgt])
 
-                # generate the combined csv/txt file for the coalition uls
-                # processor
-                generateUlsScriptInputUS(
-                    regionDataDir + '/weekly',
-                    logFile,
-                    fullPathCoalitionScriptInput)
+                    # generate the combined csv/txt file for the coalition uls
+                    # processor
+                    generateUlsScriptInputUS(
+                        regionDataDir + '/weekly',
+                        logFile,
+                        fullPathCoalitionScriptInput)
+                except Exception as e:
+                    didUSFail = handleRegionFailure(region, didUSFail, fullPathSaveDir, fullPathTempDir)
+
+                    weeklyCreation = verifyCountsFile(regionDataDir + '/weekly')
+                    uploadTime = processDailyFiles(
+                        weeklyCreation, logFile, regionDataDir, currentWeekday)
+                    dataIdentity = uploadTime.isoformat()
+
+                    rasDataFileUSSrc = root + '/data_files/RASdatabase.dat'
+                    rasDataFileUSTgt = regionDataDir + '/weekly/RA.dat_withDaily'
+                    logFile.write("Copying " + rasDataFileUSSrc +
+                                  ' to ' + rasDataFileUSTgt + '\n')
+                    subprocess.call(['cp', rasDataFileUSSrc, rasDataFileUSTgt])
+                    generateUlsScriptInputUS(
+                        regionDataDir + '/weekly',
+                        logFile,
+                        fullPathCoalitionScriptInput)
+
             elif region == 'CA':
                 # For Canada identity is MD5 of downloaded files
-                dataIdentity = generateUlsScriptInputCA(
-                    regionDataDir, logFile, fullPathCoalitionScriptInput)
+                try:
+                    dataIdentity = generateUlsScriptInputCA(
+                        regionDataDir, logFile, fullPathCoalitionScriptInput)
+                except Exception as e:
+                    didCAFail = handleRegionFailure(region, didCAFail, fullPathSaveDir, fullPathTempDir)
+                    dataIdentity = generateUlsScriptInputCA(
+                        regionDataDir, logFile, fullPathCoalitionScriptInput)
             else:
                 logFile.write('ERROR: Invalid region = ' + region)
                 raise e
@@ -1127,6 +1214,8 @@ if __name__ == '__main__':
 
     parser.add_argument('-r', '--region', default='US:CA',
                         help='":" separated list of regions')
+    parser.add_argument('-s_dir', '--save_dir', default=None,
+                        help='Location of the saves')
 
     args = parser.parse_args()
     interactive = args.interactive
@@ -1167,6 +1256,11 @@ if __name__ == '__main__':
     print("WFA = " + str(wfaFlag))
 
     regionList = args.region.split(':')
+
+    backupDir = None
+    if args.save_dir is not None:
+        backupDir = str(args.save_dir)
+        print("Backups are expected to be located at " + str(backupDir))
 
     processUS = False
     processCA = False
