@@ -1,5 +1,22 @@
 # Release Note
 ## **Version and Date**
+|Version|**430*|
+| :- | :- |
+|**Date**|**07/07/2026**|
+
+## **Issues Addressed**
+ * 430: Update ULS Downloader to process countries independently
+ * The issue was addressed by saving the latest error-free database (for both Countries X and Y) so that if the next download from Country X is erroneous, the latest error-free database of Country X plus the most current download of the Country Y are used.
+
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Tested by triggering a relevant error within each try catch, such as passing incorrect data through overwriting. 
+ * Tested by taking downloaded data from a successful run and modifying it to contain formatting errors to see if the process was able to handle a crash if the download was successful, but mistakes such as the | appearing occurred. 
+
+## **Open Issues** 
+
 |Version|**406*|
 | :- | :- |
 |**Date**|**11/11/2025**|
