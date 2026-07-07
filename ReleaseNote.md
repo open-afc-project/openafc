@@ -1,6 +1,6 @@
 # Release Note
 ## **Version and Date**
-|Version|**430*|
+|Version|**430**|
 | :- | :- |
 |**Date**|**07/07/2026**|
 
