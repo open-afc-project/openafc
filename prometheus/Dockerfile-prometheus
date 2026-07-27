@@ -5,7 +5,11 @@
 # a copy of which is included with this software program
 #
 
-FROM ubuntu/prometheus:2.46.0-22.04_stable
+FROM ubuntu/prometheus:2.53.3-24.04_stable@sha256:e945d24df7b2f591c056a84af143dd13ac9132aa353c14a9bd71bec6faf0b966
+# Vulnerability notes (no ubuntu/prometheus image fix published):
+#   Pending upstream fixes for several reported vulnerabilities.
+#   Accepted: Prometheus web UI is not exposed externally, and remote-read endpoint
+#   is not used in this deployment.
 
 # Database directory. May be mapped to something external for persistence.
 # Evaluated in entrypoint.sh (i.e. not baked-in)
@@ -31,7 +35,7 @@ RUN apt install -y curl
 
 WORKDIR /prometheus
 
-COPY prometheus.yml /prometheus/
+COPY prometheus.yml rules.yml /prometheus/
 COPY prometheus_entrypoint.sh /prometheus
 RUN chmod +x /prometheus/prometheus_entrypoint.sh
 

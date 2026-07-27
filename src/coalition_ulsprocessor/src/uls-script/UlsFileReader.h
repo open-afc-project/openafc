@@ -33,6 +33,8 @@
 class UlsFileReader
 {
 	public:
+		// Per-callsign record cap to bound linear-scan complexity in processUS().
+		static const int MAX_RECORDS_PER_CALLSIGN = 256;
 		UlsFileReader(const char *filePath,
 			      FILE *fwarn,
 			      bool alignFederatedFlag,
@@ -174,6 +176,11 @@ class UlsFileReader
 
 		QList<RASClass> RASList;
 
+		// Callsigns whose per-key lists hit the cap.
+		// processUS() omits any path whose callsign appears here so that
+		// only fully-intact callsign records contribute to the output.
+		QSet<QString> overCapCallsigns;
+
 	private:
 		void readIndividualHeaderUS(const std::vector<std::string> &fieldList);
 		void readIndividualPathUS(const std::vector<std::string> &fieldList);
@@ -203,9 +210,9 @@ class UlsFileReader
 		void readTransmitterCA(const std::vector<std::string> &fieldList, FILE *fwarn);
 
 		void readStationDataStatic(const std::vector<std::string> &fieldList,
-				       FILE *fwarn,
-				       bool alignFederatedFlag,
-				       double alignFederatedScale);
+					   FILE *fwarn,
+					   bool alignFederatedFlag,
+					   double alignFederatedScale);
 
 		QList<UlsPath> allPaths;
 		QList<UlsEmission> allEmissions;
@@ -228,6 +235,7 @@ class UlsFileReader
 		QHash<QString, QList<UlsSegment>> segmentMap;
 		QHash<QString, QList<UlsLocation>> locationMap;
 		QHash<QString, QList<UlsPath>> pathMap;
+		QHash<QString, QList<UlsFrequency>> frequencyMap;
 		QHash<QString, QList<UlsEntity>> entityMap;
 		QHash<QString, QList<UlsControlPoint>> controlPointMap;
 		QHash<QString, QList<UlsHeader>> headerMap;

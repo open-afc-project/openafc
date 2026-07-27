@@ -69,6 +69,11 @@ def main():
                         detach=True,
                         binary=False  # armored
                     )
+                if not sigdata:
+                    raise RuntimeError(
+                        f'GPG signing produced no signature: '
+                        f'status={getattr(sigdata, "status", "unknown")!r} '
+                        f'stderr={getattr(sigdata, "stderr", "")!r}')
                 with contextlib.closing(open(sigfile_path, 'wb')) as sigfile:
                     sigfile.write(str(sigdata))
             except Exception as err:
@@ -80,6 +85,9 @@ def main():
                     use_key_id,
                     armor=True
                 )
+                if not keydata:
+                    raise RuntimeError(
+                        f'GPG export produced no key data for key id {use_key_id!r}')
                 with contextlib.closing(open(pubkey_path, 'wb')) as keyfile:
                     keyfile.write(str(keydata))
             except Exception as err:

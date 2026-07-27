@@ -12,12 +12,12 @@
 
 import pika
 import pydantic
-import random
-import string
+import secrets
 from typing import cast, List, Optional, Set
 
 from log_utils import error, get_module_logger
-from rcache_models import RCACHE_RMQ_EXCHANGE_NAME, RmqReqRespKey
+from rcache_models import compute_rmq_resp_hmac, RCACHE_RMQ_EXCHANGE_NAME, \
+    RmqReqRespKey, verify_rmq_resp_hmac
 import db_utils
 
 __all__ = ["RcacheRmq", "RcacheRmqConnection"]
@@ -58,9 +58,7 @@ class RcacheRmqConnection:
         self._for_rx = tx_queue_name is None
         if self._for_rx:
             self._queue_name = \
-                "afc_response_queue_" + \
-                "".join(random.choices(string.ascii_uppercase + string.digits,
-                                       k=10))
+                "afc_response_queue_" + secrets.token_hex(5)
             self._channel.queue_declare(queue=self._queue_name, exclusive=True)
             self._channel.queue_bind(queue=self._queue_name,
                                      exchange=RCACHE_RMQ_EXCHANGE_NAME)
@@ -88,7 +86,9 @@ class RcacheRmqConnection:
             self._channel.basic_publish(
                 exchange=RCACHE_RMQ_EXCHANGE_NAME, routing_key=self._queue_name,
                 body=RmqReqRespKey(
-                    afc_resp=response, req_cfg_digest=req_cfg_digest).json(),
+                    afc_resp=response, req_cfg_digest=req_cfg_digest,
+                    resp_hmac=compute_rmq_resp_hmac(
+                        req_cfg_digest, response)).model_dump_json(),
                 properties=pika.BasicProperties(
                     content_type="application/json",
                     delivery_mode=pika.DeliveryMode.Transient),
@@ -125,10 +125,20 @@ class RcacheRmqConnection:
                     self._channel.consume(
                         queue=self._queue_name, auto_ack=True, exclusive=True):
                 try:
-                    rrk = RmqReqRespKey.parse_raw(body)
+                    rrk = RmqReqRespKey.model_validate_json(body)
                 except pydantic.ValidationError as ex:
                     LOGGER.error(f"Decode error on AFC Response Info "
                                  f"arrived from Worker: {ex}")
+                    continue
+                if rrk.req_cfg_digest in remaining_responses and \
+                        not verify_rmq_resp_hmac(
+                            rrk.req_cfg_digest, rrk.afc_resp, rrk.resp_hmac):
+                    LOGGER.error(
+                        "Rejected RMQ response for digest %s: missing/"
+                        "invalid resp_hmac — message was not authenticated "
+                        "as coming from a holder of the objstore API key "
+                        "(possible forgery by a bare broker-credential "
+                        "holder)", rrk.req_cfg_digest)
                     continue
                 if rrk.req_cfg_digest in remaining_responses:
                     remaining_responses.remove(rrk.req_cfg_digest)
@@ -173,14 +183,17 @@ class RcacheRmq:
     _url_params -- Connection parameters
     """
 
-    def __init__(self, rmq_dsn: str) -> None:
+    def __init__(self, rmq_dsn: str,
+                 password_file: Optional[str] = None) -> None:
         """ Constructor
 
         Arguments:
-        rmq_dsn     -- RabbitMQ AMQP URI
-        as_receiver -- True if will be used for RX, false if for TX
+        rmq_dsn       -- RabbitMQ AMQP URI
+        password_file -- Optional file with password to substitute into DSN
         """
-        self.rmq_dsn = rmq_dsn
+        self.rmq_dsn = db_utils.substitute_password(
+            dsn=rmq_dsn, password_file=password_file, optional=True) \
+            or rmq_dsn
         try:
             self._url_params = pika.URLParameters(self.rmq_dsn)
         except pika.exceptions.AMQPError as ex:

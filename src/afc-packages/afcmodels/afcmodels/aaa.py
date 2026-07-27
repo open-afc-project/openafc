@@ -12,19 +12,11 @@
 '''
 import time
 import datetime
-from .base import db, UserDbInfo
-import jwt
-from appcfg import OIDCConfigurator
-import os
-from sqlalchemy.schema import Sequence
+import uuid
+from .base import db
+from flask_login import UserMixin
+from flask_security import RoleMixin
 from sqlalchemy.dialects.postgresql import JSON
-
-OIDC_LOGIN = OIDCConfigurator().OIDC_LOGIN
-
-if OIDC_LOGIN:
-    from flask_login import UserMixin
-else:
-    from flask_user import UserMixin
 
 
 class User(db.Model, UserMixin):
@@ -45,6 +37,9 @@ class User(db.Model, UserMixin):
     email_confirmed_at = db.Column(db.DateTime())
     password = db.Column(db.String(255), nullable=False)
     active = db.Column(db.Boolean())
+    fs_uniquifier = db.Column(
+        db.String(255), unique=True, nullable=False,
+        default=lambda: uuid.uuid4().hex)
 
     # Application data fields
     first_name = db.Column(db.String(50))
@@ -67,8 +62,11 @@ class User(db.Model, UserMixin):
         return User.query.filter_by(email=user_email).first()
 
 
-class Role(db.Model):
-    ''' A role is used for authorization. '''
+class Role(db.Model, RoleMixin):
+    ''' A role is used for authorization.
+    Extends RoleMixin so Flask-Security can introspect the model (e.g. for
+    get_permissions()) when running in non-OIDC (local-login) mode.
+    '''
     __tablename__ = 'aaa_role'
     __table_args__ = (
         db.UniqueConstraint('name'),
@@ -132,8 +130,20 @@ class AccessPointDeny(db.Model):
     ruleset_id = db.Column(db.Integer, db.ForeignKey(
         'aaa_ruleset.id', ondelete='CASCADE'))
 
+    @staticmethod
+    def normalize_serial(serial_number):
+        ''' Canonicalize a deny-list serial number. The enforcement path
+            (afc_server_db.py) uppercases the request serial before the
+            deny comparison, and the wildcard '*' is stored as NULL, so
+            every write path must store the same canonical form or the
+            revocation is silently bypassed (SUB-0138-20). '''
+        if serial_number is None:
+            return None
+        serial_number = serial_number.strip().upper()
+        return None if serial_number == '*' else serial_number
+
     def __init__(self, serial_number=None, certification_id=None):
-        self.serial_number = serial_number
+        self.serial_number = self.normalize_serial(serial_number)
         self.certification_id = certification_id
 
 

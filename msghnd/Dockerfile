@@ -6,7 +6,8 @@
 #
 # Install required packages
 #
-FROM python:3.12-alpine3.21
+# syntax=docker/dockerfile:1.2
+FROM python:3.12-alpine3.21@sha256:d4f9227f21409479c7fe92288f2e40b1a56ae591c8ad3b5446dfeaef90f67857
 # This variable should be set to used Python version (major.minor only)
 ENV AFC_PYTHONVERSION=3.12
 
@@ -15,18 +16,21 @@ ENV PYTHONUNBUFFERED=1
 # CMake installs packages to /usr/lib even though this image uses /usr/local/lib
 ENV PYTHONPATH=/usr/lib/python${AFC_PYTHONVERSION}/site-packages:/usr/local/lib/python${AFC_PYTHONVERSION}/site-packages:${PYTHONPATH}
 
-# Configure pip to use package registry proxy (optional)
-ARG PIP_INDEX_URL
-ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+# PIP_INDEX_URL is passed via BuildKit secret (--secret id=pip_config,src=...)
+# mounted at /root/.config/pip/pip.conf so the credential is never baked into
+# image layers or build-arg history.  For builds without a private mirror omit
+# --secret entirely; pip falls back to the public PyPI index.
 
 # Installing Python libraries
 #   Version of librdkafka-dev depends on Alpine version. confluent-kafka
 #   version in requirements.txt may need to be updated on Alpine version change
-RUN apk add --update --no-cache librdkafka-dev libffi 
+RUN apk add --update --no-cache librdkafka-dev libffi
 COPY msghnd/requirements.txt /wd/
-RUN apk add --update --no-cache python3-dev build-base libffi-dev && \
-    pip3 install --upgrade pip setuptools  && \
-    pip3 install --no-cache-dir -r /wd/requirements.txt && \
+RUN --mount=type=secret,id=pip_config,target=/root/.config/pip/pip.conf \
+    apk add --update --no-cache python3-dev build-base libffi-dev && \
+    pip3 install --upgrade pip==25.1.1 setuptools==83.0.0 && \
+    pip3 install --root-user-action=ignore --no-cache-dir --require-hashes \
+        -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base libffi-dev && \
     rm -f /wd/requirements.txt
 
@@ -49,7 +53,8 @@ ninja -j$(nproc) install && \
 apk del --purge cmake ninja && rm -rf /wd/cmake/ /wd/pkg/ /wd/src/ /wd/build/
 
 COPY src/afc-packages /wd/afc-packages
-RUN pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
+RUN --mount=type=secret,id=pip_config,target=/root/.config/pip/pip.conf \
+    pip3 install --use-pep517 --root-user-action=ignore --no-cache-dir \
         -r /wd/afc-packages/pkgs.msghnd \
     && rm -rf /wd/afc-packages
 #
@@ -92,6 +97,11 @@ ENV FLASK_AFC_MSGHND_RATAFC_TOUT=${FLASK_AFC_MSGHND_RATAFC_TOUT:-600}
 # ENV AFC_STATE_VENDOR_EXTENSIONS
 
 RUN chmod +x /entrypoint.sh
+# Drop to non-root fbrat. The fbrat user/group is already
+# created above. msghnd has no host bind mounts requiring root write access.
+RUN mkdir -p /run/gunicorn && chown -R fbrat:fbrat /wd /run/gunicorn \
+    $PROMETHEUS_MULTIPROC_DIR
+USER fbrat
 CMD ["/entrypoint.sh"]
 HEALTHCHECK CMD wget --no-verbose --tries=1 --spider \
     http://127.0.0.1:${AFC_MSGHND_PORT}/fbrat/ap-afc/healthy || exit 1

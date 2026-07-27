@@ -7,7 +7,9 @@
 
 # Cadvisor dockerfile
 
-FROM gcr.io/cadvisor/cadvisor:v0.49.1
+# Registry migrated from gcr.io/cadvisor/cadvisor to ghcr.io/google/cadvisor in v0.53.0
+# Note: ghcr.io tags omit the 'v' prefix
+FROM ghcr.io/google/cadvisor:0.56.2@sha256:5534ae91cbf3428998d60428d107cfdd97272d80658534ac6e54d8ce3b0c4d72
 
 # Housekeeping interval
 ENV CADVISOR_HOUSEKEEPING_INTERVAL=5s
@@ -15,12 +17,13 @@ ENV CADVISOR_HOUSEKEEPING_INTERVAL=5s
 # Metrics - comma separated list of metric groups (see
 # https://github.com/google/cadvisor/blob/master/docs/storage/prometheus.md for
 # more details)
-ENV CADVISOR_METRICS=cpu,memory,process,sched,network
+# disk,diskIO added to expose per-container filesystem and block-I/O metrics in Grafana
+ENV CADVISOR_METRICS=cpu,memory,process,sched,network,disk,diskIO
 
 # Additional arguments
 ENV CADVISOR_ADDITIONAL_ARGS=
 
-EXPOSE 9090
+EXPOSE 8080
 
 ENTRYPOINT /usr/bin/cadvisor \
     -logtostderr \

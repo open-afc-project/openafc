@@ -115,8 +115,8 @@ const processGroup = (
   const up2 = toHz(upper2);
   for (let i = 0; i < bandwidthGroup.profiles.length; i++) {
     for (let j = 0; j < bandwidthGroup.profiles[i].length - 1; j++) {
-      let curr = bandwidthGroup.profiles[i][j];
-      let next = bandwidthGroup.profiles[i][j + 1];
+      const curr = bandwidthGroup.profiles[i][j];
+      const next = bandwidthGroup.profiles[i][j + 1];
 
       if (
         (curr.hz !== next.hz && between(low1, curr.hz, up1) && between(low1, next.hz, up1)) ||
@@ -136,11 +136,11 @@ const processGroup = (
  * @returns processed channels
  */
 export const filterChannels = (channelsIn: ChannelData[]): ChannelData[] => {
-  let channels = clone(channelsIn);
+  const channels = clone(channelsIn);
   for (let b = 0; b < channels.length; b++) {
-    let group = channels[b];
+    const group = channels[b];
     for (let c = 0; c < group.channels.length; c++) {
-      let channel = group.channels[c];
+      const channel = group.channels[c];
       if (group.channelWidth === 20) {
         if (between(97, Number(channel.name), 113) || between(185, Number(channel.name), 233)) {
           channel.maxEIRP = -Infinity;
@@ -176,8 +176,8 @@ export const filterChannels = (channelsIn: ChannelData[]): ChannelData[] => {
  */
 const assignChannels = (prof: SpectrumProfile[], channels: ChannelData, minEIRP: number, maxEIRP: number): void => {
   for (let i = 0; i < channels.channels.length; i++) {
-    let chan = channels.channels[i];
-    let point = prof[i * 2];
+    const chan = channels.channels[i];
+    const point = prof[i * 2];
     const dbm = point.dbm;
     chan.color =
       dbm === null
@@ -225,7 +225,7 @@ export const pawsToChannels = (resp: PAWSResponse, minEIRP: number, maxEIRP: num
  * @returns processed request
  */
 export const filterUNII = (respIn: PAWSResponse): PAWSResponse => {
-  let resp = clone(respIn);
+  const resp = clone(respIn);
   resp.spectrumSpecs.forEach((spec) =>
     spec.spectrumSchedules.forEach((spectrum) =>
       spectrum.spectra.forEach((bandwidthGroup) => {
@@ -269,7 +269,7 @@ export function generateConfig(pathConfig: PathConfig, fps: number): MobileAPCon
   }));
 
   // calculate axis lengths from eccentricity. check to make sure eccentricity is valid
-  let e = pathConfig.eccentricity;
+  const e = pathConfig.eccentricity;
   if (e <= 0 || e >= 1) throw { message: 'Ecentricity is not valid. Must be in (0,1) for an ellipse.' };
 
   const requests: {

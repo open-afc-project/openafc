@@ -13,6 +13,7 @@
 
 import datetime
 import enum
+import os
 import requests
 import shlex
 import sqlalchemy as sa
@@ -70,7 +71,7 @@ LogInfo = \
          ("log_type", LogType)])
 
 # Check type
-CheckType = enum.Enum("CheckType", ["ExtParams", "FsDatabase"])
+CheckType = enum.Enum("CheckType", ["ExtParams", "FsDatabase", "HashVerification"])
 
 # Information about check
 CheckInfo = \
@@ -207,7 +208,11 @@ class StateDb:
                 db_existed = \
                     db_creator.ensure_dsn(
                         dsn=self._arg_db_dsn,
-                        password_file=self._password_file)[1]
+                        password_file=self._password_file,
+                        # Grant SELECT to bulk_ro so read-only datasources can
+                        # read-only datasource can query fs_state.
+                        grant_readonly_role=os.environ.get(
+                            'AFC_BULK_DB_READONLY_ROLE'))[1]
             except RuntimeError as ex:
                 error(f"Error creating state database "
                       f"'{db_utils.safe_dsn(self._arg_db_dsn)}': {ex}")
@@ -295,6 +300,7 @@ class StateDb:
                 with self._engine.connect() as conn:
                     for op in ops:
                         ret = conn.execute(op)
+                    conn.commit()
                 return ret
             except sa.exc.SQLAlchemyError as ex:
                 if retry:
@@ -386,7 +392,7 @@ class StateDb:
         Returns by-region dictionary of milestone timetags
         """
         table = self.metadata.tables[self.MILESTONE_TABLE_NAME]
-        sel = sa.select([table.c.region, table.c.timestamp]).\
+        sel = sa.select(table.c.region, table.c.timestamp).\
             where(table.c.milestone == milestone.name)
         rp = self._execute([sel])
         return {rec.region or None: rec.timestamp for rec in rp}
@@ -420,8 +426,8 @@ class StateDb:
         table = self.metadata.tables[self.ALARM_TABLE_NAME]
         rp = self._execute(
             [sa.select(
-                [table.c.alarm_type, table.c.alarm_reason,
-                 table.c.timestamp])])
+                table.c.alarm_type, table.c.alarm_reason,
+                table.c.timestamp)])
         return [AlarmInfo(alarm_type=AlarmType[rec.alarm_type],
                           alarm_reason=rec.alarm_reason,
                           timestamp=rec.timestamp)
@@ -453,7 +459,7 @@ class StateDb:
         Returns LogInfo object
         """
         table = self.metadata.tables[self.LOG_TABLE_NAME]
-        sel = sa.select([table.c.log_type, table.c.text, table.c.timestamp]).\
+        sel = sa.select(table.c.log_type, table.c.text, table.c.timestamp).\
             where(table.c.log_type == log_type.name)
         rp = self._execute([sel])
         row = rp.first()
@@ -488,8 +494,8 @@ class StateDb:
         Returns dictionary of CheckInfo items lists, indexed by check type
         """
         table = self.metadata.tables[self.CHECKS_TABLE]
-        sel = sa.select([table.c.check_type, table.c.check_item,
-                         table.c.errmsg, table.c.timestamp])
+        sel = sa.select(table.c.check_type, table.c.check_item,
+                        table.c.errmsg, table.c.timestamp)
         rp = self._execute([sel])
         ret: Dict[CheckType, List[CheckInfo]] = {}
         for rec in rp:

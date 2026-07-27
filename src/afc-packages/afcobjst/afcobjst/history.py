@@ -10,6 +10,10 @@
 Provides HTTP server for getting history.
 """
 
+import urllib.parse
+from markupsafe import escape
+import markupsafe
+import hmac
 import os
 import logging
 import io
@@ -23,6 +27,40 @@ NET_TIMEOUT = 60  # The amount of time, in seconds, to wait for the server respo
 
 hist_app = Flask(__name__)
 hist_app.config.from_object(ObjstConfigInternal())
+
+
+def _load_objst_api_key():
+    """ Return objst/hist API key from file (AFC_OBJST_API_KEY_FILE) or None. """
+    key_file = os.environ.get("AFC_OBJST_API_KEY_FILE")
+    if key_file and os.path.isfile(key_file):
+        with open(key_file) as f:
+            return f.read().strip() or None
+    return None
+
+
+@hist_app.before_request
+def _require_hist_bearer_token():
+    """ Require a bearer token on every history route.
+
+    The sibling objst_app gates its routes the same way; hist_app previously
+    had no authentication, exposing the AFC history directory unauthenticated
+    to any host that could reach the container.
+    """
+    if request.endpoint == "healthcheck":
+        return
+    expected = _load_objst_api_key()
+    if expected is None:
+        hist_app.logger.error(
+            "hist: AFC_OBJST_API_KEY_FILE not configured — "
+            "all requests rejected")
+        abort(503)
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        abort(401)
+    supplied = auth_header[len("Bearer "):]
+    if not hmac.compare_digest(supplied.encode(), expected.encode()):
+        abort(403)
+
 
 if hist_app.config['AFC_OBJST_LOG_FILE']:
     logging.basicConfig(filename=hist_app.config['AFC_OBJST_LOG_FILE'],
@@ -40,43 +78,41 @@ def generateHtml(rurl, path, dirs, files):
     hist_app.logger.debug(f"generateHtml({rurl}, {path}, {dirs}, {files})")
     dirs.sort()
     files.sort()
+
     vpath = "history"
-    if path is not None and path != "":
+    if path:  # Simplifies `is not None and path != ""`
         vpath += "/" + path
 
     html = """<!DOCTYPE html>
 <html>
 <head>
-    <meta content="text/html; charset="utf-8">
+    <meta content="text/html; charset=utf-8">
 </head>
 <body>
 <h1>Directory listing for """
 
     path_split = vpath.split("/")
-    url = rurl
-    if url[len(url) - 1] == "/":
-        url = url[:len(url) - 1]
-    i = 0
-    for dir in path_split:
+
+    # Strip trailing slash once to avoid index checking later
+    url = rurl.rstrip("/")
+
+    for i, directory in enumerate(path_split):
         if i != 0:
-            url += "/" + dir
-        html += " <a href=" + url + ">" + "/" + dir + "</a> "
-        i = i + 1
+            url += "/" + directory
+        # Escape exactly when injecting into the HTML template using f-strings
+        html += f' <a href="{escape(url)}">/{escape(directory)}</a> '
 
-    html += """</h1><hr>
-<ul>
-"""
+    html += "</h1><hr>\n<ul>\n"
 
-    for e in dirs:
-        html += "<li><a href=" + \
-            "/".join(s for s in (rurl.rstrip("/"), path, e) if s) + \
-            "><b>" + e + """/</b></a></li>
-"""
-    for e in files:
-        html += "<li><a href=" + \
-            "/".join(s for s in (rurl.rstrip("/"), path, e) if s) + \
-            ">" + e + """</a></li>
-"""
+    for d in dirs:
+        # Build the raw href path
+        href = "/".join(s for s in (rurl.rstrip("/"), path, d) if s)
+        # Inject and escape
+        html += f'<li><a href="{escape(href)}"><b>{escape(d)}/</b></a></li>\n'
+
+    for f in files:
+        href = "/".join(s for s in (rurl.rstrip("/"), path, f) if s)
+        html += f'<li><a href="{escape(href)}">{escape(f)}</a></li>\n'
 
     html += """</ul>
 <hr>
@@ -85,7 +121,6 @@ def generateHtml(rurl, path, dirs, files):
 """
 
     hist_app.logger.debug(html)
-
     return html.encode()
 
 
@@ -109,7 +144,7 @@ class ObjInt:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass
+        pass  # No resources to clean up in base class
 
 
 class ObjIntLocalFS(ObjInt):
@@ -172,8 +207,8 @@ class Objstorage:
             return ObjIntGoogleCloudBucket(name)
         if hist_app.config["AFC_OBJST_MEDIA"] == "LocalFS":
             return ObjIntLocalFS(name)
-        raise Exception("Unsupported AFC_OBJST_MEDIA \"{}\"".
-                        format(hist_app.config["AFC_OBJST_MEDIA"]))
+        raise RuntimeError("Unsupported AFC_OBJST_MEDIA \"{}\"".
+                           format(hist_app.config["AFC_OBJST_MEDIA"]))
 
 
 @hist_app.route('/', defaults={'path': ""}, methods=['GET'])
@@ -182,14 +217,33 @@ def get(path):
     ''' File download handler. '''
     # ratapi URL preffix
     rurl = request.args["url"]
+    # Validate scheme to block non-HTTP(S) URI schemes, and reject any URL that
+    # carries a network location (host) or is protocol-relative ('//host'): the
+    # link base must stay same-origin so generateHtml() never emits off-origin
+    # navigation hrefs.
+    import urllib.parse as _urlparse
+    _parsed_rurl = _urlparse.urlparse(rurl)
+    if _parsed_rurl.scheme not in ('http', 'https', ''):
+        return abort(400)
+    if rurl.startswith('//') or _parsed_rurl.netloc:
+        # Only same-origin is permitted; the proxy supplies request.base_url.
+        # A client-supplied off-origin base is rejected.
+        if _parsed_rurl.netloc != request.host:
+            return abort(400)
     fwd_proto = request.headers.get('X-Forwarded-Proto')
     if (fwd_proto == 'https') and (request.scheme == "http"):
         rurl = rurl.replace("http:", "https:")
     hist_app.logger.debug(
         f'get method={request.method}, path={path} url={rurl}')
     # local path in the storage
-    lpath = os.path.join(
-        hist_app.config["AFC_OBJST_FILE_LOCATION"], "history", path)
+    hroot = os.path.realpath(os.path.join(
+        hist_app.config["AFC_OBJST_FILE_LOCATION"], "history"))
+    lpath = os.path.realpath(os.path.join(hroot, path))
+    # This uses os.path.commonpath instead of manual os.sep checks
+    if lpath != hroot and os.path.commonpath([lpath, hroot]) != hroot:
+        hist_app.logger.error(
+            "get invalid path rejected: {}".format(path))
+        return abort(400)
 
     try:
         objst = Objstorage()
@@ -210,6 +264,6 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(
         hist_app.config["AFC_OBJST_FILE_LOCATION"], "history"), exist_ok=True)
     waitress.serve(
-        hist_app, port=hist_app.config["AFC_OBJST_HIST_PORT"], host="0.0.0.0")
+        hist_app, port=hist_app.config["AFC_OBJST_HIST_PORT"], host="127.0.0.1")
 
     # hist_app.run(port=hist_app.config['AFC_OBJST_HIST_PORT'], host="0.0.0.0", debug=True)

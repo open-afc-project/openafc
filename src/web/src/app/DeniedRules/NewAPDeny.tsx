@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import { AccessPointModel, RatResponse } from '../Lib/RatApiTypes';
 import {
   Gallery,
@@ -101,9 +101,10 @@ export class NewAPDeny extends React.Component<NewAPDenyProps, NewAPDenyState> {
   private hideAlert = () => this.setState({ messageType: undefined });
 
   render() {
-    const serialNumberChange = (s?: string) => this.setState({ serialNumber: s });
-    const certificationIdChange = (s?: string) => this.setState({ certificationId: s });
-    const orgChange = (s?: string) => this.setState({ org: s });
+    const serialNumberChange = (_event: any, s?: string) => this.setState({ serialNumber: s });
+    const certificationIdChange = (_event: any, s?: string) => this.setState({ certificationId: s });
+    // @ts-ignore
+    const orgChange = (_event: any, s?: string) => this.setState({ org: s });
 
     return (
       <>
@@ -111,19 +112,19 @@ export class NewAPDeny extends React.Component<NewAPDenyProps, NewAPDenyState> {
           <Alert
             variant={this.state.messageType}
             title={this.state.messageValue}
-            action={<AlertActionCloseButton onClose={this.hideAlert} />}
+            actionClose={<AlertActionCloseButton onClose={this.hideAlert} />}
           />
         )}
         <br />
-        <Gallery gutter="sm">
+        <Gallery hasGutter>
           <GalleryItem>
             <FormGroup label="Ruleset" fieldId="horizontal-form-ruleset">
               <FormSelect
                 value={this.state.rulesetId}
-                onChange={(x) => this.setRulesetId(x)}
+                onChange={(_event, x) => this.setRulesetId(x)}
                 id="horizontal-form-ruleset"
                 name="horizontal-form-ruleset"
-                isValid={!!this.state.rulesetId}
+                validated={!!this.state.rulesetId ? 'default' : 'error'}
                 style={{ textAlign: 'right' }}
               >
                 <FormSelectOption key={undefined} value={undefined} label="Select a Ruleset" />
@@ -146,7 +147,7 @@ export class NewAPDeny extends React.Component<NewAPDenyProps, NewAPDenyState> {
             </FormGroup>
           </GalleryItem>
           <GalleryItem>
-            <FormGroup label="Certification ID" fieldId="certification-id-form">
+            <FormGroup label="Certification ID" fieldId="horizontal-form-certification-list">
               <div>
                 <TextInput
                   label="Id"
@@ -156,7 +157,7 @@ export class NewAPDeny extends React.Component<NewAPDenyProps, NewAPDenyState> {
                   step="any"
                   id="horizontal-form-certification-list"
                   name="horizontal-form-certification-list"
-                  style={{ textAlign: 'left' }}
+                  style={{ textAlign: 'left', width: '100%' }}
                   placeholder="Id"
                 />
               </div>
@@ -177,13 +178,10 @@ export class NewAPDeny extends React.Component<NewAPDenyProps, NewAPDenyState> {
               </FormGroup>
             </GalleryItem>
           )}
-
-          <GalleryItem>
-            <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()}>
-              Add
-            </Button>
-          </GalleryItem>
         </Gallery>
+        <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()} style={{ marginTop: '1rem' }}>
+          Add
+        </Button>
       </>
     );
   }

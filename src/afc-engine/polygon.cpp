@@ -245,8 +245,23 @@ PolygonClass::PolygonClass(std::string kmlFilename, double resolution)
 		char *chptr;
 
 		std::vector<std::string> lonlatStrList = split(clist[ptIdx], ',');
+		if (lonlatStrList.size() < 2) {
+			errStr << "ERROR: File " << kmlFilename << " invalid coordinate token \""
+			       << clist[ptIdx] << "\"";
+			throw std::runtime_error(errStr.str());
+		}
 		double longitude = std::strtod(lonlatStrList[0].c_str(), &chptr);
+		if (chptr == lonlatStrList[0].c_str()) {
+			errStr << "ERROR: File " << kmlFilename << " non-numeric longitude \""
+			       << lonlatStrList[0] << "\"";
+			throw std::runtime_error(errStr.str());
+		}
 		double latitude = std::strtod(lonlatStrList[1].c_str(), &chptr);
+		if (chptr == lonlatStrList[1].c_str()) {
+			errStr << "ERROR: File " << kmlFilename << " non-numeric latitude \""
+			       << lonlatStrList[1] << "\"";
+			throw std::runtime_error(errStr.str());
+		}
 
 		int xval = (int)floor(((longitude) / resolution) + 0.5);
 		int yval = (int)floor(((latitude) / resolution) + 0.5);
@@ -542,8 +557,26 @@ std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilen
 				char *chptr;
 
 				std::vector<std::string> lonlatStrList = split(clist[ptIdx], ',');
+				if (lonlatStrList.size() < 2) {
+					errStr << "ERROR: File " << kmlFilename
+					       << " invalid coordinate token \"" << clist[ptIdx]
+					       << "\"";
+					throw std::runtime_error(errStr.str());
+				}
 				double longitude = std::strtod(lonlatStrList[0].c_str(), &chptr);
+				if (chptr == lonlatStrList[0].c_str()) {
+					errStr << "ERROR: File " << kmlFilename
+					       << " non-numeric longitude \"" << lonlatStrList[0]
+					       << "\"";
+					throw std::runtime_error(errStr.str());
+				}
 				double latitude = std::strtod(lonlatStrList[1].c_str(), &chptr);
+				if (chptr == lonlatStrList[1].c_str()) {
+					errStr << "ERROR: File " << kmlFilename
+					       << " non-numeric latitude \"" << lonlatStrList[1]
+					       << "\"";
+					throw std::runtime_error(errStr.str());
+				}
 
 				int xval = (int)floor(((longitude) / resolution) + 0.5);
 				int yval = (int)floor(((latitude) / resolution) + 0.5);
@@ -672,7 +705,7 @@ double PolygonClass::comp_bdy_area()
 bool PolygonClass::in_bdy_area(const int a, const int b, bool *edge)
 {
 	int segment_idx, n;
-	int is_edge;
+	int is_edge = 0;
 
 	if (edge) {
 		*edge = false;
@@ -792,6 +825,9 @@ int PolygonClass::in_bdy_area(const int a,
 	int x1, y1, x2, y2;
 
 	index = -1;
+	if (edge) {
+		*edge = 0;
+	}
 	do {
 		index++;
 		if (index == n) {
@@ -801,9 +837,6 @@ int PolygonClass::in_bdy_area(const int a,
 		y2 = y[index];
 	} while (y2 == b);
 
-	if (edge) {
-		*edge = 0;
-	}
 	same_y = 0;
 	num_left = 0;
 	num_right = 0;
@@ -871,8 +904,15 @@ int PolygonClass::in_bdy_area(const int a,
 	}
 
 	if ((num_left + num_right) & 1) {
-		printf("ERROR in routine in_bdy_area()\n");
-		CORE_DUMP;
+		// Odd parity total indicates a degenerate (self-intersecting or
+		// collinear) polygon.  Crashing the engine for a malformed AP
+		// request is worse than returning a conservative "outside" result.
+		fprintf(stderr,
+			"WARNING: in_bdy_area(): odd ray-cast parity for "
+			"point (%d,%d) — degenerate polygon; treating as outside\n",
+			a,
+			b);
+		return (0);
 	}
 
 	return (num_left & 1);
@@ -898,8 +938,25 @@ std::tuple<double, double> PolygonClass::closestPoint(std::tuple<int, int> point
 			int y0 = bdy_pt_y[segment_idx][bdy_pt_idx];
 			int x1 = bdy_pt_x[segment_idx][bdy_pt_idx2];
 			int y1 = bdy_pt_y[segment_idx][bdy_pt_idx2];
-			double Lsq = (x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0);
-			double alpha = ((xval - x0) * (x1 - x0) + (yval - y0) * (y1 - y0)) / Lsq;
+			// Compute the products in double: int*int here overflows 32-bit
+			// signed arithmetic (UB) for large vertex/query offsets, like the
+			// eps computation fixed with long long in in_bdy_area.
+			double Lsq = (double)(x1 - x0) * (x1 - x0) + (double)(y1 - y0) * (y1 - y0);
+			if (Lsq == 0.0) {
+				// Duplicate vertex (x0==x1, y0==y1): zero-length segment has no
+				// projection; treat the vertex itself as the closest candidate.
+				double dsq = (double)(x0 - xval) * (x0 - xval) +
+					     (double)(y0 - yval) * (y0 - yval);
+				if (initFlag || (dsq < cDistSq)) {
+					cDistSq = dsq;
+					cPoint = std::tuple<double, double>((double)x0, (double)y0);
+					initFlag = false;
+				}
+				continue;
+			}
+			double alpha = ((double)(xval - x0) * (x1 - x0) +
+					(double)(yval - y0) * (y1 - y0)) /
+				       Lsq;
 			double ptx, pty, dsq;
 			if (alpha <= 0.0) {
 				ptx = (double)x0;

@@ -14,7 +14,6 @@ import os
 import sys
 import traceback
 from typing import Any, Dict, Callable, List, NoReturn, Optional, Type
-import urllib.parse
 
 
 __all__ = ["dp", "error", "error_if", "FailOnError", "get_module_logger",
@@ -28,7 +27,10 @@ _error_exception_type: type[BaseException] = SystemExit
 _error_include_stack: bool = False
 
 # How to print debug messages
-_dp_printer: Callable[[str], None] = lambda s: print(s, file=sys.stderr)
+
+
+def _dp_printer(s: str) -> None:
+    return print(s, file=sys.stderr)
 
 
 def dp(*args, to_str: Optional[Callable[[Any], str]] = None) -> None:

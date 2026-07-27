@@ -17,6 +17,7 @@ import argparse
 import requests
 import json
 import os
+import re
 from email.message import EmailMessage
 
 time_val = 40
@@ -193,20 +194,35 @@ if __name__ == "__main__":
             ts = row['Timestamp']
             uid = row['Unique request ID'] + f'_R{i}'
             requester = row['Email address']
+            if not re.match(r'^[A-Za-z0-9_-]{1,64}$', row['Unique request ID']):
+                print("Skipping row %d: invalid Unique request ID" % i)
+                i = i + 1
+                continue
+            if requester and not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', requester):
+                print("Skipping row %d: invalid Email address" % i)
+                i = i + 1
+                continue
             i = i + 1
-            list = conn.execute(
-                "SELECT * from REQUESTS WHERE UID=?", (uid,)).fetchall()
-            if list == [] and i > start_row:
-                print("Querying for uid %s" % uid)
-                run_test(uid, requester, args.res, email, config_data)
+            # A single malformed/unexpected row (missing JSON file, bad
+            # response format, mail-send failure, etc.) must not abort the
+            # whole batch and block every subsequent requester: log and skip.
+            try:
+                list = conn.execute(
+                    "SELECT * from REQUESTS WHERE UID=?", (uid,)).fetchall()
+                if list == [] and i > start_row:
+                    print("Querying for uid %s" % uid)
+                    run_test(uid, requester, args.res, email, config_data)
 
-                # if not dry run, update db to avoid running same req again
-                if not dry_run:
-                    conn.execute("INSERT INTO REQUESTS (TIMESTAMP,UID) \
-                        VALUES (?, ?)", (ts, uid))
-                    conn.commit()
+                    # if not dry run, update db to avoid running same req again
+                    if not dry_run:
+                        conn.execute("INSERT INTO REQUESTS (TIMESTAMP,UID) \
+                            VALUES (?, ?)", (ts, uid))
+                        conn.commit()
 
-            else:
-                print("Ignore existing uid %s" % uid)
+                else:
+                    print("Ignore existing uid %s" % uid)
+            except Exception as exc:
+                print("Skipping row %d (uid %s): %s" % (i, uid, exc))
+                continue
 
     conn.close()

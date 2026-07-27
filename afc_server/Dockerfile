@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM python:3.12-alpine3.21
+FROM python:3.12-alpine3.21@sha256:d4f9227f21409479c7fe92288f2e40b1a56ae591c8ad3b5446dfeaef90f67857
 
 # Port REST API service listen on. Mandatory
 # ENV AFC_SERVER_PORT
@@ -90,12 +90,13 @@ RUN mkdir -p $PROMETHEUS_MULTIPROC_DIR
 
 RUN apk add --update --no-cache curl
 
-# Configure pip to use package registry proxy (optional)
-ARG PIP_INDEX_URL
-ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+# Private PyPI mirror credential is passed via BuildKit secret
+# (--secret id=pip_config,src=<pip.conf>) so it is never baked into image
+# layers or build-arg history. Omit --secret to use public PyPI.
 
 COPY src/afc-packages /wd/afc-packages
-RUN pip3 install --use-pep517 --root-user-action=ignore \
+RUN --mount=type=secret,id=pip_config,target=/root/.config/pip/pip.conf \
+    pip3 install --use-pep517 --root-user-action=ignore \
     --no-cache-dir -r /wd/afc-packages/pkgs.afc_server \
     && rm -rf /wd/afc-packages
 
@@ -104,8 +105,9 @@ RUN pip3 install --use-pep517 --root-user-action=ignore \
 #   version in requirements.txt may need to be updated on Alpine version change
 RUN apk add --update --no-cache librdkafka-dev
 COPY afc_server/requirements.txt /wd
-RUN apk add --update --no-cache python3-dev build-base && \
-    pip3 install --no-cache-dir --root-user-action=ignore -r /wd/requirements.txt && \
+RUN --mount=type=secret,id=pip_config,target=/root/.config/pip/pip.conf \
+    apk add --update --no-cache python3-dev build-base && \
+    pip3 install --no-cache-dir --root-user-action=ignore --require-hashes -r /wd/requirements.txt && \
     apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
 
 COPY afc_server/afc_server_app.py afc_server/afc_server_compute.py \
@@ -114,6 +116,13 @@ COPY afc_server/afc_server_app.py afc_server/afc_server_compute.py \
 RUN chmod a+x /wd/afc_server_app.py /wd/entrypoint.sh
 
 RUN mkdir -p `dirname $AFC_SERVER_GUNICORN_PID`
+
+# Run as non-root fbrat (uid/gid 1003).
+# afc_server has no host bind mounts, so the non-root switch is safe.
+RUN addgroup -g 1003 fbrat && \
+    adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat && \
+    chown -R fbrat:fbrat /wd `dirname $AFC_SERVER_GUNICORN_PID`
+USER fbrat
 
 CMD ["/wd/entrypoint.sh"]
 

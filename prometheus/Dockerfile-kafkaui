@@ -1,0 +1,31 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Kafka UI — web console for the ALS Kafka broker (monitoring profile).
+# Thin wrapper so the image is published to the project registry alongside
+# all other monitoring images, removing the runtime pull dependency on Docker Hub.
+#
+# Upstream: kafbat/kafka-ui:v1.5.0 (active community fork of the abandoned provectus/kafka-ui)
+# amd64 digest: sha256:7cda86a33344160309fdb65146332e4da65db81a945614f2fe32e210803f6fd1
+
+FROM kafbat/kafka-ui:v1.5.0@sha256:7cda86a33344160309fdb65146332e4da65db81a945614f2fe32e210803f6fd1
+
+# Kafka cluster name shown in the UI (overridable at runtime via docker-compose environment:)
+ENV KAFKA_CLUSTERS_0_NAME=afc-kafka
+
+# Kafka bootstrap server (overridable at runtime)
+ENV KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=als_kafka:9092
+
+# Mount the UI under the same /fbrat prefix as all other monitoring UIs
+ENV SERVER_SERVLET_CONTEXT_PATH=/fbrat/kafka-ui
+
+# Security: read-only cluster access.  Authentication is delegated to the
+# nginx reverse proxy (dispatcher auth_request _super_check, Super users only).
+# kafka_ui is isolated on monitor-net; application containers on the default
+# network cannot reach it, so AUTH_TYPE=DISABLED is safe in this deployment.
+ENV KAFKA_CLUSTERS_0_READONLY=true
+ENV AUTH_TYPE=DISABLED

@@ -4,6 +4,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <cmath>
+#include <stdexcept>
 
 #include "global_defines.h"
 #include "list.h"
@@ -15,6 +17,13 @@
 LinInterpClass::LinInterpClass(ListClass<DblDblClass> *dataList, double xshift, double yshift)
 {
 	n = dataList->getSize();
+	// n==1 → DVECTOR(n-1) == DVECTOR(0) returns NULL; a[0]/b[0] would
+	// then dereference NULL.  Linear interpolation requires at least 2
+	// data points.
+	if (n < 2) {
+		throw std::invalid_argument("LinInterpClass: data list must contain at least 2 "
+					    "points");
+	}
 
 	a = DVECTOR(n - 1);
 	b = DVECTOR(n - 1);
@@ -32,6 +41,12 @@ LinInterpClass::LinInterpClass(std::vector<std::tuple<double, double>> dataList,
 			       double yshift)
 {
 	n = dataList.size();
+	// See ListClass constructor: n<2 yields a NULL 'a' and 'b' from
+	// DVECTOR(n-1), which makelininterpcoeffs would then dereference.
+	if (n < 2) {
+		throw std::invalid_argument("LinInterpClass: data list must contain at least 2 "
+					    "points");
+	}
 
 	a = DVECTOR(n - 1);
 	b = DVECTOR(n - 1);
@@ -125,6 +140,9 @@ double LinInterpClass::lininterpval(double xpoint) const
 	int s = -1;
 	double h, z;
 
+	if (!std::isfinite(xpoint)) {
+		throw std::range_error("LinInterpClass::lininterpval: non-finite xpoint");
+	}
 	if ((xpoint >= x[0]) && (xpoint <= x[n - 1])) {
 		s = lininterp_getintindex(xpoint);
 	} else if (xpoint > x[n - 1]) {

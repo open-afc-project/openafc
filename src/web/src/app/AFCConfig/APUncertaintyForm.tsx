@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   FormGroup,
   FormSelect,
@@ -24,11 +24,11 @@ export class APUncertaintyForm extends React.PureComponent<{
   data: APUncertainty;
   onChange: (x: APUncertainty) => void;
 }> {
-  private setPointsPerDegree = (s: string) =>
+  private setPointsPerDegree = (_event: any, s: string) =>
     // @ts-ignore
     this.props.onChange({ points_per_degree: Number(s), height: this.props.data.height });
 
-  private setHeight = (s: string) =>
+  private setHeight = (_event: any, s: string) =>
     // @ts-ignore
     this.props.onChange({ points_per_degree: this.props.data.points_per_degree, height: Number(s) });
   /*
@@ -37,8 +37,8 @@ export class APUncertaintyForm extends React.PureComponent<{
 
   render = () => (
     <>
-      <FormGroup label="AP Uncertainty Region Scanning Resolution" fieldId="uncertainty-form-AP-Uncertainty">
-        {' '}
+      <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+        <legend>AP Uncertainty Region Scanning Resolution</legend>{' '}
         <Tooltip
           position={TooltipPosition.top}
           enableFlip={true}
@@ -75,7 +75,7 @@ export class APUncertaintyForm extends React.PureComponent<{
           <TextInput
             id="horizontal-label"
             name="horizontal-label"
-            isReadOnly={true}
+            readOnlyVariant="default"
             value="Horizontal Plane (points per degree)"
             style={{ textAlign: 'left', minWidth: '50%' }}
           />
@@ -84,7 +84,7 @@ export class APUncertaintyForm extends React.PureComponent<{
             type="number"
             id="horizontal-value-in"
             name="horizontal-value-in"
-            isValid={this.props.data.points_per_degree > 0}
+            validated={this.props.data.points_per_degree > 0 ? 'default' : 'error'}
             value={this.props.data.points_per_degree}
             onChange={this.setPointsPerDegree}
             style={{ textAlign: 'right' }}
@@ -95,7 +95,7 @@ export class APUncertaintyForm extends React.PureComponent<{
           <TextInput
             id="ap-height-label"
             name="ap-height-label"
-            isReadOnly={true}
+            readOnlyVariant="default"
             value="Height"
             style={{ textAlign: 'left', minWidth: '50%' }}
           />
@@ -103,14 +103,14 @@ export class APUncertaintyForm extends React.PureComponent<{
             type="number"
             id="height-value-out"
             name="height-value-out"
-            isValid={this.props.data.height > 0}
+            validated={this.props.data.height > 0 ? 'default' : 'error'}
             value={this.props.data.height}
             onChange={this.setHeight}
             style={{ textAlign: 'right' }}
           />
           <InputGroupText>m</InputGroupText>
         </InputGroup>
-      </FormGroup>
+      </fieldset>
     </>
   );
 }

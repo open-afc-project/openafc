@@ -41,9 +41,10 @@ export var guiConfig: GuiConfig = Object.freeze({
   google_apikey: '',
   rat_api_analysis: '',
   uls_convert_url: '',
-  allowed_freq_url: '',
   login_url: '',
   admin_url: '',
+  admin_eirp_url: '',
+  admin_frequency_range_url: '',
   ap_deny_admin_url: '',
   dr_admin_url: '',
   lidar_bounds: '',
@@ -53,7 +54,74 @@ export var guiConfig: GuiConfig = Object.freeze({
   afc_kml: '',
   mtls_admin_url: '',
   version: 'API NOT LOADED',
+  app_name: '',
+  about_url: '',
+  about_login_url: '',
+  about_sitekey: '',
+  logout_url: '',
+  status_url: '',
+  grafana_enabled: false,
 });
+
+const ADMIN_USER_PLACEHOLDER = '/user/-1';
+
+/** Build /admin/user/<id> from guiconfig template without replace('-1'), which can corrupt hostnames (e.g. host-1.example). */
+export function adminUserByIdUrl(id: string | number): string {
+  const idStr = String(id);
+  const u = guiConfig.admin_url;
+  if (u.endsWith(ADMIN_USER_PLACEHOLDER)) {
+    return `${u.slice(0, -ADMIN_USER_PLACEHOLDER.length)}/user/${idStr}`;
+  }
+  return u.replace('-1', idStr);
+}
+
+/** GET/PUT minimum indoor/outdoor EIRP limits (ratapi Limits view). */
+export function adminEirpMinUrl(): string {
+  const explicit = guiConfig.admin_eirp_url;
+  if (explicit) {
+    return explicit;
+  }
+  const u = guiConfig.admin_url;
+  if (u.endsWith(ADMIN_USER_PLACEHOLDER)) {
+    return `${u.slice(0, -ADMIN_USER_PLACEHOLDER.length)}/user/eirp_min`;
+  }
+  return u.replace('-1', 'eirp_min');
+}
+
+/** GET/PUT allowed frequency bands JSON. */
+export function adminFrequencyRangeUrl(): string {
+  const explicit = guiConfig.admin_frequency_range_url;
+  if (explicit) {
+    return explicit;
+  }
+  const u = guiConfig.admin_url;
+  if (u.endsWith(ADMIN_USER_PLACEHOLDER)) {
+    return `${u.slice(0, -ADMIN_USER_PLACEHOLDER.length)}/user/frequency_range`;
+  }
+  return u.replace('-1', 'frequency_range');
+}
+
+const AP_DENY_PLACEHOLDER = '/ap_deny/-1';
+
+export function apDenyAdminUrl(userId: string | number): string {
+  const idStr = String(userId);
+  const u = guiConfig.ap_deny_admin_url;
+  if (u.endsWith(AP_DENY_PLACEHOLDER)) {
+    return `${u.slice(0, -AP_DENY_PLACEHOLDER.length)}/ap_deny/${idStr}`;
+  }
+  return u.replace('-1', idStr);
+}
+
+const MTLS_PLACEHOLDER = '/mtls/-1';
+
+export function mtlsAdminUrl(userId: string | number): string {
+  const idStr = String(userId);
+  const u = guiConfig.mtls_admin_url;
+  if (u.endsWith(MTLS_PLACEHOLDER)) {
+    return `${u.slice(0, -MTLS_PLACEHOLDER.length)}/mtls/${idStr}`;
+  }
+  return u.replace('-1', idStr);
+}
 
 /**
  * Storage object to save page state in copied object when travelling between pages.
@@ -564,15 +632,20 @@ export const getRegions = (): Promise<RatResponse<string[]>> =>
   fetch('../ratapi/v1/regions', {
     method: 'GET',
   })
-    .then((res) => {
-      return res.text();
-    })
-    .then((name) => {
+    .then(async (res) => {
+      if (!res.ok) {
+        logger.error('Could not load regions, status:', res.status);
+        return error(
+          res.status === 403 ? 'Insufficient permissions to load regions. Contact your administrator.' : res.statusText,
+          res.status,
+        );
+      }
+      const name = await res.text();
       return success(name.split(' '));
     })
     .catch((err) => {
       logger.error(err);
-      return err(err);
+      return error(String(err));
     });
 
 export const getAboutLoginAfc = (): Promise<RatResponse<string>> =>
@@ -623,7 +696,7 @@ export const setAboutAfc = async (
   org: string,
   token: string,
 ): Promise<RatResponse<string>> => {
-  let csrf_token = getCSRF();
+  const csrf_token = getCSRF();
   return fetch(guiConfig.about_url, {
     method: 'POST',
     headers: {
@@ -669,7 +742,7 @@ export const getRulesetIds = (): Promise<RatResponse<string[]>> =>
  */
 export const getDefaultAfcConf = (x: string | undefined) => {
   if (!!x && (x.startsWith('TEST_') || x.startsWith('DEMO_'))) {
-    let testOrDemo: AFCConfigFile = getDefaultAfcConf(x.substring(5));
+    const testOrDemo: AFCConfigFile = getDefaultAfcConf(x.substring(5));
     testOrDemo.regionStr = x;
     return testOrDemo;
   }
@@ -716,7 +789,7 @@ export const getAfcConfigFile = (region: string): Promise<RatResponse<AFCConfigF
  * @returns success message or error
  */
 export const putAfcConfigFile = async (conf: AFCConfigFile): Promise<RatResponse<string>> => {
-  let csrf_token = getCSRF();
+  const csrf_token = getCSRF();
   return fetch(guiConfig.afcconfig_defaults.replace('default', conf.regionStr ?? 'US'), {
     method: 'PUT',
     headers: {
@@ -744,7 +817,7 @@ export const putAfcConfigFile = async (conf: AFCConfigFile): Promise<RatResponse
  *          Error: why it failed
  */
 export const getAllowedRanges = () =>
-  fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
+  fetch(adminFrequencyRangeUrl(), {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
   })
@@ -771,8 +844,8 @@ export const getAllowedRanges = () =>
 
 // Update all the frequency ranges to a new set
 export const updateAllAllowedRanges = async (allRanges: FreqRange[]) => {
-  let csrf_token = getCSRF();
-  return fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
+  const csrf_token = getCSRF();
+  return fetch(adminFrequencyRangeUrl(), {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -803,12 +876,12 @@ export const updateAllowedRanges = async (regionStr: string, conf: FreqRange[]) 
       } else {
         allRanges = defaultAllRegionFreqRanges();
       }
-      let updated = allRanges.filter((s) => s.region != regionStr).concat(conf);
+      const updated = allRanges.filter((s) => s.region != regionStr).concat(conf);
       Promise.resolve(updated);
     })
     .then(async (newData) => {
-      let csrf_token = getCSRF();
-      return fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
+      const csrf_token = getCSRF();
+      return fetch(adminFrequencyRangeUrl(), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -930,7 +1003,7 @@ export const phase1Analysis = async (
   status?: (progress: { percent: number; message: string }) => void,
   setKml?: (kml: Blob) => void,
 ): Promise<RatResponse<AnalysisResults>> => {
-  let csrf_token = getCSRF();
+  const csrf_token = getCSRF();
   return fetch(guiConfig.rat_api_analysis.replace('p_request_type', 'PointAnalysis'), {
     method: 'POST',
     headers: {
@@ -960,7 +1033,7 @@ export const runExclusionZone = async (
   status?: (progress: { percent: number; message: string }) => void,
   setKml?: (kml: Blob) => void,
 ): Promise<RatResponse<ExclusionZoneResult>> => {
-  let csrf_token = getCSRF();
+  const csrf_token = getCSRF();
   return fetch(guiConfig.rat_api_analysis.replace('p_request_type', 'ExclusionZoneAnalysis'), {
     method: 'POST',
     headers: {
@@ -988,7 +1061,7 @@ export const runHeatMap = async (
   isCanceled?: () => boolean,
   status?: (progress: { percent: number; message: string }) => void,
 ): Promise<RatResponse<HeatMapResult>> => {
-  let csrf_token = getCSRF();
+  const csrf_token = getCSRF();
   return fetch(guiConfig.rat_api_analysis.replace('p_request_type', 'HeatmapAnalysis'), {
     method: 'POST',
     headers: {
@@ -1012,7 +1085,7 @@ export const runHeatMap = async (
 export const ulsFileConvert = async (
   fileName: string,
 ): Promise<RatResponse<{ invalidRows: number; errors: string[] }>> => {
-  let csrf_token = getCSRF();
+  const csrf_token = getCSRF();
   return fetch(guiConfig.uls_convert_url.replace('p_uls_file', fileName), {
     method: 'POST',
     headers: { 'X-CSRF-Token': csrf_token },
@@ -1115,7 +1188,7 @@ export const importCache = (s: { [k: string]: any }) => Object.assign(applicatio
 export const clearCache = (): void => Object.keys(applicationCache).forEach((key) => delete applicationCache[key]);
 
 export const getCSRF = (): string => {
-  let csrf_token = document.cookie
+  const csrf_token = document.cookie
     .split('; ')
     .find((row) => row.startsWith('csrf_token='))
     ?.split('=')[1];
@@ -1127,7 +1200,7 @@ export const heatMapRequestObject = (
   certificationId: CertificationId[],
   serialNumber: string,
 ): AvailableSpectrumInquiryRequest => {
-  let d = {
+  const d = {
     deviceDescriptor: {
       certificationId: certificationId,
       serialNumber: serialNumber,

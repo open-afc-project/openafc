@@ -675,7 +675,7 @@ components:
     imageRepositoryKey: public
     env:
       ULS_AFC_URL: >-
-        http://{{sameAs:afc-req-service:host}}:{{sameAs:afc-req-service:port}}/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
+        http://{{sameAs:afc-req-service:host}}:{{sameAs:afc-req-service:port}}/fbrat/ap-afc/availableSpectrumInquiryInternal
       ULS_DELAY_HR: 0
       ULS_PROMETHEUS_PORT: 8000
       ULS_SMTP_SERVER: >-
@@ -741,7 +741,7 @@ components:
     env:
       RCACHE_CLIENT_PORT: "{{port:rcache:rcache}}"
       RCACHE_AFC_REQ_URL: >-
-        http://{{sameAs:afc-req-service:host}}:{{sameAs:afc-req-service:port}}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
+        http://{{sameAs:afc-req-service:host}}:{{sameAs:afc-req-service:port}}/fbrat/ap-afc/availableSpectrumInquiry
       RCACHE_RULESETS_URL: >-
         http://{{host:rat-server}}/fbrat/ratapi/v1/GetRulesetIDs
       RCACHE_CONFIG_RETRIEVAL_URL: >-

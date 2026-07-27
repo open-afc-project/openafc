@@ -499,7 +499,10 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 		} else if (exclusionZoneStr == "Horizon Distance") {
 			exclusionZoneType = DeniedRegionClass::horizonDistGeometry;
 		} else {
-			CORE_DUMP;
+			LOGGER_WARN(logger)
+				<< "UlsDatabase: unrecognised RAS exclusionZone "
+				<< exclusionZoneStr << " (rasid=" << rasid << ") — skipped";
+			continue;
 		}
 
 		DeniedRegionClass *ras = (DeniedRegionClass *)NULL;
@@ -591,7 +594,9 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 
 			deniedRegionList.push_back(ras);
 		} else {
-			CORE_DUMP;
+			LOGGER_WARN(logger) << "UlsDatabase: RAS switch produced null ras pointer "
+					    << "(rasid=" << rasid << ", zone=" << exclusionZoneStr
+					    << ") — skipped";
 		}
 	}
 	LOGGER_DEBUG(logger) << "READ " << numRAS << " entries from database ";
@@ -629,6 +634,11 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 		int antIdxDB = antnameQueryRes.value(antname_ant_idxIdx).toInt();
 		std::string antennaName =
 			antnameQueryRes.value(antname_ant_nameIdx).toString().toStdString();
+		if (antIdxDB < 0 || antIdxDB >= numAntennaDB) {
+			LOGGER_WARN(logger) << "UlsDatabase: ant_idx " << antIdxDB
+					    << " out of range [0," << numAntennaDB << ") — skipped";
+			continue;
+		}
 		antennaNameList[antIdxDB] = antennaName;
 	}
 	/**************************************************************************************/
@@ -663,6 +673,12 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 			int aobIdx = antaobQueryRes.value(antaob_aob_idxIdx).toInt();
 			double aobRad = antaobQueryRes.value(antaob_aob_degIdx).toDouble() * M_PI /
 					180.0;
+			if (aobIdx < 0 || aobIdx >= numAntennaAOB) {
+				LOGGER_WARN(logger)
+					<< "UlsDatabase: aob_idx " << aobIdx << " out of range [0,"
+					<< numAntennaAOB << ") — skipped";
+				continue;
+			}
 			antennaAOBList[aobIdx] = aobRad;
 		}
 	}
@@ -672,6 +688,14 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 		int r = q.at();
 		int fsid = q.value(fsidIdx).toInt();
 		int numPR = q.value(p_rp_numIdx).toInt();
+		// Clamp against the declared maximum to prevent unbounded allocation from oversized
+		// DB values.
+		if (numPR < 0 || numPR > maxNumPR) {
+			LOGGER_WARN(logger)
+				<< "ULS row fsid=" << fsid << " has invalid p_rp_num=" << numPR
+				<< "; clamping to [0, " << maxNumPR << "]";
+			numPR = (numPR < 0) ? 0 : maxNumPR;
+		}
 
 		target.at(r).fsid = fsid;
 		target.at(r).region = q.value(regionIdx).toString().toStdString();
@@ -764,7 +788,11 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 		AntennaClass *antennaPattern = (AntennaClass *)NULL;
 
 		if (rxAntennaIdxDB != -1) {
-			if (antennaIdxMap[rxAntennaIdxDB] == -1) {
+			if (rxAntennaIdxDB < 0 || rxAntennaIdxDB >= numAntennaDB) {
+				LOGGER_WARN(logger)
+					<< "UlsDatabase: rx_ant_model_idx " << rxAntennaIdxDB
+					<< " out of range [0," << numAntennaDB << ") — skipped";
+			} else if (antennaIdxMap[rxAntennaIdxDB] == -1) {
 				antennaPattern =
 					createAntennaPattern(db,
 							     rxAntennaIdxDB,
@@ -846,6 +874,14 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 				int prSeq = prQueryRes.value(prSeqIdx).toInt();
 				int prIdx = prSeq - 1;
 
+				if (prIdx < 0 || prIdx >= numPR) {
+					LOGGER_WARN(logger)
+						<< "UlsDatabase: prSeq " << prSeq
+						<< " out of range [1," << numPR << "] for fsid "
+						<< fsid << " — skipped";
+					continue;
+				}
+
 				target.at(r).prType[prIdx] = prQueryRes.value(prTypeIdx).isNull() ?
 								     "" :
 								     prQueryRes.value(prTypeIdx)
@@ -922,7 +958,12 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 				antennaPattern = (AntennaClass *)NULL;
 
 				if (prAntennaIdxDB != -1) {
-					if (antennaIdxMap[prAntennaIdxDB] == -1) {
+					if (prAntennaIdxDB < 0 || prAntennaIdxDB >= numAntennaDB) {
+						LOGGER_WARN(logger)
+							<< "UlsDatabase: pr_ant_model_idx "
+							<< prAntennaIdxDB << " out of range [0,"
+							<< numAntennaDB << ") — skipped";
+					} else if (antennaIdxMap[prAntennaIdxDB] == -1) {
 						antennaPattern = createAntennaPattern(
 							db,
 							prAntennaIdxDB,
@@ -948,8 +989,13 @@ AntennaClass *UlsDatabase::createAntennaPattern(SqlScopedConnection<SqlException
 						std::string antennaName)
 {
 	int numAntennaAOB = antennaAOBList.size();
-	int idmin = numAntennaAOB * rxAntennaIdxDB;
-	int idmax = idmin + numAntennaAOB - 1;
+	if (numAntennaAOB < 2) {
+		LOGGER_WARN(logger) << "UlsDatabase: createAntennaPattern " << antennaName
+				    << " numAntennaAOB = " << numAntennaAOB << " (< 2) — skipped";
+		return nullptr;
+	}
+	qint64 idmin = static_cast<qint64>(numAntennaAOB) * rxAntennaIdxDB;
+	qint64 idmax = idmin + numAntennaAOB - 1;
 	QSqlQuery antgainQueryRes =
 		SqlSelect(*db, "antgain")
 			.cols(antgainColumns)
@@ -974,9 +1020,10 @@ AntennaClass *UlsDatabase::createAntennaPattern(SqlScopedConnection<SqlException
 	}
 
 	if (querySize != numAntennaAOB) {
-		LOGGER_DEBUG(logger)
+		LOGGER_WARN(logger)
 			<< "ERROR Creating antenna " << antennaName
 			<< ": numAntennaAOB = " << numAntennaAOB << ", querySize = " << querySize;
+		return nullptr;
 	}
 
 	std::vector<std::tuple<double, double>> sampledData;
@@ -991,7 +1038,13 @@ AntennaClass *UlsDatabase::createAntennaPattern(SqlScopedConnection<SqlException
 	while (antgainQueryRes.next()) {
 		int id = antgainQueryRes.value(antgain_idIdx).toInt();
 		double gain = antgainQueryRes.value(antgain_gainIdx).toDouble();
-		int aobIdx = id - idmin;
+		qint64 aobIdx = static_cast<qint64>(id) - idmin;
+		if (aobIdx < 0 || aobIdx >= numAntennaAOB) {
+			LOGGER_WARN(logger)
+				<< "UlsDatabase: antgain id " << id << " aobIdx " << aobIdx
+				<< " out of range [0," << numAntennaAOB << ") — skipped";
+			continue;
+		}
 		std::get<1>(sampledData[aobIdx]) = gain;
 	}
 

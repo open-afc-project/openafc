@@ -70,7 +70,18 @@ def dump_syms(outdir, debugdir, filepath, log):
         return
 
     (rec, opsys, arch, ident, name) = match.groups()
+    # Validate MODULE name/ident: reject path separators and parent refs,
+    # and confirm the resolved path stays under outdir before creating
+    # directories or writing.
+    for component in (name, ident):
+        if ('/' in component) or ('\\' in component) or ('..' in component):
+            log.error('Rejected unsafe MODULE field: "{0}"'.format(component))
+            return
     path = os.path.join(outdir, name, ident, name + '.sym')
+    real_outdir = os.path.realpath(outdir)
+    if os.path.commonpath([os.path.realpath(path), real_outdir]) != real_outdir:
+        log.error('Rejected symbol path escaping outdir: "{0}"'.format(path))
+        return
     parent = os.path.dirname(path)
     if not os.path.isdir(parent):
         os.makedirs(parent)

@@ -21,6 +21,17 @@ app_log = logging.getLogger(__name__)
 conf = ObjstConfig()
 
 
+def _get_objst_auth_headers():
+    """ Return Authorization bearer header if AFC_OBJST_API_KEY_FILE is set. """
+    key_file = os.environ.get("AFC_OBJST_API_KEY_FILE")
+    if key_file and os.path.isfile(key_file):
+        with open(key_file) as f:
+            key = f.read().strip()
+        if key:
+            return {"Authorization": f"Bearer {key}"}
+    return {}
+
+
 class DataInt:
     """ Abstract class for data prot operations """
     __metaclass__ = abc.ABCMeta
@@ -57,14 +68,16 @@ class DataIntHttp(DataInt):
     def write(self, data):
         """ write data to prot """
         app_log.debug("DataIntHttp.write({})".format(self._file_name))
-        r = requests.post(self._file_name, data=data)
+        r = requests.post(self._file_name, data=data,
+                          headers=_get_objst_auth_headers(), timeout=30)
         if not r.ok:
-            raise Exception("Cant post file")
+            raise RuntimeError("Cant post file")
 
     def read(self):
         """ read data from prot """
         app_log.debug("DataIntHttp.read({})".format(self._file_name))
-        r = requests.get(self._file_name, stream=True)
+        r = requests.get(self._file_name, stream=True,
+                         headers=_get_objst_auth_headers(), timeout=30)
         if r.ok:
             r.raw.decode_content = False
             return r.raw.read()
@@ -73,13 +86,15 @@ class DataIntHttp(DataInt):
     def head(self):
         """ is data exist in prot """
         app_log.debug("DataIntHttp.exists({})".format(self._file_name))
-        r = requests.head(self._file_name)
+        r = requests.head(self._file_name,
+                          headers=_get_objst_auth_headers(), timeout=30)
         return r.ok
 
     def delete(self):
         """ remove data from prot """
         app_log.debug("DataIntHttp.delete({})".format(self._file_name))
-        requests.delete(self._file_name)
+        requests.delete(self._file_name,
+                        headers=_get_objst_auth_headers(), timeout=30)
 
 
 class DataIfBaseV1():
@@ -107,7 +122,7 @@ class DataIfBaseV1():
         """ Call healthcheck """
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         app_log.debug("DataIfBaseV1.healthcheck()")
-        return requests.get(self._pref + '/healthy')
+        return requests.get(self._pref + '/healthy', timeout=30)
 
     @staticmethod
     def httpsProbe(host, port):
@@ -115,7 +130,7 @@ class DataIfBaseV1():
             raise Exception("Missing host:port")
         url = "https://" + host + ":" + str(port) + "/"
         try:
-            requests.head(url, timeout=self.HTTPS_TIMEOUT)
+            requests.head(url, timeout=DataIfBaseV1.HTTPS_TIMEOUT)
         except requests.exceptions.ConnectionError:  # fall to http
             app_log.debug("httpsProbe() fall to HTTP")
             return False

@@ -19,6 +19,8 @@ datasources:
     database: ''
     isDefault: false
     jsonData:
+      allowed_hosts:
+        - '{{ GRAFANA_DS_RCACHE_URL }}'
       auth_method: none
       customHealthCheckEnabled: true
       customHealthCheckUrl: >-

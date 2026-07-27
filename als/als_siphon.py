@@ -25,6 +25,7 @@ import distinguishedname
 import geoalchemy2 as ga                            # type: ignore
 import hashlib
 import heapq
+import hmac
 import inspect
 import json
 import logging
@@ -32,23 +33,25 @@ import lz4.frame                                    # type: ignore
 import math
 import os
 import prometheus_client                            # type: ignore
-import random
 import re
+import secrets
 import shlex
 import sqlalchemy as sa                             # type: ignore
 import sqlalchemy.dialects.postgresql as sa_pg      # type: ignore
-import string
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from typing import Any, Callable, Dict, Generic, List, NamedTuple, \
     NoReturn, Optional, Set, Tuple, Type, TypeVar, Union
 import urllib.parse
 import uuid
+import wsgiref.simple_server
 
 import db_creator
 import db_utils
+import appcfg
 import utils
 
 # This script version
@@ -239,8 +242,10 @@ def ms(s: Any) -> str:
 def js(s: Any) -> str:
     """ Makes sure that given value is a string.
     raises TypeError otherwise """
+    if isinstance(s, uuid.UUID):
+        return str(s)
     if not isinstance(s, str):
-        raise TypeError(f"Unexpected '{s}'. Should be string")
+        raise TypeError(f"Unexpected '{s}' (type: {type(s)}). Should be string")
     return s
 
 
@@ -314,8 +319,7 @@ class Metrics:
     _metrics -- Dictionary of _metric objects, indexed by metric name
     """
     # Value for 'id' label of all metrics
-    INSTANCE_ID = \
-        "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    INSTANCE_ID = secrets.token_hex(5)
 
     class MetricDef(NamedTuple):
         """ Metric definition """
@@ -412,25 +416,28 @@ class BytesUtils:
 
     @classmethod
     def text_to_uuid(cls, text: str) -> uuid.UUID:
-        """ Computes UUID, generated from text's MD5 digest
+        """ Computes UUID, generated from text's SHA-256 digest (truncated to
+        128 bits).  Uses SHA-256[:16] to provide strong collision resistance.
 
         Arguments:
         text -- Text to compute UUID of
-        Returns UUID, made from MD5, computed from UTF8-encoded text
+        Returns UUID, made from first 16 bytes of SHA-256 of UTF8-encoded text
         """
-        return uuid.UUID(bytes=hashlib.md5(text.encode("utf-8")).digest())
+        return uuid.UUID(bytes=hashlib.sha256(
+            text.encode("utf-8")).digest()[:16])
 
     @classmethod
     def json_to_uuid(cls, j: JSON_DATA_TYPE) -> uuid.UUID:
-        """ Computes UUID, generated from JSON MD5 digest.
-        JSON first converted to compact (non spaces) string representation,
-        then to UTF-8 encoded bytes, then MD5 is computed
+        """ Computes UUID, generated from JSON SHA-256 digest (truncated to
+        128 bits).  JSON first converted to compact (non spaces) string
+        representation, then to UTF-8 encoded bytes, then SHA-256 is computed
+        and truncated to 128 bits.
 
         Arguments:
         j -- Dictionary or listUUIDbytes string
         Returns UUID
         """
-        return uuid.UUID(bytes=hashlib.md5(cls.json_to_bytes(j)).digest())
+        return uuid.UUID(bytes=hashlib.sha256(cls.json_to_bytes(j)).digest()[:16])
 
 
 class DatabaseBase(ABC):
@@ -525,7 +532,12 @@ class DatabaseBase(ABC):
                     dsn=utils.dsn(arg_dsn=arg_conn_str,
                                   default_dsn=cls.default_conn_str(),
                                   name_for_logs=cls.name_for_logs()),
-                    password_file=arg_password_file, recreate=recreate)[1]
+                    password_file=arg_password_file, recreate=recreate,
+                    # Grant SELECT to bulk_ro so read-only
+                    # datasources can query these databases without holding the
+                    # application read/write credential.
+                    grant_readonly_role=os.environ.get(
+                        'AFC_BULK_DB_READONLY_ROLE'))[1]
         except RuntimeError as ex:
             error(f"Error creating database "
                   f"'{db_utils.safe_dsn(arg_conn_str)}': {ex}")
@@ -565,6 +577,14 @@ class LogsDatabase(DatabaseBase):
                                    ("time", datetime.datetime),
                                    ("log", JSON_DATA_TYPE)])
 
+    # Upper bound on the number of distinct log-topic tables this process
+    # will auto-create in AFC_LOGS. Without a cap, a peer able to produce to
+    # (or auto-create) arbitrary Kafka topics matching the subscription
+    # prefix can make write_log() issue one persistent CREATE TABLE per
+    # distinct topic name, bloating the shared bulk_postgres catalog
+    # without bound.
+    MAX_LOG_TOPIC_TABLES = 1000
+
     @classmethod
     def default_conn_str(cls) -> str:
         """ Default connection string """
@@ -585,8 +605,24 @@ class LogsDatabase(DatabaseBase):
         """
         if not records:
             return
+        # Validate the topic name before using it as a table identifier.
+        # Kafka topic names are [a-zA-Z0-9._-]; bound the length and reject
+        # anything that could be misused as a SQL identifier.
+        if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$", topic):
+            logging.error("Rejected log topic with invalid name: %r", topic)
+            return
         try:
             if topic not in self.metadata.tables:
+                # Bound the number of dynamically-created log-topic tables:
+                # refuse to grow the AFC_LOGS catalog past the cap instead
+                # of creating one persistent table per attacker-chosen
+                # topic (unbounded allocation DoS).
+                if len(self.metadata.tables) >= self.MAX_LOG_TOPIC_TABLES:
+                    logging.error(
+                        "Refusing to create log table for topic %r: "
+                        "MAX_LOG_TOPIC_TABLES (%d) reached",
+                        topic, self.MAX_LOG_TOPIC_TABLES)
+                    return
                 sa.Table(
                     topic, self.metadata,
                     sa.Column("source", sa.Text(), index=True),
@@ -602,6 +638,7 @@ class LogsDatabase(DatabaseBase):
             self.conn.execute(ins)
         except sa.exc.SQLAlchemyError as ex:
             logging.error(f"Error writing {topic} log table: {ex}")
+            raise
 
 
 # Fully qualified position in Kafka queue on certain Kafka cluster
@@ -989,6 +1026,15 @@ class AlsMessageBundle:
         position -- Kafka message position
         """
         self._last_update = datetime.datetime.now()
+        # Record the position unconditionally, even for messages ignored as
+        # duplicates below (self._assembled / duplicate Request / duplicate
+        # Response early-returns): _als_positions is a Set, so recording an
+        # already-recorded position is a no-op. Without this, a duplicate
+        # message (normal at-least-once producer retry) is silently dropped
+        # without ever being recorded as processed, permanently blocking the
+        # Kafka offset commit for that partition (unbounded queue growth /
+        # backlog replay on restart).
+        self._als_positions.add(position)
         if self._assembled:
             return
         try:
@@ -997,11 +1043,23 @@ class AlsMessageBundle:
                 if self._request_msg is not None:
                     return
                 try:
-                    self._request_msg = jd(json.loads(message.json_str))
+                    request_msg = jd(json.loads(message.json_str))
                 except json.JSONDecodeError:
                     raise JsonFormatError(
                         "Malformed JSON in AFC Request message",
                         code_line=LineNumber.exc(), data=message.json_str)
+                # Reject malformed requests at ingest (offset is marked
+                # processed by the caller's JsonFormatError handler) so they
+                # can never assemble and later fault request_count()
+                if not isinstance(
+                        request_msg.get(
+                            "availableSpectrumInquiryRequests"), list):
+                    raise JsonFormatError(
+                        "AFC Request message lacks list-valued "
+                        "'availableSpectrumInquiryRequests'",
+                        code_line=LineNumber.current(),
+                        data=message.json_str)
+                self._request_msg = request_msg
                 self._request_timetag = message.time_tag
                 self._mtls_dn = message.mtls_dn or ""
                 self._ap_ip = message.ap_ip
@@ -1034,10 +1092,17 @@ class AlsMessageBundle:
                 else:
                     self._configs[None] = config_info
             self._check_config_indexes(message)
+            # Configs are flushed before the response on the producer side
+            # (als.py afc_response -> _flush_afc_configs), so once the
+            # response has arrived every config that will ever be sent for
+            # this bundle is already present; do not require per-request
+            # coverage here - rejected sub-requests legitimately have none.
+            # A bundle with Request+Response but zero configs (every
+            # sub-request rejected pre-compute) is still complete: take_apart()
+            # routes each config-less sub-request to orphans.  Do not gate on
+            # bool(self._configs) or such bundles linger ALS_MAX_AGE_SEC.
             self._assembled = (self._request_msg is not None) and \
-                (self._response_msg is not None) and bool(self._configs) and \
-                ((None in self._configs) or
-                 (len(self._configs) == self.request_count()))
+                (self._response_msg is not None)
             self._als_positions.add(position)
         except (LookupError, TypeError, ValueError) as ex:
             raise JsonFormatError(f"ALS message decoding problem: {ex}",
@@ -1078,7 +1143,15 @@ class AlsMessageBundle:
             del response_map[req_id]
 
             config_info = \
-                self._configs[req_idx if req_idx in self._configs else None]
+                self._configs.get(req_idx, self._configs.get(None))
+            if config_info is None:
+                # No AFC config was emitted for this sub-request (it was
+                # rejected before compute on the afc_server side) - route
+                # both halves to orphans to keep sibling request_response
+                # rows consistent downstream.
+                self._store_parts.orphan_requests.append(request)
+                self._store_parts.orphan_responses.append(response)
+                continue
             expire_time_str: Optional[str] = \
                 response.get("availabilityExpireTime")
             if expire_time_str is not None:
@@ -1405,7 +1478,7 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
                 on_conflict_do_nothing()
             if self._value_column is not None:
                 ins = ins.returning(self._table)
-            result = self._adb.conn.execute(ins)
+            result = self._adb.conn.execute(ins).mappings()
             if self._value_column is not None:
                 for row in result:
                     key = self._key_from_row(row)
@@ -1414,9 +1487,18 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
                     assert isinstance(key, int)
                     new_value_months.remove((value, month_idx))
                 for value_month in new_value_months:
-                    s = sa.select([self._table]).\
-                        where(self._value_column == value_month[0])
-                    result = self._adb.conn.execute(s).fetchall()
+                    # The cache key is (value, month_idx): the fallback
+                    # SELECT for an insert that lost the ON CONFLICT race
+                    # must be scoped identically, or it can return a row
+                    # from a different month partition when the same value
+                    # exists in more than one month - mis-caching the key
+                    # and making dependent audit rows unjoinable in
+                    # als_query (which requires month_idx equality).
+                    s = sa.select(self._table).\
+                        where(sa.and_(
+                            self._value_column == value_month[0],
+                            self.get_month_idx_col() == value_month[1]))
+                    result = self._adb.conn.execute(s).mappings().fetchall()
                     self._by_value[value_month] = \
                         self._key_from_row(list(result)[0])
         except (sa.exc.SQLAlchemyError, TypeError, ValueError) as ex:
@@ -1448,7 +1530,7 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
         by_key: Dict[Tuple[LookupKey, int], LookupValue] = {}
         try:
             for row in \
-                    self._adb.conn.execute(sa.select(self._table)).fetchall():
+                    self._adb.conn.execute(sa.select(self._table)).mappings().fetchall():
                 key = (self._key_from_row(row),
                        row[AlsTableBase.MONTH_IDX_COL_NAME])
                 value = by_key.get(key)
@@ -1516,7 +1598,7 @@ class CertificationsLookup(LookupBase[uuid.UUID, CertificationList]):
 
     def _key_from_row(self, row: ROW_DATA_TYPE) -> uuid.UUID:
         """ Certifications' digest for given row dictionary """
-        return uuid.UUID(js(row[ms(self._col_digest.name)]))
+        return ju(row[ms(self._col_digest.name)])
 
     def _value_from_row_create(self, row: ROW_DATA_TYPE) -> CertificationList:
         """ Returns partial certification list from given row dictionary """
@@ -1545,7 +1627,7 @@ class CertificationsLookup(LookupBase[uuid.UUID, CertificationList]):
         ret: List[ROW_DATA_TYPE] = []
         for cert_idx, certification in enumerate(value.certifications()):
             ret.append(
-                {ms(self._col_digest.name): value.get_uuid().urn,
+                {ms(self._col_digest.name): value.get_uuid(),
                  ms(self._col_index.name): cert_idx,
                  ms(self._col_month_idx.name): month_idx,
                  ms(self._col_ruleset_id.name): certification.ruleset_id,
@@ -1581,7 +1663,7 @@ class AfcConfigLookup(LookupBase[uuid.UUID, str]):
 
     def _key_from_row(self, row: ROW_DATA_TYPE) -> uuid.UUID:
         """ Returns AFC Config digest stored in a row dictionary """
-        return uuid.UUID(js(row[ms(self._col_digest.name)]))
+        return ju(row[ms(self._col_digest.name)])
 
     def _value_from_row_create(self, row: ROW_DATA_TYPE) -> str:
         """ Returns AFC Config string stored in row dictionary """
@@ -1600,7 +1682,7 @@ class AfcConfigLookup(LookupBase[uuid.UUID, str]):
             raise JsonFormatError(f"Malformed AFC Config JSON: {ex}",
                                   code_line=LineNumber.exc(), data=value)
         return [{ms(self._col_digest.name):
-                 BytesUtils.text_to_uuid(value).urn,
+                 BytesUtils.text_to_uuid(value),
                  ms(self._col_month_idx.name): month_idx,
                  ms(self._col_text.name): value,
                  ms(self._col_json.name): config_json}]
@@ -1924,13 +2006,13 @@ class DeviceDescriptorTableUpdater(TableUpdaterBase[uuid.UUID,
         """
         try:
             json_object = jd(data_object)
-            return [{ms(self._col_digest.name): data_key.urn,
+            return [{ms(self._col_digest.name): data_key,
                      ms(self._col_month_idx.name): month_idx,
                      ms(self._col_serial.name): json_object["serialNumber"],
                      ms(self._col_cert_digest.name):
                          self._cert_lookup.key_for_value(
                              CertificationList(json_object["certificationId"]),
-                             month_idx=month_idx).urn}]
+                             month_idx=month_idx)}]
         except (LookupError, TypeError, ValueError) as ex:
             raise \
                 JsonFormatError(
@@ -1997,7 +2079,7 @@ class LocationTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
             json_object = jd(data_object)
             j_elev = json_object["elevation"]
             ret: ROW_DATA_TYPE = \
-                {ms(self._col_digest.name): data_key.urn,
+                {ms(self._col_digest.name): data_key,
                  ms(self._col_month_idx.name): month_idx,
                  ms(self._col_deployment_type.name):
                     ji(json_object.get("indoorDeployment", 0)),
@@ -2025,14 +2107,22 @@ class LocationTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
                 center_lat: float = 0
                 center_lon: float = 0
                 lon0: Optional[float] = None
-                for j_p in j_l_poly["outerBoundary"]:
+                outer_boundary = j_l_poly["outerBoundary"]
+                # An empty outerBoundary would make the centroid division below
+                # a ZeroDivisionError. Reject it as a format error.
+                if not outer_boundary:
+                    raise JsonFormatError(
+                        "linearPolygon.outerBoundary is empty",
+                        code_line=LineNumber.current(),
+                        data=data_object)
+                for j_p in outer_boundary:
                     p = self._get_point(jd(j_p))
                     center_lat += p.lat
                     if lon0 is None:
                         lon0 = p.lon
                     center_lon += self._same_hemisphere(p.lon, lon0)
-                center_lat /= len(j_l_poly["outerBoundary"])
-                center_lon /= len(j_l_poly["outerBoundary"])
+                center_lat /= len(outer_boundary)
+                center_lon /= len(outer_boundary)
                 if center_lon <= -180:
                     center_lon += 360
                 elif center_lon > 180:
@@ -2059,7 +2149,7 @@ class LocationTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
         j_p -- JSON Point object
         Returns Point object
         """
-        return self.Point(lat=j_p["latitude"], lon=j_p["longitude"])
+        return self.Point(lat=float(j_p["latitude"]), lon=float(j_p["longitude"]))
 
     def _same_hemisphere(self, lon: float, root_lon: float) -> float:
         """ Makes actually close longitudes numerically close
@@ -2122,10 +2212,43 @@ class CompressedJsonTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
         data_object -- JSON itself
         month_idx   -- Month index
         """
-        return [{ms(self._col_digest.name): data_key.urn,
+        return [{ms(self._col_digest.name): data_key,
                  ms(self._col_month_idx.name): month_idx,
                  ms(self._col_data.name):
                  lz4.frame.compress(BytesUtils.json_to_bytes(data_object))}]
+
+    def update_db(self, data_dict: Dict[uuid.UUID, JSON_DATA_TYPE],
+                  month_idx: int) -> None:
+        """ Write data to table, refusing to silently substitute content on
+        a digest collision.
+
+        compressed_json is keyed by SHA-256 truncated to 128 bits
+        (BytesUtils.json_to_uuid) and inserts use ON CONFLICT DO NOTHING, so
+        two distinct adversarial JSON bodies that collide on the truncated
+        digest would otherwise have only the first-seen body retained while
+        the second silently references it. Verify byte-equality against any
+        pre-existing row before treating the digest as "already recorded".
+
+        Arguments:
+        data_dict -- Data dictionary (one item per record)
+        month_idx -- Value for 'month_idx' column
+        """
+        if data_dict:
+            existing = self._adb.conn.execute(
+                sa.select(self._col_digest, self._col_data).where(
+                    self._col_digest.in_(data_dict.keys()))).fetchall()
+            for existing_digest, existing_data in existing:
+                incoming_bytes = \
+                    BytesUtils.json_to_bytes(data_dict[existing_digest])
+                if lz4.frame.decompress(existing_data) != incoming_bytes:
+                    raise DbFormatError(
+                        f"SHA-256[:16] collision detected on "
+                        f"'{self._table_name}' digest {existing_digest}: "
+                        f"stored content differs from incoming content "
+                        f"(digest dedup key too short to trust)",
+                        code_line=LineNumber.current(),
+                        data=data_dict[existing_digest])
+        super().update_db(data_dict=data_dict, month_idx=month_idx)
 
 
 class MaxEirpTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
@@ -2177,7 +2300,7 @@ class MaxEirpTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
                 op_class: int = av_chan_info_j["globalOperatingClass"]
                 for channel, eirp in zip(av_chan_info_j["channelCfi"],
                                          av_chan_info_j["maxEirp"]):
-                    ret.append({ms(self._col_digest.name): data_key.urn,
+                    ret.append({ms(self._col_digest.name): data_key,
                                 ms(self._col_month_idx.name): month_idx,
                                 ms(self._col_op_class.name): op_class,
                                 ms(self._col_channel.name): channel,
@@ -2236,7 +2359,7 @@ class MaxPsdTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
                 av_freq_info_j = jd(av_freq_info)
                 freq_range = jd(av_freq_info_j["frequencyRange"])
                 ret.append(
-                    {ms(self._col_digest.name): data_key.urn,
+                    {ms(self._col_digest.name): data_key,
                      ms(self._col_month_idx.name): month_idx,
                      ms(self._col_low.name): freq_range["lowFrequency"],
                      ms(self._col_high.name): freq_range["highFrequency"],
@@ -2390,12 +2513,12 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
                         resp_data += \
                             ("," if resp_data else "") + ",".join(field_value)
             return [{
-                ms(self._col_digest.name): data_key.urn,
+                ms(self._col_digest.name): data_key,
                 ms(self._col_month_idx.name): month_idx,
                 ms(self._col_afc_config_digest.name):
                     self._afc_config_lookup.key_for_value(
                         json_dict[AlsMessageBundle.JRR_CONFIG_TEXT_KEY],
-                        month_idx=month_idx).urn,
+                        month_idx=month_idx),
                 ms(self._col_customer_id.name):
                     self._customer_lookup.key_for_value(
                         json_dict[AlsMessageBundle.JRR_CUSTOMER_KEY],
@@ -2410,18 +2533,18 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
                         month_idx=month_idx),
                 ms(self._col_req_digest.name):
                     BytesUtils.json_to_uuid(
-                        json_dict[AlsMessageBundle.JRR_REQUEST_KEY]).urn,
+                        json_dict[AlsMessageBundle.JRR_REQUEST_KEY]),
                 ms(self._col_resp_digest.name):
                     BytesUtils.json_to_uuid(
-                        json_dict[AlsMessageBundle.JRR_RESPONSE_KEY]).urn,
+                        json_dict[AlsMessageBundle.JRR_RESPONSE_KEY]),
                 ms(self._col_dev_desc_digest.name):
                     BytesUtils.json_to_uuid(
                         json_dict[AlsMessageBundle.JRR_REQUEST_KEY][
-                            "deviceDescriptor"]).urn,
+                            "deviceDescriptor"]),
                 ms(self._col_loc_digest.name):
                     BytesUtils.json_to_uuid(
                         json_dict[AlsMessageBundle.JRR_REQUEST_KEY][
-                            "location"]).urn,
+                            "location"]),
                 ms(self._col_response_code.name):
                     json_dict[AlsMessageBundle.JRR_RESPONSE_KEY][
                         "response"]["responseCode"],
@@ -2434,10 +2557,10 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
                 code_line=LineNumber.exc(), data=data_object)
 
     def _update_foreign_targets(
-                self,
-                row_infos: Dict[uuid.UUID,
-                                Tuple[JSON_DATA_TYPE, List[ROW_DATA_TYPE]]],
-                month_idx: int) -> None:
+            self,
+            row_infos: Dict[uuid.UUID,
+                            Tuple[JSON_DATA_TYPE, List[ROW_DATA_TYPE]]],
+            month_idx: int) -> None:
         """ Updates tables this one references
 
         Arguments:
@@ -2452,17 +2575,17 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
             json_object = jd(json_obj)
             row = rows[0]
             updated_jsons[
-                uuid.UUID(js(row[ms(self._col_req_digest.name)]))] = \
+                ju(row[ms(self._col_req_digest.name)])] = \
                 json_object[AlsMessageBundle.JRR_REQUEST_KEY]
             updated_jsons[
-                uuid.UUID(js(row[ms(self._col_resp_digest.name)]))] = \
+                ju(row[ms(self._col_resp_digest.name)])] = \
                 json_object[AlsMessageBundle.JRR_RESPONSE_KEY]
-            updated_dev_desc[uuid.UUID(
-                js(row[ms(self._col_dev_desc_digest.name)]))] = \
+            updated_dev_desc[ju(
+                row[ms(self._col_dev_desc_digest.name)])] = \
                 jd(json_object[AlsMessageBundle.JRR_REQUEST_KEY])[
                     "deviceDescriptor"]
             updated_locations[
-                uuid.UUID(js(row[ms(self._col_loc_digest.name)]))] = \
+                ju(row[ms(self._col_loc_digest.name)])] = \
                 jd(jd(json_object[AlsMessageBundle.JRR_REQUEST_KEY])[
                     "location"])
         self._compressed_json_updater.update_db(data_dict=updated_jsons,
@@ -2571,7 +2694,7 @@ class EnvelopeTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
         month_idx   -- Month index
         """
         return \
-            [{ms(self._col_digest.name): data_key.urn,
+            [{ms(self._col_digest.name): data_key,
              ms(self._col_month_idx.name): month_idx,
              ms(self._col_data.name): data_object}]
 
@@ -2622,7 +2745,7 @@ class MtlsDnTableUpdater(TableUpdaterBase[uuid.UUID, str]):
                 # slightly off data. Catching them all
                 dn_json["undecodable"] = data_object
         return \
-            [{ms(self._col_digest.name): data_key.urn,
+            [{ms(self._col_digest.name): data_key,
               ms(self._col_month_idx.name): month_idx,
               ms(self._col_text.name): data_object,
               ms(self._col_json.name): dn_json}]
@@ -2692,7 +2815,7 @@ class RequestResponseAssociationTableUpdater(
                  ms(self._col_req_id.name): data_key.request_id,
                  ms(self._col_month_idx.name): month_idx,
                  ms(self._col_rr_digest.name):
-                 BytesUtils.json_to_uuid(data_object.invariant_json).urn,
+                 BytesUtils.json_to_uuid(data_object.invariant_json),
                  ms(self._col_expire_time.name): data_object.expire_time}]
 
     def _update_foreign_targets(
@@ -2710,7 +2833,7 @@ class RequestResponseAssociationTableUpdater(
         """
         self._request_response_updater.update_db(
             data_dict={
-                uuid.UUID(js(rows[0][ms(self._col_rr_digest.name)])):
+                ju(rows[0][ms(self._col_rr_digest.name)]):
                 rr.invariant_json
                 for rr, rows in row_infos.values()},
             month_idx=month_idx)
@@ -2765,11 +2888,24 @@ class DecodeErrorTableWriter(AlsTableBase):
              ms(self._col_time.name):
              datetime.datetime.now(dateutil.tz.tzlocal())})
         self._conn.execute(ins)
+        # SQLAlchemy 2.0 commit-as-you-go: make the audit row durable
+        # immediately, before the corresponding Kafka offset is committed.
+        # Without this the autobegun transaction is rolled back at exit
+        # and every decode_error record is silently lost.
+        self._conn.commit()
 
     def _serializer(self, obj: Any) -> Any:
         """ Serializer of non-JSON-ABLE objects """
         if isinstance(obj, AlsMessageBundle):
             return obj.dump()
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+        if isinstance(obj, uuid.UUID):
+            return str(obj)
+        if hasattr(obj, 'isoformat'):
+            return obj.isoformat()
+        if hasattr(obj, '__str__'):
+            return str(obj)
         raise TypeError(f"Can't (yet) serialize object of type {type(obj)}")
 
 
@@ -2881,11 +3017,11 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
                  ms(self._col_rx_time.name): parts.rx_timetag,
                  ms(self._col_tx_time.name): parts.tx_timetag,
                  ms(self._col_rx_envelope_digest.name):
-                 BytesUtils.json_to_uuid(parts.rx_envelope).urn,
+                 BytesUtils.json_to_uuid(parts.rx_envelope),
                  ms(self._col_tx_envelope_digest.name):
-                 BytesUtils.json_to_uuid(parts.tx_envelope).urn,
+                 BytesUtils.json_to_uuid(parts.tx_envelope),
                  ms(self._col_mtls_dn_digest.name):
-                 BytesUtils.text_to_uuid(parts.mtls_dn).urn,
+                 BytesUtils.text_to_uuid(parts.mtls_dn),
                  ms(self._col_ap_ip.name): parts.ap_ip,
                  ms(self._col_runtime_opt.name): parts.runtime_opt,
                  }]
@@ -2902,22 +3038,22 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
         month_idx -- Month index
         """
         self._rx_envelope_updater.update_db(
-            data_dict={uuid.UUID(js(rows[0]
-                                    [ms(self._col_rx_envelope_digest.name)])):
+            data_dict={ju(rows[0]
+                          [ms(self._col_rx_envelope_digest.name)]):
                        bundle.take_apart().rx_envelope
-                       for bundle, rows in row_infos.values()},
+                       for bundle, rows in row_infos.values() if bundle.take_apart().rx_envelope is not None},
             month_idx=month_idx)
         self._tx_envelope_updater.update_db(
-            data_dict={uuid.UUID(js(rows[0]
-                                    [ms(self._col_tx_envelope_digest.name)])):
+            data_dict={ju(rows[0]
+                          [ms(self._col_tx_envelope_digest.name)]):
                        bundle.take_apart().tx_envelope
-                       for bundle, rows in row_infos.values()},
+                       for bundle, rows in row_infos.values() if bundle.take_apart().tx_envelope is not None},
             month_idx=month_idx)
         self._mtls_dn_updater.update_db(
             data_dict={
-                uuid.UUID(js(rows[0][ms(self._col_mtls_dn_digest.name)])):
+                ju(rows[0][ms(self._col_mtls_dn_digest.name)]):
                 bundle.take_apart().mtls_dn
-                for bundle, rows in row_infos.values()},
+                for bundle, rows in row_infos.values() if bundle.take_apart().mtls_dn is not None},
             month_idx=month_idx)
 
     def _update_foreign_sources(
@@ -2942,7 +3078,7 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
                 rr_dict[
                     RequestResponseAssociationTableDataKey(
                         message_id=ji(inserted_row[0]), request_id=req_id)] = \
-                        request_response
+                    request_response
         self._rr_assoc_updater.update_db(data_dict=rr_dict,
                                          month_idx=month_idx)
 
@@ -2996,12 +3132,18 @@ class IncompleteAlsBundles:
             heapq.heappush(self._bundle_queue, bundle)
             self._bundle_map[message_key] = bundle
         bundle.update(message, kafka_position)
-        heapq.heapify(self._bundle_queue)
+        # Do NOT re-heapify per message (O(n) on the hot path).  Heap order
+        # is rebuilt lazily in get_oldest_bundle(), the sole ordering consumer.
         return ret
 
     def get_oldest_bundle(self) -> Optional[AlsMessageBundle]:
         """ Get the oldest bundle (None if collection is empty) """
-        return self._bundle_queue[0] if self._bundle_queue else None
+        if not self._bundle_queue:
+            return None
+        # add_message()/fetch_assembled() no longer maintain heap order;
+        # rebuild lazily here (only _timeout_als_messages consumes ordering).
+        heapq.heapify(self._bundle_queue)
+        return self._bundle_queue[0]
 
     def get_incomplete_count(self) -> int:
         """ Number of incomplete (not yet assembled) bundles """
@@ -3024,21 +3166,24 @@ class IncompleteAlsBundles:
         Returns list of bundles
         """
         ret: List[AlsMessageBundle] = []
-        idx = 0
+        remaining: List[AlsMessageBundle] = []
         num_requests = 0
-        while (idx < len(self._bundle_queue)) and \
-                ((max_bundles is None) or (len(ret) < max_bundles)):
-            bundle = self._bundle_queue[idx]
-            if not bundle.assembled():
-                idx += 1
+        limit_hit = False
+        for bundle in self._bundle_queue:
+            if limit_hit or (not bundle.assembled()):
+                remaining.append(bundle)
                 continue
             if (max_requests is not None) and \
                     ((num_requests + bundle.request_count()) > max_requests):
-                break
+                limit_hit = True
+                remaining.append(bundle)
+                continue
             ret.append(bundle)
             del self._bundle_map[bundle.message_key()]
-            self._bundle_queue.pop(idx)
-            heapq.heapify(self._bundle_queue)
+            if (max_bundles is not None) and (len(ret) >= max_bundles):
+                limit_hit = True
+        if ret:
+            self._bundle_queue = remaining
         return ret
 
 
@@ -3103,7 +3248,11 @@ class KafkaClient:
         _ArgDsc(config="ssl.cipher.suites", cmdline="kafka_ssl_ciphers"),
         _ArgDsc(config="max.partition.fetch.bytes",
                 cmdline="kafka_max_partition_fetch_bytes"),
-        _ArgDsc(config="enable.auto.commit", default=True),
+        # SASL authentication options
+        _ArgDsc(config="sasl.mechanism", cmdline="kafka_sasl_mechanism"),
+        _ArgDsc(config="sasl.username", cmdline="kafka_sasl_username"),
+        _ArgDsc(config="sasl.password", cmdline="kafka_sasl_password"),
+        _ArgDsc(config="enable.auto.commit", default=False),
         _ArgDsc(config="group.id", default="ALS"),
         _ArgDsc(config="auto.offset.reset", default="earliest")]
 
@@ -3130,6 +3279,16 @@ class KafkaClient:
         if config.get("client.id", "").endswith("@"):
             config["client.id"] = config["client.id"][:-1] + \
                 "".join(f"{b:02X}" for b in os.urandom(10))
+        effective_proto = \
+            (config.get("security.protocol") or "PLAINTEXT").strip().upper()
+        error_if(
+            effective_proto == "PLAINTEXT"
+            and not os.environ.get("ALS_SIPHON_ALLOW_PLAINTEXT_KAFKA"),
+            "Refusing unauthenticated Kafka ingest: "
+            "effective security.protocol is PLAINTEXT (the audit-log "
+            "producer would be unauthenticated). Use SASL_SSL/SASL_PLAINTEXT/"
+            "SSL, or set ALS_SIPHON_ALLOW_PLAINTEXT_KAFKA=1 to override for "
+            "development.")
         try:
             self._consumer = confluent_kafka.Consumer(config)
         except confluent_kafka.KafkaException as ex:
@@ -3150,7 +3309,7 @@ class KafkaClient:
                      ("Gauge", "siphon_comitted_offsets",
                       "Committed Kafka offsets", ["topic", "partition"])])
         self._als_topic = als_topic
-        self._json_log_topic_prefix = json_log_topic_prefix
+        self._json_log_topic_prefix = json_log_topic_prefix if json_log_topic_prefix is not None else ""
 
     def subscription_check(self) -> None:
         """ If it's time - check if new matching topics arrived and resubscribe
@@ -3328,7 +3487,7 @@ class Siphon:
         self._ldb = ldb
         self._kafka_client = kafka_client
         self._als_topic = als_topic
-        self._json_log_topic_prefix = json_log_topic_prefix
+        self._json_log_topic_prefix = json_log_topic_prefix if json_log_topic_prefix is not None else ""
         if self._adb:
             self._decode_error_writer = DecodeErrorTableWriter(adb=self._adb)
             self._lookups = Lookups()
@@ -3432,7 +3591,10 @@ class Siphon:
             self._kafka_positions.add(kafka_message.position)
             self._metrics.siphon_als_received().inc()
             try:
-                assert kafka_message.key is not None
+                if kafka_message.key is None:
+                    raise AlsProtocolError("ALS Kafka message has no key",
+                                           code_line=LineNumber.current(),
+                                           data=kafka_message.value)
                 if self._als_bundles.add_message(
                         message_key=kafka_message.key,
                         message=AlsMessage(raw_msg=kafka_message.value),
@@ -3444,6 +3606,12 @@ class Siphon:
                 self._metrics.siphon_als_malformed().inc()
                 self._decode_error_writer.write_decode_error(
                     msg=ex.msg, line=ex.code_line, data=ex.data)
+                self._kafka_positions.mark_processed(
+                    kafka_position=kafka_message.position)
+            except Exception as ex:
+                self._metrics.siphon_als_malformed().inc()
+                self._decode_error_writer.write_decode_error(
+                    msg=str(ex), line=None, data=kafka_message.value)
                 self._kafka_positions.mark_processed(
                     kafka_position=kafka_message.position)
 
@@ -3483,10 +3651,20 @@ class Siphon:
                     records=records)
                 transaction.commit()
                 transaction = None
+                for kafka_message in kafka_messages:
+                    self._kafka_positions.mark_processed(
+                        kafka_position=kafka_message.position)
+            except sa.exc.SQLAlchemyError as ex:
+                logging.error(
+                    f"DB write failed for topic {topic!r}, offsets NOT committed: {ex}")
+                return
             finally:
                 if transaction is not None:
                     transaction.rollback()
-        self._kafka_positions.mark_processed(topic=topic)
+        else:
+            for kafka_message in kafka_messages:
+                self._kafka_positions.mark_processed(
+                    kafka_position=kafka_message.position)
 
     def _write_als_messages(self) -> bool:
         """ Write complete ALS Bundles to ALS database.
@@ -3494,6 +3672,10 @@ class Siphon:
         assert self._adb is not None
         month_idx = utils.get_month_idx()
         transaction: Optional[Any] = None
+        # Bind before the try block: fetch_assembled() may raise
+        # JsonFormatError before the assignment below completes, and the
+        # except handler dereferences data_dict
+        data_dict: Dict[int, Any] = {}
         try:
             data_dict = \
                 dict(
@@ -3511,20 +3693,61 @@ class Siphon:
             self._metrics.siphon_afc_msg_in_progress().set(
                 self._als_bundles.get_incomplete_count())
             transaction = None
-        except JsonFormatError as ex:
+        except (JsonFormatError, DbFormatError) as ex:
+            # One poison bundle in the batch caused the whole transaction to
+            # roll back.  Rather than discarding every co-batched (legitimate)
+            # bundle's audit records, replay the batch one bundle at a time so
+            # only the faulting bundle is dropped and the rest are persisted.
             if transaction is not None:
                 transaction.rollback()
                 transaction = None
-            self._lookups.reread()
-            self._decode_error_writer.write_decode_error(
-                ex.msg, line=ex.code_line, data=ex.data)
-        except DbFormatError as ex:
-            self._metrics.siphon_als_malformed().inc()
-            logging.error(f"Error writing ALS database: {repr(ex)}")
+            if isinstance(ex, JsonFormatError):
+                self._lookups.reread()
+            self._write_als_messages_individually(data_dict, month_idx=month_idx)
         finally:
             if transaction is not None:
                 transaction.rollback()
         return True
+
+    def _write_als_messages_individually(
+            self, data_dict: Dict[int, Any], month_idx: int) -> None:
+        """ Write each assembled bundle in its own transaction.
+
+        Used as a fallback when a batch write fails: isolates the poison
+        bundle so co-batched legitimate audit records are not lost.
+        """
+        assert self._adb is not None
+        for key, bundle in data_dict.items():
+            transaction: Optional[Any] = None
+            try:
+                transaction = self._adb.conn.begin()
+                self._afc_message_updater.update_db(
+                    {key: bundle}, month_idx=month_idx)
+                transaction.commit()
+                transaction = None
+                self._metrics.siphon_afc_msg_completed().inc(1)
+                self._metrics.siphon_afc_req_completed().inc(
+                    bundle.request_count())
+            except JsonFormatError as ex:
+                if transaction is not None:
+                    transaction.rollback()
+                    transaction = None
+                self._lookups.reread()
+                self._decode_error_writer.write_decode_error(
+                    ex.msg, line=ex.code_line, data=ex.data)
+            except DbFormatError as ex:
+                if transaction is not None:
+                    transaction.rollback()
+                    transaction = None
+                self._metrics.siphon_als_malformed().inc()
+                logging.error(f"Error writing ALS database: {repr(ex)}")
+                self._decode_error_writer.write_decode_error(
+                    ex.msg, line=ex.code_line, data=bundle.dump())
+            finally:
+                if transaction is not None:
+                    transaction.rollback()
+        self._metrics.siphon_afc_msg_in_progress().set(
+            self._als_bundles.get_incomplete_count())
 
     def _timeout_als_messages(self) -> bool:
         """ Throw away old incomplete ALS messages.
@@ -3639,6 +3862,7 @@ def do_init_db(args: Any) -> None:
                                                  read_sql_file(sql_file)):
                                 if stmt:
                                     conn.execute(sa.text(stmt))
+                            conn.commit()
                 except sa.exc.SQLAlchemyError as ex:
                     error(f"{db_class.name_for_logs()} database "
                           f"initialization failed: {ex}")
@@ -3658,6 +3882,28 @@ def do_init_db(args: Any) -> None:
             db.dispose()
 
 
+def _start_token_gated_prometheus(port: int) -> None:
+    """Start Prometheus metrics on `port` behind an X-AFC-Internal-Token gate
+    (S0096-14 parity with afc_server/rat_server /metrics)."""
+    expected = appcfg.read_secret("AFC_INTERNAL_TOKEN")
+    metrics_app = prometheus_client.make_wsgi_app()
+
+    def gated_app(environ: Any,
+                  start_response: Any) -> Iterable[bytes]:
+        supplied = environ.get("HTTP_X_AFC_INTERNAL_TOKEN", "")
+        if (not expected) or \
+                (not hmac.compare_digest(supplied, expected)):
+            start_response("403 Forbidden",
+                           [("Content-Type", "text/plain")])
+            return [b"Forbidden"]
+        return metrics_app(environ, start_response)
+
+    httpd = wsgiref.simple_server.make_server("", port, gated_app)
+    t = threading.Thread(target=httpd.serve_forever)
+    t.daemon = True
+    t.start()
+
+
 def do_siphon(args: Any) -> None:
     """Execute "siphon" command.
 
@@ -3665,7 +3911,7 @@ def do_siphon(args: Any) -> None:
     args -- Parsed command line arguments
     """
     if args.prometheus_port is not None:
-        prometheus_client.start_http_server(args.prometheus_port)
+        _start_token_gated_prometheus(args.prometheus_port)
     adb = AlsDatabase(arg_conn_str=args.als_postgres,
                       arg_password_file=args.als_postgres_password_file) \
         if args.als_postgres else None
@@ -3774,9 +4020,12 @@ def main(argv: List[str]) -> None:
         f"'@' - supplemented with random string (to achieve uniqueness). "
         f"Default is '{DEFAULT_KAFKA_CLIENT_ID}'")
     switches_kafka.add_argument(
-        "--kafka_security_protocol", choices=["", "PLAINTEXT", "SSL"],
+        "--kafka_security_protocol",
+        choices=["", "PLAINTEXT", "SSL", "SASL_PLAINTEXT", "SASL_SSL"],
         type=docker_arg_type(str, default="PLAINTEXT"),
-        help="Security protocol to use. Default is 'PLAINTEXT'")
+        help="Security protocol to use. Default is 'PLAINTEXT'. "
+             "Use SASL_PLAINTEXT or SASL_SSL with --kafka_sasl_mechanism, "
+             "--kafka_sasl_username, and --kafka_sasl_password for SASL auth.")
     switches_kafka.add_argument(
         "--kafka_ssl_keyfile", metavar="FILENAME", type=docker_arg_type(str),
         help="Client private key file for SSL authentication")
@@ -3790,6 +4039,28 @@ def main(argv: List[str]) -> None:
         "--kafka_max_partition_fetch_bytes", metavar="SIZE_IN_BYTES",
         type=docker_arg_type(int),
         help="Maximum size of Kafka message (default is 1MB)")
+    # SASL authentication arguments
+    switches_kafka.add_argument(
+        "--kafka_sasl_mechanism", metavar="MECHANISM",
+        type=docker_arg_type(str),
+        help="SASL mechanism (e.g. PLAIN, SCRAM-SHA-256, GSSAPI). "
+             "Required when using SASL_PLAINTEXT or SASL_SSL protocol.")
+    switches_kafka.add_argument(
+        "--kafka_sasl_username", metavar="USERNAME",
+        type=docker_arg_type(str),
+        help="SASL username for PLAIN/SCRAM authentication.")
+    switches_kafka.add_argument(
+        "--kafka_sasl_password", metavar="PASSWORD",
+        type=docker_arg_type(str),
+        help="SASL password for PLAIN/SCRAM authentication. Prefer "
+        "--kafka_sasl_password_file (Docker secret) - this switch leaves "
+        "the password readable via /proc/<pid>/cmdline and `docker "
+        "inspect`.")
+    switches_kafka.add_argument(
+        "--kafka_sasl_password_file", metavar="PASSWORD_FILE",
+        type=docker_arg_type(str),
+        help="File (e.g. Docker secret) with SASL password for PLAIN/SCRAM "
+        "authentication. Takes precedence over --kafka_sasl_password.")
     switches_kafka.add_argument(
         "--als_topic", metavar="KAFKA_ALS_TOPIC",
         type=docker_arg_type(str, default=DEFAULT_ALS_TOPIC),
@@ -3922,6 +4193,19 @@ def main(argv: List[str]) -> None:
         sys.exit(1)
     args = argument_parser.parse_args(argv)
 
+    # Credentials must never be accepted only via argv: resolve
+    # --kafka_sasl_password_file (Docker secret) in preference to the
+    # literal --kafka_sasl_password, mirroring the postgres
+    # *_password_file switches.
+    kafka_sasl_password_file = getattr(args, "kafka_sasl_password_file", None)
+    if kafka_sasl_password_file:
+        try:
+            with open(kafka_sasl_password_file) as f:
+                args.kafka_sasl_password = f.read().strip()
+        except OSError as ex:
+            error(f"Cannot read --kafka_sasl_password_file "
+                  f"'{kafka_sasl_password_file}': {ex}")
+
     # Set up logging
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(
@@ -3929,12 +4213,17 @@ def main(argv: List[str]) -> None:
             f"{os.path.basename(__file__)}. %(levelname)s: %(message)s"))
     logging.getLogger().addHandler(console_handler)
     logging.getLogger().setLevel(logging.INFO)
+    appcfg.install_credential_redact_filter()
 
     if args.func != do_help:
         logging.info("Arguments:")
         for arg, value in \
                 sorted(args.__dict__.items(), key=lambda kvp: kvp[0]):
             if (arg != "func") and (value is not None):
+                if arg == "kafka_sasl_password":
+                    value = "<REDACTED>"
+                elif arg in ("als_postgres", "log_postgres"):
+                    value = db_utils.safe_dsn(value)
                 logging.info(f"    {arg}: {value}")
 
     # Do the needful

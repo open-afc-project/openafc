@@ -4,9 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-from setuptools import setup, find_packages
+from setuptools import setup
 from setuptools.command.install import install
-import os
 
 
 class InstallCmdWrapper(install):

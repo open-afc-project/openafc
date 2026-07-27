@@ -4,5 +4,23 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-gevent==23.9.1
-gunicorn==23.0.0
+# Hash-pinned via:
+#   docker run --rm -v "$(pwd)/objstorage/requirements.txt:/req.txt:ro" \
+#     python:3.12-alpine sh -c \
+#     "pip download -q --no-cache-dir --dest /p -r /req.txt 2>/dev/null && \
+#      for f in /p/*.whl /p/*.tar.gz; do [ -f \"\$f\" ] || continue;
+#        n=\$(basename \"\$f\"); h=\$(sha256sum \"\$f\" | cut -d' ' -f1);
+#        printf '%s sha256:%s\n' \"\$n\" \"\$h\"; done"
+#
+gevent==26.5.0 \
+    --hash=sha256:0bf57df54f1c66273bf3601c2a1e41b12138fe848933718369663bc54f177ca2
+greenlet==3.5.3 \
+    --hash=sha256:6b1b0eed82364b0e32c4ea0f221452d33e6bb17ae094d9f72aed9851812747ea
+gunicorn==26.0.0 \
+    --hash=sha256:40233d26a5f0d1872916188c276e21641155111c2853f0c2cd55260aec0d24fc
+packaging==26.2 \
+    --hash=sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e
+zope.event==6.2 \
+    --hash=sha256:5e755153ac4faf64c10a4b6dd3307680166a3edf65b38df22df592610f8fa874
+zope.interface==8.5 \
+    --hash=sha256:7a3ba1c5877f0f3e3906b02ddf793abed2becc2948116414ce0e1dd820b68d6d

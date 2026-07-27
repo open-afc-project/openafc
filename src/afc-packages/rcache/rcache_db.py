@@ -18,19 +18,25 @@ try:
     import geoalchemy2 as ga
 except ImportError:
     pass
+import datetime
 import sqlalchemy as sa
 import sys
 from typing import Any, cast, Dict, List, NamedTuple, Optional, Tuple
 import urllib.parse
 
 import db_utils
-from log_utils import dp, error, error_if, FailOnError, get_module_logger
+from log_utils import error, error_if, FailOnError, get_module_logger
 from rcache_models import ApDbRespState, ApDbRecord
 
 __all__ = ["RcacheDb", "RcacheLookupResult"]
 
 # Logger for this module
 LOGGER = get_module_logger()
+
+# Maximum age of a cache row before lookup() treats it as a miss regardless
+# of state -- defence-in-depth bound on grant staleness independent of the
+# invalidation pipeline's health
+RCACHE_MAX_AGE = datetime.timedelta(hours=48)
 
 
 class RcacheLookupResult(NamedTuple):
@@ -162,6 +168,13 @@ class RcacheDb:
                     error(f"Error creating Rcache database "
                           f"'{db_utils.safe_dsn(self.rcache_db_dsn)}': {ex}")
 
+                try:
+                    self.metadata.create_all(engine)
+                    self._read_metadata()
+                except sa.exc.SQLAlchemyError as ex:
+                    error(f"Unable to (re)create tables in the database "
+                          f"'{self.db_name}': {ex}")
+
                 if alembic_config:
                     err = \
                         db_utils.alembic_ensure_version(
@@ -170,20 +183,6 @@ class RcacheDb:
                             initial_version=alembic_initial_version,
                             head_version=alembic_head_version)
                     error_if(err, err)
-                try:
-                    with engine.connect() as conn:
-                        conn.execute("COMMIT")
-                        conn.execute(
-                            "CREATE EXTENSION IF NOT EXISTS postgis")
-                except sa.exc.SQLAlchemyError as ex:
-                    error(f"Unable to create PostGIS extension in "
-                          f"'{self.db_name}': {ex}")
-                try:
-                    self.metadata.create_all(engine)
-                    self._read_metadata()
-                except sa.exc.SQLAlchemyError as ex:
-                    error(f"Unable to (re)create tables in the database "
-                          f"'{self.db_name}': {ex}")
                 self._update_ap_table()
                 self._engine = engine
                 engine = None
@@ -244,10 +243,12 @@ class RcacheDb:
             if try_reconnect and (self._engine is None):
                 self.connect()
             assert (self._engine is not None) and (self.ap_table is not None)
-            s = sa.select([self.ap_table]).\
+            s = sa.select(self.ap_table).\
                 where(self.ap_table.c.req_cfg_digest.in_(req_cfg_digests))
             if not return_invalidated:
                 s = s.where(self.ap_table.c.state == ApDbRespState.Valid.name)
+            s = s.where(self.ap_table.c.last_update >
+                        (datetime.datetime.now() - RCACHE_MAX_AGE))
             try:
                 with self._engine.connect() as conn:
                     rp = conn.execute(s)
@@ -255,7 +256,8 @@ class RcacheDb:
                         {rec.req_cfg_digest:
                          RcacheLookupResult(
                              found=rec.state == ApDbRespState.Valid.name,
-                             response=ApDbRecord.parse_obj(rec).
+                             response=ApDbRecord.model_validate(
+                                 dict(rec._mapping)).
                              get_patched_response())
                             for rec in rp}
             except sa.exc.SQLAlchemyError as ex:

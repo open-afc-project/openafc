@@ -10,6 +10,10 @@ AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 if [ -z "$AFC_WORKER_CELERY_CONCURRENCY" ]; then
     export AFC_WORKER_CELERY_CONCURRENCY=$(nproc)
 fi
+# Comma-separated list of queues each worker consumes.
+# Default: both the AP queue and the dedicated GUI queue so that all
+# workers can serve either class of request.
+AFC_WORKER_CELERY_QUEUES="${AFC_WORKER_CELERY_QUEUES:-celery_gui,celery}"
 case "$AFC_DEVEL_ENV" in
   "devel")
     echo "Running debug profile" 
@@ -65,7 +69,7 @@ fi
 # Celery worker shutdown function
 shutdown_celery_workers() {
     echo "Shutting down Celery workers gracefully..."
-    celery multi stopwait $AFC_WORKER_CELERY_WORKERS $AFC_WORKER_CELERY_OPTS -A afc_worker --concurrency=$AFC_WORKER_CELERY_CONCURRENCY --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$AFC_WORKER_CELERY_LOG
+    celery multi stopwait $AFC_WORKER_CELERY_WORKERS $AFC_WORKER_CELERY_OPTS -A afc_worker --queues=$AFC_WORKER_CELERY_QUEUES --concurrency=$AFC_WORKER_CELERY_CONCURRENCY --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$AFC_WORKER_CELERY_LOG
     echo "Celery workers have been gracefully shut down"
     exit 0
 }
@@ -73,7 +77,7 @@ shutdown_celery_workers() {
 # Trap SIGTERM signal
 trap 'shutdown_celery_workers' TERM
 
-celery multi start $AFC_WORKER_CELERY_WORKERS $AFC_WORKER_CELERY_OPTS -A afc_worker --concurrency=$AFC_WORKER_CELERY_CONCURRENCY --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$AFC_WORKER_CELERY_LOG
+celery multi start $AFC_WORKER_CELERY_WORKERS $AFC_WORKER_CELERY_OPTS -A afc_worker --queues=$AFC_WORKER_CELERY_QUEUES --concurrency=$AFC_WORKER_CELERY_CONCURRENCY --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$AFC_WORKER_CELERY_LOG
 
 sleep infinity &
 

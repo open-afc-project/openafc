@@ -22,10 +22,12 @@ RCACHE="${PUB_REPO}/rcache-image"                             # Request cache
 AFC_SERVER="${PUB_REPO}/afcserver-image"                      # AFC Server image
 GRAFANA="${PUB_REPO}/grafana-image"                           # Grafana
 LOKI="${PUB_REPO}/loki-image"                                 # Loki
-PROMTAIL="${PUB_REPO}/promtail-image"                         # Promtail
+ALLOY="${PUB_REPO}/alloy-image"                               # Grafana Alloy (replaces Promtail)
 PROMETHEUS="${PUB_REPO}/prometheus-image"                     # Prometheus
 CADVISOR="${PUB_REPO}/cadvisor-image"                         # Cadvisor
 NGINXEXPORTER="${PUB_REPO}/nginxexporter-image"               # Nginx-exporter
+KAFKAUI="${PUB_REPO}/kafka-ui-image"                          # Kafka UI (monitoring console)
+SOCKET_PROXY="${PUB_REPO}/socket-proxy"                       # Docker socket proxy (HAProxy)
 GEO_CONVERTERS="${PUB_REPO}/geo-converters-image"             # Geodeti cconverters
 
 WORKER=${PRIV_REPO}"/afc-worker"                                    # msghnd image
@@ -61,8 +63,15 @@ docker_build() {
   file=${1}    # Name of the Dockerfile
   image=${2}   # Name and optionally a tag in the 'name:tag' format
   args=${3}
+  # Pass ~/.npmrc as a BuildKit secret when present so that Dockerfiles that
+  # use --mount=type=secret,id=npmrc can authenticate to the private npm registry.
+  # Unused secrets are silently ignored by other Dockerfiles.
+  local secret_args=""
+  if [ -f "${HOME}/.npmrc" ]; then
+    secret_args="--secret id=npmrc,src=${HOME}/.npmrc"
+  fi
   msg "docker build ${file} file into ${image} image extra args: ${args}"
-  docker build . -f ${file} -t ${image} ${args}
+  docker build . -f ${file} -t ${image} ${args} ${secret_args}
   check_ret $?
 }
 
@@ -215,14 +224,20 @@ build_dev_server() {
   (cd ${wd}/prometheus && docker_build_and_push Dockerfile-nginxexporter ${NGINXEXPORTER}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
   build_pids+=( $! ) ; build_names+=( ${NGINXEXPORTER} )
 
+  (cd ${wd}/prometheus && docker_build_and_push Dockerfile-kafkaui ${KAFKAUI}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
+  build_pids+=( $! ) ; build_names+=( ${KAFKAUI} )
+
   docker_build_and_push ${wd}/grafana/Dockerfile-grafana ${GRAFANA}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
   build_pids+=( $! ) ; build_names+=( ${GRAFANA} )
 
   (cd ${wd}/grafana && docker_build_and_push Dockerfile-loki ${LOKI}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
   build_pids+=( $! ) ; build_names+=( ${LOKI} )
 
-  (cd ${wd}/grafana && docker_build_and_push Dockerfile-promtail ${PROMTAIL}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
-  build_pids+=( $! ) ; build_names+=( ${PROMTAIL} )
+  (cd ${wd}/grafana && docker_build_and_push Dockerfile-alloy ${ALLOY}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
+  build_pids+=( $! ) ; build_names+=( ${ALLOY} )
+
+  docker_build_and_push ${wd}/socket-proxy/Dockerfile ${SOCKET_PROXY}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}" &
+  build_pids+=( $! ) ; build_names+=( ${SOCKET_PROXY} )
 
   (cd ${wd}/tools/geo_converters && docker_build_and_push Dockerfile ${GEO_CONVERTERS}:${tag} ${push} "${PACKAGE_REGISTRY_ARGS}") &
   build_pids+=( $! ) ; build_names+=( ${GEO_CONVERTERS} )

@@ -10,14 +10,13 @@
 import json
 import logging
 import os
-import ratapi
 import shutil
 import sqlalchemy
+import tempfile
 import time
 import sys
 import click
 import flask
-from flask_migrate import MigrateCommand
 from flask.cli import FlaskGroup, with_appcontext
 from flask_migrate import Migrate
 import werkzeug.exceptions
@@ -25,7 +24,6 @@ from . import create_app
 from afcmodels.base import db
 from afcmodels.hardcoded_relations import RulesetVsRegion, \
     CERT_ID_LOCATION_UNKNOWN, CERT_ID_LOCATION_OUTDOOR, CERT_ID_LOCATION_INDOOR
-from .db.generators import shp_to_spatialite, spatialite_to_raster
 from prettytable import PrettyTable
 from . import cmd_utils
 import als
@@ -183,7 +181,9 @@ class DbCreate:
 
             if if_absent:
                 try:
-                    with db.engine.connect():
+                    with db.engine.connect() as conn:
+                        conn.execute(sqlalchemy.text(
+                            "SELECT 1 FROM aaa_user LIMIT 1"))
                         LOGGER.info("Database already exists")
                         return
                 except sqlalchemy.exc.SQLAlchemyError:
@@ -201,6 +201,15 @@ class DbCreate:
             get_or_create(db.session, Role, name='Trial')
             for rule in ruleset_list:
                 get_or_create(db.session, Ruleset, name=rule)
+
+            import uuid
+            from afcmodels.aaa import User
+            for user in User.query.filter(
+                    (User.fs_uniquifier == None) |  # noqa: E711
+                    (User.fs_uniquifier == '')).all():
+                user.fs_uniquifier = uuid.uuid4().hex
+            db.session.commit()
+
             stamp(directory=os.path.join(os.path.dirname(__file__),
                                          "migrations"),
                   revision='head')
@@ -212,7 +221,6 @@ class DbDrop:
     def __call__(self, flaskapp):
         LOGGER.debug('DbDrop.__call__()')
         with flaskapp.app_context():
-            from afcmodels.aaa import User, Role
             db.drop_all()
 
 
@@ -230,7 +238,6 @@ class DbExport:
 
         with flaskapp.app_context():
             limit = None
-            user_info = {}
             user_cfg = {}
             for user, _, role in db.session.query(
                     User, UserRole, Role).filter(
@@ -280,14 +287,12 @@ class DbExport:
 
 
 def setUserIdNextVal():
-    # Set nextval for the sequence so that next user record
-    # will not reuse older id.
     cmd = 'select max(id) from aaa_user'
-    res = db.session.execute(cmd)
+    res = db.session.execute(sqlalchemy.text(cmd))
     val = res.fetchone()[0]
     if val:
         cmd = 'ALTER SEQUENCE aaa_user_id_seq RESTART WITH ' + str(val + 1)
-    db.session.execute(cmd)
+    db.session.execute(sqlalchemy.text(cmd))
     db.session.commit()
 
 
@@ -299,7 +304,7 @@ class DbImport:
 
     def __call__(self, flaskapp, src):
         LOGGER.debug('DbImport.__call__() %s', src)
-        from afcmodels.aaa import User, Limit
+        from afcmodels.aaa import Limit
 
         filename = src
         if not os.path.exists(filename):
@@ -332,7 +337,7 @@ class DbImport:
                             if limits is None:
                                 limits = Limit(limit[0]['min_eirp'])
                                 db.session.add(limits)
-                            elif (limit[0]['enforce'] == False):
+                            elif (not limit[0]['enforce']):
                                 limits.enforce = False
                             else:
                                 limits.min_eirp = limit[0]['min_eirp']
@@ -353,13 +358,12 @@ class DbUpgrade:
 
     def __call__(self, flaskapp):
         with flaskapp.app_context():
-            import flask
             from afcmodels.aaa import Ruleset
             from flask_migrate import (upgrade, stamp)
             setUserIdNextVal()
             try:
                 from afcmodels.aaa import User
-                user = db.session.query(
+                db.session.query(
                     User).first()  # pylint: disable=no-member
             except Exception as exception:
                 if 'aaa_user.username does not exist' in str(exception.args):
@@ -389,12 +393,19 @@ def user_group(log_level):
 
 @user_group.command('create')
 @click.argument('username', type=str)
-@click.argument('password_in', type=str)
+@click.option('--password-file', 'password_file', type=str, default=None,
+              help='Read password from file (e.g. /dev/stdin); prompts if omitted')
 @click.option('--role', type=click.Choice(['Admin', 'Super', 'Analysis', 'AP', 'Trial']), multiple=True, help='role to include with the new user')
 @click.option('--org', type=str, help='Organization')
 @click.option('--email', type=str, help='User email')
 @with_appcontext
-def user_create(username, password_in, role, org, email):
+def user_create(username, password_file, role, org, email):
+    if password_file:
+        with open(password_file) as pwfile:
+            password_in = pwfile.read().strip()
+    else:
+        password_in = click.prompt('Password', hide_input=True,
+                                   confirmation_prompt=True)
     UserCreate()(flaskapp=flask.current_app, username=username,
                  password_in=password_in, role=role, org=org, email=email)
 
@@ -408,30 +419,23 @@ class UserCreate:
         from contextlib import closing
         import datetime
         from afcmodels.aaa import User, Role, Organization
-        LOGGER.debug('UserCreate.__create_user() %s %s %s',
-                     email, password_in, role)
+        LOGGER.debug('UserCreate.__create_user() %s %s',
+                     email, role)
 
         if 'UPGRADE_REQ' in flaskapp.config and flaskapp.config['UPGRADE_REQ']:
             return
         try:
             if not hashed:
                 # hash password field in non OIDC mode
-                if isinstance(password_in, str):
-                    password = password_in.strip()
-                else:
-                    with closing(open(password_in)) as pwfile:
-                        password = pwfile.read().strip()
+                password = password_in.strip()
 
                 if flaskapp.config['OIDC_LOGIN']:
-                    # OIDC, password is never stored locally
-                    # Still we hash it so that if we switch back
-                    # to non OIDC, the hash still match, and can be logged in
                     from passlib.context import CryptContext
                     password_crypt_context = CryptContext(['bcrypt'])
                     passhash = password_crypt_context.encrypt(password_in)
                 else:
-                    passhash = flaskapp.user_manager.password_manager.hash_password(
-                        password)
+                    from flask_security import hash_password
+                    passhash = hash_password(password)
             else:
                 passhash = password_in
 
@@ -533,7 +537,6 @@ class UserUpdate:
 
     def _update_user(self, flaskapp, email, role, org=None):
         ''' Create user in database. '''
-        from contextlib import closing
         from afcmodels.aaa import User, Role, Organization
 
         if 'UPGRADE_REQ' in flaskapp.config and flaskapp.config['UPGRADE_REQ']:
@@ -555,7 +558,7 @@ class UserUpdate:
                     organization = Organization.query.filter_by(
                         name=org).first()
                     if not organization:
-                        organization = aaa.Organization(name=org)
+                        organization = Organization(name=org)
                         db.session.add(
                             organization)  # pylint: disable=no-member
 
@@ -587,7 +590,7 @@ class UserRemove:
     ''' Remove a user by email. '''
 
     def _remove_user(self, flaskapp, email):
-        from afcmodels.aaa import User, Role
+        from afcmodels.aaa import User
         LOGGER.debug('UserRemove._remove_user() %s', email)
 
         with flaskapp.app_context():
@@ -679,8 +682,6 @@ class AccessPointDenyCreate:
     ''' Create a new access point. '''
 
     def _create_ap(self, flaskapp, serial, cert_id, ruleset, org):
-        from contextlib import closing
-        import datetime
         from afcmodels.aaa import AccessPointDeny, Organization, Ruleset
         LOGGER.debug('AccessPointDenyCreate._create_ap() %s %s %s',
                      serial, cert_id, ruleset)
@@ -800,7 +801,7 @@ class CertIdList:
 
     def __call__(self, flaskapp):
         table = PrettyTable()
-        from afcmodels.aaa import CertId, Organization
+        from afcmodels.aaa import CertId
 
         table.field_names = ["Cert ID", "Ruleset", "Loc", "Refreshed"]
         with flaskapp.app_context():
@@ -857,9 +858,7 @@ class CertIdCreate:
     ''' Create a new certification Id. '''
 
     def _create_cert_id(self, flaskapp, cert_id, ruleset_id, location=0):
-        from contextlib import closing
-        import datetime
-        from afcmodels.aaa import CertId, Ruleset, Organization
+        from afcmodels.aaa import CertId, Ruleset
         LOGGER.debug('CertIdCreate._create_cert_id() %s %s',
                      cert_id, ruleset_id)
         with flaskapp.app_context():
@@ -919,6 +918,7 @@ class CertIdSweep:
                 'content-type': 'application/x-www-form-urlencoded',
                 'user-agent': 'rat_server/1.0'
             }
+            local_filename = None
             try:
                 timeout = os.environ.get("REQUEST_TIMEOUT_SEC")
                 if timeout is not None:
@@ -926,10 +926,18 @@ class CertIdSweep:
                 with requests.get(url, headers, stream=True, timeout=timeout) as r:
                     r.raise_for_status()
 
-                    local_filename = "/tmp/SD6_list.csv"
-                    with open(local_filename, 'wb') as f:
+                    with tempfile.NamedTemporaryFile(
+                            mode='wb', suffix='.csv', delete=False) as tmp_f:
+                        local_filename = tmp_f.name
+                        max_bytes = 16 * 1024 * 1024
+                        total = 0
                         for chunk in r.iter_content(chunk_size=8192):
-                            f.write(chunk)
+                            total += len(chunk)
+                            if total > max_bytes:
+                                raise requests.exceptions.RequestException(
+                                    "CertId CA CSV exceeds %d bytes; "
+                                    "aborting download" % max_bytes)
+                            tmp_f.write(chunk)
 
                 with open(local_filename, newline='') as csvfile:
                     rdr = csv.reader(csvfile, delimiter=',')
@@ -969,9 +977,9 @@ class CertIdSweep:
                             pass
                     ruleset_id = \
                         Ruleset.query.filter_by(name=ruleset_id_str).first().id
-                    db.engine.execute(
+                    db.session.execute(
                         CertId.__table__.delete().where(
-                            (CertId.downloaded == True) &
+                            (CertId.downloaded) &
                             (CertId.certification_id.notin_(cert_ids)) &
                             (CertId.ruleset_id == ruleset_id)))
 
@@ -984,14 +992,21 @@ class CertIdSweep:
                     'cert_db', {
                         'action': 'sweep', 'country': 'CA', 'status': 'failed download'})
                 self.mailAlert(flaskapp, 'CA', 'none')
+            finally:
+                if local_filename:
+                    try:
+                        os.unlink(local_filename)
+                    except OSError:
+                        pass
 
     def sweep_fcc(self, flaskapp):
         from afcmodels.aaa import CertId, Ruleset
         import requests
+        import json
         import datetime
 
         now = datetime.datetime.now()
-        url = f'https://apps.fcc.gov/OETLabServices/getAFCAuthorizations'
+        url = 'https://apps.fcc.gov/OETLabServices/getAFCAuthorizations'
         headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
@@ -1007,65 +1022,79 @@ class CertIdSweep:
                     if timeout is not None:
                         timeout = float(timeout)
                     resp = requests.get(url, headers=headers, params=params,
-                                        timeout=timeout)
+                                        timeout=timeout, stream=True)
                     if resp.status_code == 200:
+                        max_bytes = 16 * 1024 * 1024
+                        buf = bytearray()
+                        for chunk in resp.iter_content(chunk_size=8192):
+                            buf.extend(chunk)
+                            if len(buf) > max_bytes:
+                                raise requests.exceptions.RequestException(
+                                    "CertId FCC JSON exceeds %d bytes; "
+                                    "aborting download" % max_bytes)
                         cert_ids = []
                         ruleset_id_str = \
                             RulesetVsRegion.region_to_ruleset(
                                 "US", exc=werkzeug.exceptions.NotFound)
-                        try:
-                            for cert_info in resp.json():
-                                if cert_info.get('equipmentClass') != '6SD':
-                                    continue
-                                fcc_id = cert_info.get('fccid')
-                                if not fcc_id:
-                                    continue
-                                location = CERT_ID_LOCATION_OUTDOOR
-                                for spec_info in cert_info.get('lSpecs', {}).\
-                                        get('specs', []):
-                                    if any(note_info.get('grantNoteId') == 'BX'
-                                           for note_info in
-                                           spec_info.get('lNotes', {}).
-                                           get('notes', [])):
-                                        location |= CERT_ID_LOCATION_INDOOR
-                                        break
-                                cert = CertId.query.filter_by(
-                                    certification_id=fcc_id).first()
-                                if cert:
-                                    cert.refreshed_at = now
-                                    cert.location = location
-                                    cert.downloaded = True
-                                else:
-                                    cert = CertId(certification_id=fcc_id,
-                                                  location=location,
-                                                  downloaded=True)
-                                    ruleset_id_str = \
-                                        RulesetVsRegion.region_to_ruleset(
-                                            "US",
-                                            exc=werkzeug.exceptions.NotFound)
-                                    ruleset = Ruleset.query.filter_by(
-                                        name=ruleset_id_str).first()
-                                    ruleset.cert_ids.append(cert)
-                                    db.session.add(cert)
-                                cert_ids.append(fcc_id)
-                            ruleset_id = \
-                                Ruleset.query.filter_by(name=ruleset_id_str).\
-                                first().id
-                            db.engine.execute(
-                                CertId.__table__.delete().where(
-                                    (CertId.downloaded == True) &
-                                    (CertId.certification_id.notin_(cert_ids)) &
-                                    (CertId.ruleset_id == ruleset_id)))
+                        for cert_info in json.loads(buf.decode('utf-8')):
+                            if cert_info.get('equipmentClass') != '6SD':
+                                continue
+                            fcc_id = cert_info.get('fccid')
+                            if not fcc_id:
+                                continue
+                            location = CERT_ID_LOCATION_OUTDOOR
+                            lspecs = cert_info.get('lSpecs', [])
+                            if isinstance(lspecs, dict):
+                                lspecs = lspecs.get('specs', [])
+                            for spec_info in lspecs:
+                                lnotes = spec_info.get('lNotes', [])
+                                if isinstance(lnotes, dict):
+                                    lnotes = lnotes.get('notes', [])
+                                if any(note_info.get('grantNoteId') == 'BX'
+                                       for note_info in lnotes):
+                                    location |= CERT_ID_LOCATION_INDOOR
+                                    break
+                            cert = CertId.query.filter_by(
+                                certification_id=fcc_id).first()
+                            if cert:
+                                cert.refreshed_at = now
+                                cert.location = location
+                                cert.downloaded = True
+                            else:
+                                cert = CertId(certification_id=fcc_id,
+                                              location=location,
+                                              downloaded=True)
+                                ruleset_id_str = \
+                                    RulesetVsRegion.region_to_ruleset(
+                                        "US",
+                                        exc=werkzeug.exceptions.NotFound)
+                                ruleset = Ruleset.query.filter_by(
+                                    name=ruleset_id_str).first()
+                                ruleset.cert_ids.append(cert)
+                                db.session.add(cert)
+                            cert_ids.append(fcc_id)
+                        ruleset_id = \
+                            Ruleset.query.filter_by(name=ruleset_id_str).\
+                            first().id
+                        db.session.execute(
+                            CertId.__table__.delete().where(
+                                (CertId.downloaded) &
+                                (CertId.certification_id.notin_(cert_ids)) &
+                                (CertId.ruleset_id == ruleset_id)))
 
-                            als.als_json_log(
-                                'cert_db',
-                                {'action': 'sweep', 'country': 'US',
-                                 'status': 'success'})
-                        finally:
-                            db.session.commit()  # pylint: disable=no-member
+                        als.als_json_log(
+                            'cert_db',
+                            {'action': 'sweep', 'country': 'US',
+                             'status': 'success'})
+                        # Commit only after both the upsert loop AND the
+                        # DELETE succeed; this prevents a partial-commit
+                        # where refreshed certs get an updated timestamp
+                        # but revoked certs are never pruned.
+                        db.session.commit()  # pylint: disable=no-member
                     return
                 except BaseException:
-                    raise
+                    # sleep(5) + implicit continue lets the outer
+                    # for-loop retry up to 5 times before giving up.
                     time.sleep(5)
         als.als_json_log(
             'cert_db', {
@@ -1083,11 +1112,16 @@ class CertIdSweep:
             dest_email = flask.current_app.config['REGISTRATION_DEST_PDL_EMAIL']
 
             mail = Mail(flask.current_app)
-            msg = Message(f"AFC CertId download failure",
+            msg = Message("AFC CertId download failure",
                           sender=src_email,
                           recipients=[dest_email])
             msg.body = f'''Fail to download CertId for country: {country} info {other}'''
-            mail.send(msg)
+            try:
+                mail.send(msg)
+            except Exception as exc:
+                LOGGER.warning(
+                    "mailAlert: could not send alert email for country=%s: %s",
+                    country, exc)
 
     def __call__(self, flaskapp, country):
         als.als_json_log('cert_db', {'action': 'sweep', 'country': country,
@@ -1118,8 +1152,6 @@ class OrganizationCreate:
     ''' Create a new Organization. '''
 
     def _create_org(self, flaskapp, name):
-        from contextlib import closing
-        import datetime
         from afcmodels.aaa import Organization
         LOGGER.debug('OrganizationCreate._create_org() %s', name)
         with flaskapp.app_context():
@@ -1220,9 +1252,7 @@ class MTLSCreate:
     ''' Create a new mtls certificate. '''
 
     def _create_mtls(self, flaskapp, note="", org="", src=None):
-        from contextlib import closing
-        import datetime
-        from afcmodels.aaa import MTLS, User
+        from afcmodels.aaa import MTLS
         LOGGER.debug('MTLS._create_mtls() %s %s %s',
                      note, org, src)
         if not src:
@@ -1261,9 +1291,7 @@ class MTLSRemove:
     ''' Remove MTLS certificate by id. '''
 
     def _remove_mtls(self, flaskapp, id=None):
-        from contextlib import closing
-        import datetime
-        from afcmodels.aaa import MTLS, User
+        from afcmodels.aaa import MTLS
         LOGGER.debug('MTLS._remove_mtls() %d', id)
 
         if not id:
@@ -1303,8 +1331,6 @@ class MTLSList:
         with flaskapp.app_context():
             for mtls in db.session.query(
                     MTLS).all():  # pylint: disable=no-member
-                org = mtls.org if mtls.org else ""
-                note = mtls.note if mtls.note else ""
                 table.add_row(
                     [mtls.id, mtls.note, mtls.org, str(mtls.created)])
             print(table)
@@ -1322,9 +1348,7 @@ class MTLSDump:
     ''' Remove MTLS certificate by id. '''
 
     def _dump_mtls(self, flaskapp, id=None, dst=None):
-        from contextlib import closing
-        import datetime
-        from afcmodels.aaa import MTLS, User
+        from afcmodels.aaa import MTLS
         LOGGER.debug('MTLS._remove_mtls() %d', id)
         if not id:
             raise RuntimeError('mtls id required')
@@ -1343,8 +1367,8 @@ class MTLSDump:
                 fpout.write("%s" % (mtls.cert))
 
     def __init__(self, flaskapp=None, id=None, dst=None):
-        if flaskapp and id and filename:
-            self._dump_mtls(flaskapp, id, filename)
+        if flaskapp and id and dst:
+            self._dump_mtls(flaskapp, id, dst)
 
     def __call__(self, flaskapp, id, dst):
         self._dump_mtls(flaskapp, id, dst)
@@ -1490,7 +1514,7 @@ class ConfigAdd:
 
     def __call__(self, flaskapp, src):
         LOGGER.debug('ConfigAdd.__call__() %s', src)
-        from afcmodels.aaa import AFCConfig, CertId, User
+        from afcmodels.aaa import AFCConfig, User
         import datetime
 
         split_items = src.split('=', 1)
@@ -1512,8 +1536,7 @@ class ConfigAdd:
                 username = json_lookup('username', user_rcrd, None)
                 try:
                     UserCreate(flaskapp, user_rcrd[0], False)
-                    f_str = "UserRemove(flaskapp, '" + username[0] + "')"
-                    rollback.insert(0, f_str)
+                    rollback.insert(0, lambda u=username[0]: UserRemove(flaskapp, u))
                 except RuntimeError:
                     LOGGER.debug('User %s already exists', username[0])
 
@@ -1535,9 +1558,7 @@ class ConfigAdd:
 
                         try:
                             OrganizationCreate(flaskapp, org)
-                            f_str = "OrganizationRemove(flaskapp, '" + \
-                                org + "')"
-                            rollback.insert(0, f_str)
+                            rollback.insert(0, lambda o=org: OrganizationRemove(flaskapp, o))
                         except BaseException:
                             pass
 
@@ -1546,9 +1567,8 @@ class ConfigAdd:
                             # and indoor certified
                             CertIdCreate(flaskapp, cert_id_str,
                                          ruleset_id_str, loc)
-                            f_str = "CertIdRemove(flaskapp, '" + \
-                                cert_id_str + "')"
-                            rollback.insert(0, f_str)
+                            rollback.insert(
+                                0, lambda c=cert_id_str: CertIdRemove(flaskapp, c))
                         except BaseException:
                             LOGGER.debug(
                                 'CertId %s already exists', cert_id_str)
@@ -1585,7 +1605,7 @@ class ConfigAdd:
                     LOGGER.error(e)
                     LOGGER.error('Rolling back...')
                     for f in rollback:
-                        eval(f)
+                        f()
 
 
 @cfg_group.command('del')
@@ -1619,7 +1639,7 @@ class ConfigRemove:
                     break
                 new_rcrd = json.loads(dataline)
 
-                ap_rcrd = json_lookup('apConfig', new_rcrd, None)
+                json_lookup('apConfig', new_rcrd, None)
                 user_rcrd = json_lookup('userConfig', new_rcrd, None)
                 username = json_lookup('username', user_rcrd, None)
                 with flaskapp.app_context():
@@ -1630,7 +1650,7 @@ class ConfigRemove:
                         UserRemove(flaskapp, username[0])
                     except RuntimeError:
                         LOGGER.debug('Delete missing user %s', username[0])
-                    except Exception as e:
+                    except Exception:
                         LOGGER.debug('Missing user %s in DB', username[0])
 
 
@@ -1691,12 +1711,12 @@ def create_cli_app():
         # converts str log_level to int value
         LOG_LEVEL=log_level,
         LOG_HANDLERS=[logging.StreamHandler()]
-        )
+    )
 
     app = create_app(config_override=conf)
 
     # Initialize Flask Migrate with the app
-    migrate = Migrate(app, db)
+    Migrate(app, db)
 
     # Register all CLI command groups
     app.cli.add_command(data_group)
