@@ -158,6 +158,10 @@ class Settings(pydantic.BaseSettings):
     statsd_server: Optional[str] = \
         pydantic.Field(None, env="ULS_STATSD_SERVER",
                        description="StatsD server to send metrics to")
+    ext_wif_files_dir: str = \
+        pydantic.Field(
+            None, env="EXT_WIF_FILE_DIR",
+            description="External location for WIF files directory")
     check_ext_files: Optional[List[str]] = \
         pydantic.Field(
             "https://raw.githubusercontent.com/Wireless-Innovation-Forum/"
@@ -902,7 +906,7 @@ class ExtParamFilesChecker:
 
     def __init__(self, status_updater: StatusUpdater,
                  ext_files_arg: Optional[List[str]] = None,
-                 script_dir: Optional[str] = None) -> None:
+                 source_dir: Optional[str] = None) -> None:
         """ Constructor
 
         Arguments:
@@ -910,7 +914,7 @@ class ExtParamFilesChecker:
         ext_files_arg  -- List of 'BASE_URL:SUBDIR:FILES,FILE...' groups,
                           separated with semicolon: external parameter file
                           descriptors from command line
-        script_dir     -- Downloader script directory
+        script_dir     -- External or Downloader script directory
         """
         self._epf_list: \
             Optional[List["ExtParamFilesChecker._ExtParamFiles"]] = None
@@ -927,12 +931,12 @@ class ExtParamFilesChecker:
                         self._ExtParamFiles(base_url=m.group(1).rstrip("/"),
                                             subdir=m.group(2),
                                             files=m.group(3).split(",")))
-        self._script_dir = script_dir
+        self._source_dir = source_dir
         self._status_updater = status_updater
 
     def check(self) -> None:
         """ Check that external files matches those in image """
-        assert (self._epf_list is not None) and (self._script_dir is not None)
+        assert (self._epf_list is not None) and (self._source_dir is not None)
         temp_dir: Optional[str] = None
         check_results: Dict[str, Optional[str]] = {}
         try:
@@ -942,13 +946,13 @@ class ExtParamFilesChecker:
                     errmsg: Optional[str] = None
                     try:
                         internal_file_name = \
-                            os.path.join(self._script_dir, epf.subdir,
+                            os.path.join(self._source_dir, epf.subdir,
                                          filename)
                         url = f"{epf.base_url}/{filename}"
                         if not os.path.isfile(internal_file_name):
-                            errmsg = f"'{internal_file_name}' not foound in " \
+                            errmsg = f"'{internal_file_name}' not found in " \
                                 f"container. It should be downloaded from " \
-                                f"'{url}', verified and added to image"
+                                f"'{url}', verified and added"
                             continue
                         try:
                             external_file_name = os.path.join(temp_dir,
@@ -1108,6 +1112,10 @@ def main(argv: List[str]) -> None:
         help=f"Send metrics to given StatsD host. Default is not to"
         f"{env_help(Settings, 'prometheus_port')}")
     argument_parser.add_argument(
+        "--ext_wif_files_dir", metavar="EXT_WIF_FILES_DIR",
+        help=f"External location to load the WIF data files "
+        f"(Omit to use internal copies).{env_help(Settings, 'check_ext_files')}")
+    argument_parser.add_argument(
         "--check_ext_files", metavar="BASE_URL:SUBDIR:FILENAME[,...][;...]",
         action="append", default=[],
         help=f"Verify that given files at given location match files at given "
@@ -1205,10 +1213,14 @@ def main(argv: List[str]) -> None:
 
         executor = LoggingExecutor()
 
+        int_wif_ext_files_dir = os.path.dirname(settings.download_script)
+        if settings.ext_wif_files_dir is not None:
+            logging.info(f"Using {settings.ext_wif_files_dir} for external WIF files")
+            int_wif_ext_files_dir = settings.ext_wif_files_dir
         ext_params_file_checker = \
             ExtParamFilesChecker(
                 ext_files_arg=settings.check_ext_files,
-                script_dir=os.path.dirname(settings.download_script),
+                source_dir=int_wif_ext_files_dir,
                 status_updater=status_updater)
 
         current_uls_file = os.path.join(settings.ext_db_dir,
@@ -1289,6 +1301,8 @@ def main(argv: List[str]) -> None:
                 cmdline_args += ["--save_dir", settings.save_dir]
                 if settings.download_script_args:
                     cmdline_args.append(settings.download_script_args)
+                if settings.ext_wif_files_dir is not None:
+                    cmdline_args += ["--ext_wif_files_dir", settings.ext_wif_files_dir]
                 logging.info(f"Starting {' '.join(cmdline_args)}")
                 executor.execute(
                     " ".join(cmdline_args) if settings.download_script_args
