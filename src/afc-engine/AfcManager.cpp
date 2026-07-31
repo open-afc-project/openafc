@@ -1212,7 +1212,7 @@ void AfcManager::initializeDatabases()
 			// "nlcdFile":
 			// "rat_transfer/nlcd/nlcd_production"
 			nlcdDirectory = _nlcdFile;
-			nameMapper = GdalNameMapperDirect::make_unique("*", _nlcdFile);
+			nameMapper = GdalNameMapperDirect::make_unique("*.tif", _nlcdFile);
 		} else {
 			// Otherwise path supposed to be a file. Sample config:
 			// "nlcdFile":
@@ -3734,7 +3734,7 @@ QJsonDocument AfcManager::generateExclusionZoneJson()
 	// Instantiate polygon object
 	std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter> exclusionZoneFeature(OGRFeature::CreateFeature(exclusionLayer->GetLayerDefn()));
 
-	// Intantiate unique-pointers to OGRPolygon and OGRLinearRing for storing the beam coverage
+	// Instantiate unique-pointers to OGRPolygon and OGRLinearRing for storing the beam coverage
 	GdalHelpers::GeomUniquePtr<OGRPolygon> exZone(GdalHelpers::createGeometry<OGRPolygon>()); // Use GdalHelpers.h templates to have unique pointers create these on the heap
 	GdalHelpers::GeomUniquePtr<OGRLinearRing> exteriorOfZone(GdalHelpers::createGeometry<OGRLinearRing>());
 
