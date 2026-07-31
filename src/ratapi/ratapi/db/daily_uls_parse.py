@@ -740,8 +740,12 @@ def daily_uls_parse(state_root, interactive):
     # If prepareAFCGitHubFilesFlag set, prepare AFC GitHub data files         #
     ###########################################################################
     if prepareAFCGitHubFilesFlag:
-        prepareAFCGitHubFiles(
-            root + '/raw_wireless_innovation_forum_files', ".", logFile)
+        if ext_wif_files_dir is not None:
+            prepareAFCGitHubFiles(
+                ext_wif_files_dir, ".", logFile)
+        else:
+            prepareAFCGitHubFiles(
+                root + '/raw_wireless_innovation_forum_files', ".", logFile)
     ###########################################################################
 
     ###########################################################################
@@ -1216,6 +1220,8 @@ if __name__ == '__main__':
                         help='":" separated list of regions')
     parser.add_argument('-s_dir', '--save_dir', default=None,
                         help='Location of the saves')
+    parser.add_argument('-ext_wif', '--ext_wif_files_dir', default=None,
+                        help='Location of the external ULS files')
 
     args = parser.parse_args()
     interactive = args.interactive
@@ -1254,6 +1260,10 @@ if __name__ == '__main__':
     print("Combine Antenna Region = " + str(combineAntennaRegionFlag))
     print("Region = " + args.region)
     print("WFA = " + str(wfaFlag))
+
+    ext_wif_files_dir = None
+    if args.ext_wif_files_dir is not None:
+        ext_wif_files_dir = args.ext_wif_files_dir
 
     regionList = args.region.split(':')
 
