@@ -742,7 +742,7 @@ def daily_uls_parse(state_root, interactive):
     if prepareAFCGitHubFilesFlag:
         if ext_wif_files_dir is not None:
             prepareAFCGitHubFiles(
-                ext_wif_files_dir + '/raw_wireless_innovation_forum_files', ".", logFile)
+                ext_wif_files_dir, ".", logFile)
         else:
             prepareAFCGitHubFiles(
                 root + '/raw_wireless_innovation_forum_files', ".", logFile)
