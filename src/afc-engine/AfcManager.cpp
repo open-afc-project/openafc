@@ -9220,7 +9220,9 @@ void AfcManager::runPointAnalysis()
 															);
 													state = 1;
 													itmSegIdx = 0;
-													if (itmPathLossModelStrChk != itmPathLossModelStr) {
+													if ((itmPathLossModelStrChk.substr(0, 3) == std::string("ITM")) && (itmPathLossModelStr.substr(0, 3) == std::string("ITM"))) {
+														itmPathLossModelStr = "INTERP_ITM";
+													} else if (itmPathLossModelStrChk != itmPathLossModelStr) {
 														LOGGER_WARN(logger) << "WARNING: Different path loss models for interp: = " << itmPathLossModelStr << " and " << itmPathLossModelStrChk;
 														itmPathLossModelStr = "INTERP_" + itmPathLossModelStr + "_" + itmPathLossModelStrChk;
 													} else {
