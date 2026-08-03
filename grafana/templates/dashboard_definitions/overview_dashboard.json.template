@@ -132,18 +132,20 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "columns": [],
+          "columns": [
+            { "selector": "Labels.com\\.docker\\.compose\\.service", "text": "Service", "type": "string" },
+            { "selector": "Status", "text": "Status", "type": "string" }
+          ],
           "datasource": "Docker",
           "filters": [],
           "format": "table",
           "global_query_id": "",
-          "parser": "uql",
+          "parser": "backend",
           "refId": "A",
           "root_selector": "",
           "source": "url",
           "type": "json",
-          "uql": "parse-json\r\n| project \"Labels\", \"Status\"\r\n| extend \"Service\"=\"Labels['com.docker.compose.service']\"\r\n| extend \"Project\"=\"Labels['com.docker.compose.project']\"\r\n| extend \"Up\"=extract('^[^(]+', 0, \"Status\")\r\n| extend \"Health\"=extract('\W(unhealthy|healthy|Restarting|starting)', 1, \"Status\")\r\n| project \"Service\", \"Status\", \"Up\", \"Health\", \"Project\"\r\n| order by \"Up\" asc\r\n| order by \"Health\" desc",
-          "url": "/containers/json",
+          "url": "/containers/json?filters={\"label\":[\"com.docker.compose.project={{ GRAFANA_COMPOSE_PROJECT_NAME }}\"]}",
           "url_options": {
             "data": "",
             "method": "GET"
@@ -153,34 +155,34 @@
       "title": "Services",
       "transformations": [
         {
-          "id": "filterByValue",
+          "id": "extractFields",
           "options": {
-            "filters": [
-              {
-                "config": {
-                  "id": "notEqual",
-                  "options": {
-                    "value": "{{ GRAFANA_COMPOSE_PROJECT_NAME }}"
-                  }
-                },
-                "fieldName": "Project"
-              }
-            ],
-            "match": "any",
-            "type": "exclude"
+            "source": "Status",
+            "format": "regex",
+            "regex": "^(?P<Up>[^(]+?)\\s*(?:\\((?P<Health>[^)]+)\\))?$"
           }
         },
         {
-          "id": "filterFieldsByName",
+          "id": "organize",
           "options": {
-            "byVariable": false,
-            "include": {
-              "names": [
-                "Service",
-                "Up",
-                "Health"
-              ]
-            }
+            "excludeByName": {
+              "Status": true
+            },
+            "indexByName": {
+              "Service": 0,
+              "Up": 1,
+              "Health": 2
+            },
+            "renameByName": {}
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              { "field": "Health", "desc": true }
+            ]
           }
         }
       ],
@@ -270,10 +272,10 @@
           "disableTextWrap": false,
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum without(id, cpu, name, instance, job, project) (rate(container_cpu_usage_seconds_total{service!=\"\"}[1m]))",
+          "expr": "sum by (service) (rate(container_cpu_usage_seconds_total{project=\"{{ GRAFANA_COMPOSE_PROJECT_NAME }}\"}[1m]))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{% raw %}{{service}}{% endraw %}",
           "range": true,
           "refId": "A",
           "useBackend": false

@@ -1,0 +1,831 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "panels": [],
+      "title": "AFC Request Summary",
+      "type": "row"
+    },
+    {
+      "datasource": "Als",
+      "description": "Total AFC requests over selected time range",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1000 },
+              { "color": "red", "value": 10000 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 101,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) as total_requests FROM afc_message WHERE rx_time >= $__timeFrom() AND rx_time <= $__timeTo()",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Requests",
+      "type": "stat"
+    },
+    {
+      "datasource": "Als",
+      "description": "Average processing duration in seconds",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 102,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(AVG(EXTRACT(EPOCH FROM (tx_time - rx_time)))::numeric, 3) as avg_duration FROM afc_message WHERE rx_time >= $__timeFrom() AND rx_time <= $__timeTo() AND tx_time IS NOT NULL",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Duration",
+      "type": "stat"
+    },
+    {
+      "datasource": "Als",
+      "description": "Number of requests with error responses",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "id": 103,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) as error_count FROM request_response rr JOIN request_response_in_message rrim ON rr.request_response_digest = rrim.request_response_digest AND rr.month_idx = rrim.month_idx JOIN afc_message am ON rrim.message_id = am.message_id AND rrim.month_idx = am.month_idx WHERE am.rx_time >= $__timeFrom() AND am.rx_time <= $__timeTo() AND rr.response_code != 0",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Responses",
+      "type": "stat"
+    },
+    {
+      "datasource": "Als",
+      "description": "Unique AP serial numbers seen",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "id": 104,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT dd.serial_number) as unique_aps FROM device_descriptor dd JOIN request_response rr ON dd.device_descriptor_digest = rr.device_descriptor_digest AND dd.month_idx = rr.month_idx JOIN request_response_in_message rrim ON rr.request_response_digest = rrim.request_response_digest AND rr.month_idx = rrim.month_idx JOIN afc_message am ON rrim.message_id = am.message_id AND rrim.month_idx = am.month_idx WHERE am.rx_time >= $__timeFrom() AND am.rx_time <= $__timeTo()",
+          "refId": "A"
+        }
+      ],
+      "title": "Unique APs",
+      "type": "stat"
+    },
+    {
+      "datasource": "Als",
+      "description": "Unique regions (AFC Configs) used",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "purple", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "id": 105,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT c.customer_name) as regions FROM customer c JOIN request_response rr ON c.customer_id = rr.customer_id AND c.month_idx = rr.month_idx JOIN request_response_in_message rrim ON rr.request_response_digest = rrim.request_response_digest AND rr.month_idx = rrim.month_idx JOIN afc_message am ON rrim.message_id = am.message_id AND rrim.month_idx = am.month_idx WHERE am.rx_time >= $__timeFrom() AND am.rx_time <= $__timeTo()",
+          "refId": "A"
+        }
+      ],
+      "title": "Regions Used",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 110,
+      "panels": [],
+      "title": "Request Timeline",
+      "type": "row"
+    },
+    {
+      "datasource": "Als",
+      "description": "AFC requests over time, bucketed by response outcome",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "normal" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "errors" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "success" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "id": 111,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(am.rx_time, $__interval), COUNT(*) FILTER (WHERE rr.response_code = 0) as success, COUNT(*) FILTER (WHERE rr.response_code != 0) as errors FROM afc_message am JOIN request_response_in_message rrim ON am.message_id = rrim.message_id AND am.month_idx = rrim.month_idx JOIN request_response rr ON rrim.request_response_digest = rr.request_response_digest AND rrim.month_idx = rr.month_idx WHERE $__timeFilter(am.rx_time) GROUP BY 1 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Requests Over Time (Success vs Errors)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Als",
+      "description": "Request processing duration over time",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "seconds",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "points",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 3,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "always",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 14 },
+      "id": 112,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT am.rx_time as time, EXTRACT(EPOCH FROM (am.tx_time - am.rx_time)) as duration FROM afc_message am WHERE $__timeFilter(am.rx_time) AND am.tx_time IS NOT NULL ORDER BY am.rx_time",
+          "refId": "A"
+        }
+      ],
+      "title": "Request Duration Scatter Plot",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+      "id": 120,
+      "panels": [],
+      "title": "Request Detail Table",
+      "type": "row"
+    },
+    {
+      "datasource": "Als",
+      "description": "Detailed view of individual AFC requests with all key attributes",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "inspect": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "response_code" },
+            "properties": [
+              { "id": "custom.width", "value": 110 },
+              {
+                "id": "custom.cellOptions",
+                "value": { "applyToRow": true, "type": "color-background" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "transparent", "value": null },
+                    { "color": "rgba(255,0,0,0.15)", "value": 1 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "rx_time" },
+            "properties": [{ "id": "custom.width", "value": 200 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "duration_sec" },
+            "properties": [
+              { "id": "custom.width", "value": 110 },
+              { "id": "unit", "value": "s" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "serial_number" },
+            "properties": [{ "id": "custom.width", "value": 180 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "region" },
+            "properties": [{ "id": "custom.width", "value": 120 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "server" },
+            "properties": [{ "id": "custom.width", "value": 150 }]
+          }
+        ]
+      },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 22 },
+      "id": 121,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": true,
+          "fields": "",
+          "reducer": ["count"],
+          "show": true
+        },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "rx_time" }]
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT am.rx_time, ROUND(EXTRACT(EPOCH FROM (am.tx_time - am.rx_time))::numeric, 3) as duration_sec, srv.afc_server_name as server, dd.serial_number, cust.customer_name as region, rr.response_code, rr.response_description, rr.response_data, host(am.ap_ip) as ap_ip, loc.location_type as loc_type, ROUND(ST_Y(loc.location_wgs84::geometry)::numeric, 5) as latitude, ROUND(ST_X(loc.location_wgs84::geometry)::numeric, 5) as longitude, loc.height_m, CASE am.runtime_opt & 1 WHEN 1 THEN 'GUI' ELSE '' END as gui FROM afc_message am JOIN afc_server srv ON am.afc_server = srv.afc_server_id AND am.month_idx = srv.month_idx LEFT JOIN request_response_in_message rrim ON am.message_id = rrim.message_id AND am.month_idx = rrim.month_idx LEFT JOIN request_response rr ON rrim.request_response_digest = rr.request_response_digest AND rrim.month_idx = rr.month_idx LEFT JOIN device_descriptor dd ON rr.device_descriptor_digest = dd.device_descriptor_digest AND rr.month_idx = dd.month_idx LEFT JOIN customer cust ON rr.customer_id = cust.customer_id AND rr.month_idx = cust.month_idx LEFT JOIN location loc ON rr.location_digest = loc.location_digest AND rr.month_idx = loc.month_idx WHERE $__timeFilter(am.rx_time) ORDER BY am.rx_time DESC LIMIT 500",
+          "refId": "A"
+        }
+      ],
+      "title": "AFC Request Details",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "id": 130,
+      "panels": [],
+      "title": "Spectrum Results & Breakdowns",
+      "type": "row"
+    },
+    {
+      "datasource": "Als",
+      "description": "Response code distribution",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 35 },
+      "id": 131,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT CASE rr.response_code WHEN 0 THEN 'Success (0)' WHEN -1 THEN 'GeneralFailure (-1)' ELSE 'Code ' || rr.response_code::text END as response, COUNT(*) as count FROM request_response rr JOIN request_response_in_message rrim ON rr.request_response_digest = rrim.request_response_digest AND rr.month_idx = rrim.month_idx JOIN afc_message am ON rrim.message_id = am.message_id AND rrim.month_idx = am.month_idx WHERE $__timeFilter(am.rx_time) GROUP BY rr.response_code ORDER BY count DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Response Code Distribution",
+      "type": "piechart"
+    },
+    {
+      "datasource": "Als",
+      "description": "Top AP serial numbers by request count",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineWidth": 1,
+            "scaleDistribution": { "type": "linear" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 35 },
+      "id": 132,
+      "options": {
+        "barRadius": 0.05,
+        "barWidth": 0.7,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": { "mode": "single", "sort": "none" },
+        "xTickLabelRotation": 0
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT dd.serial_number, COUNT(*) as requests FROM device_descriptor dd JOIN request_response rr ON dd.device_descriptor_digest = rr.device_descriptor_digest AND dd.month_idx = rr.month_idx JOIN request_response_in_message rrim ON rr.request_response_digest = rrim.request_response_digest AND rr.month_idx = rrim.month_idx JOIN afc_message am ON rrim.message_id = am.message_id AND rrim.month_idx = am.month_idx WHERE $__timeFilter(am.rx_time) AND dd.serial_number IS NOT NULL GROUP BY dd.serial_number ORDER BY requests DESC LIMIT 15",
+          "refId": "A"
+        }
+      ],
+      "title": "Top 15 APs by Request Count",
+      "type": "barchart"
+    },
+    {
+      "datasource": "Als",
+      "description": "Requests per region (customer/config)",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 35 },
+      "id": 133,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(cust.customer_name, 'Unknown') as region, COUNT(*) as count FROM request_response rr JOIN request_response_in_message rrim ON rr.request_response_digest = rrim.request_response_digest AND rr.month_idx = rrim.month_idx JOIN afc_message am ON rrim.message_id = am.message_id AND rrim.month_idx = am.month_idx LEFT JOIN customer cust ON rr.customer_id = cust.customer_id AND rr.month_idx = cust.month_idx WHERE $__timeFilter(am.rx_time) GROUP BY cust.customer_name ORDER BY count DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Requests by Region",
+      "type": "piechart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 },
+      "id": 140,
+      "panels": [],
+      "title": "JSON Logs (AFC_LOGS Database)",
+      "type": "row"
+    },
+    {
+      "datasource": "AlsJson",
+      "description": "Recent user login/logout activity",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "inspect": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "time" },
+            "properties": [{ "id": "custom.width", "value": 200 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "status" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "applyToRow": true, "type": "color-background" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "transparent", "value": null }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  { "options": { "success": { "color": "rgba(0,128,0,0.1)", "index": 0 } }, "type": "value" },
+                  { "options": { "unauthorized": { "color": "rgba(255,0,0,0.15)", "index": 1 } }, "type": "value" }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+      "id": 141,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "time" }]
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "AlsJson",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT time, log ->> 'action' as action, log ->> 'user' as username, log ->> 'from' as from_ip, log ->> 'status' as status FROM user_access WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 100",
+          "refId": "A"
+        }
+      ],
+      "title": "User Access Log",
+      "type": "table"
+    },
+    {
+      "datasource": "AlsJson",
+      "description": "Recent cache invalidation events",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "inspect": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "time" },
+            "properties": [{ "id": "custom.width", "value": 200 }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+      "id": 142,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "time" }]
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "AlsJson",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT time, log ->> 'enabled' as enabled, log ->> 'invalidate_all' as invalidate_all, log ->> 'invalidate_ruleset_id' as ruleset_id FROM rcache_invalidation WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 50",
+          "refId": "A"
+        }
+      ],
+      "title": "Cache Invalidation Events",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
+      "id": 150,
+      "panels": [],
+      "title": "ALS Siphon Health",
+      "type": "row"
+    },
+    {
+      "datasource": "Als",
+      "description": "Recent decode errors encountered by als_siphon",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "inspect": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "time" },
+            "properties": [{ "id": "custom.width", "value": 200 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "msg" },
+            "properties": [{ "id": "custom.width", "value": 400 }]
+          }
+        ]
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 53 },
+      "id": 151,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": true, "fields": "", "reducer": ["count"], "show": true },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "time" }]
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": "Als",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT time, msg, code_line, LEFT(data, 200) as data_preview FROM decode_error WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 50",
+          "refId": "A"
+        }
+      ],
+      "title": "ALS Siphon Decode Errors",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "30s",
+  "schemaVersion": 40,
+  "tags": ["als", "afc"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AFC Request Trace",
+  "uid": "afc-request-trace-01",
+  "version": 1,
+  "weekStart": ""
+}

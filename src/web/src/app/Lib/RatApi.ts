@@ -53,6 +53,7 @@ export var guiConfig: GuiConfig = Object.freeze({
   afc_kml: '',
   mtls_admin_url: '',
   version: 'API NOT LOADED',
+  grafana_enabled: false,
 });
 
 /**
