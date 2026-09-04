@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "exclusionZoneInquiryRequests": [
+    {
+      "requestId": "wfa-gvp-request-0001",
+      "deviceDescriptor": {
+        "serialNumber": "GVP-AP-0001",
+        "certificationId": [
+          {
+            "rulesetId": "US_47_CFR_PART_15_SUBPART_E_GVP",
+            "id": "WFA-GVP-CERT-0001"
+          }
+        ]
+      },
+      "areaOfIntendedOperation": {
+        "ellipse": {
+          "center": {
+            "longitude": -121.983601,
+            "latitude": 37.375397
+          },
+          "majorAxis": 5000,
+          "minorAxis": 5000,
+          "orientation": 0
+        }
+      },
+      "inquiredFrequencyRange": [
+        {
+          "lowFrequency": 5925,
+          "highFrequency": 6425
+        },
+        {
+          "lowFrequency": 6525,
+          "highFrequency": 6875
+        }
+      ],
+      "desiredPsd": [
+        11,
+        5
+      ],
+      "desiredPrecision": "low"
+    }
+  ]
+}
