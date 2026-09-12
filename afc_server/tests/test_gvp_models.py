@@ -3,12 +3,33 @@
 import pydantic
 import pytest
 
-from afc_server_gvp_models import (GVP_MAX_POLYGON_VERTICES,
+from afc_server_gvp_models import (GVP_GEOMETRY_FIELDS,
+                                   GVP_MAX_POLYGON_VERTICES,
                                    GVP_MIN_POLYGON_VERTICES,
-                                   Rest_Gvp_Circle, Rest_Gvp_Ellipse,
+                                   Rest_Gvp_CertificationId,
+                                   Rest_Gvp_Circle,
+                                   Rest_Gvp_DeviceDescriptor,
+                                   Rest_Gvp_Ellipse,
+                                   Rest_Gvp_ExclusionZoneInquiryRequest,
                                    Rest_Gvp_FrequencyRange,
-                                   Rest_Gvp_LinearPolygon, Rest_Gvp_Point,
-                                   Rest_Gvp_RadialPolygon, Rest_Gvp_Vector)
+                                   Rest_Gvp_LinearPolygon, Rest_Gvp_Location,
+                                   Rest_Gvp_Point, Rest_Gvp_RadialPolygon,
+                                   Rest_Gvp_ReqMsg, Rest_Gvp_Vector)
+
+_ELLIPSE = {"center": {"longitude": -121.98, "latitude": 37.37},
+            "majorAxis": 5000, "minorAxis": 5000, "orientation": 0}
+_CIRCLE = {"longitude": -121.98, "latitude": 37.37, "radius": 5000}
+_DEVICE = {"serialNumber": "GVP-AP-0001",
+           "certificationId": [{"rulesetId": "US_47_CFR_PART_15_SUBPART_E_GVP",
+                                "id": "WFA-GVP-CERT-0001"}]}
+
+
+def _request(**over):
+    """ A minimal valid ExclusionZoneInquiryRequest, overridable. """
+    data = {"requestId": "req-1", "deviceDescriptor": dict(_DEVICE),
+            "areaOfIntendedOperation": {"ellipse": dict(_ELLIPSE)}}
+    data.update(over)
+    return data
 
 
 def _points(n):
@@ -335,3 +356,241 @@ def test_radial_polygon_requires_center():
     with pytest.raises(pydantic.ValidationError) as exc:
         Rest_Gvp_RadialPolygon(outerBoundary=_vectors(3))
     assert exc.value.errors()[0]["loc"] == ("center",)
+
+
+# ------------------------------------------------------- CertificationId --
+
+def test_certification_id_accepts_appendix_a_value():
+    c = Rest_Gvp_CertificationId(
+        rulesetId="US_47_CFR_PART_15_SUBPART_E_GVP", id="WFA-GVP-CERT-0001")
+    assert c.rulesetId == "US_47_CFR_PART_15_SUBPART_E_GVP"
+
+
+def test_certification_id_accepts_unlisted_ruleset():
+    """ Table 8 lists acceptable rulesetId values; no enumeration is
+    applied here. """
+    Rest_Gvp_CertificationId(rulesetId="GB_SOME_FUTURE_RULESET", id="x")
+
+
+@pytest.mark.parametrize("field", ["rulesetId", "id"])
+def test_certification_id_rejects_empty_string(field):
+    data = {"rulesetId": "r", "id": "i"}
+    data[field] = ""
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_CertificationId(**data)
+    assert exc.value.errors()[0]["loc"] == (field,)
+
+
+# ------------------------------------------------------ DeviceDescriptor --
+
+def test_device_descriptor_accepts_serial_only():
+    d = Rest_Gvp_DeviceDescriptor(**_DEVICE)
+    assert d.serialNumber == "GVP-AP-0001"
+    assert d.deviceModel is None
+
+
+def test_device_descriptor_accepts_model_only():
+    """ Table 7 requires serialNumber only when deviceModel is absent. """
+    data = dict(_DEVICE)
+    del data["serialNumber"]
+    data["deviceModel"] = "AP-Model-X"
+    Rest_Gvp_DeviceDescriptor(**data)
+
+
+def test_device_descriptor_accepts_both():
+    data = dict(_DEVICE, deviceModel="AP-Model-X")
+    Rest_Gvp_DeviceDescriptor(**data)
+
+
+def test_device_descriptor_rejects_neither():
+    """ The Table 7 conditional requirement, unsatisfied. """
+    data = dict(_DEVICE)
+    del data["serialNumber"]
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_DeviceDescriptor(**data)
+    assert "serialNumber or deviceModel" in str(exc.value)
+
+
+def test_device_descriptor_rejects_empty_certification_list():
+    data = dict(_DEVICE, certificationId=[])
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_DeviceDescriptor(**data)
+    assert exc.value.errors()[0]["loc"] == ("certificationId",)
+
+
+# --------------------------------------------------------------- Location --
+
+@pytest.mark.parametrize("field,value", [
+    ("ellipse", _ELLIPSE),
+    ("circle", _CIRCLE),
+])
+def test_location_accepts_one_geometry(field, value):
+    loc = Rest_Gvp_Location(**{field: value})
+    assert getattr(loc, field) is not None
+
+
+def test_location_accepts_linear_polygon():
+    Rest_Gvp_Location(linearPolygon={"outerBoundary": _points(3)})
+
+
+def test_location_accepts_radial_polygon():
+    Rest_Gvp_Location(radialPolygon={
+        "center": {"longitude": 0.0, "latitude": 0.0},
+        "outerBoundary": _vectors(3)})
+
+
+def test_location_rejects_no_geometry():
+    """ Table 9 requires one of the four when none of the others is
+    given. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_Location()
+    assert "is required" in str(exc.value)
+
+
+def test_location_rejects_two_geometries():
+    """ Table 9 forbids a geometry when another is present. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_Location(ellipse=_ELLIPSE, circle=_CIRCLE)
+    assert "only one geometry" in str(exc.value)
+
+
+def test_location_rejects_all_four_geometries():
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_Location(
+            ellipse=_ELLIPSE, circle=_CIRCLE,
+            linearPolygon={"outerBoundary": _points(3)},
+            radialPolygon={"center": {"longitude": 0.0, "latitude": 0.0},
+                           "outerBoundary": _vectors(3)})
+    assert "only one geometry" in str(exc.value)
+
+
+@pytest.mark.parametrize("value", [0, 1, 2])
+def test_location_accepts_known_indoor_deployment(value):
+    Rest_Gvp_Location(ellipse=_ELLIPSE, indoorDeployment=value)
+
+
+@pytest.mark.parametrize("value", [-1, 3, 1.5])
+def test_location_rejects_unknown_indoor_deployment(value):
+    """ Table 9 maps this field to 0, 1 or 2. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_Location(ellipse=_ELLIPSE, indoorDeployment=value)
+    assert exc.value.errors()[0]["loc"] == ("indoorDeployment",)
+
+
+def test_location_allows_unknown_field():
+    """ SDI section 3.2 requires unknown fields to be ignored, and a later
+    revision would most plausibly add a geometry here. """
+    Rest_Gvp_Location(ellipse=_ELLIPSE, hexagon={"whatever": 1})
+
+
+def test_location_geometry_field_names_match_the_models():
+    """ Guard against the constant drifting from the field definitions. """
+    assert set(GVP_GEOMETRY_FIELDS) <= set(Rest_Gvp_Location.__fields__)
+
+
+# ------------------------------------- ExclusionZoneInquiryRequest --------
+
+def test_request_accepts_minimum_required_fields():
+    r = Rest_Gvp_ExclusionZoneInquiryRequest(**_request())
+    assert r.inquiredFrequencyRange is None
+    assert r.desiredPsd is None
+    assert r.desiredPrecision is None
+
+
+@pytest.mark.parametrize("missing", ["requestId", "deviceDescriptor",
+                                     "areaOfIntendedOperation"])
+def test_request_requires_mandatory_fields(missing):
+    data = _request()
+    del data[missing]
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInquiryRequest(**data)
+    assert exc.value.errors()[0]["loc"] == (missing,)
+
+
+def test_request_accepts_fractional_psd():
+    """ Table 6 says PSD levels should be whole numbers in 1 dB steps.
+    Section 1.2.1 makes should a recommendation, so it is not enforced. """
+    Rest_Gvp_ExclusionZoneInquiryRequest(**_request(desiredPsd=[11.5]))
+
+
+def test_request_accepts_unlisted_precision():
+    """ Table 6 makes desiredPrecision a recommendation, so any value is
+    accepted. """
+    Rest_Gvp_ExclusionZoneInquiryRequest(**_request(desiredPrecision="ultra"))
+
+
+def test_request_rejects_non_numeric_psd():
+    """ Table 6 gives desiredPsd as an array of number. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInquiryRequest(**_request(desiredPsd=["11"]))
+    assert exc.value.errors()[0]["loc"][0] == "desiredPsd"
+
+
+def test_request_allows_unknown_field():
+    """ SDI section 3.2 requires unknown fields to be ignored. """
+    Rest_Gvp_ExclusionZoneInquiryRequest(**_request(futureOption=True))
+
+
+# --------------------------------------------------------------- ReqMsg --
+
+def test_req_msg_parses_appendix_a(load_fixture):
+    """ The spec's own example request, end to end. desiredPsd is [11, 5]
+    in the JSON while the prose says 11, 8 and 5; the assertion guards the
+    fixture. """
+    msg = Rest_Gvp_ReqMsg(**load_fixture("appendix_a_request.json"))
+    assert msg.version == "1.0"
+    assert len(msg.exclusionZoneInquiryRequests) == 1
+
+    req = msg.exclusionZoneInquiryRequests[0]
+    assert req.requestId == "wfa-gvp-request-0001"
+    assert req.desiredPsd == [11, 5]
+    assert req.desiredPrecision == "low"
+
+    ellipse = req.areaOfIntendedOperation.ellipse
+    assert ellipse.center.longitude == -121.983601
+    assert ellipse.center.latitude == 37.375397
+    assert ellipse.majorAxis == 5000
+
+    assert [(f.lowFrequency, f.highFrequency)
+            for f in req.inquiredFrequencyRange] == [(5925, 6425),
+                                                     (6525, 6875)]
+
+
+def test_req_msg_rejects_duplicate_request_ids():
+    """ Table 6 requires requestId unique within the message. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ReqMsg(version="1.0", exclusionZoneInquiryRequests=[
+            _request(requestId="dup"), _request(requestId="dup")])
+    assert "unique within the message" in str(exc.value)
+
+
+def test_req_msg_accepts_multiple_distinct_requests():
+    """ Section 3.2 permits aggregating one or more requests. """
+    msg = Rest_Gvp_ReqMsg(version="1.0", exclusionZoneInquiryRequests=[
+        _request(requestId="a"), _request(requestId="b")])
+    assert len(msg.exclusionZoneInquiryRequests) == 2
+
+
+def test_req_msg_rejects_empty_request_array():
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ReqMsg(version="1.0", exclusionZoneInquiryRequests=[])
+    assert exc.value.errors()[0]["loc"] == ("exclusionZoneInquiryRequests",)
+
+
+def test_req_msg_accepts_any_version_string():
+    """ Section 4.1 gives the Protocol Version as 1.0. Rejecting another
+    value belongs where a VERSION_NOT_SUPPORTED code can be produced. """
+    Rest_Gvp_ReqMsg(version="9.9",
+                    exclusionZoneInquiryRequests=[_request()])
+
+
+def test_req_msg_error_location_reaches_nested_fields():
+    """ The reported path is what populates supplementalInfo (SDI Table 24),
+    so it must survive four levels of nesting. """
+    bad = _request()
+    bad["areaOfIntendedOperation"]["ellipse"]["center"]["latitude"] = 91.0
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ReqMsg(version="1.0", exclusionZoneInquiryRequests=[bad])
+    assert exc.value.errors()[0]["loc"] == (
+        "exclusionZoneInquiryRequests", 0, "areaOfIntendedOperation",
+        "ellipse", "center", "latitude")

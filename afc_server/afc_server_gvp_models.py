@@ -1,9 +1,17 @@
 """ Request and response models for the Geofencing System to GVP Device
 Interface (SDI). """
 
-from typing import List, Union
+from typing import List, Optional, Union
 
 import pydantic
+
+from afc_server_models import Rest_VendorExtension
+
+# The four mutually exclusive geometry fields of SDI Table 9.
+GVP_GEOMETRY_FIELDS = ("ellipse", "circle", "linearPolygon", "radialPolygon")
+
+# indoorDeployment values of SDI Table 9.
+GVP_INDOOR_DEPLOYMENT_VALUES = (0, 1, 2)
 
 # Polygon vertex bounds, shared by SDI Tables 12 and 13.
 GVP_MIN_POLYGON_VERTICES = 3
@@ -134,3 +142,103 @@ class Rest_Gvp_RadialPolygon(pydantic.BaseModel,
     @pydantic.validator("outerBoundary")
     def check_vertices(cls, v):
         return _check_polygon_vertices(v)
+
+
+class Rest_Gvp_CertificationId(pydantic.BaseModel,
+                               extra=pydantic.Extra.forbid):
+    """ CertificationId object (SDI Table 8). """
+    rulesetId: str = pydantic.Field(
+        min_length=1, description="Identifier of the regulatory rules")
+    id: str = pydantic.Field(
+        min_length=1,
+        description="Certification ID of the GVP Access Point")
+
+
+class Rest_Gvp_DeviceDescriptor(pydantic.BaseModel,
+                                extra=pydantic.Extra.forbid):
+    """ DeviceDescriptor object (SDI Table 7). """
+    certificationId: List[Rest_Gvp_CertificationId] = pydantic.Field(
+        min_items=1,
+        description="Certification IDs and corresponding rulesets")
+    serialNumber: Optional[str] = pydantic.Field(
+        None, min_length=1, description="Device serial number")
+    deviceModel: Optional[str] = pydantic.Field(
+        None, min_length=1, description="Device model")
+
+    @pydantic.root_validator(skip_on_failure=True)
+    def serial_or_model(cls, values):
+        """ Apply the Table 7 conditional requirement. """
+        if values.get("serialNumber") is None and \
+                values.get("deviceModel") is None:
+            raise ValueError(
+                "one of serialNumber or deviceModel is required")
+        return values
+
+
+class Rest_Gvp_Location(pydantic.BaseModel, extra=pydantic.Extra.allow):
+    """ Location object (SDI Table 9), the area of intended operation. """
+    ellipse: Optional[Rest_Gvp_Ellipse] = None
+    circle: Optional[Rest_Gvp_Circle] = None
+    linearPolygon: Optional[Rest_Gvp_LinearPolygon] = None
+    radialPolygon: Optional[Rest_Gvp_RadialPolygon] = None
+    indoorDeployment: Optional[GvpNumber] = pydantic.Field(
+        None, description="0 unknown, 1 indoor, 2 outdoor")
+
+    @pydantic.validator("indoorDeployment")
+    def known_deployment(cls, v):
+        """ Table 9 maps this field to 0, 1 or 2. """
+        if v not in GVP_INDOOR_DEPLOYMENT_VALUES:
+            raise ValueError(
+                "must be one of %s" % (GVP_INDOOR_DEPLOYMENT_VALUES,))
+        return v
+
+    @pydantic.root_validator(skip_on_failure=True)
+    def exactly_one_geometry(cls, values):
+        """ Apply the Table 9 mutual exclusion. """
+        present = [name for name in GVP_GEOMETRY_FIELDS
+                   if values.get(name) is not None]
+        if not present:
+            raise ValueError(
+                "one of %s is required" % (", ".join(GVP_GEOMETRY_FIELDS),))
+        if len(present) > 1:
+            raise ValueError(
+                "only one geometry may be given, found %s"
+                % (", ".join(present),))
+        return values
+
+
+class Rest_Gvp_ExclusionZoneInquiryRequest(pydantic.BaseModel,
+                                           extra=pydantic.Extra.allow):
+    """ ExclusionZoneInquiryRequest object (SDI Table 6). """
+    requestId: str = pydantic.Field(
+        min_length=1,
+        description="Unique ID of this inquiry within the message")
+    deviceDescriptor: Rest_Gvp_DeviceDescriptor
+    areaOfIntendedOperation: Rest_Gvp_Location
+    inquiredFrequencyRange: Optional[List[Rest_Gvp_FrequencyRange]] = \
+        pydantic.Field(
+            None, description="Frequency ranges of interest; absent means "
+                              "all GVP-applicable bands")
+    desiredPsd: Optional[List[GvpNumber]] = pydantic.Field(
+        None, description="Power spectral density levels in dBm/MHz")
+    desiredPrecision: Optional[str] = pydantic.Field(
+        None, description="Requested precision: low, medium or high")
+    vendorExtensions: Optional[List[Rest_VendorExtension]] = None
+
+
+class Rest_Gvp_ReqMsg(pydantic.BaseModel, extra=pydantic.Extra.allow):
+    """ ExclusionZoneInquiryRequestMessage object (SDI Table 5). """
+    version: str = pydantic.Field(
+        min_length=1, description="Protocol Version")
+    exclusionZoneInquiryRequests: \
+        List[Rest_Gvp_ExclusionZoneInquiryRequest] = pydantic.Field(
+            min_items=1, description="One or more exclusion zone inquiries")
+    vendorExtensions: Optional[List[Rest_VendorExtension]] = None
+
+    @pydantic.validator("exclusionZoneInquiryRequests")
+    def unique_request_ids(cls, v):
+        """ Table 6 requires requestId unique within the message. """
+        ids = [r.requestId for r in v]
+        if len(set(ids)) != len(ids):
+            raise ValueError("requestId must be unique within the message")
+        return v
