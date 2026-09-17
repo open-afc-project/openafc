@@ -14,7 +14,33 @@ from afc_server_gvp_models import (GVP_GEOMETRY_FIELDS,
                                    Rest_Gvp_FrequencyRange,
                                    Rest_Gvp_LinearPolygon, Rest_Gvp_Location,
                                    Rest_Gvp_Point, Rest_Gvp_RadialPolygon,
-                                   Rest_Gvp_ReqMsg, Rest_Gvp_Vector)
+                                   Rest_Gvp_ExclusionZoneInfo,
+                                   Rest_Gvp_ExclusionZoneInquiryResponse,
+                                   Rest_Gvp_ReqMsg, Rest_Gvp_RespMsg,
+                                   Rest_Gvp_Vector)
+
+_FREQ = {"lowFrequency": 6182, "highFrequency": 6212}
+_EXPIRY = "2026-07-16T22:08:28Z"
+
+
+def _zone(**over):
+    """ A minimal valid ExclusionZoneInfo, overridable. """
+    data = {"exclusionZoneFrequencyRange": dict(_FREQ), "psdLevel": 11,
+            "circles": [[37.38042, -121.96694, 29269]]}
+    data.update(over)
+    return data
+
+
+def _response(**over):
+    """ A minimal valid SUCCESS ExclusionZoneInquiryResponse. """
+    data = {"requestId": "req-1",
+            "rulesetId": "US_47_CFR_PART_15_SUBPART_E_GVP",
+            "exclusionZoneInfo": [_zone()],
+            "availabilityExpireTime": _EXPIRY,
+            "response": {"responseCode": 0}}
+    data.update(over)
+    return data
+
 
 _ELLIPSE = {"center": {"longitude": -121.98, "latitude": 37.37},
             "majorAxis": 5000, "minorAxis": 5000, "orientation": 0}
@@ -594,3 +620,247 @@ def test_req_msg_error_location_reaches_nested_fields():
     assert exc.value.errors()[0]["loc"] == (
         "exclusionZoneInquiryRequests", 0, "areaOfIntendedOperation",
         "ellipse", "center", "latitude")
+
+
+# ------------------------------------------------------ ExclusionZoneInfo --
+
+def test_zone_info_accepts_appendix_a_entry():
+    """ The first exclusionZoneInfo entry of Appendix A, polygon form. """
+    z = Rest_Gvp_ExclusionZoneInfo(
+        exclusionZoneId="KFW38",
+        exclusionZoneFrequencyRange=_FREQ,
+        psdLevel=11,
+        enclosingCircle={"latitude": 37.38042, "longitude": -121.96694,
+                         "radius": 29269},
+        polygons=[[[37.36028, -121.72458], [37.36056, -121.79181],
+                   [37.36084, -121.70623]]])
+    assert z.psdLevel == 11
+    assert z.enclosingCircle.radius == 29269
+
+
+def test_zone_info_preserves_integer_radius():
+    """ Table 19 requires an integer radius; a float item type would widen
+    29269 to 29269.0. """
+    z = Rest_Gvp_ExclusionZoneInfo(**_zone())
+    assert isinstance(z.circles[0][2], int)
+    assert "29269]" in z.json()
+
+
+def test_zone_info_accepts_both_geometries():
+    """ Table 19 conditions each on what the zone contains, so a mixed zone
+    carries both. """
+    Rest_Gvp_ExclusionZoneInfo(**_zone(
+        polygons=[[[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]]]))
+
+
+def test_zone_info_rejects_no_geometry():
+    """ Table 19 states no minimum; a zone with neither polygons nor
+    circles describes no area. """
+    data = _zone()
+    del data["circles"]
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInfo(**data)
+    assert "polygons or circles" in str(exc.value)
+
+
+def test_zone_info_accepts_unbounded_vertex_count():
+    """ Table 19 states no vertex bounds, unlike Tables 12 and 13 which bound
+    request polygons at 3 to 300. A 400 point polygon is accepted. """
+    ring = [[37.0 + i * 0.001, -122.0] for i in range(400)]
+    Rest_Gvp_ExclusionZoneInfo(**_zone(polygons=[ring]))
+
+
+@pytest.mark.parametrize("field,value", [
+    ("polygons", []),
+    ("circles", []),
+])
+def test_zone_info_rejects_empty_geometry_array(field, value):
+    """ Table 19: "One or more polygons shall be included in this field." """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInfo(**_zone(**{field: value}))
+    assert exc.value.errors()[0]["loc"][0] == field
+
+
+def test_zone_info_rejects_empty_polygon():
+    """ pydantic applies the Field min_items to both list levels, so an empty
+    polygon is rejected at polygons[0]. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInfo(**_zone(polygons=[[]]))
+    assert exc.value.errors()[0]["loc"] == ("polygons", 0)
+
+
+@pytest.mark.parametrize("pair", [[37.0], [37.0, -122.0, 5.0]])
+def test_zone_info_rejects_wrong_length_coordinate(pair):
+    """ Table 19: each corner point is a two-element array. The error type
+    is asserted so the conlist bound stays. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInfo(**_zone(polygons=[[pair]]))
+    err = exc.value.errors()[0]
+    assert err["loc"][0] == "polygons"
+    assert "list.m" in err["type"]
+
+
+@pytest.mark.parametrize("triple", [[37.0, -122.0], [37.0, -122.0, 1, 2]])
+def test_zone_info_rejects_wrong_length_circle(triple):
+    """ Table 19: a three-element array of center latitude, center longitude
+    and radius. Error type asserted for the same reason as the pair above. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInfo(**_zone(circles=[triple]))
+    err = exc.value.errors()[0]
+    assert err["loc"][0] == "circles"
+    assert "list.m" in err["type"]
+
+
+@pytest.mark.parametrize("bad", [
+    [[91.0, -122.0]],
+    [[37.0, 181.0]],
+])
+def test_zone_info_rejects_out_of_range_polygon_point(bad):
+    """ Latitude comes first in Table 19, so position 0 is range checked
+    against -90..90 and position 1 against -180..180. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInfo(**_zone(polygons=[bad]))
+    assert exc.value.errors()[0]["loc"][0] == "polygons"
+
+
+@pytest.mark.parametrize("radius", [-1, 29269.5])
+def test_zone_info_rejects_bad_circle_radius(radius):
+    """ Table 19 requires an integer radius in meters. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInfo(**_zone(
+            circles=[[37.38042, -121.96694, radius]]))
+    assert exc.value.errors()[0]["loc"][0] == "circles"
+
+
+def test_zone_info_rejects_fractional_psd():
+    """ Table 19: "The value shall be an integer." """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInfo(**_zone(psdLevel=11.5))
+    assert exc.value.errors()[0]["loc"] == ("psdLevel",)
+
+
+def test_zone_info_forbids_extra_fields():
+    """ We produce these, so an unknown field means a typo in our own code. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInfo(**_zone(exclusionZoneArea=5))
+    assert exc.value.errors()[0]["loc"] == ("exclusionZoneArea",)
+
+
+# -------------------------------------- ExclusionZoneInquiryResponse -------
+
+def test_response_accepts_success_with_zones():
+    r = Rest_Gvp_ExclusionZoneInquiryResponse(**_response())
+    assert r.response.responseCode == 0
+    assert len(r.exclusionZoneInfo) == 1
+
+
+def test_response_accepts_success_with_empty_zone_array():
+    """ Table 18: "If the array size is zero, it indicates that there are no
+    exclusion zones in the Area of Intended Operation." """
+    r = Rest_Gvp_ExclusionZoneInquiryResponse(**_response(
+        exclusionZoneInfo=[]))
+    assert r.exclusionZoneInfo == []
+
+
+def test_response_accepts_failure_without_zone_data():
+    data = _response(response={"responseCode": 103})
+    del data["exclusionZoneInfo"]
+    del data["availabilityExpireTime"]
+    Rest_Gvp_ExclusionZoneInquiryResponse(**data)
+
+
+@pytest.mark.parametrize("missing", ["exclusionZoneInfo",
+                                     "availabilityExpireTime"])
+def test_response_requires_zone_data_on_success(missing):
+    """ Table 18: present if and only if the response code is SUCCESS. """
+    data = _response()
+    del data[missing]
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInquiryResponse(**data)
+    assert "required when the response code is SUCCESS" in str(exc.value)
+
+
+@pytest.mark.parametrize("keep", ["exclusionZoneInfo",
+                                  "availabilityExpireTime"])
+def test_response_forbids_zone_data_on_failure(keep):
+    """ The other half of "if and only if". """
+    data = _response(response={"responseCode": -1})
+    for field in ("exclusionZoneInfo", "availabilityExpireTime"):
+        if field != keep:
+            del data[field]
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInquiryResponse(**data)
+    assert "permitted only when the response code is SUCCESS" in str(exc.value)
+
+
+@pytest.mark.parametrize("stamp", [
+    "2026-07-16 22:08:28",
+    "2026-07-16T22:08:28",
+    "2026-07-16T22:08:28.500Z",
+    "2026-07-16T22:08:28+00:00",
+])
+def test_response_rejects_bad_expire_time(stamp):
+    """ Table 18 fixes the format as YYYY-MM-DDThh:mm:ssZ. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInquiryResponse(**_response(
+            availabilityExpireTime=stamp))
+    assert exc.value.errors()[0]["loc"] == ("availabilityExpireTime",)
+
+
+@pytest.mark.parametrize("field", ["requestId", "rulesetId"])
+def test_response_rejects_empty_identifier(field):
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInquiryResponse(**_response(**{field: ""}))
+    assert exc.value.errors()[0]["loc"] == (field,)
+
+
+def test_response_requires_response_object():
+    data = _response()
+    del data["response"]
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ExclusionZoneInquiryResponse(**data)
+    assert exc.value.errors()[0]["loc"] == ("response",)
+
+
+# --------------------------------------------------------------- RespMsg --
+
+def test_resp_msg_accepts_single_response():
+    msg = Rest_Gvp_RespMsg(version="1.0",
+                           exclusionZoneInquiryResponses=[_response()])
+    assert msg.version == "1.0"
+
+
+def test_resp_msg_accepts_multiple_distinct_responses():
+    """ Section 3.2 aggregates one response per request. """
+    msg = Rest_Gvp_RespMsg(version="1.0", exclusionZoneInquiryResponses=[
+        _response(requestId="a"), _response(requestId="b")])
+    assert len(msg.exclusionZoneInquiryResponses) == 2
+
+
+def test_resp_msg_rejects_empty_response_array():
+    """ Table 17 carries responses "for one or more GVP Access Points". """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_RespMsg(version="1.0", exclusionZoneInquiryResponses=[])
+    assert exc.value.errors()[0]["loc"] == ("exclusionZoneInquiryResponses",)
+
+
+def test_resp_msg_rejects_duplicate_request_ids():
+    """ Table 17 states no uniqueness rule; rejecting duplicates is our
+    decision. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_RespMsg(version="1.0", exclusionZoneInquiryResponses=[
+            _response(requestId="dup"), _response(requestId="dup")])
+    assert "unique within the message" in str(exc.value)
+
+
+def test_resp_msg_error_location_reaches_a_polygon_point():
+    """ The reported path is what populates supplementalInfo (SDI Table 24),
+    so it must survive five levels into the response geometry. """
+    bad = _response(exclusionZoneInfo=[_zone(
+        polygons=[[[91.0, -122.0], [37.0, -122.0], [38.0, -122.0]]])])
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_RespMsg(version="1.0", exclusionZoneInquiryResponses=[bad])
+    loc = exc.value.errors()[0]["loc"]
+    assert loc[:4] == ("exclusionZoneInquiryResponses", 0,
+                       "exclusionZoneInfo", 0)
+    assert "polygons" in loc

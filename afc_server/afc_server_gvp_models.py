@@ -1,11 +1,19 @@
 """ Request and response models for the Geofencing System to GVP Device
 Interface (SDI). """
 
+import datetime
 from typing import List, Optional, Union
 
 import pydantic
 
-from afc_server_models import Rest_VendorExtension
+from afc_server_models import (Rest_Response, Rest_SupplementalInfo,
+                               Rest_VendorExtension)
+
+# SUCCESS response code (SDI Table 23).
+GVP_SUCCESS_RESPONSE_CODE = 0
+
+# availabilityExpireTime format required by SDI Table 18.
+GVP_EXPIRE_TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 # The four mutually exclusive geometry fields of SDI Table 9.
 GVP_GEOMETRY_FIELDS = ("ellipse", "circle", "linearPolygon", "radialPolygon")
@@ -20,6 +28,18 @@ GVP_MAX_POLYGON_VERTICES = 300
 # SDI types numeric fields as "number" and constrains some to integers.
 # A plain int annotation would coerce, silently truncating 5925.5.
 GvpNumber = Union[pydantic.StrictInt, pydantic.StrictFloat]
+
+# SDI Table 19 gives response geometry as positional arrays, latitude first.
+GvpLatLonPair = pydantic.conlist(GvpNumber, min_items=2, max_items=2)
+GvpCircleTriple = pydantic.conlist(GvpNumber, min_items=3, max_items=3)
+
+
+def _check_lat_lon(lat, lon):
+    """ Range check a latitude and longitude from a positional array. """
+    if not -90.0 <= lat <= 90.0:
+        raise ValueError("latitude %r is outside [-90, 90]" % (lat,))
+    if not -180.0 <= lon <= 180.0:
+        raise ValueError("longitude %r is outside [-180, 180]" % (lon,))
 
 
 def _require_whole(value, what):
@@ -238,6 +258,127 @@ class Rest_Gvp_ReqMsg(pydantic.BaseModel, extra=pydantic.Extra.allow):
     @pydantic.validator("exclusionZoneInquiryRequests")
     def unique_request_ids(cls, v):
         """ Table 6 requires requestId unique within the message. """
+        ids = [r.requestId for r in v]
+        if len(set(ids)) != len(ids):
+            raise ValueError("requestId must be unique within the message")
+        return v
+
+
+class Rest_Gvp_ExclusionZoneInfo(pydantic.BaseModel,
+                                 extra=pydantic.Extra.forbid):
+    """ ExclusionZoneInfo object (SDI Table 19). """
+    exclusionZoneId: Optional[str] = pydantic.Field(
+        None, description="Optional non-unique label, for debugging only")
+    exclusionZoneFrequencyRange: Rest_Gvp_FrequencyRange = pydantic.Field(
+        description="Range over which operation is not permitted inside the "
+                    "zone")
+    psdLevel: GvpNumber = pydantic.Field(
+        description="PSD in dBm/MHz; operation at this level is allowed only "
+                    "outside the zone")
+    enclosingCircle: Optional[Rest_Gvp_Circle] = pydantic.Field(
+        None, description="Single circle covering the zone, for cheap "
+                          "rejection by the GVP Access Point")
+    polygons: Optional[List[List[GvpLatLonPair]]] = pydantic.Field(
+        None, min_items=1,
+        description="Polygons as arrays of [latitude, longitude] corner "
+                    "points, WGS 84")
+    circles: Optional[List[GvpCircleTriple]] = pydantic.Field(
+        None, min_items=1,
+        description="Circles as [center latitude, center longitude, radius "
+                    "in meters], WGS 84")
+
+    @pydantic.validator("psdLevel")
+    def whole_psd(cls, v):
+        """ Table 19 requires an integer value. """
+        return _require_whole(v, "psdLevel")
+
+    @pydantic.validator("polygons")
+    def check_polygons(cls, v):
+        """ Range check the [latitude, longitude] corner points. """
+        for polygon in v:
+            for lat, lon in polygon:
+                _check_lat_lon(lat, lon)
+        return v
+
+    @pydantic.validator("circles")
+    def check_circles(cls, v):
+        """ Table 19 requires an integer radius in meters. """
+        for lat, lon, radius in v:
+            _check_lat_lon(lat, lon)
+            if radius < 0:
+                raise ValueError("radius must not be negative")
+            _require_whole(radius, "radius")
+        return v
+
+    @pydantic.root_validator(skip_on_failure=True)
+    def has_some_geometry(cls, values):
+        """ A zone with neither polygons nor circles describes no area. """
+        if values.get("polygons") is None and values.get("circles") is None:
+            raise ValueError(
+                "at least one of polygons or circles is required")
+        return values
+
+
+class Rest_Gvp_ExclusionZoneInquiryResponse(pydantic.BaseModel,
+                                            extra=pydantic.Extra.forbid):
+    """ ExclusionZoneInquiryResponse object (SDI Table 18). """
+    requestId: str = pydantic.Field(
+        min_length=1, description="Echoes the requestId of the inquiry")
+    rulesetId: str = pydantic.Field(
+        min_length=1,
+        description="Regulatory rules used to determine these zones")
+    exclusionZoneInfo: Optional[List[Rest_Gvp_ExclusionZoneInfo]] = \
+        pydantic.Field(
+            None, description="Zero or more zones; empty means none overlap "
+                              "the area of intended operation")
+    availabilityExpireTime: Optional[str] = pydantic.Field(
+        None, description="UTC expiry as YYYY-MM-DDThh:mm:ssZ")
+    response: Rest_Response = pydantic.Field(
+        description="Outcome of the inquiry")
+    vendorExtensions: Optional[List[Rest_VendorExtension]] = None
+
+    @pydantic.validator("availabilityExpireTime")
+    def utc_expire_time(cls, v):
+        """ Table 18 fixes the format as YYYY-MM-DDThh:mm:ssZ. """
+        try:
+            datetime.datetime.strptime(v, GVP_EXPIRE_TIME_FORMAT)
+        except ValueError:
+            raise ValueError(
+                "must be UTC formatted as YYYY-MM-DDThh:mm:ssZ")
+        return v
+
+    @pydantic.root_validator(skip_on_failure=True)
+    def zone_data_iff_success(cls, values):
+        """ Apply the Table 18 conditional requirement in both directions. """
+        conditional = ("exclusionZoneInfo", "availabilityExpireTime")
+        response = values.get("response")
+        success = (response is not None and
+                   response.responseCode == GVP_SUCCESS_RESPONSE_CODE)
+        absent = [n for n in conditional if values.get(n) is None]
+        if success and absent:
+            raise ValueError(
+                "%s required when the response code is SUCCESS"
+                % (", ".join(absent),))
+        present = [n for n in conditional if values.get(n) is not None]
+        if not success and present:
+            raise ValueError(
+                "%s permitted only when the response code is SUCCESS"
+                % (", ".join(present),))
+        return values
+
+
+class Rest_Gvp_RespMsg(pydantic.BaseModel, extra=pydantic.Extra.forbid):
+    """ ExclusionZoneInquiryResponseMessage object (SDI Table 17). """
+    version: str = pydantic.Field(
+        min_length=1, description="Protocol Version, matching the request")
+    exclusionZoneInquiryResponses: \
+        List[Rest_Gvp_ExclusionZoneInquiryResponse] = pydantic.Field(
+            min_items=1, description="One response per inquiry")
+    vendorExtensions: Optional[List[Rest_VendorExtension]] = None
+
+    @pydantic.validator("exclusionZoneInquiryResponses")
+    def unique_request_ids(cls, v):
+        """ Each response echoes a distinct inquiry. """
         ids = [r.requestId for r in v]
         if len(set(ids)) != len(ids):
             raise ValueError("requestId must be unique within the message")
