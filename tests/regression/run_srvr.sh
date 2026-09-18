@@ -50,7 +50,7 @@ check_ret $?
 # run srvr
 docker compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE down -v && docker compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE up -d && docker ps -a
 check_ret $?
-sleep 5
+sleep 30
 
 # set default srvr configuration
 docker compose $BASE_COMPOSE_FILE $CUSTOM_COMPOSE_FILE exec -T rat_server rat-manage-api cfg add src=/pipe/export_admin_cfg.json

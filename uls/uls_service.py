@@ -98,6 +98,13 @@ class Settings(pydantic.BaseSettings):
             "/mnt/nfs/rat_transfer/daily_uls_parse/temp/", env="ULS_TEMP_DIR",
             description="Temporary directory of ULS download script, cleaned "
             "before downloading")
+    save_dir: str = \
+        pydantic.Field(
+            "/rat_transfer/daily_uls_parse/country_history/", env="ULS_SAVE_DIR",
+            description="Directory where download script puts downloaded file for country")
+    num_saves: Optional[int] = \
+        pydantic.Field(3, env="NUM_SAVE",
+                       description="Number of backup saved for data")
     ext_db_dir: str = \
         pydantic.Field(
             ..., env="ULS_EXT_DB_DIR",
@@ -151,6 +158,10 @@ class Settings(pydantic.BaseSettings):
     statsd_server: Optional[str] = \
         pydantic.Field(None, env="ULS_STATSD_SERVER",
                        description="StatsD server to send metrics to")
+    ext_wif_files_dir: str = \
+        pydantic.Field(
+            None, env="EXT_WIF_FILE_DIR",
+            description="External location for WIF files directory")
     check_ext_files: Optional[List[str]] = \
         pydantic.Field(
             "https://raw.githubusercontent.com/Wireless-Innovation-Forum/"
@@ -610,6 +621,42 @@ def update_uls_file(uls_dir: str, uls_file: str, symlink: str,
                  f"now points to '{uls_file}'")
 
 
+def save_recent_download(regions, num_of_saves, recent_download_dir: str, saved_download_dir: str) -> None:
+    """ Handles the saving and storage of the country downloads
+
+    Arguments:
+    regions  -- List of regions to saves
+    num_of_saves -- Number of backups to save
+    recent_download_dir  -- Location of where the most recent download took place
+    saved_download_dir -- Location of where to save the backups
+    """
+    startTime = datetime.datetime.now()
+    nameTime = startTime.isoformat(timespec='seconds').replace(":", '_')
+    newSaveName = f"{nameTime}"
+
+    for region in regions:
+        regionDataDir = os.path.join(recent_download_dir, region)
+        regionSaveParentDir = os.path.join(saved_download_dir, region)
+        saveDir = os.path.join(regionSaveParentDir, newSaveName)
+        shutil.copytree(regionDataDir, saveDir)
+
+        existingBackups = [
+            d for d in os.listdir(regionSaveParentDir)
+            if os.path.isdir(os.path.join(regionSaveParentDir, d))
+        ]
+
+        existingBackups.sort()
+
+        while len(existingBackups) > num_of_saves:
+            oldestBackupName = existingBackups.pop(0)
+            oldest_backup_path = os.path.join(regionSaveParentDir, oldestBackupName)
+
+            shutil.rmtree(oldest_backup_path)
+
+    logging.info(f"Successfully saved the recent downloads to backups for: "
+                 f"{', '.join(sorted(regions))}")
+
+
 class DbDiff:
     """ Computes and holds difference between two FS (aka ULS) databases
 
@@ -859,7 +906,7 @@ class ExtParamFilesChecker:
 
     def __init__(self, status_updater: StatusUpdater,
                  ext_files_arg: Optional[List[str]] = None,
-                 script_dir: Optional[str] = None) -> None:
+                 source_dir: Optional[str] = None) -> None:
         """ Constructor
 
         Arguments:
@@ -867,7 +914,7 @@ class ExtParamFilesChecker:
         ext_files_arg  -- List of 'BASE_URL:SUBDIR:FILES,FILE...' groups,
                           separated with semicolon: external parameter file
                           descriptors from command line
-        script_dir     -- Downloader script directory
+        script_dir     -- External or Downloader script directory
         """
         self._epf_list: \
             Optional[List["ExtParamFilesChecker._ExtParamFiles"]] = None
@@ -884,12 +931,12 @@ class ExtParamFilesChecker:
                         self._ExtParamFiles(base_url=m.group(1).rstrip("/"),
                                             subdir=m.group(2),
                                             files=m.group(3).split(",")))
-        self._script_dir = script_dir
+        self._source_dir = source_dir
         self._status_updater = status_updater
 
     def check(self) -> None:
         """ Check that external files matches those in image """
-        assert (self._epf_list is not None) and (self._script_dir is not None)
+        assert (self._epf_list is not None) and (self._source_dir is not None)
         temp_dir: Optional[str] = None
         check_results: Dict[str, Optional[str]] = {}
         try:
@@ -899,13 +946,13 @@ class ExtParamFilesChecker:
                     errmsg: Optional[str] = None
                     try:
                         internal_file_name = \
-                            os.path.join(self._script_dir, epf.subdir,
+                            os.path.join(self._source_dir, epf.subdir,
                                          filename)
                         url = f"{epf.base_url}/{filename}"
                         if not os.path.isfile(internal_file_name):
-                            errmsg = f"'{internal_file_name}' not foound in " \
+                            errmsg = f"'{internal_file_name}' not found in " \
                                 f"container. It should be downloaded from " \
-                                f"'{url}', verified and added to image"
+                                f"'{url}', verified and added"
                             continue
                         try:
                             external_file_name = os.path.join(temp_dir,
@@ -999,6 +1046,14 @@ def main(argv: List[str]) -> None:
         help=f"Directory containing downloader's temporary files (cleared "
         f"before downloading){env_help(Settings, 'temp_dir')}")
     argument_parser.add_argument(
+        "--save_dir", metavar="SAVE_DIR",
+        help=f"Directory containing uls downloader's previously successful downloaded region files"
+        f"per region){env_help(Settings, 'save_dir')}")
+    argument_parser.add_argument(
+        "--num_save", metavar="NUM_SAVE",
+        help=f"Number of previously successful region files to save"
+        f"expected ){env_help(Settings, 'num_saves')}")
+    argument_parser.add_argument(
         "--ext_db_dir", metavar="EXTERNAL_DATABASE_DIR",
         help=f"Directory where new ULS databases should be copied. If "
         f"--ext_db_symlink contains path, this parameter is root directory "
@@ -1056,6 +1111,10 @@ def main(argv: List[str]) -> None:
         "--statsd_server", metavar="HOST[:PORT]",
         help=f"Send metrics to given StatsD host. Default is not to"
         f"{env_help(Settings, 'prometheus_port')}")
+    argument_parser.add_argument(
+        "--ext_wif_files_dir", metavar="EXT_WIF_FILES_DIR",
+        help=f"External location to load the WIF data files "
+        f"(Omit to use internal copies).{env_help(Settings, 'check_ext_files')}")
     argument_parser.add_argument(
         "--check_ext_files", metavar="BASE_URL:SUBDIR:FILENAME[,...][;...]",
         action="append", default=[],
@@ -1154,10 +1213,14 @@ def main(argv: List[str]) -> None:
 
         executor = LoggingExecutor()
 
+        int_wif_ext_files_dir = os.path.dirname(settings.download_script)
+        if settings.ext_wif_files_dir is not None:
+            logging.info(f"Using {settings.ext_wif_files_dir} for external WIF files")
+            int_wif_ext_files_dir = settings.ext_wif_files_dir
         ext_params_file_checker = \
             ExtParamFilesChecker(
                 ext_files_arg=settings.check_ext_files,
-                script_dir=os.path.dirname(settings.download_script),
+                source_dir=int_wif_ext_files_dir,
                 status_updater=status_updater)
 
         current_uls_file = os.path.join(settings.ext_db_dir,
@@ -1235,8 +1298,11 @@ def main(argv: List[str]) -> None:
                 cmdline_args.append(settings.download_script)
                 if settings.region:
                     cmdline_args += ["--region", settings.region]
+                cmdline_args += ["--save_dir", settings.save_dir]
                 if settings.download_script_args:
                     cmdline_args.append(settings.download_script_args)
+                if settings.ext_wif_files_dir is not None:
+                    cmdline_args += ["--ext_wif_files_dir", settings.ext_wif_files_dir]
                 logging.info(f"Starting {' '.join(cmdline_args)}")
                 executor.execute(
                     " ".join(cmdline_args) if settings.download_script_args
@@ -1357,6 +1423,14 @@ def main(argv: List[str]) -> None:
                                      db_diff.diff_tiles[: 1000]]
                                 rcache.rcache_spatial_invalidate(
                                     tiles=db_diff.diff_tiles)
+
+                        # Upon success, save the new region files
+                        if settings.force:
+                            # Saves regardless of new data
+                            save_recent_download(set(new_uls_identity.keys()), settings.num_saves, settings.temp_dir, settings.save_dir)
+                        else:
+                            # Saves based on new data
+                            save_recent_download(updated_regions, settings.num_saves, settings.temp_dir, settings.save_dir)
 
                         # Update data change times (for health checker)
                         status_updater.milestone(
