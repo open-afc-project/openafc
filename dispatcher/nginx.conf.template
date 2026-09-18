@@ -28,6 +28,7 @@ http {
         keepalive  32;
     }
 
+    # MONITORING_BEGIN
     upstream prometheus {
         server ${AFC_PROMETHEUS_TARGET};
     }
@@ -35,6 +36,19 @@ http {
     upstream grafana {
         server ${AFC_GRAFANA_TARGET};
     }
+
+    upstream kafka_ui {
+        server ${AFC_KAFKA_UI_TARGET};
+    }
+
+    upstream cadvisor {
+        server ${AFC_CADVISOR_TARGET};
+    }
+
+    upstream rabbitmq {
+        server ${AFC_RABBITMQ_TARGET};
+    }
+    # MONITORING_END
 
     map $scheme:$afc_https_enforce $should_redirect {
         http:TRUE 1;
@@ -174,11 +188,39 @@ http {
             return 403;
         }
 
-        location /prometheus {
-            set $prometheus_enabled "${AFC_PROMETHEUS_ENABLED}";
-            if ($prometheus_enabled != true) {
-                return 501;
+        # Admin auth subrequest: returns 200 for Admin/Super, 403 otherwise
+        location = /fbrat/_admin_check {
+            internal;
+            proxy_pass http://webui/fbrat/auth/admin_check;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_set_header Cookie $http_cookie;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host $http_host;
+        }
+
+        # 401 handler: redirect to login; return plain 401 for WS/XHR
+        location @auth_redirect {
+            if ($http_upgrade) {
+                return 401;
             }
+            if ($http_x_requested_with) {
+                return 401;
+            }
+            return 302 $scheme://$http_host/fbrat/auth/login?next=$request_uri;
+        }
+
+        # 403 handler: access denied for non-admin users
+        location @forbidden {
+            default_type text/html;
+            return 403 '<html><body><h1>403 Forbidden</h1><p>Admin or Super role required.</p></body></html>';
+        }
+
+        # MONITORING_BEGIN
+        location /fbrat/prometheus {
+            auth_request /fbrat/_admin_check;
+            error_page 401 = @auth_redirect;
+            error_page 403 = @forbidden;
             proxy_bind $server_addr;
             sendfile on;
             proxy_set_header Host $http_host;
@@ -190,13 +232,28 @@ http {
             proxy_redirect http:// $scheme://;
         }
 
-        location /grafana {
+        location /fbrat/grafana {
             proxy_connect_timeout 60;
             proxy_read_timeout 60;
-            set $grafana_enabled "${AFC_GRAFANA_ENABLED}";
-            if ($grafana_enabled != true) {
-                return 501;
-            }
+            auth_request /fbrat/_admin_check;
+            error_page 401 = @auth_redirect;
+            error_page 403 = @forbidden;
+            proxy_bind $server_addr;
+            sendfile on;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_hide_header Content-Security-Policy;
+            add_header Content-Security-Policy  "script-src 'self' 'unsafe-eval' 'unsafe-inline'";
+            proxy_pass http://grafana$request_uri;
+        }
+
+        location /fbrat/kafka-ui {
+            auth_request /fbrat/_admin_check;
+            error_page 401 = @auth_redirect;
+            error_page 403 = @forbidden;
             proxy_bind $server_addr;
             sendfile on;
             proxy_set_header Host $http_host;
@@ -204,8 +261,46 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_hide_header Content-Security-Policy;
             add_header Content-Security-Policy  "script-src 'self' 'unsafe-eval' 'unsafe-inline'";
-            proxy_pass http://grafana$request_uri;
+            proxy_pass http://kafka_ui$request_uri;
         }
+
+        location /fbrat/cadvisor {
+            auth_request /fbrat/_admin_check;
+            error_page 401 = @auth_redirect;
+            error_page 403 = @forbidden;
+            proxy_bind $server_addr;
+            sendfile on;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_hide_header Content-Security-Policy;
+            add_header Content-Security-Policy  "script-src 'self' 'unsafe-inline'";
+            proxy_pass http://cadvisor$request_uri;
+            proxy_redirect http:// $scheme://;
+            proxy_redirect /docker/ /fbrat/cadvisor/docker/;
+            proxy_redirect /podman/ /fbrat/cadvisor/podman/;
+        }
+
+        location /fbrat/rabbitmq {
+            auth_request /fbrat/_admin_check;
+            error_page 401 = @auth_redirect;
+            error_page 403 = @forbidden;
+            proxy_bind $server_addr;
+            sendfile on;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header Authorization "Basic Y2VsZXJ5OmNlbGVyeQ==";
+            proxy_set_header Accept-Encoding "";
+            sub_filter '</head>' '<script>if(!localStorage.getItem("credentials")){localStorage.setItem("credentials","Y2VsZXJ5OmNlbGVyeQ==");localStorage.setItem("auth-scheme","Basic");location.reload();}</script></head>';
+            sub_filter_once on;
+            sub_filter_types text/html;
+            proxy_hide_header Content-Security-Policy;
+            add_header Content-Security-Policy  "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+            proxy_pass http://rabbitmq$request_uri;
+            proxy_redirect http:// $scheme://;
+        }
+        # MONITORING_END
 
         location / {
             if ($request_uri = "/") {

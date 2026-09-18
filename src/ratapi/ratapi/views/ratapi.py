@@ -157,6 +157,8 @@ class GuiConfig(MethodView):
             about_sitekey=about_sitekey if about_sitekey else None,
             app_name=flask.current_app.config['USER_APP_NAME'],
             version=serververs,
+            grafana_enabled=os.environ.get(
+                'AFC_GRAFANA_ENABLED', 'false').lower() == 'true',
         )
         return resp
 
@@ -642,8 +644,8 @@ class Phase1Analysis(MethodView):
             temp_dir, 'analysisResponse.json.gz')
 
         LOGGER.debug("Writing request file: %s", request_file_path)
-        with open(request_file_path, "w") as fle:
-            fle.write(args)  # write JSON to request file
+        with open(request_file_path, "wb") as fle:
+            fle.write(args)
         LOGGER.debug("Request file written")
 
         task = build_task(request_file_path, response_file_path,

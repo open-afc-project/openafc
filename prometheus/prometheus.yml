@@ -9,10 +9,14 @@ global:
   scrape_timeout: 2s
   evaluation_interval: 15s  # Interval for recording rules
 
+rule_files:
+  - rules.yml
+
 scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: [localhost:9090]
+    metrics_path: /fbrat/prometheus/metrics
   - job_name: rmq
     static_configs:
       - targets: [rmq:15692]
@@ -39,15 +43,16 @@ scrape_configs:
   - job_name: cadvisor
     static_configs:
       - targets: [cadvisor:8080]
+    metrics_path: /fbrat/cadvisor/metrics
     metric_relabel_configs:
       - source_labels: [name]
         regex: "(.*?)(_|-)(rat_server|als_siphon|uls_downloader|bulk_postgres|\
-          als_kafka|cert_db|rcache_tool|[^_-]+)(_|-)[0-9]+"
+          als_kafka|cert_db|kafka_ui|rcache_tool|[^_-]+)(_|-)[0-9]+"
         replacement: "$1"
         target_label: project
       - source_labels: [name]
         regex: "(.*?)(_|-)(rat_server|als_siphon|uls_downloader|bulk_postgres|\
-          als_kafka|cert_db|rcache_tool|[^_-]+)(_|-)[0-9]+"
+          als_kafka|cert_db|kafka_ui|rcache_tool|[^_-]+)(_|-)[0-9]+"
         replacement: "$3"
         target_label: service
       - regex: image

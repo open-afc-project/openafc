@@ -13,7 +13,7 @@ set -x
 # mapped inside container for this)
 if [[ -e /var/run/docker.sock ]] && \
         [[ "${GRAFANA_DOCKER_SOCKET_PORT}" != "" ]]; then
-    socat UNIX-CONNECT:/var/run/docker.sock TCP-LISTEN:${GRAFANA_DOCKER_SOCKET_PORT},fork,reuseaddr &
+    socat TCP-LISTEN:${GRAFANA_DOCKER_SOCKET_PORT},fork,reuseaddr UNIX-CONNECT:/var/run/docker.sock &
 fi
 
 grafana_tool.py jinja --recursive --strip_ext=.template $WORKDIR/templates $WORKDIR

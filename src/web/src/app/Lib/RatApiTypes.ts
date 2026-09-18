@@ -28,6 +28,7 @@ export interface GuiConfig {
   rat_afc: string;
   afc_kml: string;
   version: string;
+  grafana_enabled?: boolean;
 }
 
 export interface AFCConfigFile {

@@ -31,7 +31,7 @@ RUN apt install -y curl
 
 WORKDIR /prometheus
 
-COPY prometheus.yml /prometheus/
+COPY prometheus.yml rules.yml /prometheus/
 COPY prometheus_entrypoint.sh /prometheus
 RUN chmod +x /prometheus/prometheus_entrypoint.sh
 

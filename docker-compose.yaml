@@ -43,15 +43,9 @@ services:
       - AFC_OBJST_HOST=${AFC_OBJST_HOST}
       - AFC_OBJST_PORT=${AFC_OBJST_PORT}
       - AFC_OBJST_SCHEME=${AFC_OBJST_SCHEME}
-      # Prometheus params:
-      - AFC_PROMETHEUS_TARGET=prometheus:9090
-      - AFC_PROMETHEUS_ENABLED=true
     depends_on:
       - afcserver
-      - msghnd
       - rat_server
-      - prometheus
-      - grafana
     dns_search: [.]
 
   rat_server:
@@ -63,13 +57,20 @@ services:
       # In case you want to cinfigure OIDC
       # - ./OIDC:/OIDC
     depends_on:
-      - ratdb
-      - rmq
-      - objst
-      - als_kafka
-      - als_siphon
-      - bulk_postgres
-      - rcache
+      ratdb:
+        condition: service_started
+      rmq:
+        condition: service_started
+      objst:
+        condition: service_started
+      als_kafka:
+        condition: service_healthy
+      als_siphon:
+        condition: service_started
+      bulk_postgres:
+        condition: service_started
+      rcache:
+        condition: service_started
     secrets:
       - RATDB_PASSWORD
       - FLASK_SECRET_KEY
@@ -117,11 +118,13 @@ services:
       - AFC_DB_CREATOR_PASSWORD_FILE_RATDB=${VOL_C_SECRETS}/DB_CREATOR_PASSWORD_RATDB
       - AFC_DB_CREATOR_DSN_BULK_POSTGRES=postgresql://postgres:postgres@bulk_postgres/postgres
       - AFC_DB_CREATOR_PASSWORD_FILE_BULK_POSTGRES=${VOL_C_SECRETS}/DB_CREATOR_PASSWORD_BULK_POSTGRES
+      - AFC_GRAFANA_ENABLED=${AFC_GRAFANA_ENABLED:-false}
       # OIDC and Captcha conf can be added here:
       # - OIDC_ARG=/OIDC/oidc_env.cfg
       # - RATAPI_ARG=/OIDC/ratapi_env.cfg
 
   msghnd:
+    profiles: ["msghnd"]
     image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-msghnd:${TAG:-latest}
     environment:
       - FLASKFILE_SQLALCHEMY_DATABASE_PASSWORD=${VOL_C_SECRETS}/RATDB_PASSWORD
@@ -164,13 +167,20 @@ services:
       - OIDC_CLIENT_SECRET
       - RCACHE_DB_PASSWORD
     depends_on:
-      - ratdb
-      - rmq
-      - objst
-      - als_kafka
-      - als_siphon
-      - bulk_postgres
-      - rcache
+      ratdb:
+        condition: service_started
+      rmq:
+        condition: service_started
+      objst:
+        condition: service_started
+      als_kafka:
+        condition: service_healthy
+      als_siphon:
+        condition: service_started
+      bulk_postgres:
+        condition: service_started
+      rcache:
+        condition: service_started
 
   afcserver:
     image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afcserver-image:${TAG:-latest}
@@ -178,7 +188,7 @@ services:
     environment:
       - AFC_SERVER_PORT=${AFC_REQ_SERVER_PORT}
       - AFC_SERVER_RATDB_DSN=postgresql://postgres:postgres@ratdb/fbrat
-      - AFC_SERVER_RATDB_RATDB_PASSWORD_FILE=${VOL_C_SECRETS}/RATDB_PASSWORD
+      - AFC_SERVER_RATDB_PASSWORD_FILE=${VOL_C_SECRETS}/RATDB_PASSWORD
       - AFC_SERVER_REQUEST_TIMEOUT=180
       - AFC_SERVER_CONFIG_REFRESH=5
       - RCACHE_POSTGRES_DSN=${RCACHE_POSTGRES_DSN}
@@ -203,11 +213,16 @@ services:
       - RATDB_PASSWORD
       - RCACHE_DB_PASSWORD
     depends_on:
-      - ratdb
-      - rmq
-      - als_kafka
-      - bulk_postgres
-      - objst
+      ratdb:
+        condition: service_started
+      rmq:
+        condition: service_started
+      als_kafka:
+        condition: service_healthy
+      bulk_postgres:
+        condition: service_started
+      objst:
+        condition: service_started
 
   objst:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/objstorage-image:${TAG:-latest}
@@ -267,16 +282,27 @@ services:
       # TIMEOUT
       - AFC_WORKER_ENG_TOUT=300
     depends_on:
-      - ratdb
-      - rmq
-      - objst
-      - rcache
-      - als_kafka
+      ratdb:
+        condition: service_started
+      rmq:
+        condition: service_started
+      objst:
+        condition: service_started
+      rcache:
+        condition: service_started
+      als_kafka:
+        condition: service_healthy
     dns_search: [.]
 
   als_kafka:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/als-kafka-image:${TAG:-latest}
     restart: always
+    healthcheck:
+      test: /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:${KAFKA_CLIENT_PORT:-9092} > /dev/null 2>&1
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     environment:
       - KAFKA_ADVERTISED_HOST=${ALS_KAFKA_SERVER}
       - KAFKA_CLIENT_PORT=${ALS_KAFKA_CLIENT_PORT}
@@ -303,8 +329,23 @@ services:
       - ALS_DB_PASSWORD
       - ALS_JSON_LOG_DB_PASSWORD
     depends_on:
-      - als_kafka
-      - bulk_postgres
+      als_kafka:
+        condition: service_healthy
+      bulk_postgres:
+        condition: service_started
+    dns_search: [.]
+
+  kafka_ui:
+    profiles: ["monitor"]
+    image: provectuslabs/kafka-ui:latest
+    restart: always
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=afc-kafka
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=${ALS_KAFKA_SERVER}:${ALS_KAFKA_CLIENT_PORT}
+      - SERVER_SERVLET_CONTEXT_PATH=/fbrat/kafka-ui
+    depends_on:
+      als_kafka:
+        condition: service_healthy
     dns_search: [.]
 
   bulk_postgres:
@@ -349,13 +390,19 @@ services:
       - MAIL_PASSWORD
       - ULS_STATE_DB_PASSWORD
     depends_on:
-      - bulk_postgres
+      bulk_postgres:
+        condition: service_started
+      als_kafka:
+        condition: service_healthy
     dns_search: [.]
 
   cert_db:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/cert_db:${TAG:-latest}
     depends_on:
-      - ratdb
+      ratdb:
+        condition: service_started
+      als_kafka:
+        condition: service_healthy
     links:
       - ratdb
       - als_kafka
@@ -405,10 +452,14 @@ services:
     secrets:
       - RCACHE_DB_PASSWORD
     depends_on:
-      - bulk_postgres
+      bulk_postgres:
+        condition: service_started
+      als_kafka:
+        condition: service_healthy
     dns_search: [.]
 
   grafana:
+    profiles: ["monitor"]
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/grafana-image:${TAG:-latest}
     restart: always
     volumes:
@@ -424,7 +475,7 @@ services:
       - GRAFANA_DS_JSON_LOG_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_JSON_LOG_RO_DB_PASSWORD
       - GRAFANA_DS_FS_STATE_RO_DSN=postgresql://postgres:postgres@bulk_postgres/fs_state
       - GRAFANA_DS_FS_STATE_RO_PASSWORD_FILE=${VOL_C_SECRETS}/ULS_STATE_RO_DB_PASSWORD
-      - GRAFANA_DS_PROMETHEUS_URL=http://prometheus:9090
+      - GRAFANA_DS_PROMETHEUS_URL=http://prometheus:9090/fbrat/prometheus
       - GRAFANA_DS_RCACHE_URL=http://rcache:8000
       - GRAFANA_DS_LOKI_URL=http://loki:3100
       - GRAFANA_COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
@@ -442,11 +493,13 @@ services:
     dns_search: [.]
 
   loki:
+    profiles: ["monitor"]
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/loki-image:${TAG:-latest}
     restart: always
     dns_search: [.]
 
   promtail:
+    profiles: ["monitor"]
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/promtail-image:${TAG:-latest}
     restart: always
     volumes:
@@ -458,13 +511,18 @@ services:
     dns_search: [.]
 
   prometheus:
+    profiles: ["monitor"]
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/prometheus-image:${TAG:-latest}
     restart: always
+    entrypoint: ["/bin/sh", "-c", "prometheus --web.enable-lifecycle --storage.tsdb.path=$$PROMETHEUS_DATA --web.external-url=/fbrat/prometheus"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9090/fbrat/prometheus/-/healthy"]
     depends_on:
       - cadvisor
     dns_search: [.]
 
   cadvisor:
+    profiles: ["monitor"]
     image:  ${PUB_REPO:-ghcr.io/open-afc-project}/cadvisor-image:${TAG:-latest}
     restart: always
     volumes:
@@ -473,13 +531,19 @@ services:
     - /sys:/sys:ro
     - /var/lib/docker/:/var/lib/docker:ro
     - /dev/disk/:/dev/disk:ro
+    environment:
+      - CADVISOR_ADDITIONAL_ARGS=-url_base_prefix=/fbrat/cadvisor
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/fbrat/cadvisor/healthz"]
     dns_search: [.]
 
   nginxexporter:
+    profiles: ["monitor"]
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/nginxexporter-image:${TAG:-latest}
     restart: always
     depends_on:
-      - dispatcher
+      dispatcher:
+        condition: service_healthy
     dns_search: [.]
 
 # Should be added if ULS downloader state persistent needed
