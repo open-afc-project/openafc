@@ -1212,7 +1212,7 @@ void AfcManager::initializeDatabases()
 			// "nlcdFile":
 			// "rat_transfer/nlcd/nlcd_production"
 			nlcdDirectory = _nlcdFile;
-			nameMapper = GdalNameMapperDirect::make_unique("*", _nlcdFile);
+			nameMapper = GdalNameMapperDirect::make_unique("*.tif", _nlcdFile);
 		} else {
 			// Otherwise path supposed to be a file. Sample config:
 			// "nlcdFile":
@@ -3734,7 +3734,7 @@ QJsonDocument AfcManager::generateExclusionZoneJson()
 	// Instantiate polygon object
 	std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter> exclusionZoneFeature(OGRFeature::CreateFeature(exclusionLayer->GetLayerDefn()));
 
-	// Intantiate unique-pointers to OGRPolygon and OGRLinearRing for storing the beam coverage
+	// Instantiate unique-pointers to OGRPolygon and OGRLinearRing for storing the beam coverage
 	GdalHelpers::GeomUniquePtr<OGRPolygon> exZone(GdalHelpers::createGeometry<OGRPolygon>()); // Use GdalHelpers.h templates to have unique pointers create these on the heap
 	GdalHelpers::GeomUniquePtr<OGRLinearRing> exteriorOfZone(GdalHelpers::createGeometry<OGRLinearRing>());
 
@@ -9220,7 +9220,9 @@ void AfcManager::runPointAnalysis()
 															);
 													state = 1;
 													itmSegIdx = 0;
-													if (itmPathLossModelStrChk != itmPathLossModelStr) {
+													if ((itmPathLossModelStrChk.substr(0, 3) == std::string("ITM")) && (itmPathLossModelStr.substr(0, 3) == std::string("ITM"))) {
+														itmPathLossModelStr = "INTERP_ITM";
+													} else if (itmPathLossModelStrChk != itmPathLossModelStr) {
 														LOGGER_WARN(logger) << "WARNING: Different path loss models for interp: = " << itmPathLossModelStr << " and " << itmPathLossModelStrChk;
 														itmPathLossModelStr = "INTERP_" + itmPathLossModelStr + "_" + itmPathLossModelStrChk;
 													} else {
