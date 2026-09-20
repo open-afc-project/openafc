@@ -9,6 +9,22 @@ import pydantic
 from afc_server_models import (Rest_Response, Rest_SupplementalInfo,
                                Rest_VendorExtension)
 
+# Response codes used when translating a validation failure (SDI Table 23).
+GVP_MISSING_PARAM_CODE = 102
+GVP_INVALID_VALUE_CODE = 103
+GVP_UNEXPECTED_PARAM_CODE = 106
+
+
+class GvpMissingParam(ValueError):
+    """ Raised by a validator when a conditionally required field is
+    absent. """
+
+
+class GvpUnexpectedParam(ValueError):
+    """ Raised by a validator when a field is present but its condition is
+    not met. """
+
+
 # SUCCESS response code (SDI Table 23).
 GVP_SUCCESS_RESPONSE_CODE = 0
 
@@ -190,7 +206,7 @@ class Rest_Gvp_DeviceDescriptor(pydantic.BaseModel,
         """ Apply the Table 7 conditional requirement. """
         if values.get("serialNumber") is None and \
                 values.get("deviceModel") is None:
-            raise ValueError(
+            raise GvpMissingParam(
                 "one of serialNumber or deviceModel is required")
         return values
 
@@ -218,10 +234,10 @@ class Rest_Gvp_Location(pydantic.BaseModel, extra=pydantic.Extra.allow):
         present = [name for name in GVP_GEOMETRY_FIELDS
                    if values.get(name) is not None]
         if not present:
-            raise ValueError(
+            raise GvpMissingParam(
                 "one of %s is required" % (", ".join(GVP_GEOMETRY_FIELDS),))
         if len(present) > 1:
-            raise ValueError(
+            raise GvpUnexpectedParam(
                 "only one geometry may be given, found %s"
                 % (", ".join(present),))
         return values
@@ -314,7 +330,7 @@ class Rest_Gvp_ExclusionZoneInfo(pydantic.BaseModel,
     def has_some_geometry(cls, values):
         """ A zone with neither polygons nor circles describes no area. """
         if values.get("polygons") is None and values.get("circles") is None:
-            raise ValueError(
+            raise GvpMissingParam(
                 "at least one of polygons or circles is required")
         return values
 
@@ -356,12 +372,12 @@ class Rest_Gvp_ExclusionZoneInquiryResponse(pydantic.BaseModel,
                    response.responseCode == GVP_SUCCESS_RESPONSE_CODE)
         absent = [n for n in conditional if values.get(n) is None]
         if success and absent:
-            raise ValueError(
+            raise GvpMissingParam(
                 "%s required when the response code is SUCCESS"
                 % (", ".join(absent),))
         present = [n for n in conditional if values.get(n) is not None]
         if not success and present:
-            raise ValueError(
+            raise GvpUnexpectedParam(
                 "%s permitted only when the response code is SUCCESS"
                 % (", ".join(present),))
         return values
@@ -383,3 +399,67 @@ class Rest_Gvp_RespMsg(pydantic.BaseModel, extra=pydantic.Extra.forbid):
         if len(set(ids)) != len(ids):
             raise ValueError("requestId must be unique within the message")
         return v
+
+
+def render_error_location(loc):
+    """ Render a pydantic error location as a dotted field path, such as
+    exclusionZoneInquiryRequests[0].areaOfIntendedOperation. """
+    parts = []
+    for item in loc:
+        if item == "__root__":
+            continue
+        if isinstance(item, int):
+            if parts:
+                parts[-1] = "%s[%d]" % (parts[-1], item)
+            else:
+                parts.append("[%d]" % item)
+        else:
+            parts.append(str(item))
+    return ".".join(parts)
+
+
+def response_from_validation_error(error):
+    """ Translate a pydantic ValidationError into an SDI Response (SDI
+    Tables 23 and 24). """
+    buckets = {
+        GVP_MISSING_PARAM_CODE: [],
+        GVP_UNEXPECTED_PARAM_CODE: [],
+        GVP_INVALID_VALUE_CODE: [],
+    }
+    for entry in error.errors():
+        kind = entry["type"]
+        if kind == "value_error.missing" or \
+                kind.endswith(GvpMissingParam.__name__.lower()):
+            code = GVP_MISSING_PARAM_CODE
+        elif kind == "value_error.extra" or \
+                kind.endswith(GvpUnexpectedParam.__name__.lower()):
+            code = GVP_UNEXPECTED_PARAM_CODE
+        else:
+            code = GVP_INVALID_VALUE_CODE
+        path = render_error_location(entry["loc"])
+        if path and path not in buckets[code]:
+            buckets[code].append(path)
+
+    for code in (GVP_MISSING_PARAM_CODE, GVP_UNEXPECTED_PARAM_CODE,
+                 GVP_INVALID_VALUE_CODE):
+        if buckets[code]:
+            chosen = code
+            break
+    else:
+        chosen = GVP_INVALID_VALUE_CODE
+
+    field = {
+        GVP_MISSING_PARAM_CODE: "missingParams",
+        GVP_UNEXPECTED_PARAM_CODE: "unexpectedParams",
+        GVP_INVALID_VALUE_CODE: "invalidParams",
+    }[chosen]
+    supplemental = Rest_SupplementalInfo(**{field: buckets[chosen] or None})
+
+    described = []
+    for entry in error.errors():
+        path = render_error_location(entry["loc"])
+        described.append("%s: %s" % (path, entry["msg"]) if path
+                         else entry["msg"])
+    return Rest_Response(responseCode=chosen,
+                         shortDescription="; ".join(described),
+                         supplementalInfo=supplemental)

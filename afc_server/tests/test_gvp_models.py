@@ -1,5 +1,7 @@
 """ Unit tests for the GVP SDI request and response models. """
 
+import copy
+
 import pydantic
 import pytest
 
@@ -17,7 +19,24 @@ from afc_server_gvp_models import (GVP_GEOMETRY_FIELDS,
                                    Rest_Gvp_ExclusionZoneInfo,
                                    Rest_Gvp_ExclusionZoneInquiryResponse,
                                    Rest_Gvp_ReqMsg, Rest_Gvp_RespMsg,
-                                   Rest_Gvp_Vector)
+                                   Rest_Gvp_Vector,
+                                   render_error_location,
+                                   response_from_validation_error)
+
+
+def _bad_request(**over):
+    """ A whole request message, valid unless overridden. """
+    data = {"version": "1.0",
+            "exclusionZoneInquiryRequests": [_request(**over)]}
+    return data
+
+
+def _translate(payload):
+    """ Parse a request message and translate the failure. """
+    with pytest.raises(pydantic.ValidationError) as exc:
+        Rest_Gvp_ReqMsg(**payload)
+    return response_from_validation_error(exc.value)
+
 
 _FREQ = {"lowFrequency": 6182, "highFrequency": 6212}
 _EXPIRY = "2026-07-16T22:08:28Z"
@@ -25,9 +44,10 @@ _EXPIRY = "2026-07-16T22:08:28Z"
 
 def _zone(**over):
     """ A minimal valid ExclusionZoneInfo, overridable. """
-    data = {"exclusionZoneFrequencyRange": dict(_FREQ), "psdLevel": 11,
+    data = {"exclusionZoneFrequencyRange": copy.deepcopy(_FREQ),
+            "psdLevel": 11,
             "circles": [[37.38042, -121.96694, 29269]]}
-    data.update(over)
+    data.update(copy.deepcopy(over))
     return data
 
 
@@ -38,7 +58,7 @@ def _response(**over):
             "exclusionZoneInfo": [_zone()],
             "availabilityExpireTime": _EXPIRY,
             "response": {"responseCode": 0}}
-    data.update(over)
+    data.update(copy.deepcopy(over))
     return data
 
 
@@ -52,9 +72,11 @@ _DEVICE = {"serialNumber": "GVP-AP-0001",
 
 def _request(**over):
     """ A minimal valid ExclusionZoneInquiryRequest, overridable. """
-    data = {"requestId": "req-1", "deviceDescriptor": dict(_DEVICE),
-            "areaOfIntendedOperation": {"ellipse": dict(_ELLIPSE)}}
-    data.update(over)
+    data = {"requestId": "req-1",
+            "deviceDescriptor": copy.deepcopy(_DEVICE),
+            "areaOfIntendedOperation": {
+                "ellipse": copy.deepcopy(_ELLIPSE)}}
+    data.update(copy.deepcopy(over))
     return data
 
 
@@ -417,20 +439,20 @@ def test_device_descriptor_accepts_serial_only():
 
 def test_device_descriptor_accepts_model_only():
     """ Table 7 requires serialNumber only when deviceModel is absent. """
-    data = dict(_DEVICE)
+    data = copy.deepcopy(_DEVICE)
     del data["serialNumber"]
     data["deviceModel"] = "AP-Model-X"
     Rest_Gvp_DeviceDescriptor(**data)
 
 
 def test_device_descriptor_accepts_both():
-    data = dict(_DEVICE, deviceModel="AP-Model-X")
+    data = dict(copy.deepcopy(_DEVICE), deviceModel="AP-Model-X")
     Rest_Gvp_DeviceDescriptor(**data)
 
 
 def test_device_descriptor_rejects_neither():
     """ The Table 7 conditional requirement, unsatisfied. """
-    data = dict(_DEVICE)
+    data = copy.deepcopy(_DEVICE)
     del data["serialNumber"]
     with pytest.raises(pydantic.ValidationError) as exc:
         Rest_Gvp_DeviceDescriptor(**data)
@@ -438,7 +460,7 @@ def test_device_descriptor_rejects_neither():
 
 
 def test_device_descriptor_rejects_empty_certification_list():
-    data = dict(_DEVICE, certificationId=[])
+    data = dict(copy.deepcopy(_DEVICE), certificationId=[])
     with pytest.raises(pydantic.ValidationError) as exc:
         Rest_Gvp_DeviceDescriptor(**data)
     assert exc.value.errors()[0]["loc"] == ("certificationId",)
@@ -864,3 +886,125 @@ def test_resp_msg_error_location_reaches_a_polygon_point():
     assert loc[:4] == ("exclusionZoneInquiryResponses", 0,
                        "exclusionZoneInfo", 0)
     assert "polygons" in loc
+
+
+# ------------------------------------------------- error path rendering ---
+
+@pytest.mark.parametrize("loc,expected", [
+    (("requestId",), "requestId"),
+    (("a", 0, "b"), "a[0].b"),
+    (("a", "__root__"), "a"),
+    (("__root__",), ""),
+    ((0,), "[0]"),
+    (("a", 0, 1), "a[0][1]"),
+])
+def test_render_error_location(loc, expected):
+    """ SDI Table 24 asks for parameter names; a leaf alone is ambiguous once
+    objects nest, so the whole path is rendered. """
+    assert render_error_location(loc) == expected
+
+
+# ------------------------------------------ validation error translation --
+
+def test_translation_reports_missing_param():
+    """ A required field absent is MISSING_PARAM (SDI Table 23). """
+    data = _bad_request()
+    del data["exclusionZoneInquiryRequests"][0]["requestId"]
+    r = _translate(data)
+    assert r.responseCode == 102
+    assert r.supplementalInfo.missingParams == [
+        "exclusionZoneInquiryRequests[0].requestId"]
+
+
+def test_translation_reports_invalid_value():
+    """ A field out of range is INVALID_VALUE. """
+    data = _bad_request()
+    data["exclusionZoneInquiryRequests"][0][
+        "areaOfIntendedOperation"]["ellipse"]["center"]["latitude"] = 91.0
+    r = _translate(data)
+    assert r.responseCode == 103
+    assert r.supplementalInfo.invalidParams == [
+        "exclusionZoneInquiryRequests[0].areaOfIntendedOperation"
+        ".ellipse.center.latitude"]
+
+
+def test_translation_reports_unknown_field_as_unexpected():
+    """ An unknown field inside a forbidding sub-object is
+    UNEXPECTED_PARAM. """
+    data = _bad_request()
+    data["exclusionZoneInquiryRequests"][0][
+        "deviceDescriptor"]["certificationId"][0]["extra"] = 1
+    r = _translate(data)
+    assert r.responseCode == 106
+    assert r.supplementalInfo.unexpectedParams == [
+        "exclusionZoneInquiryRequests[0].deviceDescriptor"
+        ".certificationId[0].extra"]
+
+
+def test_translation_reports_unmet_condition_as_unexpected():
+    """ Table 23 puts an unmet condition on a present parameter under
+    UNEXPECTED_PARAM. """
+    data = _bad_request()
+    data["exclusionZoneInquiryRequests"][0]["areaOfIntendedOperation"][
+        "circle"] = dict(_CIRCLE)
+    r = _translate(data)
+    assert r.responseCode == 106
+    assert r.supplementalInfo.unexpectedParams == [
+        "exclusionZoneInquiryRequests[0].areaOfIntendedOperation"]
+
+
+def test_translation_reports_unsatisfied_requirement_as_missing():
+    """ A conditional requirement left unsatisfied is MISSING_PARAM, since
+    the missing field is what the device has to supply. """
+    data = _bad_request()
+    del data["exclusionZoneInquiryRequests"][0][
+        "deviceDescriptor"]["serialNumber"]
+    r = _translate(data)
+    assert r.responseCode == 102
+    assert r.supplementalInfo.missingParams == [
+        "exclusionZoneInquiryRequests[0].deviceDescriptor"]
+
+
+def test_translation_prefers_missing_over_other_codes():
+    """ One code has to be chosen. A value cannot be judged invalid until it
+    is present, so missing parameters win. """
+    data = _bad_request()
+    request = data["exclusionZoneInquiryRequests"][0]
+    del request["requestId"]
+    request["areaOfIntendedOperation"]["ellipse"]["orientation"] = 999.0
+    r = _translate(data)
+    assert r.responseCode == 102
+
+
+def test_translation_populates_only_the_matching_list():
+    """ Table 24 includes each list if and only if the response code
+    matches. """
+    data = _bad_request()
+    request = data["exclusionZoneInquiryRequests"][0]
+    del request["requestId"]
+    request["areaOfIntendedOperation"]["ellipse"]["orientation"] = 999.0
+    r = _translate(data)
+    assert r.supplementalInfo.missingParams
+    assert r.supplementalInfo.invalidParams is None
+    assert r.supplementalInfo.unexpectedParams is None
+
+
+def test_translation_keeps_all_detail_in_short_description():
+    """ Only one supplementalInfo list may be populated, so the remaining
+    detail goes to the human-readable shortDescription of Table 20. """
+    data = _bad_request()
+    request = data["exclusionZoneInquiryRequests"][0]
+    del request["requestId"]
+    request["areaOfIntendedOperation"]["ellipse"]["orientation"] = 999.0
+    r = _translate(data)
+    assert "requestId" in r.shortDescription
+    assert "orientation" in r.shortDescription
+
+
+def test_translation_deduplicates_paths():
+    """ Two failures on one field report that field once. """
+    data = _bad_request()
+    data["exclusionZoneInquiryRequests"][0]["desiredPsd"] = ["x", "y"]
+    r = _translate(data)
+    assert len(r.supplementalInfo.invalidParams) == \
+        len(set(r.supplementalInfo.invalidParams))
