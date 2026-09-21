@@ -202,9 +202,19 @@ class AfcServerMessageProcessor:
                     nocache=nocache, gui=gui, runtime_opt=runtime_opt,
                     internal=internal, als_req_id=als_req_id,
                     start_time=start_time, deadline=deadline))
-            self._drop_unwanted_extensions(
+            invalid_params = self._drop_unwanted_extensions(
                 msg_dict=ret, is_input=False, is_gui=gui,
                 is_internal=internal)
+            if invalid_params is not None:
+                ret = self._make_response_msg(
+                    response_info=Rest_Response(
+                        responseCode=Rest_ResponseCode.INVALID_VALUE.
+                        value.code,
+                        shortDescription=Rest_ResponseCode.
+                        INVALID_VALUE.value.prefix,
+                        supplementalInfo=Rest_SupplementalInfo(
+                            invalidParams=invalid_params)),
+                    req_msg_dict=req_msg_dict)
         als.als_afc_response(req_id=als_req_id, resp=ret)
         return ret
 
@@ -247,9 +257,18 @@ class AfcServerMessageProcessor:
                     response_info=self._make_response_info(ex=TimeoutError()),
                     req_msg_dict=req_msg_dict)
         # Remove unacceptable Vendor Extensions
-        self._drop_unwanted_extensions(
+        invalid_params = self._drop_unwanted_extensions(
             msg_dict=req_msg_dict, is_input=True, is_gui=gui,
             is_internal=internal)
+        if invalid_params is not None:
+            return self._make_response_msg(
+                response_info=Rest_Response(
+                    responseCode=Rest_ResponseCode.INVALID_VALUE.value.code,
+                    shortDescription=Rest_ResponseCode.
+                    INVALID_VALUE.value.prefix,
+                    supplementalInfo=Rest_SupplementalInfo(
+                        invalidParams=invalid_params)),
+                req_msg_dict=req_msg_dict)
         req_tasks: List[asyncio.Task] = []
         # Process individual requests
         async with asyncio.TaskGroup() as req_tg:
@@ -303,11 +322,36 @@ class AfcServerMessageProcessor:
         # True if unexpected exception happened
         exception = False
         try:
+            req_id_for_parse_errors = req_dict.get("requestId", "Unknown")
+            if not isinstance(req_id_for_parse_errors, str):
+                req_id_for_parse_errors = "Unknown"
             try:
-                err_ruleset_name = \
+                parsed_ruleset_name = \
                     req_dict["deviceDescriptor"]["certificationId"][0][
                         "rulesetId"]
-            except KeyError:
+                if isinstance(parsed_ruleset_name, str):
+                    err_ruleset_name = parsed_ruleset_name
+                else:
+                    LOGGER.warning(
+                        "Malformed certificationId[0].rulesetId: "
+                        "expected=str got=%s; rejecting request",
+                        type(parsed_ruleset_name).__name__)
+                    ret = \
+                        self._make_failed_response(
+                            request_id=req_id_for_parse_errors,
+                            ruleset_id=err_ruleset_name,
+                            response_info=Rest_Response(
+                                responseCode=Rest_ResponseCode.INVALID_VALUE.
+                                value.code,
+                                shortDescription=Rest_ResponseCode.
+                                INVALID_VALUE.value.prefix,
+                                supplementalInfo=Rest_SupplementalInfo(
+                                    invalidParams=[
+                                        "rulesetId",
+                                        type(parsed_ruleset_name).
+                                        __name__])))
+                    return ret
+            except (KeyError, IndexError, TypeError):
                 pass
             # Validate request format
             validated_dict = req_dict
@@ -483,13 +527,17 @@ class AfcServerMessageProcessor:
                         ex=ex, validated_dict=validated_dict, task_id=task_id))
             return ret
         finally:
-            assert ret is not None
+            if ret is None:
+                LOGGER.error("Request processing completed without response; "
+                             "using fallback metrics response=Error")
             afc_traffic_metrics.request_processed(
                 duration_sec=time.time() - start_time,
                 response="Exception" if exception
                 else (
                     "NotComputed" if not_computed
-                    else ret.get("response", {}).get("responseCode", "Error")))
+                    else ((ret.get("response", {})
+                           .get("responseCode", "Error"))
+                          if ret is not None else "Error")))
 
     def _make_response_msg(
             self, req_msg_dict: Dict[str, Any],
@@ -637,7 +685,7 @@ class AfcServerMessageProcessor:
 
     def _drop_unwanted_extensions(
             self, msg_dict: Dict[str, Any], is_input: bool, is_gui: bool,
-            is_internal: bool) -> None:
+            is_internal: bool) -> Optional[List[str]]:
         """ Inplace removal of unallowed vendor extensions from given message
 
         Arguments:
@@ -645,6 +693,8 @@ class AfcServerMessageProcessor:
         is_input    -- True for request, False for response
         is_gui      -- True if from GUI
         is_internal -- True if internal (from within AFC Cluster)
+        Returns INVALID_VALUE-compatible invalidParams if malformed
+        vendorExtensions were encountered, None otherwise
         """
         for container, is_message in [(msg_dict, True)] + \
                 [(req_resp, False) for req_resp in
@@ -653,14 +703,35 @@ class AfcServerMessageProcessor:
             extensions = container.get("vendorExtensions")
             if extensions is None:
                 continue
-            idx = 0
-            while idx < len(extensions):
+            if not isinstance(extensions, list):
+                LOGGER.warning("Malformed vendorExtensions container: "
+                               "expected=list got=%s; rejecting request",
+                               type(extensions).__name__)
+                return ["vendorExtensions",
+                        type(extensions).__name__]
+            filtered_extensions: List[Dict[str, Any]] = []
+            for extension in extensions:
+                if not isinstance(extension, dict):
+                    LOGGER.warning("Malformed vendorExtensions item: "
+                                   "expected=dict got=%s; rejecting request",
+                                   type(extension).__name__)
+                    return ["vendorExtensions[]",
+                            type(extension).__name__]
+                extension_id = extension.get("extensionId")
+                if not isinstance(extension_id, str):
+                    LOGGER.warning("Malformed vendorExtensions item: "
+                                   "invalid extensionId type=%s; rejecting "
+                                   "request",
+                                   type(extension_id).__name__)
+                    return ["vendorExtensions[].extensionId",
+                            type(extension_id).__name__]
                 if hardcoded_relations.VendorExtensionFilter.allowed_extension(
-                        extension=extensions[idx]["extensionId"],
-                        is_message=is_message, is_input=is_input,
-                        is_gui=is_gui, is_internal=is_internal):
-                    idx += 1
-                else:
-                    extensions.pop(idx)
-            if not extensions:
+                        extension=extension_id, is_message=is_message,
+                        is_input=is_input, is_gui=is_gui,
+                        is_internal=is_internal):
+                    filtered_extensions.append(extension)
+            if filtered_extensions:
+                container["vendorExtensions"] = filtered_extensions
+            else:
                 del container["vendorExtensions"]
+        return None
