@@ -107,17 +107,15 @@ class TestCfg(dict):
         if (self['webui'] is False):
             params_data = {
                 'conn_type': self['conn_type'],
-                'debug': self['debug'],
-                'edebug': cfg['elaborated_debug'],
-                'gui': self['gui']
             }
         else:
-            # emulating request calll from webui
-            params_data = {
-                'debug': 'True',
-                'edebug': cfg['elaborated_debug'],
-                'gui': 'True'
-            }
+            # emulating request call from webui
+            params_data = {}
+        for key, val in [('debug', self['debug']),
+                            ('edebug', cfg['elaborated_debug']),
+                            ('gui', self['gui'])]:
+            if val:
+                params_data[key] = 'True'
         if (self['cache'] == False):
             params_data['nocache'] = 'True'
 
@@ -489,20 +487,14 @@ def _send_recv(cfg, req_data, ssn=None):
     if (cfg['webui'] is False):
         params_data = {
             'conn_type': cfg['conn_type'],
-            'debug': cfg['debug'],
-            'edebug': cfg['elaborated_debug'],
-            'gui': cfg['gui']
         }
         if (cfg['cache'] == False):
             params_data['nocache'] = 'True'
         post_func = requests.post
     else:
         # emulating request call from webui
-        params_data = {
-            'debug': 'True',
-            'gui': 'True'
-        }
-        headers['Accept-Encoding'] = 'gzip, defalte'
+        params_data = {}
+        headers['Accept-Encoding'] = 'gzip, deflate'
         headers['Referer'] = cfg['base_url'] + 'fbrat/www/index.html'
 
         csrf_token = ssn.cookies.get('csrf_token', default='')
@@ -513,7 +505,11 @@ def _send_recv(cfg, req_data, ssn=None):
             f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
             f"Cookies: {requests.utils.dict_from_cookiejar(ssn.cookies)}")
         post_func = ssn.post
-
+    for key, val in [('debug', cfg['debug']),
+                        ('edebug', cfg['elaborated_debug']),
+                        ('gui', cfg['gui'])]:
+        if val:
+            params_data[key] = 'True'
     ser_cert = ()
     cli_certs = None
     if ((cfg['prot'] == AFC_PROT_NAME and
@@ -1686,7 +1682,11 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
     ssn = None
     if cfg['webui'] is True:
         ssn = requests.Session()
-        _login(cfg, ssn)
+        if cfg.get('session_cookie'):
+            ssn.cookies.set('session', cfg['session_cookie'])
+            app_log.info("Using provided session cookie (skipping login)")
+        else:
+            _login(cfg, ssn)
 
     for test_case in test_cases:
         # Default reset test_res value
@@ -1708,6 +1708,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         res = f"id {test_case} name {req_id} status $status time {tm_secs:.1f}"
         res_template = Template(res)
 
+        upd_data = None# remove the mapping info from the response
         if isinstance(resp, type(None)):
             test_res = AFC_ERR
             all_test_res = AFC_ERR
@@ -1718,9 +1719,17 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
             if cfg['webui'] is True:
                 # remove the mapping info from the response
                 # to make sure the base data matches - not checking map results
-                parent = resp['availableSpectrumInquiryResponses'][0]
-                if 'vendorExtensions' in parent:
-                    parent.pop('vendorExtensions')
+                for parent in resp['availableSpectrumInquiryResponses']:
+                    if 'vendorExtensions' in parent:
+                        parent.pop('vendorExtensions')
+                    # rat_server returns ['certificationId', 'id'] for
+                    # a missing cert id field; afcserver returns ['id']
+                    mp = (parent.get('response', {})
+                          .get('supplementalInfo', {})
+                          .get('missingParams'))
+                    if mp == ['certificationId', 'id']:
+                        parent['response']['supplementalInfo'][
+                            'missingParams'] = ['id']
 
             json_lookup('availabilityExpireTime', resp, '0')
             upd_data = json.dumps(resp, sort_keys=True)
@@ -2161,6 +2170,9 @@ def make_arg_parser():
         help="<email address> - set receiver of cc email.\n")
     args_parser.add_argument('--email_pwd', type=str,
                              help="<filename> - set sender email password.\n")
+    args_parser.add_argument('--session_cookie', type=str,
+                             help="<cookie> - session cookie for webui mode, "
+                             "bypasses login.\n")
 
     args_parser.add_argument(
         '--cmd',

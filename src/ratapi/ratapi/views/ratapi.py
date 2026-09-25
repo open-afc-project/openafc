@@ -642,8 +642,8 @@ class Phase1Analysis(MethodView):
             temp_dir, 'analysisResponse.json.gz')
 
         LOGGER.debug("Writing request file: %s", request_file_path)
-        with open(request_file_path, "w") as fle:
-            fle.write(args)  # write JSON to request file
+        with open(request_file_path, "wb") as fle:
+            fle.write(args)
         LOGGER.debug("Request file written")
 
         task = build_task(request_file_path, response_file_path,

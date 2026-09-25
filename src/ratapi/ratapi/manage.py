@@ -183,7 +183,9 @@ class DbCreate:
 
             if if_absent:
                 try:
-                    with db.engine.connect():
+                    with db.engine.connect() as conn:
+                        conn.execute(sqlalchemy.text(
+                            "SELECT 1 FROM aaa_user LIMIT 1"))
                         LOGGER.info("Database already exists")
                         return
                 except sqlalchemy.exc.SQLAlchemyError:
@@ -1021,12 +1023,15 @@ class CertIdSweep:
                                 if not fcc_id:
                                     continue
                                 location = CERT_ID_LOCATION_OUTDOOR
-                                for spec_info in cert_info.get('lSpecs', {}).\
-                                        get('specs', []):
+                                lspecs = cert_info.get('lSpecs', [])
+                                if isinstance(lspecs, dict):
+                                    lspecs = lspecs.get('specs', [])
+                                for spec_info in lspecs:
+                                    lnotes = spec_info.get('lNotes', [])
+                                    if isinstance(lnotes, dict):
+                                        lnotes = lnotes.get('notes', [])
                                     if any(note_info.get('grantNoteId') == 'BX'
-                                           for note_info in
-                                           spec_info.get('lNotes', {}).
-                                           get('notes', [])):
+                                           for note_info in lnotes):
                                         location |= CERT_ID_LOCATION_INDOOR
                                         break
                                 cert = CertId.query.filter_by(
