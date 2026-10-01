@@ -19,6 +19,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional, Union
 
 import afc_server_compute
 import afc_server_db
+import afc_server_gvp
 import afc_server_models
 import afc_server_msg_proc
 import afc_traffic_metrics
@@ -72,6 +73,9 @@ async def get_message_processor() \
 
 # FastAPI APP
 app = fastapi.FastAPI()
+
+# GVP Exclusion Zone Inquiry routes
+app.include_router(afc_server_gvp.router)
 
 
 @app.on_event("startup")

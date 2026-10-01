@@ -829,11 +829,10 @@ def test_response_rejects_bad_expire_time(stamp):
     assert exc.value.errors()[0]["loc"] == ("availabilityExpireTime",)
 
 
-@pytest.mark.parametrize("field", ["requestId", "rulesetId"])
-def test_response_rejects_empty_identifier(field):
+def test_response_rejects_empty_ruleset_id():
     with pytest.raises(pydantic.ValidationError) as exc:
-        Rest_Gvp_ExclusionZoneInquiryResponse(**_response(**{field: ""}))
-    assert exc.value.errors()[0]["loc"] == (field,)
+        Rest_Gvp_ExclusionZoneInquiryResponse(**_response(rulesetId=""))
+    assert exc.value.errors()[0]["loc"] == ("rulesetId",)
 
 
 def test_response_requires_response_object():

@@ -142,6 +142,27 @@ http {
             log_not_found off;
         }
 
+        location /fbrat/ap-gvp/exclusionZoneInquiry {
+            if ($ssl_client_verify != SUCCESS) {
+                set $afc_mtls_status "${afc_mtls_status}_false";
+            }
+            # check if mtls is enforced and ssl_client_verify is not success
+            if ($afc_mtls_status = true_false) {
+                return 403;
+            }
+            # disable buffering for latency
+            proxy_buffering off;
+            # response to a request
+            proxy_read_timeout ${AFC_PROXY_CONN_TOUT};
+            # establish a connection with a proxied server
+            proxy_connect_timeout 720;
+            # transmit a request to a proxied server
+            proxy_send_timeout 720;
+            proxy_pass http://msghnd$uri$is_args$args;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header "mTLS-DN" '$ssl_client_s_dn';
+        }
+
         # forbid internal tests
         location /fbrat/ap-afc/availableSpectrumInquiryInternal {
             return 403;

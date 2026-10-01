@@ -10,9 +10,13 @@ from afc_server_models import (Rest_Response, Rest_SupplementalInfo,
                                Rest_VendorExtension)
 
 # Response codes used when translating a validation failure (SDI Table 23).
+GVP_GENERAL_FAILURE_CODE = -1
 GVP_MISSING_PARAM_CODE = 102
 GVP_INVALID_VALUE_CODE = 103
 GVP_UNEXPECTED_PARAM_CODE = 106
+
+# Protocol Version of SDI section 4.1, distinct from the document version.
+GVP_PROTOCOL_VERSION = "1.0"
 
 
 class GvpMissingParam(ValueError):
@@ -339,7 +343,7 @@ class Rest_Gvp_ExclusionZoneInquiryResponse(pydantic.BaseModel,
                                             extra=pydantic.Extra.forbid):
     """ ExclusionZoneInquiryResponse object (SDI Table 18). """
     requestId: str = pydantic.Field(
-        min_length=1, description="Echoes the requestId of the inquiry")
+        description="Echoes the requestId of the inquiry")
     rulesetId: str = pydantic.Field(
         min_length=1,
         description="Regulatory rules used to determine these zones")
@@ -421,12 +425,18 @@ def render_error_location(loc):
 def response_from_validation_error(error):
     """ Translate a pydantic ValidationError into an SDI Response (SDI
     Tables 23 and 24). """
+    return response_from_error_entries(error.errors())
+
+
+def response_from_error_entries(entries):
+    """ Translate pydantic error entries into an SDI Response (SDI Tables 23
+    and 24). """
     buckets = {
         GVP_MISSING_PARAM_CODE: [],
         GVP_UNEXPECTED_PARAM_CODE: [],
         GVP_INVALID_VALUE_CODE: [],
     }
-    for entry in error.errors():
+    for entry in entries:
         kind = entry["type"]
         if kind == "value_error.missing" or \
                 kind.endswith(GvpMissingParam.__name__.lower()):
@@ -456,10 +466,74 @@ def response_from_validation_error(error):
     supplemental = Rest_SupplementalInfo(**{field: buckets[chosen] or None})
 
     described = []
-    for entry in error.errors():
+    for entry in entries:
         path = render_error_location(entry["loc"])
         described.append("%s: %s" % (path, entry["msg"]) if path
                          else entry["msg"])
     return Rest_Response(responseCode=chosen,
                          shortDescription="; ".join(described),
                          supplementalInfo=supplemental)
+
+
+def _inquiry_index(loc):
+    """ Index of the inquiry an error belongs to, None at message level. """
+    return loc[1] if (len(loc) >= 2 and
+                      loc[0] == "exclusionZoneInquiryRequests" and
+                      isinstance(loc[1], int)) else None
+
+
+def _echoed_request_id(inquiry):
+    """ requestId to echo per SDI Table 18, empty when the inquiry omits
+    it. """
+    value = inquiry.get("requestId") if isinstance(inquiry, dict) else None
+    return value if isinstance(value, str) else ""
+
+
+def resp_msg_from_validation_error(error, body, ruleset_id):
+    """ Build the response message for a request that failed validation. A
+    message level failure yields one response, since Table 18 correlates by
+    requestId alone; per inquiry failures yield one each per section 3.2. """
+    inquiries = body.get("exclusionZoneInquiryRequests")
+    if not isinstance(inquiries, list):
+        inquiries = []
+    message_level = []
+    grouped = [[] for _ in inquiries]
+    for entry in error.errors():
+        index = _inquiry_index(entry["loc"])
+        if index is None or index >= len(inquiries):
+            message_level.append(entry)
+        else:
+            grouped[index].append(entry)
+
+    def response_entry(request_id, response):
+        return Rest_Gvp_ExclusionZoneInquiryResponse(
+            requestId=request_id, rulesetId=ruleset_id, response=response)
+
+    if message_level or not inquiries:
+        all_entries = message_level + [e for g in grouped for e in g]
+        return _resp_msg(
+            body, [response_entry("",
+                                  response_from_error_entries(all_entries))])
+
+    responses = []
+    for inquiry, entries in zip(inquiries, grouped):
+        if entries:
+            response = response_from_error_entries(entries)
+        else:
+            response = Rest_Response(
+                responseCode=GVP_GENERAL_FAILURE_CODE,
+                shortDescription="inquiry not processed, another inquiry "
+                                 "in the message was invalid")
+        responses.append(
+            response_entry(_echoed_request_id(inquiry), response))
+    return _resp_msg(body, responses)
+
+
+def _resp_msg(body, responses):
+    """ Wrap responses in a message, echoing the request version per SDI
+    Table 17. """
+    version = body.get("version")
+    return Rest_Gvp_RespMsg(
+        version=version if isinstance(version, str) and version
+        else GVP_PROTOCOL_VERSION,
+        exclusionZoneInquiryResponses=responses)

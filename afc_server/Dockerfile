@@ -109,7 +109,8 @@ RUN apk add --update --no-cache python3-dev build-base && \
     apk del --purge python3-dev build-base && rm -f /wd/requirements.txt
 
 COPY afc_server/afc_server_app.py afc_server/afc_server_compute.py \
-    afc_server/afc_server_db.py afc_server/afc_server_models.py \
+    afc_server/afc_server_db.py afc_server/afc_server_gvp.py \
+    afc_server/afc_server_gvp_models.py afc_server/afc_server_models.py \
     afc_server/afc_server_msg_proc.py afc_server/entrypoint.sh /wd/
 RUN chmod a+x /wd/afc_server_app.py /wd/entrypoint.sh
 
