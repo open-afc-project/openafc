@@ -30,10 +30,17 @@
 /******************************************************************************************/
 int fgetline(FILE *file, std::string &s, bool keepcr)
 {
+	static const std::size_t MAX_LINE_LENGTH = 65536;
 	int c, i;
 
 	s.clear();
 	for (i = 0; (c = fgetc(file)) != EOF && c != '\n'; i++) {
+		if (s.length() >= MAX_LINE_LENGTH) {
+			std::ostringstream errStr;
+			errStr << "ERROR: fgetline() line exceeds " << MAX_LINE_LENGTH
+			       << " bytes; aborting to avoid unbounded allocation.\n";
+			throw std::runtime_error(errStr.str());
+		}
 		s += c;
 	}
 	if ((i >= 1) && (s[i - 1] == '\r')) {
@@ -54,12 +61,21 @@ int fgetline(FILE *file, std::string &s, bool keepcr)
 /**** Read a line into string s, return length.  From "C Programming Language" Pg. 29  ****/
 /**** Modified to be able to read both DOS and UNIX files.                             ****/
 /******************************************************************************************/
+// Maximum bytes written by the char-buffer fgetline variant (including the
+// terminating NUL).  Callers must ensure their buffer is at least this size.
+#define FGETLINE_CHAR_MAX 4096
+
 int fgetline(FILE *file, char *s)
 {
 	int c, i;
 
-	for (i = 0; (c = fgetc(file)) != EOF && c != '\n'; i++) {
+	for (i = 0; i < FGETLINE_CHAR_MAX - 1 && (c = fgetc(file)) != EOF && c != '\n'; i++) {
 		s[i] = c;
+	}
+	// Consume any remaining bytes on an overlong line so the next call
+	// reads from the start of the following line.
+	while (i == FGETLINE_CHAR_MAX - 1 && c != EOF && c != '\n') {
+		c = fgetc(file);
 	}
 	if ((i >= 1) && (s[i - 1] == '\r')) {
 		i--;

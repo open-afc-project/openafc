@@ -195,6 +195,12 @@ void PRTABLEClass::readTable()
 /******************************************************************************************/
 double PRTABLEClass::computePRTABLE(double Q, double oneOverKs)
 {
+	if (!std::isfinite(Q) || !std::isfinite(oneOverKs)) {
+		return 0.0;
+	}
+	if (numQ < 2 || numOneOverKs < 2) {
+		return 0.0;
+	}
 	double qIdxDbl = getIdx(Q, QValList, numQ);
 	double kIdxDbl = getIdx(oneOverKs, oneOverKsValList, numOneOverKs);
 

@@ -247,6 +247,7 @@ class Printer(contextlib.AbstractContextManager):
     _timezone -- None or timezone for datetime print
     _count    -- Number of already printed rows
     """
+
     def __init__(self) -> None:
         """ Constructor """
         self._headings: Optional[List[str]] = None
@@ -348,6 +349,7 @@ class TablePrinter(Printer):
     _rows               -- List of table rows (each being a list of strings)
     _default_alignments -- List of default alignments
     """
+
     def __init__(self) -> None:
         """ Constructor """
         super().__init__()
@@ -394,6 +396,7 @@ class CsvPrinter(Printer):
 
         Private attributes:
         _chunks - List of written chunks of last line """
+
         def __init__(self) -> None:
             """ Constructor """
             self._chunks: List[str] = []
@@ -420,7 +423,12 @@ class CsvPrinter(Printer):
         if self.count == 0:
             self._writer.writerow(self.get_headings())
             print(self._sink.retrieve())
-        self._writer.writerow(row)
+        # Neutralise CSV formula triggers: prefix fields starting with =, +, -, @, tab, CR
+        safe_row = [
+            ("\t" + v if isinstance(v, str) and v and v[0] in "=+-@\t\r" else v)
+            for v in row
+        ]
+        self._writer.writerow(safe_row)
         print(self._sink.retrieve())
 
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
@@ -434,6 +442,7 @@ class JsonPrinter(Printer):
     Private attributes:
     _indent -- True to print indented JSON
     """
+
     def __init__(self, indent: bool) -> None:
         """ Constructor
 
@@ -528,7 +537,7 @@ def do_log(args: Any) -> None:
     if args.sources:
         error_if(args.SELECT, "SELECT may not be specified with --sources")
         if args.topic:
-            s = sa.select([metadata.tables[args.topic].c.source]).\
+            s = sa.select(metadata.tables[args.topic].c.source).\
                 distinct().order_by(metadata.tables[args.topic].c.source)
             if args.max_count:
                 s = s.limit(args.max_count)
@@ -546,7 +555,7 @@ def do_log(args: Any) -> None:
                 for topic in sorted(metadata.tables.keys()):
                     if "source" not in metadata.tables[topic].c:
                         continue
-                    s = sa.select([metadata.tables[topic].c.source]).\
+                    s = sa.select(metadata.tables[topic].c.source).\
                         distinct().order_by(metadata.tables[topic].c.source)
                     if args.max_count is not None:
                         s = s.limit(args.max_count - printer.count)
@@ -605,16 +614,16 @@ class Channels:
     # Describes group of channels of same bandwidth at equal intervals
     Comb = NamedTuple("Comb",
                       [
-                       # First channel in group
-                       ("first", int),
-                       # Last channel in group
-                       ("last", int),
-                       # Numerical step of channels in group
-                       ("step", int),
-                       # Minimum frequency of first channel
-                       ("start_mhz", int),
-                       # Channel width in MHz
-                       ("width_mhz", int)])
+                          # First channel in group
+                          ("first", int),
+                          # Last channel in group
+                          ("last", int),
+                          # Numerical step of channels in group
+                          ("step", int),
+                          # Minimum frequency of first channel
+                          ("start_mhz", int),
+                          # Channel width in MHz
+                          ("width_mhz", int)])
     _combs = \
         [
             Comb(first=2, last=2, step=4, start_mhz=5925, width_mhz=20),
@@ -682,6 +691,7 @@ class Point:
     lat -- North-positive latitude in degrees
     lon -- East-positive longitude in degrees
     """
+
     def __init__(self, lat_lon: str) -> None:
         """ Constructor
 
@@ -718,6 +728,11 @@ class RuntimeOpt(enum.IntFlag):
         """ Returns output representation as list of options """
         ret: List[str] = []
         rest = self.value
+        if rest < 0:
+            # Negative stored values (Python ints have unbounded sign
+            # extension) would make the bit-stripping loop below run
+            # forever - render a diagnostic instead of hanging
+            return [f"invalid({rest})"]
         for opt in list(self):
             ret.append(opt.name)
             rest &= ~opt.value
@@ -1152,6 +1167,7 @@ class SimpleAlsOut(AlsOut):
     _column_name -- Name of column that contains desired value
     _converter   -- Optional converter function for non-None value
     """
+
     def __init__(self, cmd: str, help_: str, table_names: List[str],
                  column_name: str,
                  converter: Optional[Callable[[Any], Any]] = None) -> None:
@@ -1195,6 +1211,7 @@ class ReqRespAlsOut(AlsOut):
     _is_req -- True for request, False for response
     _is_msg -- True for message, false for individual request/response
     """
+
     def __init__(self, cmd: str, help_: str, is_req: bool, is_msg: bool) \
             -> None:
         """ Constructor
@@ -1272,6 +1289,7 @@ class ReqRespAlsOut(AlsOut):
 
 class DurationAlsOut(AlsOut):
     """ Request computation duration """
+
     def __init__(self, cmd: str, help_: str) -> None:
         """ Constructor
 
@@ -1299,6 +1317,7 @@ class DurationAlsOut(AlsOut):
 
 class CertificatesAlsOut(AlsOut):
     """ ALS Certificates """
+
     def __init__(self, cmd: str, help_: str) -> None:
         """ Constructor
 
@@ -1334,6 +1353,7 @@ class CertificatesAlsOut(AlsOut):
 
 class LocationAlsOut(AlsOut):
     """ AP Location """
+
     def __init__(self, cmd: str, help_: str) -> None:
         """ Constructor
 
@@ -1386,6 +1406,7 @@ class LocationAlsOut(AlsOut):
 
 class DistanceAlsOut(AlsOut):
     """ Distance from given position """
+
     def __init__(self, cmd: str, help_: str) -> None:
         """ Constructor
 
@@ -1419,6 +1440,7 @@ class DistanceAlsOut(AlsOut):
 
 class AzimuthAlsOut(AlsOut):
     """ Azimuth from given position """
+
     def __init__(self, cmd: str, help_: str) -> None:
         """ Constructor
 
@@ -1450,6 +1472,7 @@ class AzimuthAlsOut(AlsOut):
 
 class PsdAlsOut(AlsOut):
     """ PSD Responses """
+
     def __init__(self, cmd: str, help_: str) -> None:
         """ Constructor
 
@@ -1486,6 +1509,7 @@ class PsdAlsOut(AlsOut):
 
 class EirpAlsOut(AlsOut):
     """ EIRP Responses """
+
     def __init__(self, cmd: str, help_: str) -> None:
         """ Constructor
 
@@ -1518,6 +1542,7 @@ class EirpAlsOut(AlsOut):
 
 class ErrorAlsOut(AlsOut):
     """ Computation error responses """
+
     def __init__(self, cmd: str, help_: str) -> None:
         """ Constructor
 
@@ -1555,6 +1580,7 @@ class ErrorAlsOut(AlsOut):
 class ReqRespKeyAlsOut(AlsOut):
     """ 'Invisible' output that holds key that uniquely identifies individual
     request/response """
+
     def __init__(self) -> None:
         """ Constructor """
         super().__init__(cmd="__req_resp_key__", help_="",
@@ -1653,6 +1679,7 @@ class SimpleAlsFilter(AlsFilter):
     Private attributes:
     _column_name -- Name of column to filter by
     """
+
     def __init__(self, arg_name: str, table_names: List[str],
                  column_name: str) -> None:
         """ Constructor
@@ -1694,6 +1721,7 @@ class SimpleAlsFilter(AlsFilter):
 
 class DistAlsFilter(AlsFilter):
     """ Filter by distance """
+
     def __init__(self, arg_name: str) -> None:
         """ Constructor
 
@@ -1723,6 +1751,7 @@ class DistAlsFilter(AlsFilter):
 
 class AzimuthAlsFilter(AlsFilter):
     """ Filter by azimuth """
+
     def __init__(self, arg_name: str) -> None:
         """ Constructor
 
@@ -1740,6 +1769,12 @@ class AzimuthAlsFilter(AlsFilter):
         s         -- Select statement to apply clause to
         arg_value -- Command line parameter value
         Returns modified select statement """
+        # Reject non-finite azimuth before it reaches the raw-SQL keyhole
+        # template substitution below (SUB-0138-05 sibling pattern: an
+        # Infinity/NaN value string-substituted into raw SQL produces a
+        # malformed geometry expression instead of a clean error).
+        if not math.isfinite(arg_value):
+            error(f"--azimuth value must be finite, got {arg_value!r}")
         # Raw postgis ST_Polygon expression that defines positioned and rotated
         # keyhole shape
         keyhole_polygon = \
@@ -1768,6 +1803,7 @@ class AzimuthAlsFilter(AlsFilter):
 
 class MtlsCnAlsFilter(AlsFilter):
     """ Filter by mTLS CN """
+
     def __init__(self, arg_name: str) -> None:
         """ Constructor
 
@@ -1802,6 +1838,7 @@ class MtlsCnAlsFilter(AlsFilter):
 
 class RuntimeOptFilter(AlsFilter):
     """ Filter by runtime options """
+
     def __init__(self, arg_name: str) -> None:
         """ Constructor
 
@@ -1842,6 +1879,7 @@ class RuntimeOptFilter(AlsFilter):
 
 class RespCodeAlsFilter(AlsFilter):
     """ Filter by ALS Response code(s) """
+
     def __init__(self, arg_name: str) -> None:
         """ Constructor
 
@@ -1879,6 +1917,7 @@ class RespCodeAlsFilter(AlsFilter):
 
 class PsdAlsFilter(AlsFilter):
     """ Filter by PSD frequency range """
+
     def __init__(self, arg_name: str) -> None:
         """ Constructor
 
@@ -1918,6 +1957,7 @@ class PsdAlsFilter(AlsFilter):
 
 class EirpAlsFilter(AlsFilter):
     """ Filter by EIRP channels """
+
     def __init__(self, arg_name: str) -> None:
         """ Constructor
 
@@ -2168,8 +2208,8 @@ def do_als(args: Any) -> None:
         columns = metadata.tables["decode_error"].c
         s = \
             apply_common_limits(
-                sa.select([columns.time, columns.code_line, columns.msg,
-                           columns.data]).order_by(columns.time),
+                sa.select(columns.time, columns.code_line, columns.msg,
+                          columns.data).order_by(columns.time),
                 args=args, time_column=columns.time)
         with engine.connect() as conn, \
                 Printer.factory(

@@ -59,15 +59,15 @@ AlarmType = enum.Enum("AlarmType", ["MissingMilestone", "FailedCheck"])
 
 def recreate_tables(with_timezone: bool) -> None:
     """ Drop and recreate tables with/without timezonws in timestamps """
-    op.drop_table("milestones")
-    op.drop_table("alarms")
-    op.drop_table("logs")
-    op.drop_table("checks")
+    op.execute("DROP TABLE IF EXISTS milestones CASCADE")
+    op.execute("DROP TABLE IF EXISTS alarms CASCADE")
+    op.execute("DROP TABLE IF EXISTS logs CASCADE")
+    op.execute("DROP TABLE IF EXISTS checks CASCADE")
 
-    op.execute(sa.text("DROP TYPE downloadermilestone"))
-    op.execute(sa.text("DROP TYPE alarmtype"))
-    op.execute(sa.text("DROP TYPE logtype"))
-    op.execute(sa.text("DROP TYPE checktype"))
+    op.execute(sa.text("DROP TYPE IF EXISTS downloadermilestone"))
+    op.execute(sa.text("DROP TYPE IF EXISTS alarmtype"))
+    op.execute(sa.text("DROP TYPE IF EXISTS logtype"))
+    op.execute(sa.text("DROP TYPE IF EXISTS checktype"))
 
     op.create_table(
         "milestones",

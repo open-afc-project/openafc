@@ -60,9 +60,9 @@ bool isLOS(const TerrainClass *terrain,
 	   double *cdsmFracPtr);
 
 QVector<QPointF> computeGreatCircleLineMM(const QPointF &from,
-                      const QPointF &to,
-                      int numpts,
-                      double *tdist);
+					  const QPointF &to,
+					  int numpts,
+					  double *tdist);
 
 extern long long numInvalidSRTM;
 extern long long numSRTM;

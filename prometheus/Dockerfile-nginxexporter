@@ -7,11 +7,16 @@
 
 # Dockerfile for Nginx Exporter that brings Nginx metrics to Prometheus format
 
-FROM nginx/nginx-prometheus-exporter:0.11
+FROM nginx/nginx-prometheus-exporter:1.5.1@sha256:9f6d963bb2b19d706d401cc3e2c3ea8de2f1c471b96a2156ca45e76f650b1625
 
 # URL on which Nginx' stub_status is exported
-ENV NGINXEXPORTER_STUB_URL=http://dispatcher:8080/stub_status
+ENV SCRAPE_URI=http://dispatcher:8080/stub_status
+# Secure by default: verify TLS certificates if a deployment overrides
+# SCRAPE_URI to an https:// endpoint. Do not disable verification here —
+# an operator scraping a self-signed endpoint should opt out explicitly
+# at the compose/env level, not inherit a baked verify-off default.
+ENV SSL_VERIFY=true
 
 EXPOSE 9113/tcp
 
-ENTRYPOINT ["nginx-prometheus-exporter", "-nginx.scrape-uri=${NGINXEXPORTER_STUB_URL}"]
+ENTRYPOINT ["nginx-prometheus-exporter"]

@@ -11,6 +11,7 @@ import { clearCache, guiConfig, importCache } from './RatApi';
 import { logger } from './Logger';
 import { RatResponse, error, success } from './RatApiTypes';
 import { letin } from './Utils';
+import { apiFetch, setSessionExpiredHandler } from './HttpClient';
 
 /**
  * User.ts: Module for handling user state and login
@@ -34,6 +35,8 @@ export interface UserState {
         firstName?: string;
         lastName?: string;
         active: boolean;
+        /** False when OIDC / IdP owns email & password (see UserAPI guiconfig). */
+        editCredential?: boolean;
       };
 }
 
@@ -72,46 +75,75 @@ export const configure = (get: () => UserState, set: (user: UserState) => void) 
 };
 
 /**
+ * Handle session expiration: resets local authentication state and routes to the login screen.
+ */
+export const handleSessionExpired = () => {
+  if (getUser().data.loggedIn) {
+    logger.warn('Session has expired on backend. Resetting user state.');
+    setUser({ data: { loggedIn: false } });
+    if (guiConfig.about_url) {
+      window.location.hash = '#/login';
+    } else if (guiConfig.login_url) {
+      window.location.href = guiConfig.login_url;
+    }
+  }
+};
+
+setSessionExpiredHandler(handleSessionExpired);
+
+/**
  * Gets user state from server and set user state.
  * @param token authentication token for user
  * @returns result of getting user data
  */
 export const retrieveUserData = async (): Promise<RatResponse<string>> => {
   // get user information
-  const userInfoResult = await fetch(guiConfig.status_url, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    method: 'GET',
-  });
-
-  if (!userInfoResult.ok) return error(userInfoResult.statusText, userInfoResult.status);
-
-  const userInfo = await userInfoResult.json();
-  if (userInfo.status !== 'success') {
-    setUser({ data: { loggedIn: false } });
-    return error(status, userInfoResult.status, userInfoResult);
-  }
-
-  logger.info('User is logged in');
-  // set the user session
-  setUser({
-    data: Object.assign(
-      {
-        loggedIn: true,
+  try {
+    const userInfoResult = await apiFetch(guiConfig.status_url, {
+      headers: {
+        'Content-Type': 'application/json',
       },
-      userInfo.data,
-    ),
-  });
+      method: 'GET',
+    });
 
-  logger.info('User: ', getUser().data);
+    if (!userInfoResult.ok) {
+      if (getUser().data.loggedIn) {
+        logger.warn('User status endpoint returned not OK. Marking session as logged out.');
+        setUser({ data: { loggedIn: false } });
+      }
+      return error(userInfoResult.statusText, userInfoResult.status);
+    }
 
-  return success('User loaded');
+    const userInfo = await userInfoResult.json();
+    if (userInfo.status !== 'success') {
+      setUser({ data: { loggedIn: false } });
+      return error(userInfo.status || 'Authentication failed', userInfoResult.status, userInfoResult);
+    }
+
+    logger.info('User is logged in');
+    // set the user session
+    setUser({
+      data: Object.assign(
+        {
+          loggedIn: true,
+        },
+        userInfo.data,
+      ),
+    });
+
+    logger.info('User: ', getUser().data);
+
+    return success('User loaded');
+  } catch (err: any) {
+    logger.error('Failed to retrieve user data:', err);
+    return error(String(err));
+  }
 };
 
 /**
  * Is user credential is editable
  */
+// @ts-ignore
 export const isEditCredential = () => getUser().data.editCredential;
 
 /**

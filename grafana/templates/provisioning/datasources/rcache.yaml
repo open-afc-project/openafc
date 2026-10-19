@@ -19,6 +19,8 @@ datasources:
     database: ''
     isDefault: false
     jsonData:
+      allowed_hosts:
+        - '{{ GRAFANA_DS_RCACHE_URL }}'
       auth_method: none
       customHealthCheckEnabled: true
       customHealthCheckUrl: >-
@@ -26,7 +28,11 @@ datasources:
       global_queries: []
       oauthPassThru: false
       proxy_type: none
-      tlsSkipVerify: true
+      # TLS verification is on by default; an operator pointing this
+      # datasource at a self-signed https endpoint opts out explicitly at
+      # the compose/env level (same policy as SSL_VERIFY in
+      # prometheus/Dockerfile-nginxexporter).
+      tlsSkipVerify: {{ GRAFANA_DS_RCACHE_TLS_SKIP_VERIFY | default('false') }}
     name: Rcache
     orgId: 1
     readOnly: false

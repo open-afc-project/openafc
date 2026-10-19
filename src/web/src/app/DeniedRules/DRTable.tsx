@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { headerCol, Table, TableVariant, TableHeader, TableBody } from '@patternfly/react-table';
+import React from 'react';
+import { Table, Thead, Tr, Th, Tbody, Td, ActionsColumn } from '@patternfly/react-table';
 import {
   AccessPointModel,
   DeniedRegion,
@@ -38,61 +38,71 @@ export class DRTable extends React.Component<DRTableProps, {}> {
     };
   }
 
-  private toRow = (dr: DeniedRegion) => ({
-    id: dr.name + '===' + dr.zoneType,
-    cells: [dr.name, dr.startFreq, dr.endFreq, dr.zoneType, this.zoneToText(dr)],
-  });
-
   private zoneToText(dr: DeniedRegion) {
     switch (dr.zoneType) {
       case 'Circle':
-        let c = dr.exclusionZone as ExclusionCircle;
+        const c = dr.exclusionZone as ExclusionCircle;
         return `Center: (${c.latitude}, ${c.longitude}) Rad: ${c.radiusKm} km`;
       case 'One Rectangle':
-        let o = dr.exclusionZone as ExclusionRect;
+        const o = dr.exclusionZone as ExclusionRect;
         return `(${o.topLat}, ${o.leftLong}), (${o.bottomLat}, ${o.rightLong}) `;
       case 'Two Rectangles':
-        let t = dr.exclusionZone as ExclusionTwoRect;
+        const t = dr.exclusionZone as ExclusionTwoRect;
         return (
           `Rectangle 1: (${t.rectangleOne.topLat}, ${t.rectangleOne.leftLong}), (${t.rectangleOne.bottomLat}, ${t.rectangleOne.rightLong}) ` +
           `Rectangle 2:(${t.rectangleTwo.topLat}, ${t.rectangleTwo.leftLong}), (${t.rectangleTwo.bottomLat}, ${t.rectangleTwo.rightLong})`
         );
       case 'Horizon Distance':
-        let h = dr.exclusionZone as ExclusionHorizon;
+        const h = dr.exclusionZone as ExclusionHorizon;
         return `Center: (${h.latitude}, ${h.longitude}) Height AGL: ${h.aglHeightM} m`;
       default:
         return '';
     }
   }
 
-  actionResolver(data: any, extraData: any) {
-    return [
-      {
-        title: 'Edit',
-        onClick: (event: any, rowId: number, rowData: any, extra: any) => this.props.onOpenEdit(rowData.id),
-      },
-      {
-        title: 'Remove',
-        onClick: (event: any, rowId: number, rowData: any, extra: any) => this.props.onDelete(rowData.id),
-      },
-    ];
-  }
-
   render() {
+    const filteredRegions = Array.isArray(this.props.deniedRegions)
+      ? this.props.deniedRegions.filter((x) => x.regionStr == this.props.currentRegionStr)
+      : [];
+
     return (
-      <Table
-        aria-label="Denied Region Table"
-        cells={this.columns as any}
-        rows={
-          Array.isArray(this.props.deniedRegions)
-            ? this.props.deniedRegions?.filter((x) => x.regionStr == this.props.currentRegionStr).map(this.toRow)
-            : []
-        }
-        variant={TableVariant.compact}
-        actionResolver={(a, b) => this.actionResolver(a, b)}
-      >
-        <TableHeader />
-        <TableBody />
+      <Table aria-label="Denied Region Table" variant="compact">
+        <Thead>
+          <Tr>
+            {this.columns.map((col, idx) => (
+              <Th key={idx}>{col}</Th>
+            ))}
+            <Th screenReaderText="Actions" />
+          </Tr>
+        </Thead>
+        <Tbody>
+          {filteredRegions.map((dr, index) => {
+            const id = dr.name + '===' + dr.zoneType;
+            return (
+              <Tr key={id}>
+                <Td dataLabel={this.columns[0]}>{dr.name}</Td>
+                <Td dataLabel={this.columns[1]}>{dr.startFreq}</Td>
+                <Td dataLabel={this.columns[2]}>{dr.endFreq}</Td>
+                <Td dataLabel={this.columns[3]}>{dr.zoneType}</Td>
+                <Td dataLabel={this.columns[4]}>{this.zoneToText(dr)}</Td>
+                <Td isActionCell>
+                  <ActionsColumn
+                    items={[
+                      {
+                        title: 'Edit',
+                        onClick: () => this.props.onOpenEdit(id),
+                      },
+                      {
+                        title: 'Remove',
+                        onClick: () => this.props.onDelete(id),
+                      },
+                    ]}
+                  />
+                </Td>
+              </Tr>
+            );
+          })}
+        </Tbody>
       </Table>
     );
   }

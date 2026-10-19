@@ -11,23 +11,11 @@ apiVersion: 1
 deleteDatasources:
   - name: Docker
 
-datasources:
-  - access: proxy
-    apiVersion: ''
-    basicAuth: false
-    basicAuthUser: ''
-    database: ''
-    isDefault: false
-    jsonData:
-      global_queries: []
-    name: Docker
-    orgId: 1
-    readOnly: false
-    secureJsonFields: {}
-    type: yesoreyeram-infinity-datasource
-    typeLogoUrl: public/plugins/yesoreyeram-infinity-datasource/img/icon.svg
-    url: http://localhost:{{ GRAFANA_DOCKER_SOCKET_PORT }}
-    user: ''
-    version: 4
-    withCredentials: false
+# The 'Docker' Infinity datasource is intentionally NOT provisioned:
+# allowed_hosts constrains host but not path, so any Viewer with
+# datasources:query (viewers_can_edit=true) could issue arbitrary-path
+# GETs to socket-proxy:2375 (e.g. /containers/{id}/json, /logs),
+# defeating the monitor-net isolation socket-proxy relies on.
+# deleteDatasources above removes any previously-provisioned instance.
+datasources: []
 {% endif %}

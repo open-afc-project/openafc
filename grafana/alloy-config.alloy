@@ -1,0 +1,48 @@
+// Grafana Alloy configuration — replaces Promtail (EOL March 2, 2026).
+// Alloy version: v1.16.1+
+//
+// Environment variables consumed at runtime:
+//   GRAFANA_DS_LOKI_URL            — Loki push endpoint base URL
+//   GRAFANA_COMPOSE_PROJECT_NAME   — Docker Compose project label used for container filtering
+//   GRAFANA_DOCKER_HOST            — Docker daemon URL; defaults to "unix:///var/run/docker.sock"
+//                                    Set to "tcp://socket-proxy:2375" when using docker-socket-proxy
+
+discovery.docker "containers" {
+  host             = sys.env("GRAFANA_DOCKER_HOST")
+  refresh_interval = "15s"
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=" + sys.env("GRAFANA_COMPOSE_PROJECT_NAME")]
+  }
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    // Strip /brcm-afc_service-1 → service (removes project prefix and replica suffix)
+    regex        = "/" + sys.env("GRAFANA_COMPOSE_PROJECT_NAME") + "(_|-)(.*)(_|-)\\d+"
+    replacement  = "$2"
+    target_label = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex        = "/" + sys.env("GRAFANA_COMPOSE_PROJECT_NAME") + "(_|-)(.*)(_|-)\\d+"
+    replacement  = "$2"
+    target_label = "service_name"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = sys.env("GRAFANA_DOCKER_HOST")
+  targets    = discovery.relabel.containers.output
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = sys.env("GRAFANA_DS_LOKI_URL") + "/loki/api/v1/push"
+  }
+}

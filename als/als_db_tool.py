@@ -209,6 +209,7 @@ class Db:
     _engine  -- SqlAlchemy engine
     _verbose -- True to print SQL statements being executed
     """
+
     def __init__(self, cfg: Dict[str, Any], dsn: Optional[str],
                  password_file: Optional[str], verbose: bool) -> None:
         """ Constructor
@@ -246,6 +247,10 @@ class Db:
         except sa.exc.SQLAlchemyError as ex:
             error(str(ex))
 
+    def quote_identifier(self, name: str) -> str:
+        """ Return given name quoted as a safe SQL identifier """
+        return self._engine.dialect.identifier_preparer.quote(name)
+
     def get_partitions(self) -> Dict[str, List[PartitionInfo]]:
         """ Returns dictionary of partition month indices, indexed by base
         table names """
@@ -262,6 +267,12 @@ class Db:
                     "WHERE table_schema = 'public' AND "
                     "table_type = 'BASE TABLE';").fetchall():
             table = row[0]
+            # Only plain identifiers may participate in partition-maintenance
+            # DDL: a decoy table planted with a malicious quoted name (e.g.
+            # containing ';') must never reach the DDL f-strings below
+            # (second-order SQL injection).
+            if not re.match(r"^[A-Za-z0-9_]+$", table):
+                continue
             m = re.match(partition_regex, table)
             if not m:
                 continue
@@ -290,8 +301,10 @@ def do_add_partitions(cfg: Dict[str, Any], args: argparse.Namespace) -> None:
                 cfg["partition_name_template"].format(table_name=parent_table,
                                                       month_idx=month_idx)
             db.execute(
-                f"CREATE TABLE IF NOT EXISTS {partition_name} "
-                f"PARTITION OF {parent_table} FOR VALUES IN ({month_idx});")
+                f"CREATE TABLE IF NOT EXISTS "
+                f"{db.quote_identifier(partition_name)} "
+                f"PARTITION OF {db.quote_identifier(parent_table)} "
+                f"FOR VALUES IN ({month_idx});")
 
 
 def do_remove_partitions(cfg: Dict[str, Any], args: argparse.Namespace) \
@@ -310,7 +323,8 @@ def do_remove_partitions(cfg: Dict[str, Any], args: argparse.Namespace) \
         for pi in partitions:
             if pi.month_idx >= start_month:
                 continue
-            db.execute(f"DROP TABLE IF EXISTS {pi.table_name} CASCADE;")
+            db.execute(f"DROP TABLE IF EXISTS "
+                       f"{db.quote_identifier(pi.table_name)} CASCADE;")
 
 
 def do_partition_info(cfg: Dict[str, Any], args: argparse.Namespace) -> None:
@@ -379,7 +393,7 @@ def main(argv: List[str]) -> None:
              f"Config file '{cfg_file}' not found")
     try:
         with open(cfg_file, encoding="utf-8") as f:
-            cfg = yaml.load(f, Loader=yaml.FullLoader)
+            cfg = yaml.safe_load(f)
     except (OSError, yaml.YAMLError) as ex:
         error(f"Error reading config file '{cfg_file}': {ex}")
     # Database connection string switches

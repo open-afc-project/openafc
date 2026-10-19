@@ -35,7 +35,7 @@
     },
 {%- if GRAFANA_COMPOSE_PROJECT_NAME is defined %}
     {
-      "datasource": "Docker",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -51,34 +51,23 @@
           "mappings": [
             {
               "options": {
-                "healthy": {
-                  "color": "dark-green",
-                  "index": 1
+                "-1": {
+                  "color": "dark-blue",
+                  "index": 2,
+                  "text": "no healthcheck"
                 },
-                "Restarting": {
-                  "color": "red",
-                  "index": 2
-                },
-                "starting": {
-                  "color": "dark-purple",
-                  "index": 3
-                },
-                "unhealthy": {
+                "0": {
                   "color": "dark-red",
-                  "index": 0
+                  "index": 0,
+                  "text": "unhealthy"
+                },
+                "1": {
+                  "color": "dark-green",
+                  "index": 1,
+                  "text": "healthy"
                 }
               },
               "type": "value"
-            },
-            {
-              "options": {
-                "match": "null",
-                "result": {
-                  "color": "dark-orange",
-                  "index": 3
-                }
-              },
-              "type": "special"
             }
           ],
           "noValue": "unknown",
@@ -96,7 +85,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Health"
+              "options": "Value"
             },
             "properties": [
               {
@@ -105,6 +94,10 @@
                   "applyToRow": true,
                   "type": "color-background"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Health"
               }
             ]
           }
@@ -132,55 +125,47 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "columns": [],
-          "datasource": "Docker",
-          "filters": [],
+          "datasource": "Prometheus",
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (service) (container_health_state{project=\"{{ GRAFANA_COMPOSE_PROJECT_NAME }}\"})",
           "format": "table",
-          "global_query_id": "",
-          "parser": "uql",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "uql": "parse-json\r\n| project \"Labels\", \"Status\"\r\n| extend \"Service\"=\"Labels['com.docker.compose.service']\"\r\n| extend \"Project\"=\"Labels['com.docker.compose.project']\"\r\n| extend \"Up\"=extract('^[^(]+', 0, \"Status\")\r\n| extend \"Health\"=extract('\W(unhealthy|healthy|Restarting|starting)', 1, \"Status\")\r\n| project \"Service\", \"Status\", \"Up\", \"Health\", \"Project\"\r\n| order by \"Up\" asc\r\n| order by \"Health\" desc",
-          "url": "/containers/json",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
+          "instant": true,
+          "legendFormat": "{% raw %}{{service}}{% endraw %}",
+          "range": false,
+          "refId": "A"
         }
       ],
       "title": "Services",
       "transformations": [
         {
-          "id": "filterByValue",
+          "id": "organize",
           "options": {
-            "filters": [
-              {
-                "config": {
-                  "id": "notEqual",
-                  "options": {
-                    "value": "{{ GRAFANA_COMPOSE_PROJECT_NAME }}"
-                  }
-                },
-                "fieldName": "Project"
-              }
-            ],
-            "match": "any",
-            "type": "exclude"
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "image": true,
+              "instance": true,
+              "job": true,
+              "name": true,
+              "project": true
+            },
+            "indexByName": {
+              "service": 0,
+              "Value": 1
+            },
+            "renameByName": {
+              "service": "Service"
+            }
           }
         },
         {
-          "id": "filterFieldsByName",
+          "id": "sortBy",
           "options": {
-            "byVariable": false,
-            "include": {
-              "names": [
-                "Service",
-                "Up",
-                "Health"
-              ]
-            }
+            "fields": {},
+            "sort": [
+              { "field": "Value", "desc": false }
+            ]
           }
         }
       ],
@@ -270,10 +255,10 @@
           "disableTextWrap": false,
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum without(id, cpu, name, instance, job, project) (rate(container_cpu_usage_seconds_total{service!=\"\"}[1m]))",
+          "expr": "sum by (service) (rate(container_cpu_usage_seconds_total{project=\"{{ GRAFANA_COMPOSE_PROJECT_NAME }}\"}[1m]))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{% raw %}{{service}}{% endraw %}",
           "range": true,
           "refId": "A",
           "useBackend": false

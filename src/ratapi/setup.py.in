@@ -33,6 +33,8 @@ setuptools.setup(
             'templates/login.html',
             'templates/about.html',
             'templates/*.html',
+            'templates/security/*.html',
+            'templates/dav_htdocs/*',
         ]
     },
     entry_points={
@@ -45,7 +47,7 @@ setuptools.setup(
         'werkzeug',
         'flask',
         'flask_jsonrpc',
-        'flask-user',
+        'flask-security-too',
         'flask-sqlalchemy',
         'flask-mail',
         'pyxdg',

@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import { Progress, ProgressMeasureLocation } from '@patternfly/react-core';
 
 /**

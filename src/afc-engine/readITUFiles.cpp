@@ -42,6 +42,11 @@ void ITUDataClass::readRCFile(std::string RCFile)
 
 	latIdx = 0;
 	while (std::getline(file, line)) {
+		// Bound loop before write to prevent reading past end of allocated grid
+		if (latIdx >= RCNumLat) {
+			throw std::length_error("ERROR: Too many rows in " + RCFile +
+						" (expected " + std::to_string(RCNumLat) + ")");
+		}
 		std::istringstream lineBuffer(line);
 		for (lonIdx = 0; lonIdx < RCNumLon; ++lonIdx)
 			lineBuffer >> RCData[latIdx][lonIdx];
@@ -69,6 +74,11 @@ void ITUDataClass::readSRFile(std::string SRFile)
 
 	latIdx = 0;
 	while (std::getline(file, line)) {
+		// Bound loop before write to prevent reading past end of allocated grid
+		if (latIdx >= SRNumLat) {
+			throw std::length_error("ERROR: Too many rows in " + SRFile +
+						" (expected " + std::to_string(SRNumLat) + ")");
+		}
 		std::istringstream lineBuffer(line);
 		for (lonIdx = 0; lonIdx < SRNumLon; lonIdx++)
 			lineBuffer >> SRData[latIdx][lonIdx];

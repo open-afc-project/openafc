@@ -6,8 +6,9 @@
 #
 
 # Promtail (docker log collector for Loki)
+# NOTE: Promtail reached EOL on March 2, 2026. Consider migrating to Grafana Alloy.
 
-FROM grafana/promtail:3.3.2
+FROM grafana/promtail:3.6.10@sha256:2a0f5e3e160ee5d549c585f6cc4f4e1c566ff783324a424bd75bc16503fc660e
 
 ENV HOMEDIR=/root
 
