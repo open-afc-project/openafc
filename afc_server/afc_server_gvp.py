@@ -19,37 +19,62 @@ __all__ = ["router"]
 # rulesetId this deployment serves (SDI Table 8).
 GVP_RULESET_ID = "US_47_CFR_PART_15_SUBPART_E_GVP"
 
+# Frequency range and PSD level assumed when an inquiry omits them, which
+# SDI Table 6 leaves to the Geofencing System.
+GVP_DEFAULT_FREQUENCY_RANGE = (6182, 6212)
+GVP_DEFAULT_PSD_LEVEL = 11
+
+# Stub geometry: a zone centered near the Appendix A area of intended
+# operation, growing with PSD level because more power reaches further.
+GVP_STUB_CENTER = (37.38042, -121.96694)
+GVP_STUB_BASE_RADIUS_M = 20000
+GVP_STUB_RADIUS_PER_DB_M = 1000
+
 router = fastapi.APIRouter()
 
 
-def _gvp_stub_resp_msg(req_msg):
-    """ Build a success response carrying fixed geometry.
+def _gvp_stub_zones(request):
+    """ Build one zone per inquired frequency range and PSD level.
 
-    NOTE: Temporary. afc-engine does not compute exclusion zones yet, so
-    every inquiry gets the same zone. Replace the zone list with the engine
-    result; the surrounding message shape is final.
+    NOTE: Temporary. The cross product is real; the geometry is invented.
+    Replace the circles with the afc-engine result.
     """
+    ranges = request.inquiredFrequencyRange or [
+        Rest_Gvp_FrequencyRange(
+            lowFrequency=GVP_DEFAULT_FREQUENCY_RANGE[0],
+            highFrequency=GVP_DEFAULT_FREQUENCY_RANGE[1])]
+    psd_levels = request.desiredPsd or [GVP_DEFAULT_PSD_LEVEL]
+    latitude, longitude = GVP_STUB_CENTER
+    zones = []
+    for range_index, frequency_range in enumerate(ranges):
+        for psd_level in psd_levels:
+            radius = int(GVP_STUB_BASE_RADIUS_M +
+                         psd_level * GVP_STUB_RADIUS_PER_DB_M)
+            zones.append(
+                Rest_Gvp_ExclusionZoneInfo(
+                    exclusionZoneId="stub-%d-%g" % (range_index, psd_level),
+                    exclusionZoneFrequencyRange=frequency_range,
+                    psdLevel=psd_level,
+                    circles=[[latitude,
+                              longitude + 0.05 * range_index,
+                              radius]]))
+    return zones
+
+
+def _gvp_stub_resp_msg(req_msg):
+    """ Build a success response for every inquiry in the message. """
     expire_time = \
         (datetime.datetime.now(datetime.timezone.utc) +
          datetime.timedelta(hours=24)).strftime(GVP_EXPIRE_TIME_FORMAT)
     responses = []
     for request in req_msg.exclusionZoneInquiryRequests:
-        default_range = Rest_Gvp_FrequencyRange(
-            lowFrequency=6182, highFrequency=6212)
-        frequency_range = \
-            (request.inquiredFrequencyRange or [default_range])[0]
-        psd_level = (request.desiredPsd or [11])[0]
-        zone = Rest_Gvp_ExclusionZoneInfo(
-            exclusionZoneFrequencyRange=frequency_range,
-            psdLevel=psd_level,
-            circles=[[37.38042, -121.96694, 29269]])
         responses.append(
             Rest_Gvp_ExclusionZoneInquiryResponse(
                 requestId=request.requestId,
                 # Table 18 ties this to the request on SUCCESS
                 rulesetId=(request.deviceDescriptor
                            .certificationId[0].rulesetId),
-                exclusionZoneInfo=[zone],
+                exclusionZoneInfo=_gvp_stub_zones(request),
                 availabilityExpireTime=expire_time,
                 response=Rest_Response(
                     responseCode=GVP_SUCCESS_RESPONSE_CODE,

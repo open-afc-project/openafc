@@ -52,6 +52,29 @@ def test_success_carries_zones_and_expiry(client, request_body):
     assert entry["availabilityExpireTime"].endswith("Z")
 
 
+def test_a_zone_per_frequency_range_and_psd_level(client, request_body):
+    """ A zone applies to one frequency range at one PSD level, so the
+    Appendix A request, which inquires two ranges and two levels, gets
+    four. """
+    zones = client.post(URL, json=request_body).json()[
+        "exclusionZoneInquiryResponses"][0]["exclusionZoneInfo"]
+    combinations = {(z["exclusionZoneFrequencyRange"]["lowFrequency"],
+                     z["psdLevel"]) for z in zones}
+    assert combinations == {(5925, 11), (5925, 5), (6525, 11), (6525, 5)}
+
+
+def test_inquiry_without_ranges_or_levels_gets_one_zone(
+        client, request_body):
+    """ Table 6 leaves the choice to the Geofencing System when either
+    field is absent. """
+    del request_body["exclusionZoneInquiryRequests"][0][
+        "inquiredFrequencyRange"]
+    del request_body["exclusionZoneInquiryRequests"][0]["desiredPsd"]
+    zones = client.post(URL, json=request_body).json()[
+        "exclusionZoneInquiryResponses"][0]["exclusionZoneInfo"]
+    assert len(zones) == 1
+
+
 def test_unused_optional_fields_are_omitted(client, request_body):
     """ Section 3.2: an optional field that is not used shall be omitted. """
     payload = client.post(URL, json=request_body).json()
