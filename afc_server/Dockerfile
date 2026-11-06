@@ -5,7 +5,9 @@
 # a copy of which is included with this software program
 #
 
-FROM python:3.12-alpine3.21
+ARG BASE_REGISTRY=dhi.io
+ARG BASE_IMAGE=python:3.12-alpine3.24-dev
+FROM ${BASE_REGISTRY}/${BASE_IMAGE}
 
 # Port REST API service listen on. Mandatory
 # ENV AFC_SERVER_PORT

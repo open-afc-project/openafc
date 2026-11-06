@@ -5,7 +5,10 @@
 # a copy of which is included with this software program
 #
 
-FROM grafana/loki:3.3.2
+ARG BASE_REGISTRY=dhi.io
+ARG BASE_IMAGE=loki:3.6
+FROM ${BASE_REGISTRY}/${BASE_IMAGE}
+
 
 # Directory where Loki stores chunks, indices, etc. if filesystem store is used
 ENV GRAFANA_LOKI_DATA_FILESYSTEM_DIRECTORY=/loki
@@ -17,4 +20,4 @@ WORKDIR /wd
 
 COPY loki-config.yaml /wd/
 
-ENTRYPOINT loki -config.file=/wd/loki-config.yaml  -config.expand-env
+ENTRYPOINT ["loki", "-config.file=/wd/loki-config.yaml", "-config.expand-env"]

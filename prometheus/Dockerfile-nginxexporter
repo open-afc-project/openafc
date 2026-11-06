@@ -7,7 +7,9 @@
 
 # Dockerfile for Nginx Exporter that brings Nginx metrics to Prometheus format
 
-FROM nginx/nginx-prometheus-exporter:0.11
+ARG BASE_REGISTRY=dhi.io
+ARG BASE_IMAGE=nginx-exporter:1
+FROM ${BASE_REGISTRY}/${BASE_IMAGE}
 
 # URL on which Nginx' stub_status is exported
 ENV NGINXEXPORTER_STUB_URL=http://dispatcher:8080/stub_status

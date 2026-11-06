@@ -246,6 +246,8 @@ RUN cd /build/afc/build && \
         qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev && \
     cd / && rm -rf /build
 
+RUN chmod +x /mnt/nfs/rat_transfer/daily_uls_parse/daily_uls_parse.py
+
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
         -r /wd/afc-packages/pkgs.uls \

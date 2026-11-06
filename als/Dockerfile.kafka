@@ -7,9 +7,9 @@
 
 # Dockerfile for Kafka server, used by ALS (AFC Request/Response/Config) logging
 # This dockerfile maps outside config variables to those, used by Bitnami/Kafka
-
-From apache/kafka:3.9.1
-
+ARG BASE_REGISTRY=dhi.io
+ARG BASE_IMAGE=kafka:4.2
+FROM ${BASE_REGISTRY}/${BASE_IMAGE}
 
 # Outside configuration variables
 ENV KAFKA_ADVERTISED_HOST=localhost
@@ -29,9 +29,7 @@ ENV KAFKA_MAX_REQUEST_SIZE=1048576
 ENV KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
 
 # Setting Kafka log level to ERROR limits initialization blurt
-ENV KAFKA_LOG_LEVEL=ERROR
-RUN sed -i "s/log4j\.logger\.kafka=.*/log4j.logger.kafka=${KAFKA_LOG_LEVEL}/" /opt/kafka/config/log4j.properties
-RUN sed -i "s/log4j\.logger\.org\.apache\.kafka=.*/log4j.logger.org.apache.kafka=${KAFKA_LOG_LEVEL}/" /opt/kafka/config/log4j.properties
+ENV KAFKA_LOG4J_LOGGERS="kafka=ERROR,org.apache.kafka=ERROR"
 
 # Kafka environment variables, computed from DockerCompose-supplied variables
 # can't be defined in ENV - hence they are moved to ENTRYPOINT

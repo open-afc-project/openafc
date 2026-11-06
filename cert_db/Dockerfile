@@ -6,7 +6,10 @@
 #
 # Install required packages
 #
-FROM python:3.12-alpine3.21
+ARG BASE_REGISTRY=dhi.io
+ARG BASE_IMAGE=python:3.12-alpine3.24-dev
+FROM ${BASE_REGISTRY}/${BASE_IMAGE}
+
 # This variable should be set to used Python version (major.minor only)
 ENV AFC_PYTHONVERSION=3.12
 

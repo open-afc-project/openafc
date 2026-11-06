@@ -9,7 +9,9 @@
 # Kafka and puts them to PostgreSQL+PostGIS database (optionally creating
 # necessary database before operation)
 
-FROM python:3.12-alpine3.21
+ARG BASE_REGISTRY=dhi.io
+ARG BASE_IMAGE=python:3.12-alpine3.24-dev
+FROM ${BASE_REGISTRY}/${BASE_IMAGE}
 
 # Destination in docker image. Not a parameter (i.e. no reasons to change it)
 ARG WORKDIR=/usr/app
