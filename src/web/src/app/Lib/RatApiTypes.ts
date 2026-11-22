@@ -526,6 +526,17 @@ export interface GeoJson {
           kind: 'HMAP'; // heat map
           ItoN: number;
           indoor: 'Y' | 'N';
+        }
+      | {
+          /**
+           * GVP exclusion zone (SDI Table 19)
+           */
+          kind: 'GVP_ZONE';
+          exclusionZoneId?: string;
+          lowFrequency: number;
+          highFrequency: number;
+          psdLevel: number;
+          selected: boolean;
         }; // arbitrary description data (useful for pop-ups)
     geometry: {
       type: 'Polygon'; // Use for elipses and cones
