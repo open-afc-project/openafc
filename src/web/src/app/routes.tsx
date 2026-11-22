@@ -126,6 +126,27 @@ const MobileAP = () => {
   );
 };
 
+const getGvpApModuleAsync = () => {
+  return () => import(/* webpackChunkName: "gvp-ap" */ './GvpAp/GvpAp');
+};
+const GvpAp = () => {
+  return (
+    <DynamicImport load={getGvpApModuleAsync()}>
+      {(Component: any) => {
+        return Component === null ? (
+          <PageSection>
+            <Card>
+              <CardHeader>Loading...</CardHeader>
+            </Card>
+          </PageSection>
+        ) : (
+          <Component.GvpAp />
+        );
+      }}
+    </DynamicImport>
+  );
+};
+
 const getAfcConfigModuleAsync = () => {
   return () => import(/* webpackChunkName: "afcconfig" */ './AFCConfig/AFCConfig');
 };
@@ -404,6 +425,12 @@ const AppRoutes = () => (
       <Route path="/mobile-ap" exact={true} component={MobileAP}></Route>
     ) : (
       <Route path="/mobile-ap" exact={true} component={Dashboard}></Route>
+    )}
+
+    {isLoggedIn() && hasRole('AP') ? (
+      <Route path="/gvp-ap" exact={true} component={GvpAp}></Route>
+    ) : (
+      <Route path="/gvp-ap" exact={true} component={Dashboard}></Route>
     )}
 
     {isLoggedIn() && (hasRole('AP') || hasRole('Analysis') || hasRole('Admin')) ? (

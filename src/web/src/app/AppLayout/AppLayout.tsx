@@ -187,6 +187,13 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
                 </NavLink>
               </NavItem>
             )}
+            {hasRole('AP') && (
+              <NavItem id="gvp-ap-link" itemId={'gvp-ap'}>
+                <NavLink to="/gvp-ap" activeClassName="pf-m-current">
+                  Virtual GVP AP
+                </NavLink>
+              </NavItem>
+            )}
             {(hasRole('AP') || hasRole('Analysis') || hasRole('Admin')) && (
               <NavItem id="AFCConfig-link" itemId={'afc-config'}>
                 <NavLink to="/afc-config" activeClassName="pf-m-current">
