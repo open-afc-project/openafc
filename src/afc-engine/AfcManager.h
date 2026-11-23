@@ -81,6 +81,7 @@ class AntennaClass;
 class RlanRegionClass;
 class ExThrGzipCsv;
 class ResponseInfo;
+class ExclusionZoneClass;
 
 namespace OpClass
 {
@@ -144,11 +145,12 @@ class AfcManager
 		void importConfigAFCjson(const std::string &inputJSONpath,
 					 const std::string &tempDir);
 
-		/* create OGR layer for generateExclusionZoneJson, generateMapDataGeoJson, */
+		/* create OGR layer for generateExclusionZoneGeoJson, generateMapDataGeoJson, */
 		OGRLayer *createGeoJSONLayer(const char *tmpPath, GDALDataset **dataSet);
 
 		// create JSON object for exclusion zone to be sent to GUI
-		QJsonDocument generateExclusionZoneJson();
+		QJsonDocument generateExclusionZoneGeoJson();
+		QJsonDocument generateExclusionZoneResponseJson();
 
 		// create JSON object for new AFC specification
 		QJsonDocument generateRatAfcJson();
@@ -366,11 +368,14 @@ class AfcManager
 
 	private:
 		void importGUIjsonVersion1_4(const QJsonObject &jsonObj);
+		void importExclusionZoneInquiryjsonVersion1_0(const QJsonObject &jsonObj);
 
 		void runPointAnalysis();
 		std::vector<ULSClass *> getSortedUls();
 		void runScanAnalysis();
 		void runExclusionZoneAnalysis();
+		void runExclusionZoneAnalysisRadialScan();
+		void runExclusionZoneAnalysis2DScan();
 		void runHeatmapAnalysis();
 		void writeKML();
 		void createChannelList();
@@ -389,11 +394,11 @@ class AfcManager
 						   double latDeg,
 						   CConst::NLCDLandCatEnum &nlcdLandCat,
 						   bool errorFlag = true) const;
-		double computeIToNMargin(double d,
-					 double cc,
-					 double ss,
+		int computeExclVal(double lonDeg,
+					 double latDeg,
 					 ULSClass *uls,
 					 double chanCenterFreq,
+					 double rlanEIRPDBm,
 					 double bandwidth,
 					 double chanStartFreq,
 					 double chanStopFreq,
@@ -402,6 +407,40 @@ class AfcManager
 					 double &distKmM,
 					 std::string comment,
 					 ExThrGzipCsv *excthrGc);
+		double computeIToNMargin(double lonDeg,
+					 double latDeg,
+					 ULSClass *uls,
+					 double chanCenterFreq,
+					 double rlanEIRPDBm,
+					 double bandwidth,
+					 double chanStartFreq,
+					 double chanStopFreq,
+					 double spectralOverlapLossDB,
+					 char ulsRxPropEnv,
+					 double &distKmM,
+					 std::string comment,
+					 ExThrGzipCsv *excthrGc);
+		double computeIToNMargin(double d,
+					 double cc,
+					 double ss,
+					 ULSClass *uls,
+					 double chanCenterFreq,
+					 double rlanEIRPDBm,
+					 double bandwidth,
+					 double chanStartFreq,
+					 double chanStopFreq,
+					 double spectralOverlapLossDB,
+					 char ulsRxPropEnv,
+					 double &distKmM,
+					 std::string comment,
+					 ExThrGzipCsv *excthrGc);
+
+        void createBoundingCircle(PolygonClass *polygon,
+            double &centerLon, double &centerLat, double &radiusM);
+
+        void createBoundingEllipse(std::vector<PolygonClass *> polygonList,
+            double &centerLon, double &centerLat,
+            double &semiMajorM, double &semiMinorM, double &rotationDeg);
 
 		/**************************************************************************************/
 		/* Input Parameters */
@@ -493,6 +532,7 @@ class AfcManager
 		CConst::HeightTypeEnum
 			_rlanHeightType; // Above Mean Sea Level (AMSL), Above Ground Level (AGL)
 		QString _serialNumber;
+		QString _deviceModel;
 		QString _requestId;
 		QString _rulesetId;
 		QString _guiJsonVersion;
@@ -577,13 +617,7 @@ class AfcManager
 
 		QJsonObject _deviceDesc; // parsed device description to be returned in response
 
-		int _exclusionZoneFSID; // FSID to use for Exclusion Zone Analysis
-		int _exclusionZoneRLANChanIdx; // RLAN channel Index to use for Exclusion Zone
-					       // Analysis
-		double _exclusionZoneRLANBWHz; // RLAN bandwidth (Hz) to use for Exclusion Zone
-					       // Analysis
-		double _exclusionZoneRLANEIRPDBm; // RLAN EIRP (dBm) to use for Exclusion Zone
-						  // Analysis
+        std::vector<std::tuple<double, double, double>> _exclusionZoneDebugParamList;
 
 		double _heatmapMinLon; // Min Lon for region in which Heatmap Analysis is performed
 		double _heatmapMaxLon; // Max Lon for region in which Heatmap Analysis is performed
@@ -777,6 +811,8 @@ class AfcManager
 		PRTABLEClass *_prTable;
 		std::string _prTableFile; // File containing passive repeater tabular data described
 					  // in WINNF-TS-1014-V1.2.0-App02
+
+        ExclusionZoneClass *exclusionZone;
 		/**************************************************************************************/
 
 		/**************************************************************************************/
@@ -793,12 +829,19 @@ class AfcManager
 				      // eirp_limit_dbm
 		bool _aciFlag; // If set, consider ACI in the overal interference calculation
 
-		std::vector<LatLon>
-			_exclusionZone; // List of vertices of exclusion zone contour (Lon, Lat)
+#if 0
+		std::vector<PolygonClass *>
+			_exclusionZone; // Polygon list, multiple polygons for exclusion zone
+		int _exclusionZoneImagePtsPerDeg; // Resolution to use for sampling exclusion zone in points per degree, 3600
+						 // corresp to 1 arcsec (30 m), should not have to change
+		int _exclusionZonePolygonPtsPerDeg; // Resolution to use for polygon vertices in points per degree, 108000
+						 // corresp to 1.03m, should not have to change
+
 		double _exclusionZoneFSTerrainHeight; // Terrain height at location of FS used in
 						      // exclusion zone analysis
 		double _exclusionZoneHeightAboveTerrain; // Height above terrain for FS used in
 							 // exclusion zone analysis
+#endif
 
 		double **
 			_heatmapIToNDB; // Matrix of I/N values for heatmap

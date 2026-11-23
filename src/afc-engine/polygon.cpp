@@ -1048,3 +1048,150 @@ PolygonClass *PolygonClass::combinePolygons(std::vector<PolygonClass *> polyList
 	return combinedPoly;
 }
 /******************************************************************************************/
+
+bool comparePolarAngle(std::tuple<int,int> a, std::tuple<int,int> b) {
+    int aX, aY;
+    int bX, bY;
+    std::tie(aX, aY) = a;
+    std::tie(bX, bY) = b;
+
+    long long val = ((long long) bX)*aY - ((long long) aX)*bY;
+
+    bool retval;
+    if (val > ((long long) 0)) {
+        retval = false;
+    } else if (val < ((long long) 0)) {
+        retval = true;
+    } else {
+        long long distSqA = ((long long) aX)*aY;
+        long long distSqB = ((long long) bX)*bY;
+        retval = (distSqA < distSqB);
+    }
+
+    return (retval);
+};
+
+/******************************************************************************************/
+/**** FUNCTION: PolygonClass::convexHull                                               ****/
+/******************************************************************************************/
+PolygonClass *PolygonClass::convexHull(std::vector<std::tuple<int, int>> ptList)
+{
+    // Find the bottommost point
+    int minIdx = -1;
+    int ymin   = -1;
+    int xmin   = -1;
+    for (int ptIdx = 0; ptIdx < (int) ptList.size(); ++ptIdx) {
+        int ptX, ptY;
+        std::tie(ptX, ptY) = ptList[ptIdx];
+
+        // Pick the bottom-most or choose the left
+        // most point in case of tie
+        if ((ptIdx==0) || (ptY < ymin) || ((ptY == ymin) && (ptX < xmin))) {
+            ymin = ptY;
+            xmin = ptX;
+            minIdx = ptIdx;
+        }
+    }
+
+    // Remove bottom-most point from ptList
+    ptList.erase(ptList.begin()+minIdx);
+
+    // Normalize ptList relative to (xmin,ymin)
+    for (int ptIdx = 0; ptIdx < (int) ptList.size(); ++ptIdx) {
+        int ptX, ptY;
+        std::tie(ptX, ptY) = ptList[ptIdx];
+        ptX -= xmin;
+        ptY -= ymin;
+        ptList[ptIdx] = std::make_tuple(ptX, ptY);
+    }
+
+    // Sort ptList with respect to the origin (0,0).
+    // A point p1 comes before p2 in sorted output if p2
+    // has larger polar angle (in counterclockwise
+    // direction) than p1
+    sort(ptList.begin(), ptList.end(), comparePolarAngle);
+
+    // If two or more points make same angle with p0,
+    // Remove all but the one that is farthest from p0
+    // Remember that, in above sorting, our criteria was
+    // to keep the farthest point at the end when more than
+    // one points have same angle.
+    for(int ptIdx=0; ptIdx<(int) ptList.size()-1; ++ptIdx) {
+        int ptX, ptY;
+        std::tie(ptX, ptY) = ptList[ptIdx];
+        int numDel = 0;
+        bool colinearFlag = true;
+        for(int nextIdx=ptIdx+1; (nextIdx<(int) ptList.size())&&(colinearFlag); ++nextIdx) {
+            int nextX, nextY;
+            std::tie(nextX, nextY) = ptList[nextIdx];
+            long long val = ((long long) nextX)*ptY - ((long long) ptX)*nextY;
+            if (val == ((long long) 0)) {
+                numDel++;
+            } else {
+                colinearFlag = false;
+            }
+        }
+        if (numDel) {
+            ptList.erase(ptList.begin()+ptIdx, ptList.begin()+ptIdx+numDel);
+        }
+    }
+
+    // If modified array of points has less than 3 points,
+    // convex hull is not possible
+    if (ptList.size() < 2) {
+        std::ostringstream errStr;
+        errStr << "ERROR: convexHull() modified array has < 3 points";
+        throw std::runtime_error(errStr.str());
+    }
+
+   // Create an empty stack and push first three points
+   // to it.
+    std::vector<std::tuple<int, int>> polyPtList;
+    polyPtList.push_back(std::make_tuple(0, 0));
+    polyPtList.push_back(ptList[0]);
+    polyPtList.push_back(ptList[1]);
+
+    // Process remaining n-3 points
+    for (int ptIdx = 2; ptIdx < (int) ptList.size(); ++ptIdx) {
+        // Keep removing top while the angle formed by
+        // points next-to-top, top, and points[i] makes
+        // a non-left turn
+        int ptX, ptY;
+        std::tie(ptX, ptY) = ptList[ptIdx];
+        bool cont;
+        do {
+            int p1X, p1Y;
+            std::tie(p1X, p1Y) = polyPtList.back();
+
+            int p2X, p2Y;
+            std::tie(p2X, p2Y) = polyPtList[(int) polyPtList.size()-2];
+
+            int aX = ptX-p2X;
+            int aY = ptY-p2Y;
+            int bX = p1X-p2X;
+            int bY = p1Y-p2Y;
+
+            long long val = ((long long) aX)*bY - ((long long) bX)*aY;
+            if (val >= ((long long) 0)) {
+                polyPtList.pop_back();
+                cont = true;
+            } else {
+                cont = false;
+                polyPtList.push_back(ptList[ptIdx]);
+            }
+        } while(cont);
+    }
+
+    for(int polyPtIdx=0; polyPtIdx<(int) polyPtList.size(); ++polyPtIdx) {
+        int polyPtX, polyPtY;
+        std::tie(polyPtX, polyPtY) = polyPtList[polyPtIdx];
+        polyPtX += xmin;
+        polyPtY += ymin;
+        polyPtList[polyPtIdx] = std::make_tuple(polyPtX, polyPtY);
+    }
+
+    PolygonClass *poly = new PolygonClass(&polyPtList);
+
+    return poly;
+}
+/******************************************************************************************/

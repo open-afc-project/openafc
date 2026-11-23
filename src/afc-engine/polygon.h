@@ -5,6 +5,7 @@
 #ifndef POLYGON_H
 #define POLYGON_H
 
+#include <algorithm>
 #include <tuple>
 #include <vector>
 
@@ -41,6 +42,7 @@ class PolygonClass
 				       const int *x,
 				       const int *y,
 				       int *edge = (int *)NULL);
+        static PolygonClass *convexHull(std::vector<std::tuple<int, int>> ptList);
 
 		std::string name;
 		int num_segment;
