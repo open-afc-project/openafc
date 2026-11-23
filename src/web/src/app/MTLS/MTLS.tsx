@@ -1,7 +1,7 @@
-import * as React from 'react';
+import React from 'react';
 import { MTLSModel, error, success } from '../Lib/RatApiTypes';
 import { getMTLS, addMTLS, deleteMTLSCert } from '../Lib/Admin';
-import { Card, CardHead, CardHeader, CardBody, PageSection } from '@patternfly/react-core';
+import { Card, CardHeader, CardTitle, CardBody, PageSection } from '@patternfly/react-core';
 import { NewMTLS } from './NewMTLS';
 import { MTLSTable } from './MTLSTable';
 import { logger } from '../Lib/Logger';
@@ -76,15 +76,11 @@ export class MTLS extends React.Component<MTLSProps, MTLSState> {
   render() {
     return (
       <Card>
-        <CardHead>
-          <CardHeader>MTLS</CardHeader>
-        </CardHead>
+        <CardHeader>
+          <CardTitle>MTLS</CardTitle>
+        </CardHeader>
         <CardBody>
-          <NewMTLS
-            onAdd={(mtls: MTLSModel) => this.onAdd(mtls)}
-            userId={this.props.userId}
-            filterId={this.props.filterId}
-          />
+          <NewMTLS onAdd={(mtls: MTLSModel) => this.onAdd(mtls)} userId={this.props.userId} />
           <br />
           <MTLSTable
             mtlsList={this.state.mtlsList}
@@ -103,7 +99,8 @@ export class MTLS extends React.Component<MTLSProps, MTLSState> {
 export const MTLSPage: React.FunctionComponent = () => (
   <PageSection id="mtls-page">
     <UserContext.Consumer>
-      {(u: UserState) => u.data.loggedIn && <MTLS filterId={0} userId={u.data.userId} />}
+      {/* @ts-ignore */}
+      {(u: UserState) => u.data.loggedIn && <MTLS filterId={0} userId={u.data.userId} org={u.data.org} />}
     </UserContext.Consumer>
   </PageSection>
 );

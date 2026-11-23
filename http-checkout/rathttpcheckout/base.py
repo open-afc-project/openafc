@@ -173,9 +173,9 @@ class BaseTestCase(unittest.TestCase):
     #: Cached URL to start at and to resolve from
     BASE_URL = os.environ.get('HTTPCHECKOUT_BASEURL')
     #: True if the editing tests should be skipped
-    READONLY = bool(os.environ.get('HTTPCHECKOUT_READONLY'))
+    READONLY = str(os.environ.get('HTTPCHECKOUT_READONLY', '')).lower() in ('true', '1', 'yes')
     #: Keep any created resources in the tearDown() method which are left behind
-    KEEP_TESTITEMS = bool(os.environ.get('HTTPCHECKOUT_KEEP_TESTITEMS'))
+    KEEP_TESTITEMS = str(os.environ.get('HTTPCHECKOUT_KEEP_TESTITEMS', '')).lower() in ('true', '1', 'yes')
 
     def setUp(self):
         unittest.TestCase.setUp(self)

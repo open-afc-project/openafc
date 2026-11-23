@@ -93,9 +93,17 @@ private/
 Under templates: various templates that can be used to customize various web form, for eg.
     about.html: This is the page the user can access first to sign up as a new user.  This can be customized to give more detail sign up instruction
     flask_user_layout.html: to customize the login page for the non-OIDC method.
+    onetrust.html: Cookie consent banner (OneTrust). When present, the content of this file is
+        injected into the `<head>` of the main React SPA page (`index.html`) during the Docker
+        image build (via `rat_server/copy-private.sh`). The webpack template
+        (`src/web/src/index.html`) contains the placeholder comment
+        `<!-- PRIVATE_HEAD_SCRIPTS -->` which is replaced with the contents of this file.
+        If the file is absent (open-source builds), the placeholder comment remains in the
+        page harmlessly and no cookie consent banner is shown.
 Under images: the files here customize various images of the web page.
     logo.png: the company logo on the Information (i) page
-    background.png: the background image on the Information (i) page 
+    background.png: the background image on the Information (i) page for light theme
+    background-dark.png: the background image on the Information (i) page for dark theme
 
 ## Company Name:
    The config json file (RATAPI_ARG) accepts entry for "USER_APP_NAME" to customize the company name that appears in

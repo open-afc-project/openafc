@@ -2,8 +2,8 @@
 '''
 
 import sqlalchemy as sa
-from sqlalchemy import Column, orm
-from sqlalchemy.types import String, Boolean, Integer, Float, Date
+from sqlalchemy import Column
+from sqlalchemy.types import String, Boolean, Integer, Float
 from .base import Base
 
 

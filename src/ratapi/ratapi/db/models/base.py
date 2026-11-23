@@ -1,8 +1,6 @@
 ''' Base classes underlying model classes.
 '''
 
-import sqlalchemy as sa
-from sqlalchemy import types
 import sqlalchemy.ext.declarative as declarative
 
 #: Base class for declarative models

@@ -3,6 +3,8 @@
 /******************************************************************************************/
 #include <cstring>
 #include <cstdio>
+#include <stdexcept>
+#include <string>
 
 #include "global_defines.h"
 
@@ -32,7 +34,12 @@ int StrTypeClass::str_to_type(const char *typestr, int &validFlag, int err) cons
 	if (!validFlag) {
 		type = -1;
 		if (err) {
-			CORE_DUMP;
+			// Invalid external input must be rejected by exception (caught
+			// and converted to an AFC error response in main.cpp), not by
+			// process abort.
+			throw std::runtime_error(std::string("str_to_type(): invalid value \"") +
+						 (typestr ? typestr : "(null)") +
+						 "\" not found in string type list");
 		}
 	}
 
@@ -60,7 +67,11 @@ int StrTypeClass::str_to_type(const std::string &typestr, int &validFlag, int er
 	if (!validFlag) {
 		type = -1;
 		if (err) {
-			CORE_DUMP;
+			// Invalid external input must be rejected by exception (caught
+			// and converted to an AFC error response in main.cpp), not by
+			// process abort.
+			throw std::runtime_error("str_to_type(): invalid value \"" + typestr +
+						 "\" not found in string type list");
 		}
 	}
 
@@ -87,7 +98,8 @@ const char *StrTypeClass::type_to_str(int type) const
 	}
 
 	if (!found) {
-		CORE_DUMP;
+		throw std::runtime_error("type_to_str(): invalid type " + std::to_string(type) +
+					 " not found in string type list");
 	}
 
 	return (typestr);

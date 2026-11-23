@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import { MTLSModel, RatResponse } from '../Lib/RatApiTypes';
 import {
   Gallery,
@@ -45,6 +45,7 @@ interface NewMTLSState {
 export class NewMTLS extends React.Component<NewMTLSProps, NewMTLSState> {
   constructor(props: NewMTLSProps) {
     super(props);
+    // @ts-ignore
     this.state = {
       cert: '',
       note: '',
@@ -64,6 +65,7 @@ export class NewMTLS extends React.Component<NewMTLSProps, NewMTLSState> {
   }
 
   private submit() {
+    // @ts-ignore
     if (!this.state.org === 0) {
       this.setState({ messageType: 'danger', messageValue: 'Org must be specified' });
       return;
@@ -74,6 +76,7 @@ export class NewMTLS extends React.Component<NewMTLSProps, NewMTLSState> {
         id: 0,
         cert: this.state.cert,
         note: this.state.note,
+        // @ts-ignore
         org: this.state.org,
         created: '',
       })
@@ -88,19 +91,23 @@ export class NewMTLS extends React.Component<NewMTLSProps, NewMTLSState> {
 
   private hideAlert = () => this.setState({ messageType: undefined });
 
+  // @ts-ignore
   fileChange(e) {
-    let files = e.target.files;
-    let reader = new FileReader();
+    const files = e.target.files;
+    const reader = new FileReader();
     reader.readAsDataURL(files[0]);
     reader.onload = (e) => {
+      // @ts-ignore
       console.warn('data file', e.target.result);
+      // @ts-ignore
       this.setState({ cert: e.target.result });
     };
   }
 
   render() {
-    const noteChange = (s?: string) => this.setState({ note: s });
-    const orgChange = (s?: string) => this.setState({ org: s });
+    // @ts-ignore
+    const noteChange = (_event: any, s?: string) => this.setState({ note: s });
+    const orgChange = (_event: any, s?: string) => this.setState({ org: s });
 
     return (
       <>
@@ -108,14 +115,14 @@ export class NewMTLS extends React.Component<NewMTLSProps, NewMTLSState> {
           <Alert
             variant={this.state.messageType}
             title={this.state.messageValue}
-            action={<AlertActionCloseButton onClose={this.hideAlert} />}
+            actionClose={<AlertActionCloseButton onClose={this.hideAlert} />}
           />
         )}
         <br />
-        <Gallery gutter="sm">
+        <Gallery hasGutter>
           <GalleryItem>
             <FormGroup label="CertificateBrowser" isRequired={true} fieldId="cert-browser-form">
-              <input type="file" name="certificate file" onChange={(e) => this.fileChange(e)} />
+              <input id="cert-browser-form" type="file" name="certificate file" onChange={(e) => this.fileChange(e)} />
             </FormGroup>
           </GalleryItem>
           <br />
@@ -147,12 +154,10 @@ export class NewMTLS extends React.Component<NewMTLSProps, NewMTLSState> {
               </FormGroup>
             </GalleryItem>
           )}
-          <GalleryItem>
-            <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()}>
-              Add
-            </Button>
-          </GalleryItem>
         </Gallery>
+        <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()} style={{ marginTop: '1rem' }}>
+          Add
+        </Button>
       </>
     );
   }

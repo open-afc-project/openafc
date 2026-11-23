@@ -70,14 +70,33 @@ def dump_syms(outdir, debugdir, filepath, log):
         return
 
     (rec, opsys, arch, ident, name) = match.groups()
+    # Validate MODULE name/ident: reject path separators and parent refs,
+    # and confirm the resolved path stays under outdir before creating
+    # directories or writing.
+    for component in (name, ident):
+        if ('/' in component) or ('\\' in component) or ('..' in component):
+            log.error('Rejected unsafe MODULE field: "{0}"'.format(component))
+            return
     path = os.path.join(outdir, name, ident, name + '.sym')
+    real_outdir = os.path.realpath(outdir)
+    if os.path.commonpath([os.path.realpath(path), real_outdir]) != real_outdir:
+        log.error('Rejected symbol path escaping outdir: "{0}"'.format(path))
+        return
     parent = os.path.dirname(path)
     if not os.path.isdir(parent):
         os.makedirs(parent)
 
     log.info('Writing symbols for "{0}" from "{1}" to "{2}"'.format(
         name, filepath, path))
-    outfile = open(path, 'wb')
+    if os.path.exists(path):
+        log.error('Symbol file already exists; refusing to overwrite: "{0}"'.format(path))
+        return
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        outfile = os.fdopen(fd, 'wb')
+    except OSError as e:
+        log.error('Failed to create symbol file exclusively "{0}": {1}'.format(path, e))
+        return
     # Write re-named header line
     outfile.write(' '.join((rec, opsys, arch, ident, name)) + '\n')
 

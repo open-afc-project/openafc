@@ -1,0 +1,68 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+# Full transitive dependency tree with sha256 hashes (pip --require-hashes
+# needs a hash for every package that gets installed, not just direct pins).
+# Hash-pinned via (must match grafana/Dockerfile-grafana's base image glibc/
+# Python ABI, NOT Alpine/musl -- this image is Ubuntu-based):
+#   docker run --rm --user root --entrypoint bash
+#     -v "$(pwd)/grafana:/reqlock:ro"
+#     grafana/grafana:12.4.2-ubuntu -c
+#     "apt-get update -qq && apt-get -y install -qq python3-minimal python3-pip &&
+#      pip3 download -q --no-cache-dir --dest /p -r /reqlock/requirements-grafana.txt &&
+#      for f in /p/*.whl /p/*.tar.gz; do [ -f \"\$f\" ] || continue;
+#        n=\$(basename \"\$f\"); h=\$(sha256sum \"\$f\" | cut -d' ' -f1);
+#        printf '%s sha256:%s\n' \"\$n\" \"\$h\"; done"
+#
+
+annotated-types==0.8.0
+
+asttokens==3.0.2
+
+certifi==2026.7.22
+
+charset-normalizer==3.5.1
+
+colorama==0.4.6
+
+executing==2.2.1
+
+greenlet==3.5.5
+
+icecream==2.2.0
+
+idna==3.19
+
+jinja2==3.1.6
+
+markupsafe==3.0.3
+
+psycopg2-binary==2.9.12
+
+pydantic==2.13.5
+
+pydantic-core==2.48.0
+
+pydantic-settings==2.15.0
+
+pygments==2.21.0
+
+python-dotenv==1.2.3
+
+pyyaml==6.0.3
+
+requests==2.34.2
+
+SQLAlchemy==2.0.52
+
+tabulate==0.10.0
+
+typing-extensions==4.16.0
+
+typing-inspection==0.4.4
+
+urllib3==2.7.0
+

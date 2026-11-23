@@ -19,6 +19,20 @@ max_tab = 0
 
 def write_obj(name, size, tab, outfile):
     # print(("\t"*tab) + "{} {}".format(name, size))
+    # Entry framing is ('\t' * depth) + name + '\0' + int64 size, and the
+    # header's max_tab field is a single byte recording directory depth
+    # only. Linux filenames may legally contain TAB/NUL bytes; a name
+    # containing one of these framing bytes (a leading TAB inflates the
+    # aep.cpp consumer's depth count past max_tab) or a depth over 255
+    # would desync the parser and index its stack[] out of bounds, so
+    # refuse to emit such entries rather than writing them verbatim.
+    if "\t" in name or "\n" in name or "\0" in name:
+        raise ValueError(
+            "refusing filelist entry with framing byte (TAB/NL/NUL) "
+            "in name: {!r}".format(name))
+    if tab > 255:
+        raise ValueError(
+            "filelist depth {} exceeds 1-byte max_tab".format(tab))
     outfile.write(("\t" * tab).encode('utf-8'))
     if tab > 0:
         global max_tab
@@ -71,16 +85,22 @@ if __name__ == '__main__':
     if len(sys.argv) <= 2 or not os.path.isdir(sys.argv[1]):
         print("usage: {} static_data_path list_path".format(sys.argv[0]))
         sys.exit()
-    with open(sys.argv[2], "wb") as outfile:
+    # Write to a temp path and atomically publish only on success, so a
+    # run that dies mid-walk (e.g. write_obj ValueError on a framing byte
+    # in a filename) can never leave a truncated zero-header filelist at
+    # the destination consumed by aep_init().
+    tmp_path = sys.argv[2] + ".tmp"
+    with open(tmp_path, "wb") as outfile:
         outfile.write(noofdirs.to_bytes(4, byteorder="little", signed=False))
         outfile.write(nooffiles.to_bytes(4, byteorder="little", signed=False))
         outfile.write(max_tab.to_bytes(1, byteorder="little", signed=False))
         parse_dir(os.path.normpath(sys.argv[1]), -1, outfile)
-    with open(sys.argv[2], "r+b") as outfile:
+    with open(tmp_path, "r+b") as outfile:
         outfile.seek(0)
         outfile.write(noofdirs.to_bytes(4, byteorder="little", signed=False))
         outfile.write(nooffiles.to_bytes(4, byteorder="little", signed=False))
         outfile.write(max_tab.to_bytes(1, byteorder="little", signed=False))
+    os.replace(tmp_path, sys.argv[2])
 
     print("dirs {} files {} max tab {} max size {} max name length {}".format(
         noofdirs, nooffiles, max_tab, hex(max_size), max_name_len))

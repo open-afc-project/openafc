@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React from 'react';
 import {
   FormGroup,
   FormSelect,
@@ -24,6 +24,7 @@ export class ITMParametersForm extends React.PureComponent<{
   data: ITMParameters;
   onChange: (x: ITMParameters) => void;
 }> {
+  // @ts-ignore
   constructor(props) {
     super(props);
   }
@@ -61,7 +62,7 @@ export class ITMParametersForm extends React.PureComponent<{
     this.props.onChange(Object.assign(this.props.data, { polarization: s }));
 
   private setGroundType = (s: string) => {
-    let constants = this.lookUpConstants(s as GroundType);
+    const constants = this.lookUpConstants(s as GroundType);
     // @ts-ignore
     this.props.onChange(
       Object.assign(this.props.data, {
@@ -84,8 +85,8 @@ export class ITMParametersForm extends React.PureComponent<{
 
   render = () => (
     <>
-      <FormGroup label="ITM Parameters" fieldId="ITM-parameters-form">
-        {' '}
+      <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+        <legend>ITM Parameters</legend>{' '}
         <Tooltip
           position={TooltipPosition.top}
           enableFlip={true}
@@ -110,13 +111,13 @@ export class ITMParametersForm extends React.PureComponent<{
           <TextInput
             id="polarization-label"
             name="polarization-label"
-            isReadOnly={true}
+            readOnlyVariant="default"
             value="Polarization"
             style={{ textAlign: 'left', minWidth: '50%' }}
           />
           <FormSelect
             value={this.props.data.polarization}
-            onChange={(x) => this.setPolarization(x)}
+            onChange={(_event, x) => this.setPolarization(x)}
             id="polarization-drop"
             name="polarization-drop"
             style={{ textAlign: 'right' }}
@@ -129,13 +130,13 @@ export class ITMParametersForm extends React.PureComponent<{
           <TextInput
             id="ground-type-label"
             name="ground-type-label"
-            isReadOnly={true}
+            readOnlyVariant="default"
             value="Ground Type"
             style={{ textAlign: 'left', minWidth: '50%' }}
           />
           <FormSelect
             value={this.props.data.ground}
-            onChange={(x: string) => this.setGroundType(x)}
+            onChange={(_event: any, x: string) => this.setGroundType(x)}
             id="ground-type-drop"
             name="ground-type-drop"
             style={{ textAlign: 'right' }}
@@ -151,14 +152,14 @@ export class ITMParametersForm extends React.PureComponent<{
           <TextInput
             id="dielectric-label"
             name="dielectric-label"
-            isReadOnly={true}
+            readOnlyVariant="default"
             value="Dielectric Constant"
             style={{ textAlign: 'left', minWidth: '65%' }}
           />
           <TextInput
             id="dielectric-display"
             name="dielectric-display"
-            isReadOnly={true}
+            readOnlyVariant="default"
             value={this.props.data.dielectricConst}
             style={{ textAlign: 'right' }}
           />
@@ -167,14 +168,14 @@ export class ITMParametersForm extends React.PureComponent<{
           <TextInput
             id="conductivity-label"
             name="conductivity-label"
-            isReadOnly={true}
+            readOnlyVariant="default"
             value="Conductivity"
             style={{ textAlign: 'left', minWidth: '60%' }}
           />
           <TextInput
             id="conductivity-data"
             name="conductivity-data"
-            isReadOnly={true}
+            readOnlyVariant="default"
             value={this.props.data.conductivity}
             style={{ textAlign: 'right' }}
           />
@@ -184,17 +185,17 @@ export class ITMParametersForm extends React.PureComponent<{
           <TextInput
             id="min-spacing-label"
             name="min-spacing-label"
-            isReadOnly={true}
+            readOnlyVariant="default"
             value="Path Min Spacing"
             style={{ textAlign: 'left', minWidth: '55%' }}
           />
           <TextInput
             id="min-spacing-data"
             name="min-spacing-data"
-            onChange={(x: string) => this.setMinSpacing(x)}
+            onChange={(_event: any, x: string) => this.setMinSpacing(x)}
             step="any"
             type="number"
-            isValid={this.props.data.minSpacing >= 1 && this.props.data.minSpacing <= 30}
+            validated={this.props.data.minSpacing >= 1 && this.props.data.minSpacing <= 30 ? 'default' : 'error'}
             value={this.props.data.minSpacing}
             style={{ textAlign: 'right' }}
           />
@@ -204,22 +205,22 @@ export class ITMParametersForm extends React.PureComponent<{
           <TextInput
             id="max-points-label"
             name="max-points-label"
-            isReadOnly={true}
+            readOnlyVariant="default"
             value="Path Max Points"
             style={{ textAlign: 'left', minWidth: '55%' }}
           />
           <TextInput
             id="max-points-data"
             name="max-points-data"
-            onChange={(x: string) => this.setMaxPoints(x)}
+            onChange={(_event: any, x: string) => this.setMaxPoints(x)}
             step="any"
             type="number"
-            isValid={this.props.data.maxPoints >= 100 && this.props.data.maxPoints <= 10000}
+            validated={this.props.data.maxPoints >= 100 && this.props.data.maxPoints <= 10000 ? 'default' : 'error'}
             value={this.props.data.maxPoints}
             style={{ textAlign: 'right' }}
           />
         </InputGroup>
-      </FormGroup>
+      </fieldset>
     </>
   );
 }

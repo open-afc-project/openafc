@@ -21,8 +21,8 @@ import math
 import os
 import sqlalchemy as sa
 import sys
-from typing import Any, cast, Dict, Iterator, List, NamedTuple, NoReturn, \
-    Optional, Set, Tuple
+from typing import Any, cast, Dict, Iterator, List, Mapping, NamedTuple, \
+    NoReturn, Optional, Set, Tuple
 
 
 # START OF DATABASE SCHEMA-DEPENDENT STUFF
@@ -182,13 +182,13 @@ class HashFields:
                 self._field_infos.append(
                     self._FieldInfo(name=col.name, idx=idx))
 
-    def get_hash_fields(self, row: sa.engine.Row) -> Iterator[Tuple[str, Any]]:
+    def get_hash_fields(self, row: Mapping[str, Any]) -> Iterator[Tuple[str, Any]]:
         """ Iterator over fields of given row
 
         Yields (filed_name, field_value) tuples
         """
         for fi in self._field_infos:
-            yield (fi.name, row[fi.idx])
+            yield (fi.name, row[fi.name])
 
 
 class Beam(NamedTuple):
@@ -230,7 +230,9 @@ class FsPath:
     _path_hash  -- Path hash (hash of pertinent non-identification fields in
                    the path) if its computation was requested, None otherwise
     """
-    def __init__(self, fs_row: sa.engine.Row, conn: sa.engine.Connection,
+
+    def __init__(self, fs_row: Mapping[str, Any],
+                 conn: sa.engine.Connection,
                  pr_table: sa.Table, fs_hash_fields: HashFields,
                  pr_hash_fields: HashFields, compute_hash: bool = False,
                  compute_fields: bool = False, compute_beams: bool = False) \
@@ -269,7 +271,7 @@ class FsPath:
             sel = sa.select(pr_table).\
                 where(pr_table.c[PR_FSID_FIELD] == self.fsid).\
                 order_by(pr_table.c[PR_ORDER_FIELD])
-            for pr_row in conn.execute(sel):
+            for pr_row in conn.execute(sel).mappings():
                 pr: Optional[Dict[str, Any]] = {} if self._prs is not None \
                     else None
                 if self._prs is not None:
@@ -396,7 +398,8 @@ class Ras:
         Circle = "Circle"
         Horizon = "Horizon Distance"
 
-    def __init__(self, fs_row: sa.engine.Row, hash_fields: HashFields) -> None:
+    def __init__(self, fs_row: Mapping[str, Any],
+                 hash_fields: HashFields) -> None:
         """ Constructor
 
         Arguments:
@@ -523,21 +526,23 @@ class Db:
         """ Close connection """
         self.conn.close()
 
-    def all_fs_rows(self) -> Iterator[sa.engine.Row]:
+    def all_fs_rows(self) -> Iterator[Mapping[str, Any]]:
         """ Iterator that reads all FS Path rows """
         try:
-            yield from self.conn.execute(sa.select(self.fs_table)).fetchall()
+            yield from \
+                self.conn.execute(sa.select(self.fs_table)).mappings().fetchall()
         except sa.exc.SQLAlchemyError as ex:
             error(f"Error reading '{self.fs_table.name}' table from FS "
                   f"database '{self.filename}': {ex}")
 
-    def fs_row_by_fsid(self, fsid: int) -> sa.engine.Row:
+    def fs_row_by_fsid(self, fsid: int) -> Mapping[str, Any]:
         """ Fetch FS row by FSID """
         try:
             ret = \
                 self.conn.execute(
                     sa.select(self.fs_table).
-                    where(self.fs_table.c[FS_FSID_FIELD] == fsid)).first()
+                    where(self.fs_table.c[FS_FSID_FIELD] == fsid)
+                ).mappings().first()
             error_if(
                 ret is None,
                 f"Record with FSID of {fsid} not found in table "
@@ -548,12 +553,13 @@ class Db:
             error(f"Error reading '{self.fs_table.name}' table from FS "
                   f"database '{self.filename}': {ex}")
 
-    def all_ras_rows(self) -> Iterator[sa.engine.Row]:
+    def all_ras_rows(self) -> Iterator[Mapping[str, Any]]:
         """ Iterator that reads all RAS rows """
         if self.ras_table is None:
             return
         try:
-            yield from self.conn.execute(sa.select(self.ras_table)).fetchall()
+            yield from \
+                self.conn.execute(sa.select(self.ras_table)).mappings().fetchall()
         except sa.exc.SQLAlchemyError as ex:
             error(f"Error reading '{self.ras_table.name}' table from FS "
                   f"database '{self.filename}': {ex}")

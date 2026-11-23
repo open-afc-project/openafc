@@ -11,6 +11,8 @@ Provides wrappers for RATAPI file operations
 """
 
 import abc
+import hashlib
+import hmac
 import os
 import inspect
 import logging
@@ -19,6 +21,33 @@ from appcfg import ObjstConfig
 
 app_log = logging.getLogger(__name__)
 conf = ObjstConfig()
+
+
+def _derive_objst_bearer_token(key):
+    """ Purpose-bound objstore bearer token:
+    HMAC-SHA256(key, 'afc-objst-bearer-v1').
+
+    The raw provisioned secret must never transit the wire: it is also the
+    input of the RMQ response-signing key derivation
+    (rcache_models._derive_rmq_resp_hmac_key), so a bearer-header observer
+    on plaintext objstore HTTP traffic must not obtain material from which
+    that signing key can be recomputed.  Sending a per-purpose subkey means
+    neither wire value yields the other (or the raw secret).
+    """
+    return hmac.new(key.encode("utf-8"), b"afc-objst-bearer-v1",
+                    hashlib.sha256).hexdigest()
+
+
+def _get_objst_auth_headers():
+    """ Return Authorization bearer header if AFC_OBJST_API_KEY_FILE is set. """
+    key_file = os.environ.get("AFC_OBJST_API_KEY_FILE")
+    if key_file and os.path.isfile(key_file):
+        with open(key_file) as f:
+            key = f.read().strip()
+        if key:
+            return {"Authorization":
+                    f"Bearer {_derive_objst_bearer_token(key)}"}
+    return {}
 
 
 class DataInt:
@@ -33,7 +62,7 @@ class DataInt:
         pass
 
     @abc.abstractmethod
-    def read(self):
+    def read(self, max_bytes=None):
         pass
 
     @abc.abstractmethod
@@ -57,29 +86,78 @@ class DataIntHttp(DataInt):
     def write(self, data):
         """ write data to prot """
         app_log.debug("DataIntHttp.write({})".format(self._file_name))
-        r = requests.post(self._file_name, data=data)
+        r = requests.post(self._file_name, data=data,
+                          headers=_get_objst_auth_headers(), timeout=30)
         if not r.ok:
-            raise Exception("Cant post file")
+            raise RuntimeError("Cant post file")
 
-    def read(self):
-        """ read data from prot """
+    def read(self, max_bytes=None):
+        """ read data from prot
+
+        max_bytes, when set, rejects objects larger than that many bytes
+        BEFORE buffering them into memory (the object body is untrusted
+        input; see the dispatcher mTLS-bundle install path).
+        """
         app_log.debug("DataIntHttp.read({})".format(self._file_name))
-        r = requests.get(self._file_name, stream=True)
+        r = requests.get(self._file_name, stream=True,
+                         headers=_get_objst_auth_headers(), timeout=30)
         if r.ok:
             r.raw.decode_content = False
-            return r.raw.read()
+            if max_bytes is None:
+                return r.raw.read()
+            # Reject on the declared length first, then bound the actual
+            # streamed read (Content-Length may be absent or wrong).
+            content_length = r.headers.get("Content-Length")
+            if content_length is not None:
+                try:
+                    declared = int(content_length)
+                except ValueError:
+                    raise RuntimeError(
+                        "Object {} has malformed Content-Length".format(
+                            self._file_name))
+                if declared > max_bytes:
+                    raise RuntimeError(
+                        "Object {} exceeds size limit of {} bytes".format(
+                            self._file_name, max_bytes))
+            chunks = []
+            total = 0
+            while total <= max_bytes:
+                chunk = r.raw.read(65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                total += len(chunk)
+            if total > max_bytes:
+                raise RuntimeError(
+                    "Object {} exceeds size limit of {} bytes".format(
+                        self._file_name, max_bytes))
+            return b"".join(chunks)
+        if r.status_code == 404:
+            # Distinguish "object absent" from transport/server errors so
+            # callers (e.g. afctask.Task ownership preservation) can treat
+            # only genuine absence as benign and fail closed on the rest.
+            raise FileNotFoundError(
+                "Object {} not found".format(self._file_name))
         raise Exception("Cant get file")
 
     def head(self):
         """ is data exist in prot """
         app_log.debug("DataIntHttp.exists({})".format(self._file_name))
-        r = requests.head(self._file_name)
+        r = requests.head(self._file_name,
+                          headers=_get_objst_auth_headers(), timeout=30)
         return r.ok
 
     def delete(self):
         """ remove data from prot """
         app_log.debug("DataIntHttp.delete({})".format(self._file_name))
-        requests.delete(self._file_name)
+        r = requests.delete(self._file_name,
+                            headers=_get_objst_auth_headers(), timeout=30)
+        # A 404 means the object is already gone, which satisfies the
+        # caller's intent; any other non-2xx status (401/403/503/5xx)
+        # means the object may still exist and must fail loudly
+        # (mirrors write()'s error handling).
+        if not r.ok and r.status_code != 404:
+            raise RuntimeError("Cant delete file")
 
 
 class DataIfBaseV1():
@@ -107,7 +185,7 @@ class DataIfBaseV1():
         """ Call healthcheck """
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         app_log.debug("DataIfBaseV1.healthcheck()")
-        return requests.get(self._pref + '/healthy')
+        return requests.get(self._pref + '/healthy', timeout=30)
 
     @staticmethod
     def httpsProbe(host, port):
@@ -115,7 +193,7 @@ class DataIfBaseV1():
             raise Exception("Missing host:port")
         url = "https://" + host + ":" + str(port) + "/"
         try:
-            requests.head(url, timeout=self.HTTPS_TIMEOUT)
+            requests.head(url, timeout=DataIfBaseV1.HTTPS_TIMEOUT)
         except requests.exceptions.ConnectionError:  # fall to http
             app_log.debug("httpsProbe() fall to HTTP")
             return False

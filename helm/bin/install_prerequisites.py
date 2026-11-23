@@ -45,6 +45,7 @@ class InstallComponent:
     _component       -- Install component content as dictionary
     _cluster_context -- ClusterContext object
     """
+
     def __init__(self, cfg: Dict[str, Any], name: str,
                  cluster_context: ClusterContext) -> None:
         """ Constructor
@@ -134,6 +135,7 @@ class InstallHandler(abc.ABC):
     _cluster_context  -- ClusterContext object
     _namespace        -- None or namespace used in this item
     """
+
     def __init__(self, component: InstallComponent, is_new_namespace: bool,
                  cluster_context: ClusterContext) -> None:
         """ Constructor

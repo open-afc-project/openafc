@@ -1,5 +1,40 @@
 :root {
   --myApp-global--spacer--md: 30px;
+  /* ~half of PatternFly md gap between action buttons */
+  --afc-button-group-gap: calc(var(--pf-t--global--spacer--md, 1rem) / 2);
+}
+
+/*
+ * PatternFly ActionGroup lays out .pf-v6-c-form__actions children with per-item margins.
+ * That yields uneven gaps. Use flex + gap on the actions container and clear child margins.
+ */
+.afc-button-group .pf-v6-c-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--afc-button-group-gap);
+  margin: 0;
+}
+
+.afc-button-group .pf-v6-c-form__actions > * {
+  margin: 0 !important;
+}
+
+/* Plain flex rows (no ActionGroup): Mobile AP timeline, RatAfc map toolbar, etc. */
+.afc-button-group--row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--afc-button-group-gap);
+}
+
+.afc-button-group--after-form {
+  margin-top: var(--pf-t--global--spacer--sm, 0.5rem);
+}
+
+/* PatternFly checkboxes: a bit more space between the box and label in dense forms */
+.pf-v6-c-check:not(.pf-m-standalone) {
+  column-gap: var(--pf-t--global--spacer--sm, 0.5rem);
 }
 
 html,
@@ -9,11 +44,16 @@ body,
 }
 
 pre {
-  white-space: pre-wrap; /* Since CSS 2.1 */
-  white-space: -moz-pre-wrap; /* Mozilla, since 1999 */
-  white-space: -pre-wrap; /* Opera 4-6 */
-  white-space: -o-pre-wrap; /* Opera 7 */
-  word-wrap: break-word; /* Internet Explorer 5.5+ */
+  white-space: pre-wrap;
+  /* Since CSS 2.1 */
+  white-space: -moz-pre-wrap;
+  /* Mozilla, since 1999 */
+  white-space: -pre-wrap;
+  /* Opera 4-6 */
+  white-space: -o-pre-wrap;
+  /* Opera 7 */
+  word-wrap: break-word;
+  /* Internet Explorer 5.5+ */
 }
 
 .app-container {
@@ -27,12 +67,12 @@ pre {
   flex: 0 1 auto;
 }
 
-.pf-c-page__main {
-  background: #ededed;
+.pf-c-page__main,
+.pf-v6-c-page__main {
+  background: var(--pf-t--global--background--color--secondary--default, #ededed);
 }
 
 #nav-list-simple {
-  height: 85hv;
 }
 
 #nav-footer {
@@ -53,7 +93,7 @@ pre {
   width: 100%;
   height: 15px;
   border-radius: 5px;
-  background: #d3d3d3;
+  background: var(--pf-t--global--background--color--secondary--default, #d3d3d3);
   outline: none;
   opacity: 0.7;
   -webkit-transition: 0.2s;
@@ -78,18 +118,13 @@ pre {
   cursor: pointer;
 }
 
-#horizontal-form-certification-nra {
-  max-width: 50%;
-  display: inline;
-}
-
+/* IDs used for name/id attributes only; no width constraints needed */
+#horizontal-form-certification-nra,
 #horizontal-form-certification-list {
-  max-width: 50%;
-  display: inline;
 }
 
 .nestedGallery {
-  border: 1px solid darkgray;
+  border: 1px solid var(--pf-t--global--border--color--default, darkgray);
 }
 
 .inquiredChannelsSection {
@@ -118,19 +153,346 @@ pre {
 }
 
 .custom-tooltip {
-  background-color: white;
+  background-color: var(--pf-t--global--background--color--primary--default, white);
 }
 
 #aboutAccordion {
-  --pf-global--Color--100: white;
-  --pf-global--BackgroundColor--100: black;
-  --pf-c-accordion--BackgroundColor: black;
-  --pf-c-accordion__toggle--hover--BackgroundColor: darkgrey;
-  --pf-c-accordion__toggle--focus--BackgroundColor: darkgrey;
-  --pf-c-accordion__toggle--active--BackgroundColor: darkgrey;
-  --pf-c-accordion__expanded-content--Color: white;
+  --pf-v6-c-accordion--BackgroundColor: var(--pf-t--global--background--color--primary--default);
+  --pf-v6-c-accordion__toggle--hover--BackgroundColor: var(--pf-t--global--background--color--secondary--hover);
+  --pf-v6-c-accordion__toggle--focus--BackgroundColor: var(--pf-t--global--background--color--secondary--hover);
+  --pf-v6-c-accordion__toggle--active--BackgroundColor: var(--pf-t--global--background--color--secondary--hover);
+  --pf-v6-c-accordion__toggle--Color: var(--pf-t--global--text--color--regular);
+  --pf-v6-c-accordion__expanded-content-body--Color: var(--pf-t--global--text--color--regular);
 }
 
 #parametersList {
   font-size: large;
+}
+
+/* Global link underlines: no underline by default, solid underline on hover */
+a,
+.pf-v6-c-nav__link,
+.pf-v6-c-button.pf-m-link {
+  text-decoration: none !important;
+}
+
+a:hover,
+.pf-v6-c-nav__link:hover,
+.pf-v6-c-button.pf-m-link:hover {
+  text-decoration: underline !important;
+  text-decoration-style: solid !important;
+}
+
+/* Masthead brand alignment */
+.pf-v6-c-masthead__main {
+  align-items: center !important;
+}
+
+.pf-v6-c-masthead__brand {
+  align-self: center !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.pf-v6-c-masthead__logo {
+  display: flex !important;
+  align-items: center !important;
+  line-height: normal !important;
+  text-decoration: none !important;
+}
+
+.pf-v6-c-masthead__logo:hover {
+  text-decoration: underline !important;
+  text-decoration-style: solid !important;
+}
+
+/* Ensure toolbar content row is also vertically centered */
+.pf-v6-c-masthead__content {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* PF6 toolbar__content-section defaults to align-items:start; override to center
+   so that text NavLinks and icon Buttons all align to the same vertical midpoint */
+.pf-v6-c-masthead .pf-v6-c-toolbar__content-section {
+  align-items: center !important;
+}
+
+/* PF6 form-control uses display:grid. Chrome does not auto-stretch replaced
+   elements (<input>, <select>) to fill the grid cell even with grid-column:1/-1.
+   Explicitly set width:100% on the inner elements so they fill the container. */
+.pf-v6-c-form-control > input,
+.pf-v6-c-form-control > select {
+  width: 100%;
+}
+
+/* Custom AboutModal styling to match PatternFly 4 look */
+.pf-v6-c-modal-box:has(.custom-about-modal) {
+  --pf-v6-c-modal-box--m-lg--lg--MaxWidth: 77rem;
+  /* Restore original PF4 1232px width */
+}
+
+.custom-about-modal {
+  /* 1fr .6fr means left side is 62.5%, right side is 37.5% */
+  --pf-v6-c-about-modal-box--lg--GridTemplateColumns: 1fr 0.6fr !important;
+
+  /* Mask the left 62.5% with the solid background color, let the image show on the right 37.5% */
+  background-image:
+    linear-gradient(to right, var(--pf-v6-c-about-modal-box--BackgroundColor) 62.5%, transparent 62.5%),
+    var(--pf-v6-c-about-modal-box--BackgroundImage) !important;
+  background-size:
+    100% 100%,
+    auto 100% !important;
+  background-position:
+    left top,
+    right top !important;
+  background-repeat: no-repeat, no-repeat !important;
+
+  max-height: calc(100% - 2rem);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure the content area can scroll when items are expanded */
+.custom-about-modal > .pf-v6-c-about-modal-box__content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.custom-about-modal .pf-v6-c-about-modal-box__close .pf-v6-c-button.pf-m-plain {
+  background-color: var(--pf-v6-c-about-modal-box--BackgroundColor) !important;
+  border-radius: 50% !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  max-width: 24px !important;
+  max-height: 24px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+.custom-about-modal .pf-v6-c-description-list {
+  --pf-v6-c-description-list--m-horizontal__term--width: 8ch;
+  --pf-v6-c-description-list--m-horizontal__description--width: auto;
+  white-space: nowrap;
+}
+
+.custom-about-modal .pf-v6-c-about-modal-box__close .pf-v6-c-button.pf-m-plain svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.pf-v6-c-nav__item .pf-v6-c-divider {
+  margin: 0 !important;
+  width: 100% !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* OneTrust Cookie Settings - PatternFly Theme Integration            */
+/* ------------------------------------------------------------------ */
+#onetrust-pc-sdk,
+#onetrust-banner-sdk {
+  font-family: var(
+    --pf-t--global--font--family--body,
+    'Red Hat Text',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif
+  ) !important;
+  border-radius: 6px !important;
+}
+
+#onetrust-pc-sdk h2,
+#onetrust-pc-sdk h3,
+#onetrust-pc-sdk h4,
+#onetrust-pc-sdk h5,
+#onetrust-pc-sdk p,
+#onetrust-pc-sdk span,
+#onetrust-pc-sdk button,
+#onetrust-pc-sdk a,
+#onetrust-banner-sdk * {
+  font-family: inherit !important;
+}
+
+/* Light Theme Styling */
+#onetrust-pc-sdk {
+  border: 1px solid var(--pf-t--global--border--color--default, #e0e0e0) !important;
+}
+
+#onetrust-pc-sdk .ot-active-menu.category-menu-switch-handler {
+  border-left: 3px solid var(--pf-t--global--border--color--brand--default, #0066cc) !important;
+}
+
+#onetrust-pc-sdk #accept-recommended-btn-handler,
+#onetrust-pc-sdk .save-preference-btn-handler {
+  background-color: var(--pf-t--global--color--brand--200, #0066cc) !important;
+  border: 1px solid var(--pf-t--global--color--brand--200, #0066cc) !important;
+  border-radius: 4px !important;
+}
+
+#onetrust-pc-sdk #accept-recommended-btn-handler:hover,
+#onetrust-pc-sdk .save-preference-btn-handler:hover {
+  background-color: #004d99 !important;
+  border-color: #004d99 !important;
+}
+
+#onetrust-pc-sdk .ot-pc-refuse-all-handler {
+  border-radius: 4px !important;
+}
+
+/* Dark Theme Overrides (.pf-v6-theme-dark) */
+.pf-v6-theme-dark #onetrust-pc-sdk,
+.pf-v6-theme-dark #onetrust-banner-sdk {
+  background-color: var(--pf-t--global--background--color--secondary--default, #1f2227) !important;
+  color: var(--pf-t--global--text--color--regular, #ffffff) !important;
+  border: 1px solid var(--pf-t--global--border--color--default, #383b40) !important;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.6) !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-pc-header {
+  background-color: var(--pf-t--global--background--color--secondary--default, #1f2227) !important;
+  border-bottom: 1px solid var(--pf-t--global--border--color--default, #383b40) !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk #ot-pc-title,
+.pf-v6-theme-dark #onetrust-pc-sdk #ot-pc-title-mobile,
+.pf-v6-theme-dark #onetrust-pc-sdk h2,
+.pf-v6-theme-dark #onetrust-pc-sdk h3,
+.pf-v6-theme-dark #onetrust-pc-sdk h4,
+.pf-v6-theme-dark #onetrust-pc-sdk h5,
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-cat-header,
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-label-status {
+  color: var(--pf-t--global--text--color--regular, #ffffff) !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk #close-pc-btn-handler,
+.pf-v6-theme-dark #onetrust-banner-sdk .onetrust-close-btn-handler {
+  filter: brightness(0) invert(1) !important;
+  opacity: 0.8 !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk #close-pc-btn-handler:hover,
+.pf-v6-theme-dark #onetrust-banner-sdk .onetrust-close-btn-handler:hover {
+  opacity: 1 !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-pc-logo {
+  background: rgba(255, 255, 255, 0.95) !important;
+  padding: 4px 10px !important;
+  border-radius: 4px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-sdk-four.ot-tab-list {
+  background-color: var(--pf-t--global--background--color--primary--default, #151515) !important;
+  border-right: 1px solid var(--pf-t--global--border--color--default, #383b40) !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .category-menu-switch-handler {
+  background-color: var(--pf-t--global--background--color--primary--default, #151515) !important;
+  color: var(--pf-t--global--text--color--subtle, #c7c7c7) !important;
+  border-bottom: 1px solid var(--pf-t--global--border--color--default, #292929) !important;
+  border-left: 3px solid transparent !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .category-menu-switch-handler:hover {
+  background-color: #25282d !important;
+  color: #ffffff !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-active-menu.category-menu-switch-handler {
+  background-color: var(--pf-t--global--background--color--secondary--default, #1f2227) !important;
+  color: #ffffff !important;
+  border-left: 3px solid var(--pf-t--global--border--color--brand--default, #0066cc) !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-desc-cntr,
+.pf-v6-theme-dark #onetrust-pc-sdk #ot-tab-desc,
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-tab-desc,
+.pf-v6-theme-dark #onetrust-pc-sdk #ot-pc-content {
+  background-color: var(--pf-t--global--background--color--secondary--default, #1f2227) !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk #ot-pc-desc,
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-grp-desc,
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-subgrp-desc,
+.pf-v6-theme-dark #onetrust-pc-sdk p {
+  color: var(--pf-t--global--text--color--subtle, #c7c7c7) !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk a,
+.pf-v6-theme-dark #onetrust-pc-sdk .privacy-notice-link,
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-link-btn,
+.pf-v6-theme-dark #onetrust-banner-sdk a {
+  color: #58a6ff !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-always-active-group .ot-always-active {
+  color: #3fb950 !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-pc-footer,
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-pc-footer-logo {
+  background-color: var(--pf-t--global--background--color--secondary--default, #1f2227) !important;
+  border-top: 1px solid var(--pf-t--global--border--color--default, #383b40) !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk #accept-recommended-btn-handler,
+.pf-v6-theme-dark #onetrust-pc-sdk .save-preference-btn-handler,
+.pf-v6-theme-dark #onetrust-banner-sdk #onetrust-accept-btn-handler {
+  background-color: var(--pf-t--global--color--brand--200, #0066cc) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--pf-t--global--color--brand--200, #0066cc) !important;
+  border-radius: 4px !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk #accept-recommended-btn-handler:hover,
+.pf-v6-theme-dark #onetrust-pc-sdk .save-preference-btn-handler:hover,
+.pf-v6-theme-dark #onetrust-banner-sdk #onetrust-accept-btn-handler:hover {
+  background-color: #004d99 !important;
+  border-color: #004d99 !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-pc-refuse-all-handler,
+.pf-v6-theme-dark #onetrust-banner-sdk #onetrust-reject-all-handler {
+  background-color: transparent !important;
+  color: #58a6ff !important;
+  border: 1px solid #383b40 !important;
+  border-radius: 4px !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-pc-refuse-all-handler:hover,
+.pf-v6-theme-dark #onetrust-banner-sdk #onetrust-reject-all-handler:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: #58a6ff !important;
+}
+
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-pc-footer-logo img,
+.pf-v6-theme-dark #onetrust-pc-sdk .powered-by-logo,
+.pf-v6-theme-dark #onetrust-pc-sdk .ot-pc-footer-logo svg {
+  filter: brightness(0) invert(1) !important;
+  opacity: 0.6 !important;
+}
+
+.pf-v6-theme-dark #ot-sdk-btn-floating .ot-floating-button__back {
+  background-color: #1f2227 !important;
+  border: 1px solid #383b40 !important;
+  border-radius: 50% !important;
+}
+
+.pf-v6-theme-dark #ot-sdk-btn-floating .ot-floating-button__close {
+  background: transparent !important;
+  border: none !important;
+}
+
+.pf-v6-theme-dark #ot-sdk-btn-floating .ot-floating-button__svg-fill polygon {
+  fill: #ffffff !important;
 }

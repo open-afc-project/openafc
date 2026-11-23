@@ -34,6 +34,8 @@ use strict;
 use threads;
 use threads::shared;
 use IO::Handle;
+use File::Temp qw(tempfile);
+use File::Spec;
 
 my $pi = 2*atan2(1.0, 0.0);
 my $earthRadius = 6378.137e3;
@@ -547,6 +549,12 @@ sub processCity
         my $filename;
         foreach $filename (@filelist) {
             if (-d "${topDir}/${dir}/$filename") {
+                # Dataset directory names are later interpolated unquoted into
+                # shell commands (backticks / execute_command): reject anything
+                # outside a safe character set.
+                if ($filename !~ /^[A-Za-z0-9._-]+$/) {
+                    die "ERROR: Unsafe subdirectory name in dataset: ${dir}/${filename}\n";
+                }
                 push @dirlist, "$dir/$filename";
             }
         }
@@ -582,6 +590,14 @@ sub processCity
         opendir DIR, $srcBEDir;
         my @srcBElist = grep /\.(img|tif)$/, readdir DIR;
         closedir DIR;
+        # Dataset filenames are later interpolated unquoted into shell
+        # commands (backticks / execute_command): reject anything outside a
+        # safe character set.
+        foreach my $srcBEName (@srcBElist) {
+            if ($srcBEName !~ /^[A-Za-z0-9._-]+$/) {
+                die "ERROR: Unsafe filename in dataset: ${srcBEDir}/${srcBEName}\n";
+            }
+        }
         #########################################################################
 
         #########################################################################
@@ -708,6 +724,14 @@ sub processCity
             opendir DIR, $srcBldgDir;
             @srcBldglist = grep /\.shp$/, readdir DIR;
             closedir DIR;
+            # Dataset filenames are later interpolated unquoted into shell
+            # commands (backticks / execute_command): reject anything outside
+            # a safe character set.
+            foreach my $srcBldgName (@srcBldglist) {
+                if ($srcBldgName !~ /^[A-Za-z0-9._-]+$/) {
+                    die "ERROR: Unsafe filename in dataset: ${srcBldgDir}/${srcBldgName}\n";
+                }
+            }
         }
         #########################################################################
 
@@ -840,6 +864,14 @@ sub processCity
             opendir DIR, $srcBldg2Dir;
             @srcBldg2list = grep /\.shp$/, readdir DIR;
             closedir DIR;
+            # Dataset filenames are later interpolated unquoted into shell
+            # commands (backticks / execute_command): reject anything outside
+            # a safe character set.
+            foreach my $srcBldg2Name (@srcBldg2list) {
+                if ($srcBldg2Name !~ /^[A-Za-z0-9._-]+$/) {
+                    die "ERROR: Unsafe filename in dataset: ${srcBldg2Dir}/${srcBldg2Name}\n";
+                }
+            }
         }
         #########################################################################
 
@@ -1723,7 +1755,7 @@ sub fixRaster
     my $p = $_[4];
     my $cityName = $_[5];
 
-    my $templFile = "/tmp/templ_proc_gdal_${cityName}_$$.txt";
+    my ($templFh, $templFile) = tempfile("templ_proc_gdal_${cityName}_XXXXXX", DIR => File::Spec->tmpdir, SUFFIX => ".txt", UNLINK => 1);
 
     my $s = "";
     my $paramIdx = 0;
@@ -1760,14 +1792,13 @@ sub fixRaster
 
     my $numParam = $paramIdx;
 
-    open(FILE, ">$templFile") || die "Can't open file $templFile : $!\n";
-    print FILE "# proc_gdal TEMPLATE FILE\n";
-    print FILE "FORMAT: 1_0\n";
-    print FILE "\n";
-    print FILE "NUM_PARAM: ${numParam}\n";
-    print FILE "\n";
-    print FILE "$s";
-    close FILE;
+    print $templFh "# proc_gdal TEMPLATE FILE\n";
+    print $templFh "FORMAT: 1_0\n";
+    print $templFh "\n";
+    print $templFh "NUM_PARAM: ${numParam}\n";
+    print $templFh "\n";
+    print $templFh "$s";
+    close $templFh;
 
     my $resp = `./proc_gdal -templ $templFile 2>&1`;
 
@@ -1787,7 +1818,7 @@ sub fixVector
     my $tmpImageFile = $_[4];
     my $cityName = $_[5];
 
-    my $templFile = "/tmp/templ_proc_gdal_${cityName}_$$.txt";
+    my ($templFh, $templFile) = tempfile("templ_proc_gdal_${cityName}_XXXXXX", DIR => File::Spec->tmpdir, SUFFIX => ".txt", UNLINK => 1);
 
     my $s = "";
     my $paramIdx = 0;
@@ -1818,14 +1849,13 @@ sub fixVector
 
     my $numParam = $paramIdx;
 
-    open(FILE, ">$templFile") || die "Can't open file $templFile : $!\n";
-    print FILE "# proc_gdal TEMPLATE FILE\n";
-    print FILE "FORMAT: 1_0\n";
-    print FILE "\n";
-    print FILE "NUM_PARAM: ${numParam}\n";
-    print FILE "\n";
-    print FILE "$s";
-    close FILE;
+    print $templFh "# proc_gdal TEMPLATE FILE\n";
+    print $templFh "FORMAT: 1_0\n";
+    print $templFh "\n";
+    print $templFh "NUM_PARAM: ${numParam}\n";
+    print $templFh "\n";
+    print $templFh "$s";
+    close $templFh;
 
     my $resp = `./proc_gdal -templ $templFile 2>&1`;
 
@@ -1842,7 +1872,7 @@ sub vectorCvg
     my $imageFile = $_[1];
     my $tmpImageFile = $_[2];
 
-    my $templFile = "/tmp/templ_proc_gdal_$$.txt";
+    my ($templFh, $templFile) = tempfile("templ_proc_gdal_XXXXXX", DIR => File::Spec->tmpdir, SUFFIX => ".txt", UNLINK => 1);
 
     my $s = "";
     my $paramIdx = 0;
@@ -1864,14 +1894,13 @@ sub vectorCvg
 
     my $numParam = $paramIdx;
 
-    open(FILE, ">$templFile") || die "Can't open file $templFile : $!\n";
-    print FILE "# proc_gdal TEMPLATE FILE\n";
-    print FILE "FORMAT: 1_0\n";
-    print FILE "\n";
-    print FILE "NUM_PARAM: ${numParam}\n";
-    print FILE "\n";
-    print FILE "$s";
-    close FILE;
+    print $templFh "# proc_gdal TEMPLATE FILE\n";
+    print $templFh "FORMAT: 1_0\n";
+    print $templFh "\n";
+    print $templFh "NUM_PARAM: ${numParam}\n";
+    print $templFh "\n";
+    print $templFh "$s";
+    close $templFh;
 
     my $resp = `./proc_gdal -templ $templFile`;
     print $resp;

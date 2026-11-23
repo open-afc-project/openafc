@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM grafana/loki:3.3.2
+FROM grafana/loki:3.6.10@sha256:f59e6aedfee6af2388d69962b178a35a23152573b4bf0937106746deb7146ec7
 
 # Directory where Loki stores chunks, indices, etc. if filesystem store is used
 ENV GRAFANA_LOKI_DATA_FILESYSTEM_DIRECTORY=/loki
@@ -17,4 +17,4 @@ WORKDIR /wd
 
 COPY loki-config.yaml /wd/
 
-ENTRYPOINT loki -config.file=/wd/loki-config.yaml  -config.expand-env
+ENTRYPOINT ["loki", "-config.file=/wd/loki-config.yaml", "-config.expand-env"]
